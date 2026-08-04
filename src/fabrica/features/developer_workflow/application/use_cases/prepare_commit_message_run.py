@@ -1,10 +1,12 @@
 """Use case for preparing a selected-skill commit-message runtime run."""
 
 from fabrica.features.agent_runtime.application.dtos import (
+    LocalAgentContextBlock,
     LocalAgentRunCommand,
     SelectedSkill,
 )
 from fabrica.features.agent_runtime.application.use_cases.load_skill_context import LoadSkillContext
+from fabrica.features.developer_workflow.application.dtos import STAGED_DIFF_CONTEXT_LABEL, GitStagedDiff
 from fabrica.features.developer_workflow.application.ports import GitStagedDiffLoader
 
 DEFAULT_COMMIT_MESSAGE_SKILL_ID = "conventional-commits"
@@ -54,6 +56,19 @@ class PrepareCommitMessageRun:
         staged_diff = self._staged_changes_loader.load_diff()
         command = LocalAgentRunCommand(
             prompt=COMMIT_MESSAGE_PROMPT,
-            context=(staged_diff.to_context_block(),),
+            context=(_staged_diff_context_block(staged_diff),),
         )
         return self._skill_context_loader.augment_command(command, (SelectedSkill(skill_id=skill_id),))
+
+
+def _staged_diff_context_block(staged_diff: GitStagedDiff) -> LocalAgentContextBlock:
+    """Map staged git diff evidence into local-agent runtime context."""
+    return LocalAgentContextBlock(
+        text=staged_diff.text,
+        label=STAGED_DIFF_CONTEXT_LABEL,
+        metadata={
+            "source": "git_staged_diff",
+            "char_count": len(staged_diff.text),
+            **staged_diff.metadata,
+        },
+    )

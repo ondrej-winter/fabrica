@@ -6,14 +6,9 @@ from enum import StrEnum
 from pathlib import PurePosixPath
 from types import MappingProxyType
 
-from fabrica.features.agent_runtime.application.dtos.runtime import (
-    MAX_CONTEXT_TEXT_CHARS,
-    LocalAgentContextBlock,
-    SafeRuntimeMetadataValue,
-)
-
-DEFAULT_MAX_STAGED_DIFF_CHARS = MAX_CONTEXT_TEXT_CHARS
+DEFAULT_MAX_STAGED_DIFF_CHARS = 500_000
 STAGED_DIFF_CONTEXT_LABEL = "Git staged diff"
+SafeGitStagedChangesMetadataValue = str | int | float | bool | None
 
 
 class GitStagedFileStatus(StrEnum):
@@ -80,8 +75,8 @@ class GitStagedDiffBounds:
         if self.max_chars < 1:
             msg = "max_chars must be at least 1"
             raise ValueError(msg)
-        if self.max_chars > MAX_CONTEXT_TEXT_CHARS:
-            msg = "max_chars exceeds the local runtime context block bound"
+        if self.max_chars > DEFAULT_MAX_STAGED_DIFF_CHARS:
+            msg = "max_chars exceeds the staged git diff bound"
             raise ValueError(msg)
 
 
@@ -91,7 +86,7 @@ class GitStagedDiff:
 
     text: str
     bounds: GitStagedDiffBounds = field(default_factory=GitStagedDiffBounds)
-    metadata: Mapping[str, SafeRuntimeMetadataValue] = field(default_factory=dict)
+    metadata: Mapping[str, SafeGitStagedChangesMetadataValue] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.text.strip():
@@ -101,18 +96,6 @@ class GitStagedDiff:
             msg = "staged git diff exceeds the configured bound"
             raise ValueError(msg)
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
-
-    def to_context_block(self) -> LocalAgentContextBlock:
-        """Return the staged diff as a bounded local runtime context block."""
-        return LocalAgentContextBlock(
-            text=self.text,
-            label=STAGED_DIFF_CONTEXT_LABEL,
-            metadata={
-                "source": "git_staged_diff",
-                "char_count": len(self.text),
-                **self.metadata,
-            },
-        )
 
 
 def _validate_safe_relative_path(path: str) -> str:

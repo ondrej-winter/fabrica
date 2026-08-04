@@ -9,6 +9,7 @@ from fabrica.features.developer_workflow.application.dtos.git_staged_changes imp
     GitStagedFile,
     GitStagedFileList,
     GitStagedFileStatus,
+    SafeGitStagedChangesMetadataValue,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "GitStagedFile",
     "GitStagedFileList",
     "GitStagedFileStatus",
+    "SafeGitStagedChangesMetadataValue",
 ]

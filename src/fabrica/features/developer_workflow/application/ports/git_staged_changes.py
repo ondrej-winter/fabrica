@@ -3,11 +3,11 @@
 from collections.abc import Mapping
 from typing import Protocol
 
-from fabrica.features.agent_runtime.application.dtos import SafeRuntimeMetadataValue
 from fabrica.features.developer_workflow.application.dtos import (
     GitStagedChangesFailureCategory,
     GitStagedDiff,
     GitStagedFileList,
+    SafeGitStagedChangesMetadataValue,
 )
 
 
@@ -19,7 +19,7 @@ class GitStagedChangesLoadError(Exception):
         message: str,
         *,
         category: GitStagedChangesFailureCategory,
-        metadata: Mapping[str, SafeRuntimeMetadataValue] | None = None,
+        metadata: Mapping[str, SafeGitStagedChangesMetadataValue] | None = None,
     ) -> None:
         super().__init__(message)
         self.category = category

@@ -4,9 +4,8 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from fabrica.features.agent_runtime.application.dtos import LocalAgentContextBlock
-from fabrica.features.agent_runtime.application.dtos.runtime import MAX_CONTEXT_TEXT_CHARS
 from fabrica.features.developer_workflow.application.dtos import (
+    DEFAULT_MAX_STAGED_DIFF_CHARS,
     GitStagedDiff,
     GitStagedDiffBounds,
     GitStagedFile,
@@ -15,14 +14,11 @@ from fabrica.features.developer_workflow.application.dtos import (
 )
 
 
-def test_staged_diff_converts_to_safe_runtime_context_block() -> None:
+def test_staged_diff_preserves_bounded_text_and_safe_metadata() -> None:
     diff = GitStagedDiff(text="diff --git a/file.py b/file.py\n+print('hi')\n", metadata={"file_count": 1})
 
-    assert diff.to_context_block() == LocalAgentContextBlock(
-        text="diff --git a/file.py b/file.py\n+print('hi')\n",
-        label="Git staged diff",
-        metadata={"source": "git_staged_diff", "char_count": 44, "file_count": 1},
-    )
+    assert diff.text == "diff --git a/file.py b/file.py\n+print('hi')\n"
+    assert diff.metadata == {"file_count": 1}
 
 
 def test_staged_diff_rejects_empty_and_oversized_text() -> None:
@@ -33,12 +29,12 @@ def test_staged_diff_rejects_empty_and_oversized_text() -> None:
         GitStagedDiff(text="abcd", bounds=GitStagedDiffBounds(max_chars=3))
 
 
-def test_staged_diff_bounds_respect_runtime_context_limit() -> None:
+def test_staged_diff_bounds_respect_staged_diff_limit() -> None:
     with pytest.raises(ValueError, match="at least 1"):
         GitStagedDiffBounds(max_chars=0)
 
-    with pytest.raises(ValueError, match="runtime context block bound"):
-        GitStagedDiffBounds(max_chars=MAX_CONTEXT_TEXT_CHARS + 1)
+    with pytest.raises(ValueError, match="staged git diff bound"):
+        GitStagedDiffBounds(max_chars=DEFAULT_MAX_STAGED_DIFF_CHARS + 1)
 
 
 def test_staged_diff_is_immutable_boundary_value() -> None:
