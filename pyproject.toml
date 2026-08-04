@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fabrica"
-version = "0.1.0"
+version = "0.0.1"
 description = "Local Python runtime for subscription-backed agent experiments."
 readme = "README.md"
 requires-python = ">=3.13"
