@@ -44,7 +44,3 @@ class GitStagedChangesLoader(GitStagedDiffLoader, Protocol):
     def load_file_diff(self, path: str) -> GitStagedDiff:
         """Load currently staged git diff text for one safe relative path."""
         ...
-
-    def load(self) -> GitStagedDiff:
-        """Load currently staged git diff text using the legacy local method name."""
-        ...

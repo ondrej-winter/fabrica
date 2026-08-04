@@ -1,0 +1,13 @@
+"""Safe adapter-local error messages for staged git loading failures."""
+
+DECODE_ERROR_MESSAGE = "git staged diff output could not be decoded as UTF-8"
+GIT_FAILED_MESSAGE = "git staged diff failed"
+GIT_START_FAILED_MESSAGE = "git staged diff failed to start"
+GIT_TIMED_OUT_MESSAGE = "git staged diff timed out"
+GIT_UNAVAILABLE_MESSAGE = "git executable is unavailable"
+NO_STAGED_CHANGES_MESSAGE = "no staged git changes were found"
+NOT_REPOSITORY_MESSAGE = "current directory is not inside a git repository"
+OVERSIZED_DIFF_MESSAGE = "staged git diff exceeds the configured bound"
+UNSTAGED_FILE_PATH_MESSAGE = "requested staged file path is not currently staged"
+UNSAFE_FILE_PATH_MESSAGE = "requested staged file path is not safe"
+UNSUPPORTED_NAME_STATUS_MESSAGE = "git staged file list output is not supported"

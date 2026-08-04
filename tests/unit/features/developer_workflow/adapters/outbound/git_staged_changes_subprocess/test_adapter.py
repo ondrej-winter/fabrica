@@ -44,7 +44,7 @@ def test_adapter_invokes_read_only_staged_diff_command() -> None:
         working_directory=Path("repo"),
         timeout_seconds=2.5,
         runner=runner,
-    ).load()
+    ).load_diff()
 
     assert diff.text == "diff --git a/file.py b/file.py\n"
     assert runner.calls == [(("git", "--no-pager", "diff", "--staged"), Path("repo"), 2.5)]
@@ -200,7 +200,7 @@ def test_adapter_maps_git_result_failures(result: GitCommandResult, category: Gi
         GitStagedChangesSubprocessLoader(
             bounds=GitStagedDiffBounds(max_chars=5),
             runner=FakeGitRunner(result=result),
-        ).load()
+        ).load_diff()
 
     assert exc_info.value.category is category
     assert exc_info.value.metadata["category"] == category.value
@@ -219,7 +219,7 @@ def test_adapter_maps_git_result_failures(result: GitCommandResult, category: Gi
 )
 def test_adapter_maps_subprocess_failures(error: BaseException, category: GitStagedChangesFailureCategory) -> None:
     with pytest.raises(GitStagedChangesLoadError) as exc_info:
-        GitStagedChangesSubprocessLoader(runner=FakeGitRunner(error=error)).load()
+        GitStagedChangesSubprocessLoader(runner=FakeGitRunner(error=error)).load_diff()
 
     assert exc_info.value.category is category
 
@@ -228,7 +228,7 @@ def test_adapter_maps_decode_failure_without_raw_diff_diagnostics() -> None:
     with pytest.raises(GitStagedChangesLoadError) as exc_info:
         GitStagedChangesSubprocessLoader(
             runner=FakeGitRunner(result=GitCommandResult(returncode=0, stdout=b"\xff")),
-        ).load()
+        ).load_diff()
 
     assert exc_info.value.category is GitStagedChangesFailureCategory.DECODE_ERROR
     assert "\xff" not in str(exc_info.value.metadata)
