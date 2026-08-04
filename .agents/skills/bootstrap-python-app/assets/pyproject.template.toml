@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.29.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "<app_name>"
+version = "0.1.0"
+requires-python = ">= <python_version>"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "mypy>=2.1.0",
+    "ruff>=0.15.14",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/<app_name>"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py<python_version_nodot>" # e.g. py313 (version without the dot)
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812",  # trailing comma — conflicts with ruff formatter
+    "ISC001",  # implicit string concat — conflicts with ruff formatter
+    "D1",      # missing docstrings — too noisy for early development
+    "ANN",     # type annotations — redundant with mypy strict
+    "TD",      # TODO comment format
+    "FIX",     # fixme comments
+]
+
+[tool.mypy]
+python_version = "<python_version>"
+strict = true
+files = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=src --cov-report=term-missing"
