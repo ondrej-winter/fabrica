@@ -1,11 +1,12 @@
 """Use case for preparing a selected-skill commit-message runtime run."""
 
+from typing import Protocol
+
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentContextBlock,
     LocalAgentRunCommand,
     SelectedSkill,
 )
-from fabrica.features.agent_runtime.application.use_cases.load_skill_context import LoadSkillContext
 from fabrica.features.developer_workflow.application.dtos import STAGED_DIFF_CONTEXT_LABEL, GitStagedDiff
 from fabrica.features.developer_workflow.application.ports import GitStagedDiffLoader
 
@@ -44,10 +45,26 @@ Do not run git commands, write files, create commits, or assume unstaged changes
 """
 
 
+class LocalAgentCommandAugmenter(Protocol):
+    """Boundary for adding selected context to local agent runtime commands."""
+
+    def augment_command(
+        self,
+        command: LocalAgentRunCommand,
+        selections: tuple[SelectedSkill, ...],
+    ) -> LocalAgentRunCommand:
+        """Return a runtime command augmented with selected context."""
+        ...
+
+
 class PrepareCommitMessageRun:
     """Prepare a local agent command for selected-skill commit-message generation."""
 
-    def __init__(self, staged_changes_loader: GitStagedDiffLoader, skill_context_loader: LoadSkillContext) -> None:
+    def __init__(
+        self,
+        staged_changes_loader: GitStagedDiffLoader,
+        skill_context_loader: LocalAgentCommandAugmenter,
+    ) -> None:
         self._staged_changes_loader = staged_changes_loader
         self._skill_context_loader = skill_context_loader
 

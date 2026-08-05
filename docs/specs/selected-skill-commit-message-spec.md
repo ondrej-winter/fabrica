@@ -1,5 +1,10 @@
 # Spec: Selected Skill Commit Message Workflow
 
+> Status: historical MVP/background for the `commit-message` command surface.
+> Future evidence-first behavior is specified in
+> `docs/specs/evidence-first-commit-message-generation-spec.md`, which supersedes
+> the one-shot full-diff model-call architecture described here.
+
 ## Objective
 
 Productize the first selected-skill agent workflow by adding a specialized CLI
