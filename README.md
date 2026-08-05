@@ -101,7 +101,7 @@ uv run fabrica run \
 ### Commit-message workflow for staged changes
 
 The first productized selected-skill workflow proposes commit-message text from
-the currently staged git diff:
+the currently staged git changes:
 
 ```bash
 uv run fabrica commit-message
@@ -120,26 +120,38 @@ uv run fabrica commit-message \
 ```
 
 The Codex-backed commit-message workflow defaults to `gpt-5.3-codex-spark` with
-`low` reasoning effort because the task is a bounded diff summarization and
+`low` reasoning effort because the task is a bounded staged-change analysis and
 Conventional Commit formatting workflow. Use `--model` and `--reasoning-effort`
 when a specific run needs a different Codex model or deeper reasoning.
 
-The workflow reads staged changes only, equivalent to
-`git --no-pager diff --staged`. It does **not** run `git commit`, write a
+The workflow reads staged changes only. It lists staged files, loads each staged
+file diff individually, analyzes each file into structured evidence, and then
+runs one final synthesis call. It does **not** run `git commit`, write a
 commit-message file, mutate staged or unstaged repository state, or fall back to
 unstaged changes.
 
-The recommendation workflow is evidence-first: it asks the selected Agent Skill
-to use staged-file evidence, group changes by intent, and propose a Conventional
-Commit centered on the dominant change intent. The default terminal output stays
-concise and copy-oriented rather than exposing a verbose per-file evidence
-report.
+The recommendation workflow is evidence-first and multi-call in v1: it may make
+one model call per staged file plus one final synthesis call. The final
+synthesizer receives compact structured evidence and selected Agent Skill
+context, not the full raw staged diff by default. The selected skill is applied
+after evidence collection to group changes by intent and propose a Conventional
+Commit centered on the dominant change intent.
 
-Fabrica fails before model invocation when staged changes are absent, the
-staged diff exceeds the runtime context bound, git is unavailable, the current
-directory is not a git repository, git times out, or selected skill loading
-fails. Raw diffs are not printed in diagnostics; the diff is passed only as a
-validated runtime context block.
+Default terminal output stays concise and copy-oriented rather than exposing a
+verbose per-file evidence report. It preserves these labels:
+
+```text
+Summary:
+Rationale:
+Commit message:
+```
+
+Fabrica fails closed when staged changes are absent, more than 25 staged files
+are present, serialized structured evidence exceeds 50,000 characters, git is
+unavailable, the current directory is not a git repository, git times out, a
+per-file diff or analysis fails, final synthesis fails, or selected skill loading
+fails. Raw diffs are not printed in diagnostics; raw staged file diffs are scoped
+to their per-file analysis calls.
 
 Script policy can be inspected without execution:
 
@@ -663,9 +675,10 @@ tools do not inspect unstaged changes and do not run `git add`, `git commit`,
 `git reset`, checkout, branch switching, stash, push, or pull.
 
 These optional tools are separate from the deterministic `commit-message`
-workflow. `commit-message` continues to load the staged diff before model
-invocation and does not depend on model tool calls. No environment-variable or
-settings surface is introduced for staged git tool composition.
+workflow. `commit-message` deterministically loads staged file metadata and
+per-file staged diffs before model invocation and does not depend on model tool
+calls. No environment-variable or settings surface is introduced for staged git
+tool composition.
 
 ## Model-driven selected Agent Skills composition
 
