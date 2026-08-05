@@ -184,19 +184,19 @@ normalized evidence through the existing transport-backed runtime adapter.
 
 **Acceptance criteria:**
 
-- [ ] `CodexTransportResult` exposes
+- [x] `CodexTransportResult` exposes
   `usage_evidence: tuple[ModelUsageEvidence, ...]` defaulting to `()`.
-- [ ] `CodexTransportResult` exposes
+- [x] `CodexTransportResult` exposes
   `cost_evidence: tuple[ModelCostEvidence, ...]` defaulting to `()`.
-- [ ] Evidence tuples may be populated on non-success results when they explain
+- [x] Evidence tuples may be populated on non-success results when they explain
   failed or unavailable collection.
-- [ ] Failure results do not fabricate token counts, monetary amounts, or exact
+- [x] Failure results do not fabricate token counts, monetary amounts, or exact
   Codex pricing.
-- [ ] Existing `output_text` success/non-success validation remains unchanged.
+- [x] Existing `output_text` success/non-success validation remains unchanged.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/codex_transport/application/test_transport_dtos.py tests/unit/features/agent_runtime/application/test_usage_dtos.py`
+- [x] `uv run pytest tests/unit/features/codex_transport/application/test_transport_dtos.py tests/unit/features/agent_runtime/application/test_usage_dtos.py`
 
 **Dependencies:** Task 1
 
@@ -209,11 +209,11 @@ normalized evidence through the existing transport-backed runtime adapter.
 
 ### Checkpoint: Generic Contract
 
-- [ ] Agent runtime DTO tests pass.
-- [ ] Generic DTO names and enum values match the spec.
-- [ ] No Codex-specific fields or provider extension maps were added to generic
+- [x] Agent runtime DTO tests pass.
+- [x] Generic DTO names and enum values match the spec.
+- [x] No Codex-specific fields or provider extension maps were added to generic
   DTOs.
-- [ ] `LocalAgentRunResult` and `CodexTransportResult` can both carry generic
+- [x] `LocalAgentRunResult` and `CodexTransportResult` can both carry generic
   evidence tuples without requiring evidence to be present.
 
 ### Phase 2: Codex Mapping

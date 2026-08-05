@@ -5,6 +5,16 @@ from typing import cast
 
 import pytest
 
+from fabrica.features.agent_runtime.application.dtos import (
+    ModelCostEvidence,
+    ModelPricingStatus,
+    ModelTokenUsageEvidence,
+    ModelUsageCollectionStatus,
+    ModelUsageEvidence,
+    ModelUsageEvidenceConfidence,
+    ModelUsageEvidenceSource,
+    ModelUsageObservation,
+)
 from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
     CodexCredentials,
@@ -56,6 +66,67 @@ def test_result_exposes_success_helper_and_safe_observations() -> None:
     assert result.succeeded is True
     assert result.output_text == "pong"
     assert result.observations == (observation,)
+    assert result.usage_evidence == ()
+    assert result.cost_evidence == ()
+
+
+def test_result_carries_generic_usage_and_cost_evidence_immutably() -> None:
+    usage_evidence = ModelUsageEvidence(
+        provider="codex",
+        status=ModelUsageCollectionStatus.COLLECTED,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.EXTRACTED,
+        model="gpt-5",
+        tokens=ModelTokenUsageEvidence(input_tokens=4, output_tokens=2, total_tokens=6),
+    )
+    cost_evidence = ModelCostEvidence(
+        pricing_status=ModelPricingStatus.UNKNOWN,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+        observations=(ModelUsageObservation(message="Codex per-call cost is not known"),),
+    )
+
+    result = CodexTransportResult(
+        status=CodexTransportStatus.SUCCESS,
+        output_text="pong",
+        usage_evidence=(usage_evidence,),
+        cost_evidence=(cost_evidence,),
+    )
+
+    assert result.usage_evidence == (usage_evidence,)
+    assert result.cost_evidence == (cost_evidence,)
+    with pytest.raises(FrozenInstanceError):
+        setattr(result, "usage_evidence", ())  # noqa: B010
+
+
+def test_non_success_result_can_carry_failed_or_unavailable_evidence() -> None:
+    usage_evidence = ModelUsageEvidence(
+        provider="codex",
+        status=ModelUsageCollectionStatus.FAILED,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+        observations=(ModelUsageObservation(message="transport failed before usage was collected"),),
+    )
+    cost_evidence = ModelCostEvidence(
+        pricing_status=ModelPricingStatus.NOT_AVAILABLE,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+        observations=(ModelUsageObservation(message="cost evidence unavailable after transport failure"),),
+    )
+
+    result = CodexTransportResult(
+        status=CodexTransportStatus.TRANSPORT_ERROR,
+        usage_evidence=(usage_evidence,),
+        cost_evidence=(cost_evidence,),
+    )
+
+    assert result.succeeded is False
+    assert result.output_text is None
+    assert result.usage_evidence == (usage_evidence,)
+    assert result.cost_evidence == (cost_evidence,)
+    assert result.usage_evidence[0].tokens == ModelTokenUsageEvidence()
+    assert result.cost_evidence[0].estimated_amount is None
+    assert result.cost_evidence[0].currency is None
 
 
 def test_non_success_result_is_not_successful() -> None:
@@ -64,6 +135,8 @@ def test_non_success_result_is_not_successful() -> None:
     assert result.succeeded is False
     assert result.output_text is None
     assert result.observations == ()
+    assert result.usage_evidence == ()
+    assert result.cost_evidence == ()
 
 
 def test_success_result_requires_output_text() -> None:

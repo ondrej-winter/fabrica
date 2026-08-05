@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from fabrica.features.agent_runtime.application.dtos.usage import ModelCostEvidence, ModelUsageEvidence
 from fabrica.features.codex_transport.application.dtos.observations import CodexTransportObservation
 
 
@@ -45,6 +46,8 @@ class CodexTransportResult:
     status: CodexTransportStatus
     output_text: str | None = None
     observations: tuple[CodexTransportObservation, ...] = field(default_factory=tuple)
+    usage_evidence: tuple[ModelUsageEvidence, ...] = field(default_factory=tuple)
+    cost_evidence: tuple[ModelCostEvidence, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         if self.status is CodexTransportStatus.SUCCESS and self.output_text is None:
@@ -53,6 +56,9 @@ class CodexTransportResult:
         if self.status is not CodexTransportStatus.SUCCESS and self.output_text is not None:
             msg = "non-success Codex transport results must not include output_text"
             raise ValueError(msg)
+        object.__setattr__(self, "observations", tuple(self.observations))
+        object.__setattr__(self, "usage_evidence", tuple(self.usage_evidence))
+        object.__setattr__(self, "cost_evidence", tuple(self.cost_evidence))
 
     @property
     def succeeded(self) -> bool:
