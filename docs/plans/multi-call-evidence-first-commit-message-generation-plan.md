@@ -171,19 +171,19 @@ synthesis.
 
 **Acceptance criteria:**
 
-- [ ] DTOs are immutable where practical.
-- [ ] DTOs use application/domain terms, not transport schemas.
-- [ ] DTOs reuse existing staged-git DTO concepts such as `GitStagedFile`,
+- [x] DTOs are immutable where practical.
+- [x] DTOs use application/domain terms, not transport schemas.
+- [x] DTOs reuse existing staged-git DTO concepts such as `GitStagedFile`,
       `GitStagedFileList`, `GitStagedFileStatus`, and `GitStagedDiff` where
       practical instead of duplicating staged path/status models.
-- [ ] Evidence contains staged path, status, summary, category, and optional impact
+- [x] Evidence contains staged path, status, summary, category, and optional impact
       fields.
-- [ ] Evidence captures `public_contract_impact`, `validation_relevance`,
+- [x] Evidence captures `public_contract_impact`, `validation_relevance`,
       `migration_concern`, and `breaking_risk` as explicit structured fields.
-- [ ] Final workflow results and failures are represented with
+- [x] Final workflow results and failures are represented with
       developer-workflow-owned DTOs or errors, not agent-runtime result DTOs.
-- [ ] DTO validation rejects empty required text and empty evidence bundles.
-- [ ] DTO validation rejects evidence bundles above the v1 serialized evidence
+- [x] DTO validation rejects empty required text and empty evidence bundles.
+- [x] DTO validation rejects evidence bundles above the v1 serialized evidence
       bound of 50,000 characters.
 
 **Verify:**
@@ -199,9 +199,9 @@ analysis and final synthesis.
 
 **Acceptance criteria:**
 
-- [ ] Ports are narrow `Protocol`s in the developer-workflow application layer.
-- [ ] Port signatures use developer-workflow DTOs.
-- [ ] Ports do not expose agent-runtime DTOs, HTTP schemas, or framework types.
+- [x] Ports are narrow `Protocol`s in the developer-workflow application layer.
+- [x] Port signatures use developer-workflow DTOs.
+- [x] Ports do not expose agent-runtime DTOs, HTTP schemas, or framework types.
 
 **Verify:**
 
@@ -218,15 +218,15 @@ loads each file diff, runs per-file analysis, and calls final synthesis.
 
 **Acceptance criteria:**
 
-- [ ] Calls `list_files()` before per-file diff loading.
-- [ ] Calls `load_file_diff(path)` for each staged file.
-- [ ] Calls analyzer once per staged file.
-- [ ] Preserves staged file order in the evidence bundle.
-- [ ] Calls synthesizer once after all evidence is collected.
-- [ ] Fails before per-file analysis when more than 25 staged files are present.
-- [ ] Fails before final synthesis when serialized evidence exceeds 50,000
+- [x] Calls `list_files()` before per-file diff loading.
+- [x] Calls `load_file_diff(path)` for each staged file.
+- [x] Calls analyzer once per staged file.
+- [x] Preserves staged file order in the evidence bundle.
+- [x] Calls synthesizer once after all evidence is collected.
+- [x] Fails before per-file analysis when more than 25 staged files are present.
+- [x] Fails before final synthesis when serialized evidence exceeds 50,000
       characters.
-- [ ] Stops before synthesis if staged discovery, diff loading, or analysis fails.
+- [x] Stops before synthesis if staged discovery, diff loading, or analysis fails.
 
 **Verify:**
 
@@ -241,15 +241,15 @@ staged-git failures, analysis failures, and synthesis failures.
 
 **Acceptance criteria:**
 
-- [ ] No staged files fail before model invocation.
-- [ ] Too many staged files fail before per-file model invocation.
-- [ ] Per-file diff load failure reports which staged file failed without exposing
+- [x] No staged files fail before model invocation.
+- [x] Too many staged files fail before per-file model invocation.
+- [x] Per-file diff load failure reports which staged file failed without exposing
       raw diff content.
-- [ ] Per-file analyzer failure stops final synthesis.
-- [ ] Invalid or unparsable structured per-file analyzer output stops final
+- [x] Per-file analyzer failure stops final synthesis.
+- [x] Invalid or unparsable structured per-file analyzer output stops final
       synthesis and reports a safe application failure.
-- [ ] Oversized serialized evidence stops final synthesis.
-- [ ] Final synthesis failure maps into developer-workflow-owned failure/result
+- [x] Oversized serialized evidence stops final synthesis.
+- [x] Final synthesis failure maps into developer-workflow-owned failure/result
       language before composition maps it to the existing CLI/result pattern.
 
 **Verify:**
@@ -267,16 +267,16 @@ an agent-runtime call and maps the response into `StagedFileCommitEvidence`.
 
 **Acceptance criteria:**
 
-- [ ] The per-file prompt asks for factual file evidence only.
-- [ ] The per-file prompt explicitly forbids final commit-message synthesis.
-- [ ] The per-file prompt requests strict structured output with required fields:
+- [x] The per-file prompt asks for factual file evidence only.
+- [x] The per-file prompt explicitly forbids final commit-message synthesis.
+- [x] The per-file prompt requests strict structured output with required fields:
       `summary`, `category`, `public_contract_impact`, `validation_relevance`,
       `migration_concern`, and `breaking_risk`.
-- [ ] The adapter owns parsing and validation of structured model output.
-- [ ] Missing, empty, invalid, or unparsable required fields become safe analyzer
+- [x] The adapter owns parsing and validation of structured model output.
+- [x] Missing, empty, invalid, or unparsable required fields become safe analyzer
       failures before final synthesis.
-- [ ] Raw file diff is scoped to the per-file call.
-- [ ] Adapter output is normalized into application DTOs.
+- [x] Raw file diff is scoped to the per-file call.
+- [x] Adapter output is normalized into application DTOs.
 
 **Verify:**
 
@@ -291,13 +291,13 @@ selected skill context into one final agent-runtime call.
 
 **Acceptance criteria:**
 
-- [ ] Final prompt receives structured evidence, not the full raw staged diff by
+- [x] Final prompt receives structured evidence, not the full raw staged diff by
       default.
-- [ ] Final prompt applies the selected commit-message skill after evidence
+- [x] Final prompt applies the selected commit-message skill after evidence
       grouping.
-- [ ] Final prompt preserves the `Summary:`, `Rationale:`, and `Commit message:`
+- [x] Final prompt preserves the `Summary:`, `Rationale:`, and `Commit message:`
       output labels.
-- [ ] Final output remains terminal-friendly and copy-oriented.
+- [x] Final output remains terminal-friendly and copy-oriented.
 
 **Verify:**
 
@@ -314,10 +314,10 @@ commit-message workflow uses the new developer-workflow orchestration.
 
 **Acceptance criteria:**
 
-- [ ] Existing CLI command options still work unless explicitly changed.
-- [ ] Default skill remains `conventional-commits`.
-- [ ] Model and reasoning-effort overrides still reach model-backed adapters.
-- [ ] Git access remains read-only and staged-only.
+- [x] Existing CLI command options still work unless explicitly changed.
+- [x] Default skill remains `conventional-commits`.
+- [x] Model and reasoning-effort overrides still reach model-backed adapters.
+- [x] Git access remains read-only and staged-only.
 
 **Verify:**
 
@@ -333,10 +333,10 @@ replaces it.
 
 **Acceptance criteria:**
 
-- [ ] `PrepareCommitMessageRun` is deleted or clearly no longer used.
-- [ ] Tests no longer assert one full staged diff context block as the core
+- [x] `PrepareCommitMessageRun` is deleted or clearly no longer used.
+- [x] Tests no longer assert one full staged diff context block as the core
       architecture.
-- [ ] Exports remain clear and focused on the new workflow.
+- [x] Exports remain clear and focused on the new workflow.
 
 **Verify:**
 
@@ -354,20 +354,20 @@ failure bounds, and preserved output contract.
 
 **Acceptance criteria:**
 
-- [ ] README describes the staged-only, read-only, evidence-first behavior.
-- [ ] README notes that v1 may make one per-file model call plus one final
+- [x] README describes the staged-only, read-only, evidence-first behavior.
+- [x] README notes that v1 may make one per-file model call plus one final
       synthesis call and may fail closed when staged file or evidence bounds are
       exceeded.
-- [ ] README does not promise verbose per-file evidence output by default.
+- [x] README does not promise verbose per-file evidence output by default.
 
 ### Task 10: Run quality gate
 
 **Acceptance criteria:**
 
-- [ ] Formatting passes.
-- [ ] Lint passes.
-- [ ] Type checking passes.
-- [ ] Tests pass.
+- [x] Formatting passes.
+- [x] Lint passes.
+- [x] Type checking passes.
+- [x] Tests pass.
 
 **Verify:**
 
