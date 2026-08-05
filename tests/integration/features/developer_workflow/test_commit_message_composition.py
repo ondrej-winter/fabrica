@@ -10,87 +10,75 @@ import httpx
 from fabrica.bootstrap import (
     DEFAULT_COMMIT_MESSAGE_CODEX_MODEL,
     DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT,
-    CommitMessageWorkflow,
     CommitMessageWorkflowOptions,
     create_codex_commit_message_workflow,
+    create_commit_message_workflow,
 )
 from fabrica.features.agent_runtime.application.dtos import (
-    LoadedSkillContext,
     LocalAgentRunCommand,
     LocalAgentRunResult,
     LocalAgentRunStatus,
-    SelectedSkill,
 )
-from fabrica.features.agent_runtime.application.use_cases import LoadSkillContext
 from fabrica.features.developer_workflow.application.dtos import (
     GitStagedChangesFailureCategory,
-    GitStagedDiff,
 )
-from fabrica.features.developer_workflow.application.ports import GitStagedChangesLoadError
-from fabrica.features.developer_workflow.application.use_cases import PrepareCommitMessageRun
 
-
-@dataclass
-class FakeStagedChangesLoader:
-    diff: GitStagedDiff | None = None
-    error: GitStagedChangesLoadError | None = None
-
-    def load(self) -> GitStagedDiff:
-        return self.load_diff()
-
-    def load_diff(self) -> GitStagedDiff:
-        if self.error is not None:
-            raise self.error
-        return self.diff or GitStagedDiff(text="diff --git a/file.py b/file.py\n")
-
-
-@dataclass
-class FakeSkillContextLoader:
-    def load(self, selection: SelectedSkill) -> LoadedSkillContext:
-        return LoadedSkillContext(skill_id=selection.skill_id, markdown="# Conventional Commits\n")
+EXPECTED_ONE_FILE_MODEL_CALLS = 2
 
 
 @dataclass
 class FakeRuntime:
+    results: list[LocalAgentRunResult]
     calls: list[LocalAgentRunCommand] = field(default_factory=list)
 
     def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         self.calls.append(command)
-        return LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="ok")
+        return self.results.pop(0)
 
 
-def test_commit_message_workflow_runs_runtime_after_preparation() -> None:
-    runtime = FakeRuntime()
-    workflow = CommitMessageWorkflow(
-        preparer=PrepareCommitMessageRun(FakeStagedChangesLoader(), LoadSkillContext(FakeSkillContextLoader())),
+def test_commit_message_workflow_runs_per_file_analysis_then_final_synthesis(tmp_path: Path) -> None:
+    runtime = FakeRuntime(
+        results=[
+            LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text=_analysis_json()),
+            LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text=_synthesis_text()),
+        ],
+    )
+    git_repository = _create_repository_with_staged_diff(tmp_path)
+    skill_root = _write_commit_message_skill(tmp_path)
+    workflow = create_commit_message_workflow(
         runtime=runtime,
+        options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
     )
 
     result = workflow.run(skill_id="conventional-commits")
 
     assert result.succeeded
-    assert runtime.calls
-    assert [block.metadata["source"] for block in runtime.calls[0].context] == ["git_staged_diff", "agent_skill"]
+    assert result.output_text == _synthesis_text()
+    assert [block.metadata["source"] for call in runtime.calls for block in call.context] == [
+        "git_staged_file_diff",
+        "commit_message_evidence",
+        "agent_skill",
+    ]
+    assert "diff --git" in runtime.calls[0].context[0].text
+    assert "diff --git" not in runtime.calls[1].context[0].text
 
 
-def test_commit_message_workflow_stops_before_runtime_when_staged_diff_fails() -> None:
-    runtime = FakeRuntime()
-    workflow = CommitMessageWorkflow(
-        preparer=PrepareCommitMessageRun(
-            FakeStagedChangesLoader(
-                error=GitStagedChangesLoadError(
-                    "no staged git changes were found",
-                    category=GitStagedChangesFailureCategory.NO_STAGED_CHANGES,
-                ),
-            ),
-            LoadSkillContext(FakeSkillContextLoader()),
-        ),
+def test_commit_message_workflow_stops_before_runtime_when_staged_discovery_fails(tmp_path: Path) -> None:
+    runtime = FakeRuntime(results=[])
+    git_repository = tmp_path / "repo"
+    git_repository.mkdir()
+    _run_git(("git", "init"), cwd=git_repository)
+    workflow = create_commit_message_workflow(
         runtime=runtime,
+        options=CommitMessageWorkflowOptions(
+            git_working_directory=git_repository,
+        ),
     )
 
     result = workflow.run()
 
     assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.observations[0].metadata["category"] == GitStagedChangesFailureCategory.NO_STAGED_CHANGES
     assert runtime.calls == []
 
 
@@ -102,7 +90,8 @@ def test_codex_commit_message_workflow_uses_spark_low_defaults_with_mock_transpo
 
     def handler(request: httpx.Request) -> httpx.Response:
         observed_payloads.append(json.loads(request.content.decode("utf-8")))
-        return httpx.Response(200, json={"output_text": "feat: add example"})
+        output_text = _analysis_json() if len(observed_payloads) == 1 else _synthesis_text()
+        return httpx.Response(200, json={"output_text": output_text})
 
     workflow = create_codex_commit_message_workflow(
         CommitMessageWorkflowOptions(
@@ -116,8 +105,11 @@ def test_codex_commit_message_workflow_uses_spark_low_defaults_with_mock_transpo
     result = workflow.run()
 
     assert result.succeeded
+    assert len(observed_payloads) == EXPECTED_ONE_FILE_MODEL_CALLS
     assert observed_payloads[0]["model"] == DEFAULT_COMMIT_MESSAGE_CODEX_MODEL
     assert observed_payloads[0]["reasoning"] == {"effort": DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT}
+    assert observed_payloads[1]["model"] == DEFAULT_COMMIT_MESSAGE_CODEX_MODEL
+    assert observed_payloads[1]["reasoning"] == {"effort": DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT}
 
 
 def test_codex_commit_message_workflow_allows_model_and_effort_overrides(tmp_path: Path) -> None:
@@ -128,7 +120,8 @@ def test_codex_commit_message_workflow_allows_model_and_effort_overrides(tmp_pat
 
     def handler(request: httpx.Request) -> httpx.Response:
         observed_payloads.append(json.loads(request.content.decode("utf-8")))
-        return httpx.Response(200, json={"output_text": "feat: add example"})
+        output_text = _analysis_json() if len(observed_payloads) == 1 else _synthesis_text()
+        return httpx.Response(200, json={"output_text": output_text})
 
     workflow = create_codex_commit_message_workflow(
         CommitMessageWorkflowOptions(
@@ -144,8 +137,32 @@ def test_codex_commit_message_workflow_allows_model_and_effort_overrides(tmp_pat
     result = workflow.run()
 
     assert result.succeeded
+    assert len(observed_payloads) == EXPECTED_ONE_FILE_MODEL_CALLS
     assert observed_payloads[0]["model"] == "gpt-5.6-sol"
     assert observed_payloads[0]["reasoning"] == {"effort": "medium"}
+    assert observed_payloads[1]["model"] == "gpt-5.6-sol"
+    assert observed_payloads[1]["reasoning"] == {"effort": "medium"}
+
+
+def _analysis_json() -> str:
+    return json.dumps(
+        {
+            "summary": "Adds an example file.",
+            "category": "maintenance",
+            "public_contract_impact": "No public contract impact identified.",
+            "validation_relevance": "No validation relevance identified.",
+            "migration_concern": "No migration concern identified.",
+            "breaking_risk": "No breaking risk identified.",
+        }
+    )
+
+
+def _synthesis_text() -> str:
+    return (
+        "Summary:\nAdds an example file.\n\n"
+        "Rationale:\nThe structured evidence shows one staged maintenance change.\n\n"
+        "Commit message:\nchore: add example file"
+    )
 
 
 def _write_synthetic_auth_file(tmp_path: Path) -> Path:

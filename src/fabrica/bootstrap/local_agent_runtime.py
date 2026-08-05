@@ -67,17 +67,31 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http impor
     CodexUsageRequestSettings,
 )
 from fabrica.features.codex_transport.application.use_cases import CompleteWithCodexTransport
+from fabrica.features.developer_workflow.adapters.outbound.commit_message_agent_runtime import (
+    AgentRuntimeCommitMessageSynthesizer,
+    AgentRuntimeStagedFileCommitMessageAnalyzer,
+)
 from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_registered_tool import (
     create_git_staged_changes_registered_tools,
 )
 from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_subprocess import (
     GitStagedChangesSubprocessLoader,
 )
-from fabrica.features.developer_workflow.application.dtos import GitStagedDiffBounds
-from fabrica.features.developer_workflow.application.ports import GitStagedChangesLoadError
+from fabrica.features.developer_workflow.application.dtos import (
+    CommitMessageRecommendation,
+    GitStagedDiffBounds,
+    SynthesizeCommitMessageCommand,
+)
+from fabrica.features.developer_workflow.application.ports import (
+    CommitMessageAnalysisError,
+    CommitMessageSynthesisError,
+    CommitMessageSynthesizer,
+    GitStagedChangesLoadError,
+)
 from fabrica.features.developer_workflow.application.use_cases import (
     DEFAULT_COMMIT_MESSAGE_SKILL_ID,
-    PrepareCommitMessageRun,
+    GenerateCommitMessage,
+    GenerateCommitMessageError,
 )
 
 DEFAULT_CODEX_AUTH_FILE = Path.home() / ".codex" / "auth.json"
@@ -210,19 +224,18 @@ class CommitMessageRuntime(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class CommitMessageWorkflow:
-    """Composed workflow that prepares and runs commit-message generation."""
+    """Composed workflow that runs evidence-first commit-message generation."""
 
-    preparer: PrepareCommitMessageRun
-    runtime: CommitMessageRuntime
+    generator: GenerateCommitMessage
 
     def run(
         self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
     ) -> LocalAgentRunResult:
-        """Prepare selected context and invoke the local runtime when valid."""
+        """Generate a recommendation and map it to the local runtime result contract."""
         selected_skill_id = getattr(command, "skill_id", skill_id)
         try:
-            runtime_command = self.preparer.prepare(skill_id=selected_skill_id)
-        except (GitStagedChangesLoadError, SkillContextLoadError) as err:
+            result = self.generator.generate(skill_id=selected_skill_id)
+        except GitStagedChangesLoadError as err:
             return LocalAgentRunResult(
                 status=LocalAgentRunStatus.CONFIGURATION_ERROR,
                 observations=(
@@ -232,14 +245,75 @@ class CommitMessageWorkflow:
                     ),
                 ),
             )
-        except ValueError as err:
+        except SkillContextLoadError as err:
             return LocalAgentRunResult(
                 status=LocalAgentRunStatus.CONFIGURATION_ERROR,
                 observations=(
-                    RuntimeObservation(message=str(err), metadata={"category": "invalid_commit_message_input"}),
+                    RuntimeObservation(
+                        message=str(err),
+                        metadata={"category": err.category, **err.metadata},
+                    ),
                 ),
             )
-        return self.runtime.run(runtime_command)
+        except (GenerateCommitMessageError, ValueError) as err:
+            return LocalAgentRunResult(
+                status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+                observations=(
+                    RuntimeObservation(
+                        message=str(err),
+                        metadata={
+                            "category": "invalid_commit_message_input",
+                            **getattr(err, "metadata", {}),
+                        },
+                    ),
+                ),
+            )
+        except (CommitMessageAnalysisError, CommitMessageSynthesisError) as err:
+            return LocalAgentRunResult(
+                status=LocalAgentRunStatus.MODEL_ERROR,
+                observations=(
+                    RuntimeObservation(
+                        message=str(err),
+                        metadata={
+                            "category": "commit_message_model_failure",
+                            **err.metadata,
+                        },
+                    ),
+                ),
+            )
+        return LocalAgentRunResult(
+            status=LocalAgentRunStatus.SUCCESS,
+            output_text=_format_commit_message_recommendation(result.recommendation),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SkillContextCommitMessageSynthesizer:
+    """Synthesizer decorator that loads selected skill markdown before synthesis."""
+
+    synthesizer: CommitMessageSynthesizer
+    skill_context_loader: LoadSkillContext
+
+    def synthesize(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
+        """Load selected skill context and delegate final synthesis."""
+        skill_context = self.skill_context_loader.load((SelectedSkill(skill_id=command.skill_id),))
+        skill_markdown = skill_context[0].text if skill_context else None
+        return self.synthesizer.synthesize(
+            SynthesizeCommitMessageCommand(
+                evidence_bundle=command.evidence_bundle,
+                skill_id=command.skill_id,
+                skill_markdown=skill_markdown,
+            ),
+        )
+
+
+def _format_commit_message_recommendation(recommendation: CommitMessageRecommendation) -> str:
+    """Format a recommendation with the stable terminal output labels."""
+    return (
+        f"Summary:\n{recommendation.summary}\n\n"
+        f"Rationale:\n{recommendation.rationale}\n\n"
+        f"Commit message:\n{recommendation.commit_message}"
+    )
 
 
 class DenyByDefaultSkillScriptApprovalLookup:
@@ -356,7 +430,7 @@ def create_skill_context_augmented_local_agent_command(
 
 def create_commit_message_workflow(
     *,
-    runtime: RunLocalAgent,
+    runtime: CommitMessageRuntime,
     options: CommitMessageWorkflowOptions | None = None,
 ) -> CommitMessageWorkflow:
     """Create the selected-skill commit-message workflow with injected runtime."""
@@ -373,11 +447,14 @@ def create_commit_message_workflow(
         verbose_diagnostics=workflow_options.verbose_diagnostics,
     )
     return CommitMessageWorkflow(
-        preparer=PrepareCommitMessageRun(
+        generator=GenerateCommitMessage(
             staged_changes_loader=staged_changes_loader,
-            skill_context_loader=skill_context_loader,
+            analyzer=AgentRuntimeStagedFileCommitMessageAnalyzer(runtime),
+            synthesizer=SkillContextCommitMessageSynthesizer(
+                synthesizer=AgentRuntimeCommitMessageSynthesizer(runtime),
+                skill_context_loader=skill_context_loader,
+            ),
         ),
-        runtime=runtime,
     )
 
 
