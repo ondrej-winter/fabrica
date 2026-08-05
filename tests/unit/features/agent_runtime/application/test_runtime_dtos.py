@@ -10,6 +10,13 @@ from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     LocalAgentRunResult,
     LocalAgentRunStatus,
+    ModelCostEvidence,
+    ModelPricingStatus,
+    ModelTokenUsageEvidence,
+    ModelUsageCollectionStatus,
+    ModelUsageEvidence,
+    ModelUsageEvidenceConfidence,
+    ModelUsageEvidenceSource,
     RuntimeObservation,
 )
 from fabrica.features.agent_runtime.application.dtos.runtime import MAX_CONTEXT_TEXT_CHARS, MAX_PROMPT_CHARS
@@ -90,6 +97,36 @@ def test_non_success_result_is_not_successful() -> None:
     assert result.succeeded is False
     assert result.output_text is None
     assert result.observations == ()
+    assert result.usage_evidence == ()
+    assert result.cost_evidence == ()
+
+
+def test_result_carries_usage_and_cost_evidence_without_changing_success_semantics() -> None:
+    usage_evidence = ModelUsageEvidence(
+        provider="synthetic",
+        model="model-a",
+        status=ModelUsageCollectionStatus.COLLECTED,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.EXTRACTED,
+        tokens=ModelTokenUsageEvidence(input_tokens=10, output_tokens=4, total_tokens=14),
+    )
+    cost_evidence = ModelCostEvidence(
+        pricing_status=ModelPricingStatus.UNKNOWN,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+    )
+
+    result = LocalAgentRunResult(
+        status=LocalAgentRunStatus.SUCCESS,
+        usage_evidence=cast("tuple[ModelUsageEvidence, ...]", [usage_evidence]),
+        cost_evidence=cast("tuple[ModelCostEvidence, ...]", [cost_evidence]),
+    )
+
+    assert result.succeeded is True
+    assert result.usage_evidence == (usage_evidence,)
+    assert result.cost_evidence == (cost_evidence,)
+    assert isinstance(result.usage_evidence, tuple)
+    assert isinstance(result.cost_evidence, tuple)
 
 
 def test_runtime_dtos_are_immutable_boundary_values() -> None:

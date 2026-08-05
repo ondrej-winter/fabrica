@@ -153,19 +153,19 @@ vocabularies under `agent_runtime/application/dtos/usage.py`.
 
 **Acceptance criteria:**
 
-- [ ] `LocalAgentRunResult` exposes
+- [x] `LocalAgentRunResult` exposes
   `usage_evidence: tuple[ModelUsageEvidence, ...]` defaulting to `()`.
-- [ ] `LocalAgentRunResult` exposes
+- [x] `LocalAgentRunResult` exposes
   `cost_evidence: tuple[ModelCostEvidence, ...]` defaulting to `()`.
-- [ ] Constructor normalizes provided iterables to tuples if project style
+- [x] Constructor normalizes provided iterables to tuples if project style
   chooses explicit normalization.
-- [ ] Existing runtime result tests still pass with default empty evidence.
-- [ ] New test proves evidence is carried immutably and does not affect
+- [x] Existing runtime result tests still pass with default empty evidence.
+- [x] New test proves evidence is carried immutably and does not affect
   `succeeded` semantics.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/agent_runtime/application/test_runtime_dtos.py tests/unit/features/agent_runtime/application/test_usage_dtos.py`
+- [x] `uv run pytest tests/unit/features/agent_runtime/application/test_runtime_dtos.py tests/unit/features/agent_runtime/application/test_usage_dtos.py`
 
 **Dependencies:** Task 1
 

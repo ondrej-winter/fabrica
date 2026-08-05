@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from types import MappingProxyType
 
+from fabrica.features.agent_runtime.application.dtos.usage import ModelCostEvidence, ModelUsageEvidence
+
 MAX_PROMPT_CHARS = 20_000
 MAX_CONTEXT_TEXT_CHARS = 500_000
 
@@ -72,6 +74,13 @@ class LocalAgentRunResult:
     status: LocalAgentRunStatus
     output_text: str | None = None
     observations: tuple[RuntimeObservation, ...] = field(default_factory=tuple)
+    usage_evidence: tuple[ModelUsageEvidence, ...] = field(default_factory=tuple)
+    cost_evidence: tuple[ModelCostEvidence, ...] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "observations", tuple(self.observations))
+        object.__setattr__(self, "usage_evidence", tuple(self.usage_evidence))
+        object.__setattr__(self, "cost_evidence", tuple(self.cost_evidence))
 
     @property
     def succeeded(self) -> bool:
