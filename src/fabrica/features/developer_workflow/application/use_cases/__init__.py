@@ -1,5 +1,9 @@
 """Application use cases for developer workflow orchestration."""
 
+from fabrica.features.developer_workflow.application.use_cases.generate_commit_message import (
+    GenerateCommitMessage,
+    GenerateCommitMessageError,
+)
 from fabrica.features.developer_workflow.application.use_cases.prepare_commit_message_run import (
     DEFAULT_COMMIT_MESSAGE_SKILL_ID,
     PrepareCommitMessageRun,
@@ -7,5 +11,7 @@ from fabrica.features.developer_workflow.application.use_cases.prepare_commit_me
 
 __all__ = [
     "DEFAULT_COMMIT_MESSAGE_SKILL_ID",
+    "GenerateCommitMessage",
+    "GenerateCommitMessageError",
     "PrepareCommitMessageRun",
 ]
