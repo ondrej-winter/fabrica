@@ -111,30 +111,30 @@ vocabularies under `agent_runtime/application/dtos/usage.py`.
 
 **Acceptance criteria:**
 
-- [ ] Defines closed `StrEnum` vocabularies for collection status, evidence
+- [x] Defines closed `StrEnum` vocabularies for collection status, evidence
   source, confidence, and pricing status.
-- [ ] Collection status values are exactly `collected`,
+- [x] Collection status values are exactly `collected`,
   `partially_collected`, `unavailable`, `unsupported`, and `failed` for v1.
-- [ ] Confidence values are exactly `observed`, `extracted`, `inferred`,
+- [x] Confidence values are exactly `observed`, `extracted`, `inferred`,
   `manual`, `estimated`, and `unknown` for v1.
-- [ ] Defines immutable DTOs for token evidence, quota/rate-limit evidence,
+- [x] Defines immutable DTOs for token evidence, quota/rate-limit evidence,
   usage evidence, and cost evidence.
-- [ ] Token counts and quota values reject negative integers.
-- [ ] Missing token categories remain `None`, not zero.
-- [ ] Monetary estimates use standard-library `Decimal` for `estimated_amount`
+- [x] Token counts and quota values reject negative integers.
+- [x] Missing token categories remain `None`, not zero.
+- [x] Monetary estimates use standard-library `Decimal` for `estimated_amount`
   and require amount, uppercase currency, source, and confidence when
   applicable.
-- [ ] Unknown/unavailable/subscription pricing does not require or imply a
+- [x] Unknown/unavailable/subscription pricing does not require or imply a
   per-call amount.
-- [ ] Defines a dedicated generic `ModelUsageObservation` DTO with safe bounded
+- [x] Defines a dedicated generic `ModelUsageObservation` DTO with safe bounded
   scalar metadata.
-- [ ] Observation metadata rejects non-string keys and nested/raw values, copies
+- [x] Observation metadata rejects non-string keys and nested/raw values, copies
   inputs, and exposes immutable mapping views consistent with existing DTO style.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/agent_runtime/application/test_usage_dtos.py`
-- [ ] `uv run ty check src tests`
+- [x] `uv run pytest tests/unit/features/agent_runtime/application/test_usage_dtos.py`
+- [x] `uv run ty check src tests`
 
 **Dependencies:** None
 
