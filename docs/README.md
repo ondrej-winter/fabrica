@@ -1,6 +1,6 @@
 # Project documentation
 
-This directory contains durable project documentation plus active planning notes.
+This directory contains durable project documentation and current reference notes.
 
 ## Documentation lifecycle
 
@@ -28,22 +28,12 @@ This directory contains durable project documentation plus active planning notes
   current subscription-backed Codex runtime viability label.
 - `observations/2026-08-01-redacted-live-evidence-collection.md` records the
   dated repeated-session live validation evidence behind that label.
-- `observations/codex-runtime-viability-template.md` is the template for future
-  redacted manual observations.
 
 ### Specs
 
 - `specs/subscription-backed-python-agent-runtime-spec.md` defines the original
   transport spike target and preserves later errata.
-- `specs/selected-skill-commit-message-spec.md` is historical MVP background for
-  the first `commit-message` command surface.
 - `specs/evidence-first-commit-message-generation-spec.md` defines the current
   multi-call evidence-first commit-message target.
 - `specs/model-callable-staged-git-tools-spec.md` defines optional read-only
   staged git tools for explicit agent/tool-loop workflows.
-
-### Active plans
-
-- `plans/multi-call-evidence-first-commit-message-generation-plan.md` tracks the
-  unfinished implementation plan for the current evidence-first commit-message
-  architecture.

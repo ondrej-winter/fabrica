@@ -18,23 +18,17 @@ commit-message Agent Skill to produce the final recommendation.
 
 ## Current context
 
-- The first selected-skill commit-message workflow is specified in
-  `docs/specs/selected-skill-commit-message-spec.md`.
-- The earlier source idea and completed prompt-level implementation plan were
-  temporary working artifacts and have been removed after promotion into this spec
-  and the current multi-call plan.
-- The current implemented commit-message preparation use case is
-  `src/fabrica/features/developer_workflow/application/use_cases/prepare_commit_message_run.py`.
-- The current use case reads full staged git diff context through an
-  application-owned `GitStagedChangesLoader`, builds one `LocalAgentRunCommand`,
-  and augments it with the selected commit-message Agent Skill. This one-shot
-  shape is no longer the target evidence-first architecture.
-- The existing staged-git application port already exposes the primitives needed
+- Earlier source ideas, prompt-level plans, and the one-shot full-diff MVP spec
+  were temporary working artifacts and have been removed after promotion into this
+  evidence-first spec and implementation.
+- The current implementation lives in
+  `src/fabrica/features/developer_workflow/application/use_cases/generate_commit_message.py`.
+- The staged-git application port exposes the primitives needed
   for the desired flow:
   - `list_files()` to enumerate staged files;
   - `load_file_diff(path)` to load one file's staged diff;
-  - `load_diff()` for full staged diff loading, which should no longer be the
-    default evidence-first path.
+  - `load_diff()` for full staged diff loading outside the default evidence-first
+    commit-message path.
 - The current built-in prompt asks the model to return terminal-friendly sections
   labeled `Summary:`, `Rationale:`, and `Commit message:`.
 - The current command boundary remains intentionally read-only: it reads staged
@@ -152,20 +146,14 @@ developer's ambient staged git state.
 ## Project structure
 
 - Spec: `docs/specs/evidence-first-commit-message-generation-spec.md`.
-- Implementation plan:
-  `docs/plans/multi-call-evidence-first-commit-message-generation-plan.md`.
-- Existing one-shot use case, likely to be replaced:
-  `src/fabrica/features/developer_workflow/application/use_cases/prepare_commit_message_run.py`.
-- New developer-workflow DTOs, likely:
+- Developer-workflow DTOs:
   `src/fabrica/features/developer_workflow/application/dtos/commit_message.py`.
-- New developer-workflow ports, likely:
+- Developer-workflow ports:
   `src/fabrica/features/developer_workflow/application/ports/commit_message.py`.
-- New developer-workflow use cases, likely:
-  - `src/fabrica/features/developer_workflow/application/use_cases/analyze_staged_file_for_commit_message.py`;
-  - `src/fabrica/features/developer_workflow/application/use_cases/synthesize_commit_message.py`;
-  - `src/fabrica/features/developer_workflow/application/use_cases/generate_commit_message.py`.
-- Agent-runtime-backed adapters, if needed:
-  `src/fabrica/features/developer_workflow/adapters/outbound/`.
+- Developer-workflow use case:
+  `src/fabrica/features/developer_workflow/application/use_cases/generate_commit_message.py`.
+- Agent-runtime-backed adapters:
+  `src/fabrica/features/developer_workflow/adapters/outbound/commit_message_agent_runtime/`.
 - Composition wiring: `src/fabrica/bootstrap/local_agent_runtime.py`.
 - Unit tests:
   `tests/unit/features/developer_workflow/application/`.
@@ -261,7 +249,6 @@ developer's ambient staged git state.
 
 ## Superseded decisions
 
-The earlier prompt-level v1 decision to avoid multiple model calls is superseded
-for future evidence-first work. The prompt-level implementation may remain useful
-as a temporary fallback or historical spike, but it is no longer the target
-architecture for the commit-message workflow.
+The earlier prompt-level v1 decision to avoid multiple model calls is superseded.
+The evidence-first workflow is now the target architecture for the commit-message
+workflow.

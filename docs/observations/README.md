@@ -106,9 +106,9 @@ viability evidence.
    recorded. More sessions are useful when results are flaky, contradictory, or
    close to quota/rate limits.
 
-7. Copy only redacted observations into `codex-runtime-viability-template.md` or
-   a dated note derived from it. Keep observed facts separate from interpretation
-   and record the separate-session success count after each observation.
+7. Record only redacted observations in a dated note that follows the safe
+   observation shape above. Keep observed facts separate from interpretation and
+   record the separate-session success count after each observation.
 
 8. Record failures with the same schema. Use these normalized failure categories
    when possible:
