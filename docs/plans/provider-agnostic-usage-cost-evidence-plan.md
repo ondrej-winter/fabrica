@@ -300,17 +300,17 @@ usage/cost evidence from `CodexTransportResult` into `LocalAgentRunResult`.
 
 **Acceptance criteria:**
 
-- [ ] `CodexTransportResult` can carry generic usage and cost evidence tuples.
-- [ ] `CodexTransportAgentModel.run()` passes evidence through to
+- [x] `CodexTransportResult` can carry generic usage and cost evidence tuples.
+- [x] `CodexTransportAgentModel.run()` passes evidence through to
   `LocalAgentRunResult`.
-- [ ] Failure results do not fabricate token/cost values.
-- [ ] Non-success transport results may propagate failed/unavailable evidence
+- [x] Failure results do not fabricate token/cost values.
+- [x] Non-success transport results may propagate failed/unavailable evidence
   tuples when the upstream result provides them.
-- [ ] Existing observation mapping behavior remains unchanged.
+- [x] Existing observation mapping behavior remains unchanged.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/agent_runtime/ tests/unit/features/codex_transport/application/`
+- [x] `uv run pytest tests/unit/features/agent_runtime/ tests/unit/features/codex_transport/application/`
 
 **Dependencies:** Tasks 2-4
 
@@ -325,10 +325,10 @@ usage/cost evidence from `CodexTransportResult` into `LocalAgentRunResult`.
 
 ### Checkpoint: Codex Evidence Path
 
-- [ ] Codex mapping tests cover present, missing, partial, quota/rate-limit,
+- [x] Codex mapping tests cover present, missing, partial, quota/rate-limit,
   unknown-pricing, and unsafe-field cases.
-- [ ] Runtime adapter tests prove evidence reaches `LocalAgentRunResult`.
-- [ ] No live Codex probe is required for default tests.
+- [x] Runtime adapter tests prove evidence reaches `LocalAgentRunResult`.
+- [x] No live Codex probe is required for default tests.
 
 ### V1 Codex-to-Generic Status Mapping
 

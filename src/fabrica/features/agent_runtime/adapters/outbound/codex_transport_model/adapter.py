@@ -42,6 +42,8 @@ class CodexTransportAgentModel:
             status=runtime_status,
             output_text=transport_result.output_text if runtime_status is LocalAgentRunStatus.SUCCESS else None,
             observations=_map_observations(transport_result),
+            usage_evidence=transport_result.usage_evidence,
+            cost_evidence=transport_result.cost_evidence,
         )
 
     async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:

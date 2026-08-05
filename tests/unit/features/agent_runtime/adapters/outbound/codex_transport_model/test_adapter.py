@@ -9,6 +9,14 @@ from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentContextBlock,
     LocalAgentRunCommand,
     LocalAgentRunStatus,
+    ModelCostEvidence,
+    ModelPricingStatus,
+    ModelTokenUsageEvidence,
+    ModelUsageCollectionStatus,
+    ModelUsageEvidence,
+    ModelUsageEvidenceConfidence,
+    ModelUsageEvidenceSource,
+    ModelUsageObservation,
     RuntimeObservation,
 )
 from fabrica.features.codex_transport.application.dtos import (
@@ -30,11 +38,27 @@ class FakeCodexTransportCompletion:
 
 
 def test_adapter_maps_successful_transport_result_to_runtime_result() -> None:
+    usage_evidence = ModelUsageEvidence(
+        provider="codex",
+        status=ModelUsageCollectionStatus.COLLECTED,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.EXTRACTED,
+        model="gpt-5",
+        tokens=ModelTokenUsageEvidence(input_tokens=4, output_tokens=2, total_tokens=6),
+    )
+    cost_evidence = ModelCostEvidence(
+        pricing_status=ModelPricingStatus.UNKNOWN,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+        observations=(ModelUsageObservation(message="Codex per-call cost is not known"),),
+    )
     transport = FakeCodexTransportCompletion(
         result=CodexTransportResult(
             status=CodexTransportStatus.SUCCESS,
             output_text="pong",
             observations=(CodexTransportObservation(message="backend probe succeeded"),),
+            usage_evidence=(usage_evidence,),
+            cost_evidence=(cost_evidence,),
         ),
     )
     command = LocalAgentRunCommand(prompt="Reply with the single word: pong")
@@ -47,6 +71,8 @@ def test_adapter_maps_successful_transport_result_to_runtime_result() -> None:
     assert result.observations == (
         RuntimeObservation(message="backend probe succeeded", metadata={"transport_status": "success"}),
     )
+    assert result.usage_evidence == (usage_evidence,)
+    assert result.cost_evidence == (cost_evidence,)
     assert transport.calls == [CodexCompletionCommand(prompt="Reply with the single word: pong")]
 
 
@@ -141,3 +167,37 @@ def test_adapter_maps_model_transport_failures_to_model_errors(
             metadata={"transport_status": transport_status.value, "category": "synthetic"},
         ),
     )
+
+
+def test_adapter_propagates_non_success_transport_evidence_without_fabricating_output() -> None:
+    usage_evidence = ModelUsageEvidence(
+        provider="codex",
+        status=ModelUsageCollectionStatus.FAILED,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+        observations=(ModelUsageObservation(message="transport failed before usage was collected"),),
+    )
+    cost_evidence = ModelCostEvidence(
+        pricing_status=ModelPricingStatus.NOT_AVAILABLE,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+        observations=(ModelUsageObservation(message="cost evidence unavailable after transport failure"),),
+    )
+    transport = FakeCodexTransportCompletion(
+        result=CodexTransportResult(
+            status=CodexTransportStatus.TRANSPORT_ERROR,
+            usage_evidence=(usage_evidence,),
+            cost_evidence=(cost_evidence,),
+        ),
+    )
+
+    result = CodexTransportAgentModel(transport=transport).run(LocalAgentRunCommand(prompt="ping"))
+
+    assert result.status is LocalAgentRunStatus.MODEL_ERROR
+    assert result.succeeded is False
+    assert result.output_text is None
+    assert result.usage_evidence == (usage_evidence,)
+    assert result.cost_evidence == (cost_evidence,)
+    assert result.usage_evidence[0].tokens == ModelTokenUsageEvidence()
+    assert result.cost_evidence[0].estimated_amount is None
+    assert result.cost_evidence[0].currency is None
