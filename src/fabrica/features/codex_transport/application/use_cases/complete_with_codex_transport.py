@@ -2,7 +2,6 @@
 
 from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
-    CodexTransportObservation,
     CodexTransportResult,
     CodexTransportStatus,
 )
@@ -11,6 +10,9 @@ from fabrica.features.codex_transport.application.exceptions import (
     CodexCredentialStoreError,
 )
 from fabrica.features.codex_transport.application.ports import CodexBackend, CodexCredentialStore
+from fabrica.features.codex_transport.application.use_cases._credential_failures import (
+    credential_transport_failure_result,
+)
 
 
 class CompleteWithCodexTransport:
@@ -25,33 +27,16 @@ class CompleteWithCodexTransport:
         try:
             credentials = self._credential_store.load()
         except CodexCredentialAuthenticationError as err:
-            return _credential_failure_result(
+            return credential_transport_failure_result(
                 status=CodexTransportStatus.AUTHENTICATION_FAILED,
                 message="credential loading failed authentication",
                 err=err,
             )
         except CodexCredentialStoreError as err:
-            return _credential_failure_result(
+            return credential_transport_failure_result(
                 status=CodexTransportStatus.CREDENTIAL_ERROR,
                 message="credential loading failed",
                 err=err,
             )
 
         return self._backend.complete(command=command, credentials=credentials)
-
-
-def _credential_failure_result(
-    *,
-    status: CodexTransportStatus,
-    message: str,
-    err: CodexCredentialStoreError,
-) -> CodexTransportResult:
-    return CodexTransportResult(
-        status=status,
-        observations=(
-            CodexTransportObservation(
-                message=message,
-                metadata={"error_type": type(err).__name__},
-            ),
-        ),
-    )
