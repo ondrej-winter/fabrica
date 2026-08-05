@@ -1,4 +1,19 @@
-"""Composition root for local agent runtime wiring."""
+"""Composition root for local agent runtime wiring.
+
+This module is the consumer-facing bootstrap boundary for local Fabrica agent
+experiments. Factory functions here construct application use cases and wire
+concrete adapters, but construction must stay side-effect light: factories do
+not read Codex credentials, inspect skill roots, call model backends, execute
+tools or scripts, or prompt for approval unless a factory docstring explicitly
+says otherwise.
+
+Potentially risky capabilities are opt-in composition decisions. Registered
+tools are available only when supplied to a tool-loop factory, staged-git tools
+are exposed only through the staged-git helper, and selected skill scripts are
+denied by default unless an approval lookup returns an exact approved metadata
+binding. Runtime I/O and caller-visible failures are reported through the
+application result DTOs returned by the composed use case.
+"""
 
 import asyncio
 from dataclasses import dataclass, field
@@ -103,7 +118,12 @@ DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT = "low"
 
 @dataclass(frozen=True, slots=True)
 class SkillContextAugmentationOptions:
-    """Composition options for selected skill markdown and resource context."""
+    """Composition options for selected skill markdown and resource context.
+
+    Selected files are loaded lazily when a command is augmented or when a
+    composed model-driven runtime is run. ``verbose_diagnostics`` may include
+    additional non-secret troubleshooting metadata in result observations.
+    """
 
     skill_selections: tuple[SelectedSkill, ...] = field(default_factory=tuple)
     resource_selections: tuple[SelectedSkillResource, ...] = field(default_factory=tuple)
@@ -115,7 +135,12 @@ class SkillContextAugmentationOptions:
 
 @dataclass(frozen=True, slots=True)
 class SkillScriptPolicyEvaluationOptions:
-    """Composition options for selected skill script policy evaluation."""
+    """Composition options for selected skill script policy evaluation.
+
+    Construction is metadata-loader wiring only; script files are inspected when
+    the returned evaluator is called. Without an explicit ``approval_lookup``,
+    selected scripts are denied by default in non-interactive runs.
+    """
 
     skill_roots: tuple[Path, ...] | None = None
     sandbox_policy: SkillScriptSandboxPolicy = field(default_factory=SkillScriptSandboxPolicy)
@@ -126,7 +151,13 @@ class SkillScriptPolicyEvaluationOptions:
 
 @dataclass(frozen=True, slots=True)
 class SkillScriptExecutionOptions:
-    """Composition options for selected skill script execution."""
+    """Composition options for selected skill script execution.
+
+    Script execution remains policy-gated. Construction does not inspect skill
+    roots or execute scripts; the selected script can run only after evaluation
+    returns an approved binding. ``working_directory`` controls subprocess cwd
+    and interpreter fields select the command used for approved scripts.
+    """
 
     skill_roots: tuple[Path, ...] | None = None
     sandbox_policy: SkillScriptSandboxPolicy = field(default_factory=SkillScriptSandboxPolicy)
@@ -140,7 +171,14 @@ class SkillScriptExecutionOptions:
 
 @dataclass(frozen=True, slots=True)
 class CommitMessageWorkflowOptions:
-    """Composition options for selected-skill commit-message generation."""
+    """Composition options for selected-skill commit-message generation.
+
+    Options define the staged-git, selected-skill, and Codex transport wiring
+    used by commit-message factories. Timeouts are expressed in seconds when a
+    numeric value is accepted. Construction does not read git state,
+    credentials, skill files, or call model backends; those effects occur during
+    workflow execution.
+    """
 
     codex_model: str | None = None
     codex_reasoning_effort: str | None = None
@@ -158,7 +196,12 @@ class CommitMessageWorkflowOptions:
 
 @dataclass(frozen=True, slots=True)
 class StagedGitToolOptions:
-    """Composition options for optional read-only staged git registered tools."""
+    """Composition options for optional read-only staged git registered tools.
+
+    The configured working directory is a composition-owned trust boundary; the
+    model cannot choose it. ``timeout_seconds`` is the subprocess timeout for
+    read-only staged-git inspection, and bounds limit returned staged diff data.
+    """
 
     working_directory: Path | None = None
     bounds: GitStagedDiffBounds | None = None
@@ -168,7 +211,13 @@ class StagedGitToolOptions:
 
 @dataclass(frozen=True, slots=True)
 class ModelDrivenSkillRuntimeOptions:
-    """Composition options for model-driven selected skill context and tools."""
+    """Composition options for model-driven selected skill context and tools.
+
+    Only explicitly supplied ``skill_tools`` can be exposed to the model, and
+    only for selected skills. Skill markdown/resources are loaded when the
+    runtime is run; tool declarations are prepared during construction without
+    invoking tool handlers.
+    """
 
     skill_context_options: SkillContextAugmentationOptions = field(default_factory=SkillContextAugmentationOptions)
     skill_tools: tuple[SkillAssociatedRegisteredTool, ...] = field(default_factory=tuple)
