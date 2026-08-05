@@ -1,10 +1,10 @@
-"""Tests for bounded async query execution."""
+"""Tests for bounded async query fan-out."""
 
 import asyncio
 
 import pytest
 
-from fabrica.features.query_execution.application.use_cases import BoundedAsyncQueryExecutor
+from fabrica.features.query_execution.application.use_cases import BoundedAsyncQueryFanoutExecutor
 
 
 def test_gather_ordered_preserves_input_order_when_operations_finish_out_of_order() -> None:
@@ -22,7 +22,7 @@ def test_gather_ordered_preserves_input_order_when_operations_finish_out_of_orde
         events.append("finish:second")
         return "second"
 
-    result = asyncio.run(BoundedAsyncQueryExecutor().gather_ordered((first, second), max_concurrency=2))
+    result = asyncio.run(BoundedAsyncQueryFanoutExecutor().gather_ordered((first, second), max_concurrency=2))
 
     assert result == ("first", "second")
     assert events == ["start:first", "start:second", "finish:second", "finish:first"]
@@ -41,7 +41,7 @@ def test_gather_ordered_respects_max_concurrency() -> None:
         return "ok"
 
     result = asyncio.run(
-        BoundedAsyncQueryExecutor().gather_ordered((operation, operation, operation), max_concurrency=1),
+        BoundedAsyncQueryFanoutExecutor().gather_ordered((operation, operation, operation), max_concurrency=1),
     )
 
     assert result == ("ok", "ok", "ok")
@@ -54,9 +54,9 @@ def test_gather_ordered_fails_closed_when_any_operation_fails() -> None:
         raise RuntimeError(msg)
 
     with pytest.raises(RuntimeError, match="query failed"):
-        asyncio.run(BoundedAsyncQueryExecutor().gather_ordered((failing,), max_concurrency=1))
+        asyncio.run(BoundedAsyncQueryFanoutExecutor().gather_ordered((failing,), max_concurrency=1))
 
 
 def test_gather_ordered_rejects_non_positive_concurrency() -> None:
     with pytest.raises(ValueError, match="max_concurrency"):
-        asyncio.run(BoundedAsyncQueryExecutor().gather_ordered((), max_concurrency=0))
+        asyncio.run(BoundedAsyncQueryFanoutExecutor().gather_ordered((), max_concurrency=0))

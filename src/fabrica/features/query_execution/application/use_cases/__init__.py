@@ -1,7 +1,7 @@
-"""Application use cases for reusable query execution."""
+"""Application use cases for reusable async query fan-out."""
 
-from fabrica.features.query_execution.application.use_cases.bounded_async_query_executor import (
-    BoundedAsyncQueryExecutor,
+from fabrica.features.query_execution.application.use_cases.bounded_async_query_fanout_executor import (
+    BoundedAsyncQueryFanoutExecutor,
 )
 
-__all__ = ["BoundedAsyncQueryExecutor"]
+__all__ = ["BoundedAsyncQueryFanoutExecutor"]

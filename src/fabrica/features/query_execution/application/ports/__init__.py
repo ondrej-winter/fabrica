@@ -1,5 +1,7 @@
-"""Application-owned ports for reusable query execution."""
+"""Application-owned ports for reusable async query fan-out."""
 
-from fabrica.features.query_execution.application.ports.async_query_executor import AsyncQueryExecutor
+from fabrica.features.query_execution.application.ports.async_query_fanout_executor import (
+    AsyncQueryFanoutExecutor,
+)
 
-__all__ = ["AsyncQueryExecutor"]
+__all__ = ["AsyncQueryFanoutExecutor"]

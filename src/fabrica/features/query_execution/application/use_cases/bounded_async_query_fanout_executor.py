@@ -1,4 +1,4 @@
-"""Bounded async query execution primitives."""
+"""Bounded async query fan-out primitives."""
 
 import asyncio
 from collections.abc import Awaitable, Callable, Sequence
@@ -7,8 +7,8 @@ from typing import TypeVar, cast
 T = TypeVar("T")
 
 
-class BoundedAsyncQueryExecutor:
-    """Run independent async query operations with bounded fan-out."""
+class BoundedAsyncQueryFanoutExecutor:
+    """Fan out independent async query operations with bounded concurrency."""
 
     async def gather_ordered(
         self,
@@ -16,7 +16,7 @@ class BoundedAsyncQueryExecutor:
         *,
         max_concurrency: int,
     ) -> tuple[T, ...]:
-        """Run operations concurrently while preserving input order in the result."""
+        """Await operations concurrently while preserving input order in the result."""
         if max_concurrency < 1:
             msg = "max_concurrency must be at least 1"
             raise ValueError(msg)

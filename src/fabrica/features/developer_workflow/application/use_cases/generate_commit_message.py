@@ -22,8 +22,8 @@ from fabrica.features.developer_workflow.application.ports import (
     GitStagedChangesLoader,
     GitStagedChangesLoadError,
 )
-from fabrica.features.query_execution.application.ports import AsyncQueryExecutor
-from fabrica.features.query_execution.application.use_cases import BoundedAsyncQueryExecutor
+from fabrica.features.query_execution.application.ports import AsyncQueryFanoutExecutor
+from fabrica.features.query_execution.application.use_cases import BoundedAsyncQueryFanoutExecutor
 
 
 class _SyncStagedFileCommitMessageAnalyzer(Protocol):
@@ -76,14 +76,14 @@ class GenerateCommitMessage:
         staged_changes_loader: AsyncGitStagedChangesLoader,
         analyzer: AsyncStagedFileCommitMessageAnalyzer,
         synthesizer: AsyncCommitMessageSynthesizer,
-        query_executor: AsyncQueryExecutor | None = None,
+        query_executor: AsyncQueryFanoutExecutor | None = None,
         options: GenerateCommitMessageOptions | None = None,
     ) -> None:
         workflow_options = options or GenerateCommitMessageOptions()
         self._staged_changes_loader = staged_changes_loader
         self._analyzer = analyzer
         self._synthesizer = synthesizer
-        self._query_executor = query_executor or BoundedAsyncQueryExecutor()
+        self._query_executor = query_executor or BoundedAsyncQueryFanoutExecutor()
         self._options = workflow_options
 
     def generate(self, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID) -> GenerateCommitMessageResult:
