@@ -1,6 +1,7 @@
 .PHONY: help test test-live-codex test-live-runtime run-live-cli commit-message
 
 PROMPT ?= Reply with the single word: pong
+FABRICA_GLOBAL_OPTIONS ?=
 
 help:
 	@echo "Available targets:"
@@ -20,10 +21,9 @@ test-live-runtime:
 	FABRICA_RUN_LIVE_CODEX_TESTS=1 uv run pytest -m live_codex tests/integration/features/agent_runtime/test_live_local_agent_runtime.py
 
 run-live-cli:
-	uv run fabrica run --prompt "$(PROMPT)"
+	uv run fabrica $(FABRICA_GLOBAL_OPTIONS) run --prompt "$(PROMPT)"
 
 commit-message:
-	uv run fabrica commit-message \
+	uv run fabrica --print-usage --verbose-diagnostics $(FABRICA_GLOBAL_OPTIONS) commit-message \
 	  --skill conventional-commits \
-	  --skill-root .agents/skills \
-	  --verbose-diagnostics
+	  --skill-root .agents/skills

@@ -7,6 +7,8 @@ import pytest
 
 from fabrica.features.agent_runtime.adapters.inbound.cli import (
     CliCommitMessageCommand,
+    CliGlobalOptions,
+    CliInvocation,
     CliRunCommand,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
@@ -31,11 +33,17 @@ def test_build_parser_renders_help_without_runtime_side_effects(capsys: pytest.C
     assert "commit-message" in captured.out
     assert "script-policy" in captured.out
     assert "script-execute" in captured.out
+    assert "--print-usage" in captured.out
+    assert "--print-prices" in captured.out
+    assert "--verbose-diagnostics" in captured.out
 
 
 def test_parse_run_command_supports_prompt_model_and_explicit_context() -> None:
     command = parse_args(
         [
+            "--print-usage",
+            "--print-prices",
+            "--verbose-diagnostics",
             "run",
             "--prompt",
             "Reply with pong",
@@ -49,35 +57,37 @@ def test_parse_run_command_supports_prompt_model_and_explicit_context() -> None:
             "python-testing:references/example.md",
             "--skill-root",
             "./skills",
-            "--verbose-diagnostics",
         ],
     )
 
-    assert command == CliRunCommand(
-        prompt="Reply with pong",
-        model_hint="codex-compatible",
-        skill_ids=("python-testing", "code-review"),
-        resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
-        skill_roots=(Path("./skills"),),
-        verbose_diagnostics=True,
+    assert command == CliInvocation(
+        command=CliRunCommand(
+            prompt="Reply with pong",
+            model_hint="codex-compatible",
+            skill_ids=("python-testing", "code-review"),
+            resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
+            skill_roots=(Path("./skills"),),
+        ),
+        global_options=CliGlobalOptions(print_usage=True, print_prices=True, verbose_diagnostics=True),
     )
 
 
 def test_parse_run_command_uses_empty_explicit_context_defaults() -> None:
     command = parse_args(["run", "--prompt", "Reply with pong"])
 
-    assert command == CliRunCommand(prompt="Reply with pong")
+    assert command == CliInvocation(command=CliRunCommand(prompt="Reply with pong"))
 
 
 def test_parse_commit_message_command_defaults_to_conventional_commits_skill() -> None:
     command = parse_args(["commit-message"])
 
-    assert command == CliCommitMessageCommand(skill_id="conventional-commits")
+    assert command == CliInvocation(command=CliCommitMessageCommand(skill_id="conventional-commits"))
 
 
 def test_parse_commit_message_command_supports_skill_root_and_diagnostics_overrides() -> None:
     command = parse_args(
         [
+            "--verbose-diagnostics",
             "commit-message",
             "--skill",
             "team-style",
@@ -87,16 +97,37 @@ def test_parse_commit_message_command_supports_skill_root_and_diagnostics_overri
             "medium",
             "--skill-root",
             "./skills",
-            "--verbose-diagnostics",
         ],
     )
+    assert command == CliInvocation(
+        command=CliCommitMessageCommand(
+            skill_id="team-style",
+            model="gpt-5.6-sol",
+            reasoning_effort="medium",
+            skill_roots=(Path("./skills"),),
+        ),
+        global_options=CliGlobalOptions(verbose_diagnostics=True),
+    )
 
-    assert command == CliCommitMessageCommand(
-        skill_id="team-style",
-        model="gpt-5.6-sol",
-        reasoning_effort="medium",
-        skill_roots=(Path("./skills"),),
-        verbose_diagnostics=True,
+
+def test_parse_command_rejects_global_options_after_subcommand() -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        parse_args(
+            [
+                "commit-message",
+                "--verbose-diagnostics",
+            ],
+        )
+
+    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
+
+
+def test_parse_commit_message_command_supports_usage_and_price_reporting() -> None:
+    command = parse_args(["--print-usage", "--print-prices", "commit-message"])
+
+    assert command == CliInvocation(
+        command=CliCommitMessageCommand(skill_id="conventional-commits"),
+        global_options=CliGlobalOptions(print_usage=True, print_prices=True),
     )
 
 
@@ -117,6 +148,7 @@ def test_parse_run_command_rejects_malformed_resource_selection() -> None:
 def test_parse_script_policy_command_supports_explicit_selected_script() -> None:
     command = parse_args(
         [
+            "--verbose-diagnostics",
             "script-policy",
             "--skill-id",
             "python-testing",
@@ -124,21 +156,23 @@ def test_parse_script_policy_command_supports_explicit_selected_script() -> None
             "scripts/check.py",
             "--skill-root",
             "./skills",
-            "--verbose-diagnostics",
         ],
     )
 
-    assert command == CliScriptPolicyCommand(
-        skill_id="python-testing",
-        script_id="scripts/check.py",
-        skill_roots=(Path("./skills"),),
-        verbose_diagnostics=True,
+    assert command == CliInvocation(
+        command=CliScriptPolicyCommand(
+            skill_id="python-testing",
+            script_id="scripts/check.py",
+            skill_roots=(Path("./skills"),),
+        ),
+        global_options=CliGlobalOptions(verbose_diagnostics=True),
     )
 
 
 def test_parse_script_execute_command_requires_metadata_bound_approval() -> None:
     command = parse_args(
         [
+            "--verbose-diagnostics",
             "script-execute",
             "--skill-id",
             "python-testing",
@@ -154,19 +188,20 @@ def test_parse_script_execute_command_requires_metadata_bound_approval() -> None
             "sha256:abc123",
             "--skill-root",
             "./skills",
-            "--verbose-diagnostics",
         ],
     )
 
-    assert command == CliScriptExecuteCommand(
-        skill_id="python-testing",
-        script_id="scripts/check.py",
-        approval_script_type=SkillScriptType.PYTHON,
-        approval_suffix=".py",
-        approval_byte_size=128,
-        approval_content_digest="sha256:abc123",
-        skill_roots=(Path("./skills"),),
-        verbose_diagnostics=True,
+    assert command == CliInvocation(
+        command=CliScriptExecuteCommand(
+            skill_id="python-testing",
+            script_id="scripts/check.py",
+            approval_script_type=SkillScriptType.PYTHON,
+            approval_suffix=".py",
+            approval_byte_size=128,
+            approval_content_digest="sha256:abc123",
+            skill_roots=(Path("./skills"),),
+        ),
+        global_options=CliGlobalOptions(verbose_diagnostics=True),
     )
 
 
@@ -202,10 +237,10 @@ def test_parsed_commands_are_immutable_boundary_values() -> None:
     commit_message_command = parse_args(["commit-message"])
 
     with pytest.raises(FrozenInstanceError):
-        setattr(run_command, "prompt", "changed")  # noqa: B010
+        setattr(run_command, "command", CliRunCommand(prompt="changed"))  # noqa: B010
     with pytest.raises(FrozenInstanceError):
-        setattr(policy_command, "script_id", "changed")  # noqa: B010
+        setattr(policy_command.command, "script_id", "changed")  # noqa: B010
     with pytest.raises(FrozenInstanceError):
-        setattr(execution_command, "script_id", "changed")  # noqa: B010
+        setattr(execution_command.command, "script_id", "changed")  # noqa: B010
     with pytest.raises(FrozenInstanceError):
-        setattr(commit_message_command, "skill_id", "changed")  # noqa: B010
+        setattr(commit_message_command.command, "skill_id", "changed")  # noqa: B010

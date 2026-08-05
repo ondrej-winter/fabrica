@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the local agent runtime CLI and return a process exit code."""
-    command = parse_args(tuple(argv) if argv is not None else None)
-    return run_cli_command(command)
+    invocation = parse_args(tuple(argv) if argv is not None else None)
+    return run_cli_command(invocation)
 
 
 if __name__ == "__main__":

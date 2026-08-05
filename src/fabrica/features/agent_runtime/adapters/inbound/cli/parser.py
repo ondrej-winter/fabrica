@@ -11,6 +11,15 @@ from fabrica.features.developer_workflow.application.use_cases import DEFAULT_CO
 
 
 @dataclass(frozen=True, slots=True)
+class CliGlobalOptions:
+    """Parsed CLI options shared by all subcommands."""
+
+    print_usage: bool = False
+    print_prices: bool = False
+    verbose_diagnostics: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class CliSelectedResource:
     """Adapter-local reference to one selected skill resource argument."""
 
@@ -27,7 +36,6 @@ class CliRunCommand:
     skill_ids: tuple[str, ...] = field(default_factory=tuple)
     resources: tuple[CliSelectedResource, ...] = field(default_factory=tuple)
     skill_roots: tuple[Path, ...] = field(default_factory=tuple)
-    verbose_diagnostics: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "skill_ids", tuple(self.skill_ids))
@@ -43,7 +51,6 @@ class CliCommitMessageCommand:
     model: str | None = None
     reasoning_effort: str | None = None
     skill_roots: tuple[Path, ...] = field(default_factory=tuple)
-    verbose_diagnostics: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "skill_roots", tuple(self.skill_roots))
@@ -56,7 +63,6 @@ class CliScriptPolicyCommand:
     skill_id: str
     script_id: str
     skill_roots: tuple[Path, ...] = field(default_factory=tuple)
-    verbose_diagnostics: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "skill_roots", tuple(self.skill_roots))
@@ -73,7 +79,6 @@ class CliScriptExecuteCommand:
     approval_byte_size: int
     approval_content_digest: str
     skill_roots: tuple[Path, ...] = field(default_factory=tuple)
-    verbose_diagnostics: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "skill_roots", tuple(self.skill_roots))
@@ -82,11 +87,34 @@ class CliScriptExecuteCommand:
 type CliCommand = CliRunCommand | CliCommitMessageCommand | CliScriptPolicyCommand | CliScriptExecuteCommand
 
 
+@dataclass(frozen=True, slots=True)
+class CliInvocation:
+    """Parsed CLI invocation with shared options and one selected command."""
+
+    command: CliCommand
+    global_options: CliGlobalOptions = field(default_factory=CliGlobalOptions)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the side-effect-free CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="fabrica",
         description="Run local subscription-backed agent runtime experiments.",
+    )
+    parser.add_argument(
+        "--print-usage",
+        action="store_true",
+        help="Print model usage evidence after command output when available.",
+    )
+    parser.add_argument(
+        "--print-prices",
+        action="store_true",
+        help="Print model pricing/cost evidence after command output when available.",
+    )
+    parser.add_argument(
+        "--verbose-diagnostics",
+        action="store_true",
+        help="Include additional diagnostics without exposing secrets or executing scripts.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -188,11 +216,18 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def parse_args(args: tuple[str, ...] | list[str] | None = None) -> CliCommand:
-    """Parse command-line arguments into adapter-local command objects."""
+def parse_args(args: tuple[str, ...] | list[str] | None = None) -> CliInvocation:
+    """Parse command-line arguments into an adapter-local invocation object."""
     namespace = build_parser().parse_args(args)
     command_factory = namespace.command_factory
-    return command_factory(namespace)
+    return CliInvocation(
+        command=command_factory(namespace),
+        global_options=CliGlobalOptions(
+            print_usage=namespace.print_usage,
+            print_prices=namespace.print_prices,
+            verbose_diagnostics=namespace.verbose_diagnostics,
+        ),
+    )
 
 
 def _add_common_skill_root_flags(parser: argparse.ArgumentParser) -> None:
@@ -203,11 +238,6 @@ def _add_common_skill_root_flags(parser: argparse.ArgumentParser) -> None:
         type=Path,
         default=[],
         help="Skill root override for explicit skill/resource/script selection. May be repeated.",
-    )
-    parser.add_argument(
-        "--verbose-diagnostics",
-        action="store_true",
-        help="Include additional diagnostics without exposing secrets or executing scripts.",
     )
 
 
@@ -234,7 +264,6 @@ def _run_command_from_namespace(namespace: argparse.Namespace) -> CliRunCommand:
         skill_ids=tuple(namespace.skill_ids),
         resources=tuple(namespace.resources),
         skill_roots=tuple(namespace.skill_roots),
-        verbose_diagnostics=namespace.verbose_diagnostics,
     )
 
 
@@ -244,7 +273,6 @@ def _commit_message_command_from_namespace(namespace: argparse.Namespace) -> Cli
         model=namespace.model,
         reasoning_effort=namespace.reasoning_effort,
         skill_roots=tuple(namespace.skill_roots),
-        verbose_diagnostics=namespace.verbose_diagnostics,
     )
 
 
@@ -253,7 +281,6 @@ def _script_policy_command_from_namespace(namespace: argparse.Namespace) -> CliS
         skill_id=namespace.skill_id,
         script_id=namespace.script_id,
         skill_roots=tuple(namespace.skill_roots),
-        verbose_diagnostics=namespace.verbose_diagnostics,
     )
 
 
@@ -266,5 +293,4 @@ def _script_execute_command_from_namespace(namespace: argparse.Namespace) -> Cli
         approval_byte_size=namespace.approve_byte_size,
         approval_content_digest=namespace.approve_content_digest,
         skill_roots=tuple(namespace.skill_roots),
-        verbose_diagnostics=namespace.verbose_diagnostics,
     )

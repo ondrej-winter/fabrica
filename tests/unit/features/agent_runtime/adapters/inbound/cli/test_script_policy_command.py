@@ -50,7 +50,6 @@ def test_script_policy_command_maps_explicit_selection_to_policy_evaluator() -> 
             skill_id="python-testing",
             script_id="scripts/check.py",
             skill_roots=(Path("synthetic-skills"),),
-            verbose_diagnostics=True,
         ),
         dependencies=CliCommandDependencies(script_policy_evaluator=evaluator),
         stdout=stdout,

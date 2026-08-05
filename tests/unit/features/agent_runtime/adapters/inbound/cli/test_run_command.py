@@ -6,6 +6,8 @@ from pathlib import Path
 
 from fabrica.features.agent_runtime.adapters.inbound.cli import (
     CliCommandDependencies,
+    CliGlobalOptions,
+    CliInvocation,
     CliRunCommand,
     CliSelectedResource,
     run_cli_command,
@@ -100,7 +102,6 @@ def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> 
             skill_ids=("python-testing",),
             resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
             skill_roots=(Path("synthetic-skills"),),
-            verbose_diagnostics=True,
         ),
         dependencies=CliCommandDependencies(runtime=runtime, command_augmenter=augmenter),
         stdout=StringIO(),
@@ -114,7 +115,7 @@ def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> 
             (SelectedSkill(skill_id="python-testing"),),
             (SelectedSkillResource(skill_id="python-testing", resource_id="references/example.md"),),
             (Path("synthetic-skills"),),
-            True,
+            False,
         ),
     ]
     assert runtime.calls == [
@@ -123,6 +124,30 @@ def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> 
             context=(LocalAgentContextBlock(text="synthetic skill context", label="python-testing"),),
         ),
     ]
+
+
+def test_run_invocation_passes_global_verbose_diagnostics_to_augmenter() -> None:
+    runtime = FakeRuntime(
+        result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="context-ok"),
+    )
+    augmenter = RecordingAugmenter()
+
+    exit_code = run_cli_command(
+        CliInvocation(
+            command=CliRunCommand(
+                prompt="Use selected context",
+                skill_ids=("python-testing",),
+                skill_roots=(Path("synthetic-skills"),),
+            ),
+            global_options=CliGlobalOptions(verbose_diagnostics=True),
+        ),
+        dependencies=CliCommandDependencies(runtime=runtime, command_augmenter=augmenter),
+        stdout=StringIO(),
+        stderr=StringIO(),
+    )
+
+    assert exit_code == 0
+    assert augmenter.calls[0][4] is True
 
 
 def test_run_command_skips_augmentation_when_no_context_is_selected() -> None:

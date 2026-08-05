@@ -80,6 +80,7 @@ The project exposes a minimal local CLI for explicit runtime experiments:
 ```bash
 uv run fabrica --help
 uv run fabrica run --prompt "Reply with the single word: pong"
+uv run fabrica --print-usage --print-prices run --prompt "Reply with the single word: pong"
 ```
 
 The `run` command uses the direct Codex-backed runtime composition. It may read
@@ -115,8 +116,16 @@ uv run fabrica commit-message \
   --skill conventional-commits \
   --model gpt-5.3-codex-spark \
   --reasoning-effort low \
-  --skill-root .agents/skills \
-  --verbose-diagnostics
+  --skill-root .agents/skills
+```
+
+Fabrica-wide reporting and diagnostic flags are passed before the subcommand and
+apply to commands that produce model runtime evidence:
+
+```bash
+uv run fabrica --print-usage --print-prices --verbose-diagnostics commit-message \
+  --skill conventional-commits \
+  --skill-root .agents/skills
 ```
 
 The Codex-backed commit-message workflow defaults to `gpt-5.3-codex-spark` with
