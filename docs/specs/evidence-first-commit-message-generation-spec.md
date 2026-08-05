@@ -18,13 +18,11 @@ commit-message Agent Skill to produce the final recommendation.
 
 ## Current context
 
-- The source idea is documented in
-  `docs/ideas/evidence-first-commit-message-generation.md`.
 - The first selected-skill commit-message workflow is specified in
   `docs/specs/selected-skill-commit-message-spec.md`.
-- The completed prompt-level implementation plan is documented in
-  `docs/plans/evidence-first-commit-message-generation-plan.md` and is now
-  superseded for future evidence-first architecture work.
+- The earlier source idea and completed prompt-level implementation plan were
+  temporary working artifacts and have been removed after promotion into this spec
+  and the current multi-call plan.
 - The current implemented commit-message preparation use case is
   `src/fabrica/features/developer_workflow/application/use_cases/prepare_commit_message_run.py`.
 - The current use case reads full staged git diff context through an
@@ -156,7 +154,6 @@ developer's ambient staged git state.
 - Spec: `docs/specs/evidence-first-commit-message-generation-spec.md`.
 - Implementation plan:
   `docs/plans/multi-call-evidence-first-commit-message-generation-plan.md`.
-- Source idea: `docs/ideas/evidence-first-commit-message-generation.md`.
 - Existing one-shot use case, likely to be replaced:
   `src/fabrica/features/developer_workflow/application/use_cases/prepare_commit_message_run.py`.
 - New developer-workflow DTOs, likely:

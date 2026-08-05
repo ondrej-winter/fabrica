@@ -1,5 +1,10 @@
 # Spec: Subscription-Backed Python Agent Runtime
 
+> Status note: this is the original transport spike spec. Later implementation
+> and observation notes found that the private Codex backend request path requires
+> `stream: true`, so older "non-streaming" MVP wording below should be read as
+> historical context rather than the current adapter contract.
+
 ## Objective
 
 Define the first implementation target for a local Python agent runtime experiment that can use an existing

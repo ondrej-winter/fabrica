@@ -14,9 +14,9 @@ list staged files
   -> return a concise Conventional Commit recommendation
 ```
 
-This plan supersedes the completed prompt-level plan in
-`docs/plans/evidence-first-commit-message-generation-plan.md` for future
-evidence-first architecture work.
+This plan supersedes the completed prompt-level plan. Completed temporary plans
+are deleted from `docs/plans/`, so this file is the active implementation plan for
+future evidence-first architecture work.
 
 ## Goal
 
