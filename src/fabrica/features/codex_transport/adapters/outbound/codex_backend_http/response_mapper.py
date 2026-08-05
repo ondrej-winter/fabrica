@@ -1,4 +1,11 @@
-"""Map Codex backend HTTP outcomes to application transport results."""
+"""Map Codex backend HTTP outcomes to application result contracts.
+
+The mapper is the trust boundary for untyped third-party response data. It
+classifies status codes, edge challenges, quota/rate-limit signals, success
+response shapes, and transport exceptions into bounded, secret-safe application
+DTOs. Success extraction accepts both JSON responses and the stream-backed SSE
+shape currently used by the Codex responses endpoint.
+"""
 
 import json
 from collections.abc import Mapping, Sequence
@@ -24,7 +31,7 @@ _MAX_ERROR_TYPE_LENGTH = 80
 
 @dataclass(frozen=True, slots=True)
 class CodexBackendResponse:
-    """Adapter-owned HTTP response shape for offline response mapping."""
+    """Adapter-owned HTTP response shape for deterministic response mapping."""
 
     status_code: int
     headers: Mapping[str, str]
@@ -36,7 +43,7 @@ class CodexBackendResponse:
 
 @dataclass(frozen=True, slots=True)
 class CodexUsageResponse:
-    """Adapter-owned HTTP response shape for offline usage response mapping."""
+    """Adapter-owned HTTP response shape for deterministic usage mapping."""
 
     status_code: int
     headers: Mapping[str, str]
@@ -47,7 +54,7 @@ class CodexUsageResponse:
 
 
 def map_codex_backend_response(response: CodexBackendResponse) -> CodexTransportResult:
-    """Map a backend response into the normalized application result contract."""
+    """Map a completion response into the normalized application result contract."""
     if _is_edge_challenge_response(response.headers):
         return _result(
             status=CodexTransportStatus.TRANSPORT_ERROR,
@@ -126,7 +133,7 @@ def map_codex_backend_transport_error(err: BaseException) -> CodexTransportResul
 
 
 def map_codex_usage_response(response: CodexUsageResponse) -> CodexUsageResult:
-    """Map a usage endpoint response into the normalized usage result contract."""
+    """Map a usage response into safe status and allowlisted usage evidence."""
     if _is_edge_challenge_response(response.headers):
         return _usage_result(
             status=CodexUsageStatus.TRANSPORT_ERROR,

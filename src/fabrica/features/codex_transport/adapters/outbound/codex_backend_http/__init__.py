@@ -1,4 +1,8 @@
-"""HTTP backend adapter components for Codex transport probing."""
+"""Public HTTP backend adapter surface for Codex transport probing.
+
+Low-level request builders and response mappers are adapter internals. Import
+them from their concrete modules in focused tests or adapter-local tooling.
+"""
 
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.adapter import (
     DEFAULT_CODEX_BACKEND_TIMEOUT_SECONDS,
@@ -10,20 +14,8 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.reque
     DEFAULT_CODEX_MODEL,
     DEFAULT_CODEX_PRODUCT_SKU,
     DEFAULT_CODEX_USAGE_PATH,
-    CodexBackendRequest,
     CodexBackendRequestSettings,
-    CodexUsageRequest,
     CodexUsageRequestSettings,
-    build_codex_backend_request,
-    build_codex_usage_request,
-)
-from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.response_mapper import (
-    CodexBackendResponse,
-    CodexUsageResponse,
-    map_codex_backend_response,
-    map_codex_backend_transport_error,
-    map_codex_usage_response,
-    map_codex_usage_transport_error,
 )
 
 __all__ = [
@@ -34,16 +26,6 @@ __all__ = [
     "DEFAULT_CODEX_PRODUCT_SKU",
     "DEFAULT_CODEX_USAGE_PATH",
     "CodexBackendHttpAdapter",
-    "CodexBackendRequest",
     "CodexBackendRequestSettings",
-    "CodexBackendResponse",
-    "CodexUsageRequest",
     "CodexUsageRequestSettings",
-    "CodexUsageResponse",
-    "build_codex_backend_request",
-    "build_codex_usage_request",
-    "map_codex_backend_response",
-    "map_codex_backend_transport_error",
-    "map_codex_usage_response",
-    "map_codex_usage_transport_error",
 ]

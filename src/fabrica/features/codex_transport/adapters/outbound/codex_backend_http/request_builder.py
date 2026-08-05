@@ -1,4 +1,9 @@
-"""Build ChatGPT Codex backend requests from application boundary values."""
+"""Build ChatGPT Codex backend requests from application boundary values.
+
+The request builders are adapter-owned contracts: they translate application
+DTOs and credentials into the current Codex HTTP wire shape without exposing
+that shape to the application layer.
+"""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -22,7 +27,12 @@ DEFAULT_CODEX_PRODUCT_SKU = "codex"
 
 @dataclass(frozen=True, slots=True)
 class CodexBackendRequestSettings:
-    """Adapter-owned settings for Codex backend request construction."""
+    """Adapter-owned settings for stream-backed completion requests.
+
+    ``base_url`` and ``path`` identify the Codex responses endpoint, ``model``
+    and ``product_sku`` are sent on every completion request, and
+    ``reasoning_effort`` is omitted unless explicitly configured.
+    """
 
     base_url: str = DEFAULT_CODEX_BACKEND_BASE_URL
     path: str = DEFAULT_CODEX_BACKEND_PATH
@@ -33,7 +43,7 @@ class CodexBackendRequestSettings:
 
 @dataclass(frozen=True, slots=True)
 class CodexUsageRequestSettings:
-    """Adapter-owned settings for Codex usage evidence request construction."""
+    """Adapter-owned settings for Codex usage evidence requests."""
 
     base_url: str = DEFAULT_CODEX_BACKEND_BASE_URL
     usage_path: str = DEFAULT_CODEX_USAGE_PATH
@@ -41,7 +51,7 @@ class CodexUsageRequestSettings:
 
 @dataclass(frozen=True, slots=True)
 class CodexBackendRequest:
-    """Adapter-owned representation of a Codex backend HTTP request."""
+    """Adapter-owned representation of a stream-backed completion request."""
 
     url: str
     headers: Mapping[str, str]
@@ -61,7 +71,7 @@ class CodexBackendRequest:
                 "authorization": str(redacted_headers.get("Authorization")),
                 "account_header": str(redacted_headers.get("ChatGPT-Account-ID")),
                 "header_count": len(self.headers),
-                "payload_shape": "responses_non_streaming",
+                "payload_shape": "responses_streaming",
                 "stream": self.json_payload.get("stream") is True,
             },
         )
@@ -69,7 +79,12 @@ class CodexBackendRequest:
 
 @dataclass(frozen=True, slots=True)
 class CodexUsageRequest:
-    """Adapter-owned representation of a Codex usage evidence HTTP request."""
+    """Adapter-owned representation of a Codex usage evidence HTTP request.
+
+    ``include_rate_limit_reset`` is an application observation preference. The
+    current upstream endpoint exposes reset evidence in safe response headers
+    when available; no additional request parameter is known for this flag.
+    """
 
     url: str
     headers: Mapping[str, str]
@@ -99,7 +114,7 @@ def build_codex_backend_request(
     credentials: CodexCredentials,
     settings: CodexBackendRequestSettings | None = None,
 ) -> CodexBackendRequest:
-    """Build the current best-known non-streaming Codex backend request."""
+    """Build the current best-known stream-backed Codex completion request."""
     request_settings = settings or CodexBackendRequestSettings()
     json_payload: dict[str, object] = {
         "model": request_settings.model,

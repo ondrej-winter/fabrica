@@ -1,4 +1,4 @@
-"""HTTP implementation of the Codex backend outbound port."""
+"""HTTP implementation of the Codex backend outbound ports."""
 
 from dataclasses import dataclass
 
@@ -34,7 +34,14 @@ DEFAULT_CODEX_BACKEND_TIMEOUT_SECONDS = 30.0
 
 @dataclass(frozen=True, slots=True)
 class CodexBackendHttpAdapter:
-    """Execute Codex backend probes through an injected or internally owned HTTP client."""
+    """Execute Codex backend calls through injected or internally owned HTTP clients.
+
+    The completion/probe endpoint currently uses the stream-backed Codex
+    responses wire shape, but this adapter consumes the HTTP response fully and
+    returns one normalized application result. HTTP client exceptions are
+    translated into secret-safe result DTOs instead of escaping through the
+    outbound port boundary.
+    """
 
     request_settings: CodexBackendRequestSettings | None = None
     usage_request_settings: CodexUsageRequestSettings | None = None
@@ -46,7 +53,7 @@ class CodexBackendHttpAdapter:
         command: CodexTransportProbeCommand,
         credentials: CodexCredentials,
     ) -> CodexTransportResult:
-        """Execute one non-streaming Codex backend probe via HTTP."""
+        """Execute one Codex backend probe and return a normalized result."""
         return self.complete(
             command=CodexCompletionCommand(prompt=command.prompt),
             credentials=credentials,
@@ -57,7 +64,7 @@ class CodexBackendHttpAdapter:
         command: CodexCompletionCommand,
         credentials: CodexCredentials,
     ) -> CodexTransportResult:
-        """Execute one non-streaming Codex backend completion via HTTP."""
+        """Execute one Codex completion and return a normalized result."""
         request = build_codex_backend_request(
             command=command,
             credentials=credentials,

@@ -18,7 +18,7 @@ class CodexBackend(Protocol):
         command: CodexCompletionCommand,
         credentials: CodexCredentials,
     ) -> CodexTransportResult:
-        """Execute one non-streaming Codex completion."""
+        """Execute one Codex completion and return a normalized result."""
         ...
 
     def execute_probe(

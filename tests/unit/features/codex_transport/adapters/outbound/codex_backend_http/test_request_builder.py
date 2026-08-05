@@ -12,6 +12,8 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http impor
     DEFAULT_CODEX_USAGE_PATH,
     CodexBackendRequestSettings,
     CodexUsageRequestSettings,
+)
+from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.request_builder import (
     build_codex_backend_request,
     build_codex_usage_request,
 )
@@ -41,7 +43,7 @@ def test_build_codex_backend_request_uses_default_backend_url_and_headers() -> N
     }
 
 
-def test_build_codex_backend_request_produces_minimal_non_streaming_responses_payload() -> None:
+def test_build_codex_backend_request_produces_stream_backed_responses_payload() -> None:
     request = build_codex_backend_request(
         command=CodexTransportProbeCommand(prompt="Reply with the single word: pong"),
         credentials=CodexCredentials(
@@ -134,7 +136,7 @@ def test_backend_request_redacted_observation_excludes_raw_tokens_and_account_id
         "authorization": REDACTED_VALUE,
         "account_header": REDACTED_VALUE,
         "header_count": 4,
-        "payload_shape": "responses_non_streaming",
+        "payload_shape": "responses_streaming",
         "stream": True,
     }
     assert "synthetic-access-token" not in str(observation.metadata)

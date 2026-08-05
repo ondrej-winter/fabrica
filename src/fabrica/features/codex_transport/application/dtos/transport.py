@@ -20,14 +20,14 @@ class CodexTransportStatus(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class CodexCompletionCommand:
-    """Application command for one non-streaming Codex completion."""
+    """Application command for one normalized Codex completion result."""
 
     prompt: str
 
 
 @dataclass(frozen=True, slots=True)
 class CodexTransportProbeCommand:
-    """Application command for one non-streaming Codex backend probe."""
+    """Application command for one normalized Codex backend probe result."""
 
     prompt: str
 
