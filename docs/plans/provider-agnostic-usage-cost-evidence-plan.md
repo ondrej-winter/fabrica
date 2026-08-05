@@ -360,20 +360,20 @@ optional public-price estimate without Codex assumptions.
 
 **Acceptance criteria:**
 
-- [ ] Synthetic response maps prompt/input, completion/output, and total tokens
+- [x] Synthetic response maps prompt/input, completion/output, and total tokens
   into the same generic DTOs.
-- [ ] Optional public-price estimate is represented as estimated cost evidence
+- [x] Optional public-price estimate is represented as estimated cost evidence
   with amount, currency, source, and confidence.
-- [ ] Test code does not introduce a new live provider integration or runtime
+- [x] Test code does not introduce a new live provider integration or runtime
   dependency.
-- [ ] The synthetic provider mapper lives in test code only unless a real
+- [x] The synthetic provider mapper lives in test code only unless a real
   provider integration is explicitly requested.
-- [ ] The generic DTO remains free of Codex-specific assumptions.
+- [x] The generic DTO remains free of Codex-specific assumptions.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/agent_runtime/application/test_usage_dtos.py`
-- [ ] `uv run pytest tests/unit/features/agent_runtime/application/test_synthetic_provider_usage_mapping.py` if a separate test module is created
+- [x] `uv run pytest tests/unit/features/agent_runtime/application/test_usage_dtos.py`
+- [x] `uv run pytest tests/unit/features/agent_runtime/application/test_synthetic_provider_usage_mapping.py` if a separate test module is created
 
 **Dependencies:** Task 1
 
@@ -392,21 +392,21 @@ configuration, or CLI behavior.
 
 **Acceptance criteria:**
 
-- [ ] Public DTOs needed by adapters/tests are exported from
+- [x] Public DTOs needed by adapters/tests are exported from
   `agent_runtime.application.dtos`.
-- [ ] No README/docs update is needed unless CLI/user-visible output changes; if
+- [x] No README/docs update is needed unless CLI/user-visible output changes; if
   it does, update docs accordingly.
-- [ ] If implementation enum names, field names, status mappings, or DTO shapes
+- [x] If implementation enum names, field names, status mappings, or DTO shapes
   differ from the spec or this plan, update the spec or record a plan deviation.
-- [ ] Full quality gate commands pass or any unrun/failing checks are documented
+- [x] Full quality gate commands pass or any unrun/failing checks are documented
   with reason.
 
 **Verification:**
 
-- [ ] `uv run ruff format .`
-- [ ] `uv run ruff check .`
-- [ ] `uv run ty check src tests`
-- [ ] `uv run pytest`
+- [x] `uv run ruff format .`
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src tests`
+- [x] `uv run pytest`
 
 **Dependencies:** Tasks 1-7
 
@@ -421,11 +421,11 @@ configuration, or CLI behavior.
 
 ### Checkpoint: Complete
 
-- [ ] All task acceptance criteria are complete.
-- [ ] Full local quality gate passes.
-- [ ] Handoff notes include files changed, validation performed, assumptions, and
+- [x] All task acceptance criteria are complete.
+- [x] Full local quality gate passes.
+- [x] Handoff notes include files changed, validation performed, assumptions, and
   any deviations.
-- [ ] No raw provider payloads, account IDs, secrets, auth headers, cookies, or
+- [x] No raw provider payloads, account IDs, secrets, auth headers, cookies, or
   billing-page content are introduced.
 
 ## Dependency Graph
