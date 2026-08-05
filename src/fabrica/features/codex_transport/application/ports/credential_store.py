@@ -9,5 +9,11 @@ class CodexCredentialStore(Protocol):
     """Outbound port for loading Codex credentials into application DTOs."""
 
     def load(self) -> CodexCredentials:
-        """Load credentials required for one Codex transport probe."""
+        """Load credentials required for one Codex transport operation.
+
+        Raises:
+            CodexCredentialStoreError: Credentials could not be safely loaded or
+                are not usable for Codex authentication.
+
+        """
         ...

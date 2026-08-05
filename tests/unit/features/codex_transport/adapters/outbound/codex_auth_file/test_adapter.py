@@ -27,6 +27,30 @@ def test_load_returns_credentials_from_chatgpt_auth_file(tmp_path: Path) -> None
     )
 
 
+def test_constructor_accepts_string_path_for_config_boundaries(tmp_path: Path) -> None:
+    auth_file_path = _write_auth_file(tmp_path)
+
+    credentials = CodexAuthFileCredentialStore(str(auth_file_path)).load()
+
+    assert credentials == CodexCredentials(
+        access_token=SYNTHETIC_ACCESS_TOKEN,
+        account_id=SYNTHETIC_ACCOUNT_ID,
+    )
+
+
+def test_constructor_expands_user_home_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    home_path = tmp_path / "home"
+    _write_auth_file(home_path / ".codex")
+    monkeypatch.setenv("HOME", str(home_path))
+
+    credentials = CodexAuthFileCredentialStore(Path("~/.codex/auth.json")).load()
+
+    assert credentials == CodexCredentials(
+        access_token=SYNTHETIC_ACCESS_TOKEN,
+        account_id=SYNTHETIC_ACCOUNT_ID,
+    )
+
+
 def test_load_raises_credential_unavailable_when_file_is_missing(tmp_path: Path) -> None:
     auth_file_path = tmp_path / "missing-auth.json"
 
@@ -106,5 +130,6 @@ def _write_auth_file(
         payload.update(payload_override)
 
     auth_file_path = tmp_path / "auth.json"
+    auth_file_path.parent.mkdir(parents=True, exist_ok=True)
     auth_file_path.write_text(json.dumps(payload), encoding="utf-8")
     return auth_file_path
