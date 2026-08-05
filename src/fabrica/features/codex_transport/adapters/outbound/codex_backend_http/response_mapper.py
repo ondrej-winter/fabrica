@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import cast
 
+from fabrica.features.agent_runtime.application.dtos.usage import ModelUsageEvidenceSource
 from fabrica.features.codex_transport.application.dtos import (
     CodexTransportObservation,
     CodexTransportResult,
@@ -21,6 +22,10 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexUsageResult,
     CodexUsageStatus,
     SafeUsageEvidenceValue,
+)
+from fabrica.features.codex_transport.application.usage_mapping import (
+    CodexCompletionUsageFacts,
+    map_codex_completion_evidence,
 )
 
 _AUTHENTICATION_STATUS_CODES = frozenset({401, 403})
@@ -59,33 +64,29 @@ def map_codex_backend_response(response: CodexBackendResponse) -> CodexTransport
     if _is_edge_challenge_response(response.headers):
         return _result(
             status=CodexTransportStatus.TRANSPORT_ERROR,
-            message="Codex backend request was blocked by edge challenge mitigation",
             response=response,
-            category="edge_challenge",
+            outcome=("Codex backend request was blocked by edge challenge mitigation", "edge_challenge"),
         )
 
     if response.status_code in _AUTHENTICATION_STATUS_CODES:
         return _result(
             status=CodexTransportStatus.AUTHENTICATION_FAILED,
-            message="Codex backend rejected credentials",
             response=response,
-            category="authentication",
+            outcome=("Codex backend rejected credentials", "authentication"),
         )
 
     if _is_quota_exceeded_response(response):
         return _result(
             status=CodexTransportStatus.QUOTA_EXCEEDED,
-            message="Codex backend quota was exceeded",
             response=response,
-            category="quota",
+            outcome=("Codex backend quota was exceeded", "quota"),
         )
 
     if response.status_code == _RATE_LIMIT_STATUS_CODE or _has_rate_limit_signal(response.headers):
         return _result(
             status=CodexTransportStatus.RATE_LIMITED,
-            message="Codex backend request was rate limited",
             response=response,
-            category="rate_limit",
+            outcome=("Codex backend request was rate limited", "rate_limit"),
         )
 
     if _is_success_status_code(response.status_code):
@@ -93,9 +94,8 @@ def map_codex_backend_response(response: CodexBackendResponse) -> CodexTransport
 
     return _result(
         status=CodexTransportStatus.TRANSPORT_ERROR,
-        message="Codex backend returned an unsuccessful response",
         response=response,
-        category="backend_error",
+        outcome=("Codex backend returned an unsuccessful response", "backend_error"),
     )
 
 
@@ -104,16 +104,16 @@ def _map_success_response(response: CodexBackendResponse) -> CodexTransportResul
     if output_text is None:
         return _result(
             status=CodexTransportStatus.BACKEND_SHAPE_MISMATCH,
-            message="Codex backend response shape was unexpected",
             response=response,
-            category="shape_mismatch",
+            outcome=("Codex backend response shape was unexpected", "shape_mismatch"),
         )
+    usage_facts = _extract_completion_usage_facts(response.json_body)
     return _result(
         status=CodexTransportStatus.SUCCESS,
-        message="Codex backend returned expected response shape",
         response=response,
-        category="success",
+        outcome=("Codex backend returned expected response shape", "success"),
         output_text=output_text,
+        usage_facts=usage_facts,
     )
 
 
@@ -197,11 +197,13 @@ def map_codex_usage_transport_error(err: BaseException) -> CodexUsageResult:
 def _result(
     *,
     status: CodexTransportStatus,
-    message: str,
     response: CodexBackendResponse,
-    category: str,
+    outcome: tuple[str, str],
     output_text: str | None = None,
+    usage_facts: CodexCompletionUsageFacts | None = None,
 ) -> CodexTransportResult:
+    message, category = outcome
+    generic_evidence = map_codex_completion_evidence(status=status, usage_facts=usage_facts)
     return CodexTransportResult(
         status=status,
         output_text=output_text,
@@ -217,6 +219,8 @@ def _result(
                 },
             ),
         ),
+        usage_evidence=generic_evidence.usage_evidence,
+        cost_evidence=generic_evidence.cost_evidence,
     )
 
 
@@ -277,6 +281,107 @@ def _extract_usage_evidence(json_body: object, headers: Mapping[str, str]) -> di
         evidence["rate_limit_header_count"] = len(rate_limit_header_names)
         evidence["rate_limit_header_names"] = ",".join(rate_limit_header_names)
     return evidence
+
+
+def _extract_completion_usage_facts(json_body: object) -> CodexCompletionUsageFacts | None:
+    if isinstance(json_body, str):
+        return _extract_completion_usage_facts_from_event_stream(json_body)
+    if not isinstance(json_body, Mapping):
+        return None
+    return _extract_completion_usage_facts_from_mapping(
+        cast("Mapping[object, object]", json_body),
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+    )
+
+
+def _extract_completion_usage_facts_from_event_stream(response_text: str) -> CodexCompletionUsageFacts | None:
+    latest_facts: CodexCompletionUsageFacts | None = None
+    for line in response_text.splitlines():
+        if not line.startswith("data:"):
+            continue
+        event_data = line.removeprefix("data:").strip()
+        if event_data in {"", "[DONE]"}:
+            continue
+        try:
+            payload = json.loads(event_data)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, Mapping):
+            facts = _extract_completion_usage_facts_from_mapping(
+                cast("Mapping[object, object]", payload),
+                source=ModelUsageEvidenceSource.STREAM_EVENT,
+            )
+            if facts is not None:
+                latest_facts = facts
+    return latest_facts
+
+
+def _extract_completion_usage_facts_from_mapping(
+    json_body: Mapping[object, object],
+    *,
+    source: ModelUsageEvidenceSource,
+) -> CodexCompletionUsageFacts | None:
+    usage = _usage_mapping_from_response_shape(json_body)
+    candidate = usage if usage is not None else json_body
+    input_tokens = _optional_non_negative_int(candidate.get("input_tokens"), candidate.get("prompt_tokens"))
+    output_tokens = _optional_non_negative_int(candidate.get("output_tokens"), candidate.get("completion_tokens"))
+    total_tokens = _optional_non_negative_int(candidate.get("total_tokens"))
+    details = _first_mapping(candidate.get("input_token_details"), candidate.get("prompt_tokens_details"))
+    output_details = _first_mapping(candidate.get("output_token_details"), candidate.get("completion_tokens_details"))
+    cached_input_tokens = _optional_non_negative_int(
+        candidate.get("cached_input_tokens"),
+        details.get("cached_tokens") if details is not None else None,
+    )
+    reasoning_tokens = _optional_non_negative_int(
+        candidate.get("reasoning_tokens"),
+        output_details.get("reasoning_tokens") if output_details is not None else None,
+    )
+    model = _safe_model(candidate.get("model"), json_body.get("model"))
+
+    facts = CodexCompletionUsageFacts(
+        source=source,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        cached_input_tokens=cached_input_tokens,
+        reasoning_tokens=reasoning_tokens,
+        model=model,
+    )
+    return facts if facts.has_token_counts else None
+
+
+def _first_mapping(*values: object) -> Mapping[object, object] | None:
+    for value in values:
+        if isinstance(value, Mapping):
+            return cast("Mapping[object, object]", value)
+    return None
+
+
+def _usage_mapping_from_response_shape(json_body: Mapping[object, object]) -> Mapping[object, object] | None:
+    usage = _first_mapping(json_body.get("usage"))
+    if usage is not None:
+        return usage
+    for nested_key in ("response", "item", "part"):
+        nested_value = json_body.get(nested_key)
+        if isinstance(nested_value, Mapping):
+            nested_usage = _usage_mapping_from_response_shape(cast("Mapping[object, object]", nested_value))
+            if nested_usage is not None:
+                return nested_usage
+    return None
+
+
+def _optional_non_negative_int(*values: object) -> int | None:
+    for value in values:
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            return value
+    return None
+
+
+def _safe_model(*values: object) -> str | None:
+    for value in values:
+        if isinstance(value, str) and value:
+            return _bounded(value, 120)
+    return None
 
 
 def _extract_usage_mapping_evidence(json_body: object) -> dict[str, SafeUsageEvidenceValue]:

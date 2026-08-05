@@ -227,26 +227,26 @@ partial evidence explicitly.
 
 **Acceptance criteria:**
 
-- [ ] Raw Codex response bodies and SSE payloads are parsed only in the outbound
+- [x] Raw Codex response bodies and SSE payloads are parsed only in the outbound
   adapter or adapter-local helpers.
-- [ ] Only safe bounded facts cross from adapter extraction into Codex
+- [x] Only safe bounded facts cross from adapter extraction into Codex
   application mapping.
-- [ ] Safe response usage maps input/output/total/cached/reasoning token fields
+- [x] Safe response usage maps input/output/total/cached/reasoning token fields
   where present.
-- [ ] Missing usage yields unavailable or partially collected usage evidence with
+- [x] Missing usage yields unavailable or partially collected usage evidence with
   a redacted observation.
-- [ ] Partial usage preserves only categories actually reported.
-- [ ] Pricing evidence for Codex defaults to unknown, unavailable, or
+- [x] Partial usage preserves only categories actually reported.
+- [x] Pricing evidence for Codex defaults to unknown, unavailable, or
   subscription-oriented status with source/confidence.
-- [ ] Raw provider response bodies and unsafe fields are not exposed in DTOs or
+- [x] Raw provider response bodies and unsafe fields are not exposed in DTOs or
   observations.
-- [ ] `tests/unit/features/codex_transport/application/test_usage_mapping.py` is
+- [x] `tests/unit/features/codex_transport/application/test_usage_mapping.py` is
   the required boundary test for generic evidence conversion.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/codex_transport/application/test_usage_mapping.py`
-- [ ] `uv run pytest tests/unit/features/codex_transport/adapters/outbound/codex_backend_http/test_response_mapper.py`
+- [x] `uv run pytest tests/unit/features/codex_transport/application/test_usage_mapping.py`
+- [x] `uv run pytest tests/unit/features/codex_transport/adapters/outbound/codex_backend_http/test_response_mapper.py`
 
 **Dependencies:** Tasks 1-3
 

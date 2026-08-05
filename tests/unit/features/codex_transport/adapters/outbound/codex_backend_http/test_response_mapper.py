@@ -4,6 +4,11 @@ from typing import cast
 
 import pytest
 
+from fabrica.features.agent_runtime.application.dtos import (
+    ModelPricingStatus,
+    ModelUsageCollectionStatus,
+    ModelUsageEvidenceSource,
+)
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.response_mapper import (
     CodexBackendResponse,
     CodexUsageResponse,
@@ -13,6 +18,15 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.respo
     map_codex_usage_transport_error,
 )
 from fabrica.features.codex_transport.application.dtos import CodexTransportStatus, CodexUsageStatus
+
+RESPONSE_INPUT_TOKENS = 10
+RESPONSE_OUTPUT_TOKENS = 4
+RESPONSE_TOTAL_TOKENS = 14
+RESPONSE_CACHED_INPUT_TOKENS = 6
+RESPONSE_REASONING_TOKENS = 2
+STREAM_INPUT_TOKENS = 8
+STREAM_OUTPUT_TOKENS = 2
+STREAM_TOTAL_TOKENS = 10
 
 
 def test_map_success_response_with_direct_output_text() -> None:
@@ -26,6 +40,8 @@ def test_map_success_response_with_direct_output_text() -> None:
 
     assert result.status is CodexTransportStatus.SUCCESS
     assert result.output_text == "pong"
+    assert result.usage_evidence[0].status is ModelUsageCollectionStatus.UNAVAILABLE
+    assert result.cost_evidence[0].pricing_status is ModelPricingStatus.UNKNOWN
     assert result.observations[0].metadata == {
         "http_status": 200,
         "category": "success",
@@ -55,6 +71,81 @@ def test_map_success_response_with_nested_responses_output_content() -> None:
 
     assert result.status is CodexTransportStatus.SUCCESS
     assert result.output_text == "pong"
+
+
+def test_map_success_response_extracts_safe_response_usage_evidence() -> None:
+    response = CodexBackendResponse(
+        status_code=200,
+        headers={},
+        json_body={
+            "output_text": "pong",
+            "model": "codex-mini",
+            "usage": {
+                "input_tokens": RESPONSE_INPUT_TOKENS,
+                "output_tokens": RESPONSE_OUTPUT_TOKENS,
+                "total_tokens": RESPONSE_TOTAL_TOKENS,
+                "input_token_details": {"cached_tokens": RESPONSE_CACHED_INPUT_TOKENS},
+                "output_token_details": {"reasoning_tokens": RESPONSE_REASONING_TOKENS},
+                "account_id": "synthetic-account",
+                "access_token": "synthetic-access-token",
+            },
+        },
+    )
+
+    result = map_codex_backend_response(response)
+
+    usage = result.usage_evidence[0]
+    assert usage.status is ModelUsageCollectionStatus.COLLECTED
+    assert usage.source is ModelUsageEvidenceSource.RESPONSE_PAYLOAD
+    assert usage.model == "codex-mini"
+    assert usage.tokens.input_tokens == RESPONSE_INPUT_TOKENS
+    assert usage.tokens.output_tokens == RESPONSE_OUTPUT_TOKENS
+    assert usage.tokens.total_tokens == RESPONSE_TOTAL_TOKENS
+    assert usage.tokens.cached_input_tokens == RESPONSE_CACHED_INPUT_TOKENS
+    assert usage.tokens.reasoning_tokens == RESPONSE_REASONING_TOKENS
+    assert "synthetic-account" not in str(result)
+    assert "synthetic-access-token" not in str(result)
+
+
+def test_map_success_response_extracts_partial_usage_without_zero_defaults() -> None:
+    response = CodexBackendResponse(
+        status_code=200,
+        headers={},
+        json_body={"output_text": "pong", "usage": {"output_tokens": RESPONSE_OUTPUT_TOKENS}},
+    )
+
+    result = map_codex_backend_response(response)
+
+    usage = result.usage_evidence[0]
+    assert usage.status is ModelUsageCollectionStatus.PARTIALLY_COLLECTED
+    assert usage.tokens.input_tokens is None
+    assert usage.tokens.output_tokens == RESPONSE_OUTPUT_TOKENS
+    assert usage.tokens.total_tokens is None
+
+
+def test_map_success_response_ignores_unsafe_or_invalid_usage_fields() -> None:
+    response = CodexBackendResponse(
+        status_code=200,
+        headers={},
+        json_body={
+            "output_text": "pong",
+            "usage": {
+                "input_tokens": -1,
+                "output_tokens": True,
+                "total_tokens": "14",
+                "authorization": "Bearer synthetic-token",
+            },
+        },
+    )
+
+    result = map_codex_backend_response(response)
+
+    usage = result.usage_evidence[0]
+    assert usage.status is ModelUsageCollectionStatus.UNAVAILABLE
+    assert usage.tokens.input_tokens is None
+    assert usage.tokens.output_tokens is None
+    assert usage.tokens.total_tokens is None
+    assert "synthetic-token" not in str(result)
 
 
 def test_map_success_response_from_event_stream() -> None:
@@ -115,6 +206,33 @@ def test_map_success_response_from_event_stream_completed_response_output() -> N
     assert result.output_text == "pong"
 
 
+def test_map_success_response_from_event_stream_extracts_usage_evidence() -> None:
+    response = CodexBackendResponse(
+        status_code=200,
+        headers={"content-type": "text/event-stream"},
+        json_body=(
+            "event: response.output_text.delta\n"
+            'data: {"type":"response.output_text.delta","delta":"pong"}\n\n'
+            "event: response.completed\n"
+            "data: {"
+            '"type":"response.completed",'
+            f'"response":{{"usage":{{"input_tokens":{STREAM_INPUT_TOKENS},'
+            f'"output_tokens":{STREAM_OUTPUT_TOKENS},"total_tokens":{STREAM_TOTAL_TOKENS}}}}}'
+            "}\n\n"
+        ),
+    )
+
+    result = map_codex_backend_response(response)
+
+    usage = result.usage_evidence[0]
+    assert result.status is CodexTransportStatus.SUCCESS
+    assert usage.status is ModelUsageCollectionStatus.COLLECTED
+    assert usage.source is ModelUsageEvidenceSource.STREAM_EVENT
+    assert usage.tokens.input_tokens == STREAM_INPUT_TOKENS
+    assert usage.tokens.output_tokens == STREAM_OUTPUT_TOKENS
+    assert usage.tokens.total_tokens == STREAM_TOTAL_TOKENS
+
+
 def test_map_success_response_from_event_stream_output_item_done_content() -> None:
     response = CodexBackendResponse(
         status_code=200,
@@ -146,6 +264,8 @@ def test_map_authentication_failure_for_401_and_403() -> None:
 
         assert result.status is CodexTransportStatus.AUTHENTICATION_FAILED
         assert result.output_text is None
+        assert result.usage_evidence[0].status is ModelUsageCollectionStatus.FAILED
+        assert result.cost_evidence[0].pricing_status is ModelPricingStatus.NOT_AVAILABLE
         assert result.observations[0].metadata["http_status"] == status_code
         assert result.observations[0].metadata["category"] == "authentication"
         assert result.observations[0].metadata["error_type"] == "invalid_token"
