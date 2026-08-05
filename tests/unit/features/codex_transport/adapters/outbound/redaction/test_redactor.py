@@ -8,8 +8,11 @@ import pytest
 from fabrica.features.codex_transport.adapters.outbound.redaction import (
     REDACTED_VALUE,
     redact_mapping,
+    redact_metadata,
+    redact_metadata_value,
     redact_value,
 )
+from fabrica.features.codex_transport.application.dtos.observations import SafeObservationValue
 
 MAX_REDACTED_STRING_LENGTH = 160
 
@@ -94,6 +97,39 @@ def test_redact_mapping_returns_immutable_mapping() -> None:
         cast("dict[str, object]", redacted)["http_status"] = 500
 
 
+def test_redact_metadata_returns_scalar_observation_values() -> None:
+    redacted = redact_metadata(
+        {
+            "Authorization": "Bearer synthetic-token",
+            "headers": {"status": 200},
+            "events": [{"message": "started"}, {"message": "finished"}],
+            "body": b"synthetic bytes",
+            "ok": True,
+        }
+    )
+
+    assert redacted == {
+        "Authorization": REDACTED_VALUE,
+        "headers": "<mapping length=1>",
+        "events": "<sequence length=2>",
+        "body": "<bytes length=15>",
+        "ok": True,
+    }
+    assert all(_is_safe_observation_value(value) for value in redacted.values())
+
+
+def test_redact_metadata_returns_immutable_mapping() -> None:
+    redacted = redact_metadata({"http_status": 200})
+
+    with pytest.raises(TypeError):
+        cast("dict[str, object]", redacted)["http_status"] = 500
+
+
+def test_redact_metadata_value_masks_auth_like_scalar_strings() -> None:
+    assert redact_metadata_value("Bearer synthetic-token") == REDACTED_VALUE
+    assert redact_metadata_value("Basic synthetic-token") == REDACTED_VALUE
+
+
 def test_redact_value_returns_safe_descriptions_for_bytes_and_unknown_objects() -> None:
     class SyntheticDiagnostic:
         pass
@@ -101,3 +137,7 @@ def test_redact_value_returns_safe_descriptions_for_bytes_and_unknown_objects() 
     assert redact_value(b"synthetic bytes") == "<bytes length=15>"
     assert redact_value(SyntheticDiagnostic()) == "<SyntheticDiagnostic>"
     assert isinstance(redact_mapping({"nested": {"status": 200}})["nested"], Mapping)
+
+
+def _is_safe_observation_value(value: object) -> bool:
+    return isinstance(value, SafeObservationValue)

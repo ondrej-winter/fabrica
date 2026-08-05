@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from fabrica.features.codex_transport.adapters.outbound.redaction import redact_mapping
+from fabrica.features.codex_transport.adapters.outbound.redaction import redact_metadata
 from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
     CodexCredentials,
@@ -63,7 +63,7 @@ class CodexBackendRequest:
 
     def redacted_observation(self) -> CodexTransportObservation:
         """Return bounded, secret-safe diagnostics for the built request."""
-        redacted_headers = redact_mapping(self.headers)
+        redacted_headers = redact_metadata(self.headers)
         return CodexTransportObservation(
             message="built Codex backend request",
             metadata={
@@ -95,7 +95,7 @@ class CodexUsageRequest:
 
     def redacted_observation(self) -> CodexTransportObservation:
         """Return bounded, secret-safe diagnostics for the usage request."""
-        redacted_headers = redact_mapping(self.headers)
+        redacted_headers = redact_metadata(self.headers)
         return CodexTransportObservation(
             message="built Codex usage evidence request",
             metadata={
