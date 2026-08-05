@@ -268,20 +268,20 @@ provider-agnostic usage evidence where values are safely known.
 
 **Acceptance criteria:**
 
-- [ ] `limit`, `remaining`, `reset_at`, and `window_seconds` are populated only
+- [x] `limit`, `remaining`, `reset_at`, and `window_seconds` are populated only
   when safely known and type-valid.
-- [ ] Provider-specific safe facts such as plan/tier/usage percent are
+- [x] Provider-specific safe facts such as plan/tier/usage percent are
   represented only as bounded redacted observations.
-- [ ] Status mapping distinguishes collected, partially collected, unavailable,
+- [x] Status mapping distinguishes collected, partially collected, unavailable,
   failed, and unsupported cases where possible.
-- [ ] Status mapping follows the v1 status table in this plan.
-- [ ] Unsafe raw keys/values remain filtered by existing allowlist behavior or
+- [x] Status mapping follows the v1 status table in this plan.
+- [x] Unsafe raw keys/values remain filtered by existing allowlist behavior or
   stronger checks.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/codex_transport/application/test_usage_mapping.py`
-- [ ] `uv run pytest tests/unit/features/codex_transport/application/test_probe_codex_usage.py`
+- [x] `uv run pytest tests/unit/features/codex_transport/application/test_usage_mapping.py`
+- [x] `uv run pytest tests/unit/features/codex_transport/application/test_probe_codex_usage.py`
 
 **Dependencies:** Tasks 1 and 4
 

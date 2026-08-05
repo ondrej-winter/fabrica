@@ -8,10 +8,16 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageEvidenceConfidence,
     ModelUsageEvidenceSource,
 )
-from fabrica.features.codex_transport.application.dtos import CodexTransportStatus
+from fabrica.features.codex_transport.application.dtos import (
+    CodexTransportStatus,
+    CodexUsageEvidence,
+    CodexUsageResult,
+    CodexUsageStatus,
+)
 from fabrica.features.codex_transport.application.usage_mapping import (
     CodexCompletionUsageFacts,
     map_codex_completion_evidence,
+    map_codex_usage_endpoint_evidence,
 )
 
 COMPLETE_INPUT_TOKENS = 12
@@ -20,6 +26,10 @@ COMPLETE_TOTAL_TOKENS = 17
 COMPLETE_CACHED_INPUT_TOKENS = 3
 COMPLETE_REASONING_TOKENS = 2
 PARTIAL_OUTPUT_TOKENS = 5
+USAGE_LIMIT = 100
+USAGE_REMAINING = 75
+USAGE_PERCENT = 25
+USAGE_WINDOW_SECONDS = 3600
 
 
 def test_map_codex_completion_evidence_maps_complete_token_usage() -> None:
@@ -115,3 +125,124 @@ def test_codex_completion_usage_facts_reject_negative_token_counts() -> None:
             source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
             input_tokens=-1,
         )
+
+
+def test_map_codex_usage_endpoint_evidence_maps_safe_quota_fields() -> None:
+    evidence = map_codex_usage_endpoint_evidence(
+        CodexUsageResult(
+            status=CodexUsageStatus.SUCCESS,
+            evidence=CodexUsageEvidence(
+                {
+                    "limit": USAGE_LIMIT,
+                    "remaining": USAGE_REMAINING,
+                    "reset_at": "2026-08-05T20:00:00Z",
+                    "window_seconds": USAGE_WINDOW_SECONDS,
+                    "plan_type": "synthetic-pro",
+                    "usage_percent": USAGE_PERCENT,
+                },
+            ),
+        ),
+    )
+
+    usage = evidence.usage_evidence[0]
+    cost = evidence.cost_evidence[0]
+
+    assert usage.provider == "codex"
+    assert usage.status is ModelUsageCollectionStatus.COLLECTED
+    assert usage.source is ModelUsageEvidenceSource.USAGE_ENDPOINT
+    assert usage.confidence is ModelUsageEvidenceConfidence.EXTRACTED
+    assert usage.quota is not None
+    assert usage.quota.limit == USAGE_LIMIT
+    assert usage.quota.remaining == USAGE_REMAINING
+    assert usage.quota.reset_at == "2026-08-05T20:00:00Z"
+    assert usage.quota.window_seconds == USAGE_WINDOW_SECONDS
+    assert usage.tokens.total_tokens is None
+    assert usage.observations[0].metadata["plan_type"] == "synthetic-pro"
+    assert usage.observations[0].metadata["usage_percent"] == USAGE_PERCENT
+    assert cost.pricing_status is ModelPricingStatus.NOT_AVAILABLE
+    assert cost.source is ModelUsageEvidenceSource.USAGE_ENDPOINT
+
+
+def test_map_codex_usage_endpoint_evidence_maps_partial_quota_without_coercion() -> None:
+    evidence = map_codex_usage_endpoint_evidence(
+        CodexUsageResult(
+            status=CodexUsageStatus.SUCCESS,
+            evidence=CodexUsageEvidence(
+                {
+                    "remaining": USAGE_REMAINING,
+                    "limit": "100",
+                    "window_seconds": -1,
+                    "reset_at": "",
+                },
+            ),
+        ),
+    )
+
+    usage = evidence.usage_evidence[0]
+
+    assert usage.status is ModelUsageCollectionStatus.PARTIALLY_COLLECTED
+    assert usage.quota is not None
+    assert usage.quota.limit is None
+    assert usage.quota.remaining == USAGE_REMAINING
+    assert usage.quota.reset_at is None
+    assert usage.quota.window_seconds is None
+
+
+def test_map_codex_usage_endpoint_evidence_reports_success_without_quota_as_unavailable() -> None:
+    evidence = map_codex_usage_endpoint_evidence(
+        CodexUsageResult(
+            status=CodexUsageStatus.SUCCESS,
+            evidence=CodexUsageEvidence({"plan_type": "synthetic-pro"}),
+        ),
+    )
+
+    usage = evidence.usage_evidence[0]
+
+    assert usage.status is ModelUsageCollectionStatus.UNAVAILABLE
+    assert usage.quota is None
+    assert usage.confidence is ModelUsageEvidenceConfidence.EXTRACTED
+    assert usage.observations[0].metadata["plan_type"] == "synthetic-pro"
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_collection_status"),
+    [
+        (CodexUsageStatus.AUTHENTICATION_FAILED, ModelUsageCollectionStatus.FAILED),
+        (CodexUsageStatus.CREDENTIAL_ERROR, ModelUsageCollectionStatus.FAILED),
+        (CodexUsageStatus.TRANSPORT_ERROR, ModelUsageCollectionStatus.FAILED),
+        (CodexUsageStatus.RATE_LIMITED, ModelUsageCollectionStatus.UNAVAILABLE),
+        (CodexUsageStatus.QUOTA_EXCEEDED, ModelUsageCollectionStatus.UNAVAILABLE),
+        (CodexUsageStatus.BACKEND_SHAPE_MISMATCH, ModelUsageCollectionStatus.UNAVAILABLE),
+    ],
+)
+def test_map_codex_usage_endpoint_evidence_maps_non_success_statuses(
+    status: CodexUsageStatus,
+    expected_collection_status: ModelUsageCollectionStatus,
+) -> None:
+    evidence = map_codex_usage_endpoint_evidence(CodexUsageResult(status=status))
+
+    usage = evidence.usage_evidence[0]
+    cost = evidence.cost_evidence[0]
+
+    assert usage.status is expected_collection_status
+    assert usage.source is ModelUsageEvidenceSource.USAGE_ENDPOINT
+    assert usage.quota is None
+    assert cost.pricing_status is ModelPricingStatus.NOT_AVAILABLE
+
+
+def test_map_codex_usage_endpoint_evidence_does_not_expose_unsafe_values() -> None:
+    evidence = map_codex_usage_endpoint_evidence(
+        CodexUsageResult(
+            status=CodexUsageStatus.SUCCESS,
+            evidence=CodexUsageEvidence(
+                {
+                    "remaining": USAGE_REMAINING,
+                    "account_id": "synthetic-account",
+                    "access_token": "synthetic-access-token",
+                },
+            ),
+        ),
+    )
+
+    assert "synthetic-account" not in str(evidence)
+    assert "synthetic-access-token" not in str(evidence)
