@@ -51,7 +51,9 @@ def test_adapter_maps_successful_transport_result_to_runtime_result() -> None:
 
 
 def test_adapter_includes_runtime_context_as_bounded_prompt_text() -> None:
-    transport = FakeCodexTransportCompletion(result=CodexTransportResult(status=CodexTransportStatus.SUCCESS))
+    transport = FakeCodexTransportCompletion(
+        result=CodexTransportResult(status=CodexTransportStatus.SUCCESS, output_text="pong"),
+    )
     command = LocalAgentRunCommand(
         prompt="Answer from context only",
         context=(LocalAgentContextBlock(text="The answer is pong.", label="note"),),
@@ -79,7 +81,6 @@ def test_adapter_maps_credential_transport_failures_to_configuration_errors(
     transport = FakeCodexTransportCompletion(
         result=CodexTransportResult(
             status=transport_status,
-            output_text="ignored failure output",
             observations=(
                 CodexTransportObservation(
                     message="credential loading failed",

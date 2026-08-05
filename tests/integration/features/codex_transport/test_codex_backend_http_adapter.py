@@ -61,7 +61,8 @@ def test_codex_backend_http_adapter_fetches_usage_with_mock_transport() -> None:
     assert result.evidence.values == {
         "plan_type": "synthetic-pro",
         "usage_percent": 20,
-        "rate_limit_headers": {"x-codex-ratelimit-remaining": "42"},
+        "rate_limit_header_count": 1,
+        "rate_limit_header_names": "x-codex-ratelimit-remaining",
     }
     assert "synthetic-access-token" not in str(result.observations)
     assert "synthetic-account" not in str(result.observations)

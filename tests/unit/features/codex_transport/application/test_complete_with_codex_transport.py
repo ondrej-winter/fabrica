@@ -79,7 +79,7 @@ def test_complete_loads_credentials_and_executes_backend_completion() -> None:
 def test_complete_returns_credential_error_when_credentials_cannot_be_loaded() -> None:
     command = CodexCompletionCommand(prompt="Reply with the single word: pong")
     credential_store = FakeCredentialStore(error=CodexCredentialUnavailableError("synthetic missing auth file"))
-    backend = FakeCodexBackend(result=CodexTransportResult(status=CodexTransportStatus.SUCCESS))
+    backend = FakeCodexBackend(result=CodexTransportResult(status=CodexTransportStatus.TRANSPORT_ERROR))
 
     result = CompleteWithCodexTransport(credential_store=credential_store, backend=backend).complete(command)
 
@@ -98,7 +98,7 @@ def test_complete_returns_credential_error_when_credentials_cannot_be_loaded() -
 def test_complete_returns_authentication_failed_for_credential_authentication_failures() -> None:
     command = CodexCompletionCommand(prompt="Reply with the single word: pong")
     credential_store = FakeCredentialStore(error=CodexCredentialAuthenticationError("synthetic unsupported auth mode"))
-    backend = FakeCodexBackend(result=CodexTransportResult(status=CodexTransportStatus.SUCCESS))
+    backend = FakeCodexBackend(result=CodexTransportResult(status=CodexTransportStatus.TRANSPORT_ERROR))
 
     result = CompleteWithCodexTransport(credential_store=credential_store, backend=backend).complete(command)
 

@@ -281,7 +281,8 @@ def test_map_usage_success_response_extracts_safe_usage_evidence() -> None:
         "plan_type": "synthetic-pro",
         "usage_percent": 25,
         "remaining": 75,
-        "rate_limit_headers": {"x-codex-ratelimit-remaining": "12"},
+        "rate_limit_header_count": 1,
+        "rate_limit_header_names": "x-codex-ratelimit-remaining",
     }
     assert "synthetic-account" not in str(result)
     assert "synthetic-access-token" not in str(result)

@@ -1,7 +1,10 @@
 """Application boundary DTOs for Codex transport probing."""
 
 from fabrica.features.codex_transport.application.dtos.credentials import CodexCredentials
-from fabrica.features.codex_transport.application.dtos.observations import CodexTransportObservation
+from fabrica.features.codex_transport.application.dtos.observations import (
+    CodexTransportObservation,
+    SafeObservationValue,
+)
 from fabrica.features.codex_transport.application.dtos.transport import (
     CodexCompletionCommand,
     CodexTransportProbeCommand,
@@ -13,6 +16,7 @@ from fabrica.features.codex_transport.application.dtos.usage import (
     CodexUsageProbeCommand,
     CodexUsageResult,
     CodexUsageStatus,
+    SafeUsageEvidenceValue,
 )
 
 __all__ = [
@@ -26,4 +30,6 @@ __all__ = [
     "CodexUsageProbeCommand",
     "CodexUsageResult",
     "CodexUsageStatus",
+    "SafeObservationValue",
+    "SafeUsageEvidenceValue",
 ]
