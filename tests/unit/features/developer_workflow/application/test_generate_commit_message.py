@@ -23,6 +23,7 @@ from fabrica.features.developer_workflow.application.ports import (
 from fabrica.features.developer_workflow.application.use_cases import (
     GenerateCommitMessage,
     GenerateCommitMessageError,
+    GenerateCommitMessageOptions,
 )
 
 
@@ -44,11 +45,17 @@ class FakeStagedChangesLoader:
             raise self.list_error
         return self.staged_files
 
+    async def list_files_async(self) -> GitStagedFileList:
+        return self.list_files()
+
     def load_file_diff(self, path: str) -> GitStagedDiff:
         self.events.append(f"load_file_diff:{path}")
         if path in self.diff_error_by_path:
             raise self.diff_error_by_path[path]
         return self.diffs[path]
+
+    async def load_file_diff_async(self, path: str) -> GitStagedDiff:
+        return self.load_file_diff(path)
 
 
 @dataclass
@@ -65,6 +72,9 @@ class FakeAnalyzer:
         if path in self.error_by_path:
             raise self.error_by_path[path]
         return _evidence(command.staged_file, summary=self.summary_by_path.get(path, f"Analyzed {path}."))
+
+    async def analyze_async(self, command: AnalyzeStagedFileForCommitMessageCommand) -> StagedFileCommitEvidence:
+        return self.analyze(command)
 
 
 @dataclass
@@ -83,6 +93,9 @@ class FakeSynthesizer:
             rationale="The staged evidence is collected per file before final synthesis.",
             commit_message="feat(developer-workflow): generate commit messages from per-file evidence",
         )
+
+    async def synthesize_async(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
+        return self.synthesize(command)
 
 
 def test_generate_commit_message_lists_files_before_loading_and_preserves_evidence_order() -> None:
@@ -134,7 +147,7 @@ def test_generate_commit_message_fails_before_analysis_when_staged_file_bound_is
             staged_changes_loader=loader,
             analyzer=analyzer,
             synthesizer=synthesizer,
-            max_staged_files=2,
+            options=GenerateCommitMessageOptions(max_staged_files=2),
         ).generate()
 
     assert error_info.value.metadata == {"staged_file_count": 3, "max_staged_files": 2}

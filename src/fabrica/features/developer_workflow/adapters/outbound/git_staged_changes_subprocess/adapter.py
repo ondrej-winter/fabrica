@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
 from time import monotonic
 from typing import TYPE_CHECKING
@@ -138,6 +139,10 @@ class GitStagedChangesSubprocessLoader:
                 duration_seconds=duration_seconds,
             ) from err
 
+    async def load_file_diff_async(self, path: str) -> GitStagedDiff:
+        """Load staged git diff text for one safe path without blocking the event loop."""
+        return await asyncio.to_thread(self.load_file_diff, path)
+
     def list_files(self) -> GitStagedFileList:
         """List staged file paths and statuses without mutating repository state."""
         result, duration_seconds = self._run_git(GIT_STAGED_FILE_LIST_ARGV)
@@ -161,6 +166,10 @@ class GitStagedChangesSubprocessLoader:
                 category=GitStagedChangesFailureCategory.GIT_FAILED,
                 duration_seconds=duration_seconds,
             ) from err
+
+    async def list_files_async(self) -> GitStagedFileList:
+        """List staged file paths and statuses without blocking the event loop."""
+        return await asyncio.to_thread(self.list_files)
 
     def _run_git(self, argv: Sequence[str]) -> tuple[GitCommandResult, float]:
         started = monotonic()

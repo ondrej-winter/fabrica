@@ -27,6 +27,9 @@ class FakeAgentModel:
             raise AssertionError(msg)
         return self.result
 
+    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        return self.run(command)
+
 
 def test_run_local_agent_delegates_to_model_port() -> None:
     command = LocalAgentRunCommand(prompt="Reply with the single word: pong")

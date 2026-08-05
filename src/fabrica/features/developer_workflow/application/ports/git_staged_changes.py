@@ -44,3 +44,15 @@ class GitStagedChangesLoader(GitStagedDiffLoader, Protocol):
     def load_file_diff(self, path: str) -> GitStagedDiff:
         """Load currently staged git diff text for one safe relative path."""
         ...
+
+
+class AsyncGitStagedChangesLoader(Protocol):
+    """Async outbound port for read-only staged git change inspection."""
+
+    async def list_files_async(self) -> GitStagedFileList:
+        """List currently staged file paths and statuses."""
+        ...
+
+    async def load_file_diff_async(self, path: str) -> GitStagedDiff:
+        """Load currently staged git diff text for one safe relative path."""
+        ...

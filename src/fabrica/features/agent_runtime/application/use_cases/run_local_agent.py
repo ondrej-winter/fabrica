@@ -28,3 +28,18 @@ class RunLocalAgent:
                     ),
                 ),
             )
+
+    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        """Run one local agent command asynchronously and normalize model failures."""
+        try:
+            return await self._model.run_async(command)
+        except AgentModelError as err:
+            return LocalAgentRunResult(
+                status=err.status,
+                observations=(
+                    RuntimeObservation(
+                        message="model dependency failed",
+                        metadata={"error_type": type(err).__name__, **err.metadata},
+                    ),
+                ),
+            )

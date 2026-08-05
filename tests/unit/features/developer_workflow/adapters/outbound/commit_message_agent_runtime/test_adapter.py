@@ -38,6 +38,9 @@ class FakeRuntime:
         self.calls.append(command)
         return self.result
 
+    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        return self.run(command)
+
 
 def test_analyzer_sends_one_file_diff_and_parses_strict_json_evidence() -> None:
     runtime = FakeRuntime(result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text=_analysis_json()))

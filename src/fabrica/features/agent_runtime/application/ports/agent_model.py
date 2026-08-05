@@ -32,3 +32,7 @@ class AgentModel(Protocol):
     def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         """Run the model/session dependency for one local agent command."""
         ...
+
+    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        """Run the model/session dependency for one local agent command."""
+        ...

@@ -1,5 +1,6 @@
 """Runtime model adapter backed by PydanticAI custom model support."""
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
@@ -95,6 +96,10 @@ class PydanticAIAgentModel:
                 ),
             ),
         )
+
+    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        """Run one local agent command without blocking the event loop."""
+        return await asyncio.to_thread(self.run, command)
 
 
 class _CompletionModel(Model[None]):

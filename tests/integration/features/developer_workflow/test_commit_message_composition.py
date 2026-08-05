@@ -35,6 +35,9 @@ class FakeRuntime:
         self.calls.append(command)
         return self.results.pop(0)
 
+    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        return self.run(command)
+
 
 def test_commit_message_workflow_runs_per_file_analysis_then_final_synthesis(tmp_path: Path) -> None:
     runtime = FakeRuntime(

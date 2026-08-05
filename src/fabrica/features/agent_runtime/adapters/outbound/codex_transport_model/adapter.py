@@ -1,5 +1,6 @@
 """Runtime model adapter backed by the Codex transport application API."""
 
+import asyncio
 from typing import Protocol
 
 from fabrica.features.agent_runtime.application.dtos import (
@@ -42,6 +43,10 @@ class CodexTransportAgentModel:
             output_text=transport_result.output_text if runtime_status is LocalAgentRunStatus.SUCCESS else None,
             observations=_map_observations(transport_result),
         )
+
+    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        """Run one local agent command without blocking the event loop."""
+        return await asyncio.to_thread(self.run, command)
 
 
 def _build_transport_prompt(command: LocalAgentRunCommand) -> str:

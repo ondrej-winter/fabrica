@@ -4,10 +4,12 @@ from fabrica.features.developer_workflow.application.dtos import DEFAULT_COMMIT_
 from fabrica.features.developer_workflow.application.use_cases.generate_commit_message import (
     GenerateCommitMessage,
     GenerateCommitMessageError,
+    GenerateCommitMessageOptions,
 )
 
 __all__ = [
     "DEFAULT_COMMIT_MESSAGE_SKILL_ID",
     "GenerateCommitMessage",
     "GenerateCommitMessageError",
+    "GenerateCommitMessageOptions",
 ]

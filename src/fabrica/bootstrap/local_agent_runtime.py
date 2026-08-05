@@ -1,5 +1,6 @@
 """Composition root for local agent runtime wiring."""
 
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -83,15 +84,16 @@ from fabrica.features.developer_workflow.application.dtos import (
     SynthesizeCommitMessageCommand,
 )
 from fabrica.features.developer_workflow.application.ports import (
+    AsyncCommitMessageSynthesizer,
     CommitMessageAnalysisError,
     CommitMessageSynthesisError,
-    CommitMessageSynthesizer,
     GitStagedChangesLoadError,
 )
 from fabrica.features.developer_workflow.application.use_cases import (
     DEFAULT_COMMIT_MESSAGE_SKILL_ID,
     GenerateCommitMessage,
     GenerateCommitMessageError,
+    GenerateCommitMessageOptions,
 )
 
 DEFAULT_CODEX_AUTH_FILE = Path.home() / ".codex" / "auth.json"
@@ -150,6 +152,7 @@ class CommitMessageWorkflowOptions:
     skill_bounds: SkillContextBounds | None = None
     git_timeout_seconds: float = 10.0
     git_working_directory: Path | None = None
+    max_parallel_analysis: int = 4
     verbose_diagnostics: bool = False
 
 
@@ -221,6 +224,9 @@ class CommitMessageRuntime(Protocol):
     def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         """Run one prepared local agent command."""
 
+    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        """Run one prepared local agent command asynchronously."""
+
 
 @dataclass(frozen=True, slots=True)
 class CommitMessageWorkflow:
@@ -232,9 +238,15 @@ class CommitMessageWorkflow:
         self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
     ) -> LocalAgentRunResult:
         """Generate a recommendation and map it to the local runtime result contract."""
+        return asyncio.run(self.run_async(command, skill_id=skill_id))
+
+    async def run_async(
+        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
+    ) -> LocalAgentRunResult:
+        """Generate a recommendation asynchronously and map it to the runtime result contract."""
         selected_skill_id = getattr(command, "skill_id", skill_id)
         try:
-            result = self.generator.generate(skill_id=selected_skill_id)
+            result = await self.generator.generate_async(skill_id=selected_skill_id)
         except GitStagedChangesLoadError as err:
             return LocalAgentRunResult(
                 status=LocalAgentRunStatus.CONFIGURATION_ERROR,
@@ -291,14 +303,17 @@ class CommitMessageWorkflow:
 class SkillContextCommitMessageSynthesizer:
     """Synthesizer decorator that loads selected skill markdown before synthesis."""
 
-    synthesizer: CommitMessageSynthesizer
+    synthesizer: AsyncCommitMessageSynthesizer
     skill_context_loader: LoadSkillContext
 
-    def synthesize(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
+    async def synthesize_async(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
         """Load selected skill context and delegate final synthesis."""
-        skill_context = self.skill_context_loader.load((SelectedSkill(skill_id=command.skill_id),))
+        skill_context = await asyncio.to_thread(
+            self.skill_context_loader.load,
+            (SelectedSkill(skill_id=command.skill_id),),
+        )
         skill_markdown = skill_context[0].text if skill_context else None
-        return self.synthesizer.synthesize(
+        return await self.synthesizer.synthesize_async(
             SynthesizeCommitMessageCommand(
                 evidence_bundle=command.evidence_bundle,
                 skill_id=command.skill_id,
@@ -454,6 +469,7 @@ def create_commit_message_workflow(
                 synthesizer=AgentRuntimeCommitMessageSynthesizer(runtime),
                 skill_context_loader=skill_context_loader,
             ),
+            options=GenerateCommitMessageOptions(max_parallel_analysis=workflow_options.max_parallel_analysis),
         ),
     )
 
