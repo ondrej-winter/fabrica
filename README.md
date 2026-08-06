@@ -99,10 +99,11 @@ uv run fabrica run \
   --skill-root .agents/skills
 ```
 
-### Commit-message workflow for staged changes
+### Commit workflows for staged changes
 
-The first productized selected-skill workflow proposes commit-message text from
-the currently staged git changes:
+The first productized selected-skill workflows propose Conventional Commit text
+from the currently staged git changes. Use `commit-message` when you want a
+read-only preview that you can copy, edit, or run through your own git command:
 
 ```bash
 uv run fabrica commit-message
@@ -119,6 +120,25 @@ uv run fabrica commit-message \
   --skill-root .agents/skills
 ```
 
+Use `commit` when you want Fabrica to generate the same recommendation, show it
+once, prompt for approval, and create the git commit only after explicit
+confirmation:
+
+```bash
+uv run fabrica commit
+```
+
+`commit` accepts the same selected skill, skill root, Codex model, and reasoning
+effort options as `commit-message`:
+
+```bash
+uv run fabrica commit \
+  --skill conventional-commits \
+  --model gpt-5.3-codex-spark \
+  --reasoning-effort low \
+  --skill-root .agents/skills
+```
+
 Fabrica-wide reporting and diagnostic flags are passed before the subcommand and
 apply to commands that produce model runtime evidence:
 
@@ -128,16 +148,42 @@ uv run fabrica --print-usage --print-prices --verbose-diagnostics commit-message
   --skill-root .agents/skills
 ```
 
+For the interactive commit workflow, place the same global reporting flags before
+the `commit` subcommand:
+
+```bash
+uv run fabrica --print-usage --print-prices --verbose-diagnostics commit \
+  --skill conventional-commits \
+  --skill-root .agents/skills
+```
+
 The Codex-backed commit-message workflow defaults to `gpt-5.3-codex-spark` with
 `low` reasoning effort because the task is a bounded staged-change analysis and
 Conventional Commit formatting workflow. Use `--model` and `--reasoning-effort`
 when a specific run needs a different Codex model or deeper reasoning.
 
-The workflow reads staged changes only. It lists staged files, loads each staged
-file diff individually, analyzes each file into structured evidence, and then
-runs one final synthesis call. It does **not** run `git commit`, write a
-commit-message file, mutate staged or unstaged repository state, or fall back to
-unstaged changes.
+Both workflows read staged changes only. They list staged files, load each staged
+file diff individually, analyze each file into structured evidence, and then run
+one final synthesis call. They do not auto-stage files, inspect unstaged changes,
+fall back to unstaged changes, auto-push, bypass hooks, open an editor,
+regenerate on rejection, or produce JSON output.
+
+`commit-message` remains read-only: it does **not** run `git commit`, write a
+commit-message file, or mutate staged or unstaged repository state.
+
+`commit` is mutating only after approval. It prints the `Summary:`,
+`Rationale:`, and `Commit message:` block once, then asks:
+
+```text
+Commit with this message? [y/N]
+```
+
+Only trimmed, case-insensitive `y` or `yes` creates a commit. `n`, `no`, empty
+input, EOF, and unrecognized answers cancel the command as a successful no-op:
+no commit is created and staged changes remain staged. Interrupted input such as
+Ctrl-C exits non-zero without committing. When approval succeeds, Fabrica passes
+the exact generated message to git through a temporary commit-message file and
+prints `Committed as <short-sha>.` when git reports the new short hash.
 
 The recommendation workflow is evidence-first and multi-call in v1: it may make
 one model call per staged file plus one final synthesis call. The final

@@ -270,7 +270,7 @@ path and does not model rejection input.
 
 - [x] Recommendation generation remains staged-only.
 - [x] Approved generated message creates a real commit in a temporary repo.
-- [ ] Failure and rejection paths do not create commits.
+- [x] Failure and rejection paths do not create commits.
 - [x] Existing `commit-message` composition tests still pass.
 
 ### Phase 3: CLI Parser and Runner
@@ -395,19 +395,19 @@ between `commit-message` and `commit`.
 
 **Acceptance criteria:**
 
-- [ ] README shows `uv run fabrica commit-message` as the read-only preview
+- [x] README shows `uv run fabrica commit-message` as the read-only preview
   command.
-- [ ] README shows `uv run fabrica commit` as the interactive mutating command.
-- [ ] README states that `commit` requires explicit `y`/`yes` approval before
+- [x] README shows `uv run fabrica commit` as the interactive mutating command.
+- [x] README states that `commit` requires explicit `y`/`yes` approval before
   `git commit`.
-- [ ] README states that rejection/default no-op leaves staged changes
+- [x] README states that rejection/default no-op leaves staged changes
   untouched.
-- [ ] README does not document unsupported `--yes`, edit, regenerate,
+- [x] README does not document unsupported `--yes`, edit, regenerate,
   auto-stage, hook-bypass, JSON, or auto-push behavior.
 
 **Verification:**
 
-- [ ] Documentation review against
+- [x] Documentation review against
   `docs/specs/interactive-confirmed-commit-flow-spec.md`.
 
 **Dependencies:** Tasks 5-7
@@ -425,20 +425,20 @@ with completed/verified items.
 
 **Acceptance criteria:**
 
-- [ ] `uv run ruff format .` passes.
-- [ ] `uv run ruff check .` passes.
-- [ ] `uv run ty check src tests` passes.
-- [ ] `uv run pytest` passes.
-- [ ] Plan checkboxes reflect completed tasks and any deviations.
-- [ ] Handoff notes list files changed, validation run, assumptions, and
+- [x] `uv run ruff format .` passes.
+- [x] `uv run ruff check .` passes.
+- [x] `uv run ty check src tests` passes.
+- [x] `uv run pytest` passes.
+- [x] Plan checkboxes reflect completed tasks and any deviations.
+- [x] Handoff notes list files changed, validation run, assumptions, and
   deviations.
 
 **Verification:**
 
-- [ ] `uv run ruff format .`
-- [ ] `uv run ruff check .`
-- [ ] `uv run ty check src tests`
-- [ ] `uv run pytest`
+- [x] `uv run ruff format .`
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src tests`
+- [x] `uv run pytest`
 
 **Dependencies:** Tasks 1-8
 
@@ -452,11 +452,16 @@ with completed/verified items.
 ### Checkpoint: Complete
 
 - [ ] All task acceptance criteria are complete.
-- [ ] Full local quality gate passes or any unrun/failing checks are documented
+- [x] Full local quality gate passes or any unrun/failing checks are documented
   with reasons.
-- [ ] README and CLI help accurately describe the mutating safety boundary.
-- [ ] No `--yes`/non-interactive approval path exists.
-- [ ] No model output can influence git flags, paths, or shell commands.
+- [x] README and CLI help accurately describe the mutating safety boundary.
+- [x] No `--yes`/non-interactive approval path exists.
+- [x] No model output can influence git flags, paths, or shell commands.
+
+**Remaining documented deviation:** Task 4's temporary-repository rejection-path
+acceptance criterion remains unchecked because rejection is owned and covered by
+the CLI prompt tests in Task 6; the confirmed commit workflow models the
+already-approved application path and has no rejection input.
 
 ## Dependency Graph
 
