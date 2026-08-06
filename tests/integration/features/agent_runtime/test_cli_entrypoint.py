@@ -17,6 +17,7 @@ def test_module_entrypoint_help_is_offline_and_lists_explicit_script_execution_c
 
     assert result.returncode == 0
     assert "run" in result.stdout
+    assert "commit" in result.stdout
     assert "commit-message" in result.stdout
     assert "script-policy" in result.stdout
     assert "script-execute" in result.stdout
@@ -37,6 +38,7 @@ def test_console_script_help_is_offline_and_lists_explicit_script_execution_comm
 
     assert result.returncode == 0
     assert "run" in result.stdout
+    assert "commit" in result.stdout
     assert "commit-message" in result.stdout
     assert "script-policy" in result.stdout
     assert "script-execute" in result.stdout

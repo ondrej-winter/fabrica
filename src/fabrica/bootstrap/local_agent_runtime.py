@@ -415,10 +415,30 @@ class ConfirmedCommitWorkflow:
         """Generate a recommendation and create the approved git commit."""
         return asyncio.run(self.run_async(command, skill_id=skill_id))
 
+    def generate(
+        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
+    ) -> ConfirmedCommitWorkflowResult:
+        """Generate a recommendation without creating a git commit."""
+        return asyncio.run(self.generate_async(command, skill_id=skill_id))
+
     async def run_async(
         self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
     ) -> ConfirmedCommitWorkflowResult:
         """Generate a recommendation asynchronously and create the approved git commit."""
+        generation_result = await self.generate_async(command, skill_id=skill_id)
+        if not generation_result.succeeded or generation_result.recommendation is None:
+            return generation_result
+        return self.commit(
+            generation_result.recommendation,
+            output_text=generation_result.output_text,
+            usage_evidence=generation_result.usage_evidence,
+            cost_evidence=generation_result.cost_evidence,
+        )
+
+    async def generate_async(
+        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
+    ) -> ConfirmedCommitWorkflowResult:
+        """Generate a recommendation asynchronously without creating a git commit."""
         selected_skill_id = getattr(command, "skill_id", skill_id)
         if self.evidence_recorder is not None:
             self.evidence_recorder.reset()
@@ -465,6 +485,24 @@ class ConfirmedCommitWorkflow:
 
         recommendation = result.recommendation
         output_text = _format_commit_message_recommendation(recommendation)
+
+        return ConfirmedCommitWorkflowResult(
+            status=LocalAgentRunStatus.SUCCESS,
+            recommendation=recommendation,
+            output_text=output_text,
+            usage_evidence=self._usage_evidence,
+            cost_evidence=self._cost_evidence,
+        )
+
+    def commit(
+        self,
+        recommendation: CommitMessageRecommendation,
+        *,
+        output_text: str | None = None,
+        usage_evidence: tuple[ModelUsageEvidence, ...] | None = None,
+        cost_evidence: tuple[ModelCostEvidence, ...] | None = None,
+    ) -> ConfirmedCommitWorkflowResult:
+        """Create a git commit from an externally approved recommendation."""
         try:
             commit_result = self.committer.create(
                 CreateGitCommitCommand(message=recommendation.commit_message),
@@ -484,8 +522,8 @@ class ConfirmedCommitWorkflow:
                         },
                     ),
                 ),
-                usage_evidence=self._usage_evidence,
-                cost_evidence=self._cost_evidence,
+                usage_evidence=usage_evidence or self._usage_evidence,
+                cost_evidence=cost_evidence or self._cost_evidence,
                 commit_attempted=True,
             )
 
@@ -494,8 +532,8 @@ class ConfirmedCommitWorkflow:
             recommendation=recommendation,
             commit_result=commit_result,
             output_text=output_text,
-            usage_evidence=self._usage_evidence,
-            cost_evidence=self._cost_evidence,
+            usage_evidence=usage_evidence or self._usage_evidence,
+            cost_evidence=cost_evidence or self._cost_evidence,
             commit_attempted=True,
         )
 

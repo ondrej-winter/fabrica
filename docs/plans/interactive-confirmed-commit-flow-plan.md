@@ -311,29 +311,29 @@ adapter with deterministic fakes for unit tests.
 
 **Acceptance criteria:**
 
-- [ ] Runner prints the full recommendation block once before prompting.
-- [ ] Prompt text is `Commit with this message? [y/N]` or equivalent
+- [x] Runner prints the full recommendation block once before prompting.
+- [x] Prompt text is `Commit with this message? [y/N]` or equivalent
   conservative default.
-- [ ] Prompt handling uses injected input/prompt dependencies or an explicit
+- [x] Prompt handling uses injected input/prompt dependencies or an explicit
   `stdin` boundary so approval, EOF, empty input, and interrupted input are
   deterministic in unit tests.
-- [ ] Only trimmed, case-insensitive `y` or `yes` invokes the git commit
+- [x] Only trimmed, case-insensitive `y` or `yes` invokes the git commit
   workflow.
-- [ ] `n`, `no`, empty input, EOF, and unrecognized answers print a concise
+- [x] `n`, `no`, empty input, EOF, and unrecognized answers print a concise
   no-op message, do not call the commit port/workflow, and exit `0`.
-- [ ] Keyboard interrupt prints/returns a failure path and exits non-zero without
+- [x] Keyboard interrupt prints/returns a failure path and exits non-zero without
   committing.
-- [ ] Recommendation-generation failures skip prompting and skip commit
+- [x] Recommendation-generation failures skip prompting and skip commit
   execution.
-- [ ] `--print-usage` and `--print-prices` append recommendation-generation
+- [x] `--print-usage` and `--print-prices` append recommendation-generation
   evidence when requested and available after generation failure, rejection,
   approval success, and approval commit failure, without duplicating the
   recommendation block.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/agent_runtime/adapters/inbound/cli/test_commit_command.py`
-- [ ] `uv run pytest tests/unit/features/agent_runtime/adapters/inbound/cli/test_commit_message_command.py`
+- [x] `uv run pytest tests/unit/features/agent_runtime/adapters/inbound/cli/test_commit_command.py`
+- [x] `uv run pytest tests/unit/features/agent_runtime/adapters/inbound/cli/test_commit_message_command.py`
 
 **Dependencies:** Tasks 3 and 5
 
@@ -354,18 +354,18 @@ confirmed commit workflow.
 
 **Acceptance criteria:**
 
-- [ ] Default CLI runner creates the confirmed commit workflow through bootstrap
+- [x] Default CLI runner creates the confirmed commit workflow through bootstrap
   composition.
-- [ ] Model, reasoning effort, skill roots, verbose diagnostics, and git working
+- [x] Model, reasoning effort, skill roots, verbose diagnostics, and git working
   directory behavior match `commit-message` where applicable.
-- [ ] CLI entrypoint tests cover `commit` without live Codex or ambient git
+- [x] CLI entrypoint tests cover `commit` without live Codex or ambient git
   state.
-- [ ] Existing `commit-message` CLI behavior remains unchanged.
+- [x] Existing `commit-message` CLI behavior remains unchanged.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/integration/features/agent_runtime/test_cli_entrypoint.py`
-- [ ] `uv run pytest tests/unit/features/agent_runtime/adapters/inbound/cli/`
+- [x] `uv run pytest tests/integration/features/agent_runtime/test_cli_entrypoint.py`
+- [x] `uv run pytest tests/unit/features/agent_runtime/adapters/inbound/cli/`
 
 **Dependencies:** Tasks 3, 5, and 6
 
@@ -380,11 +380,11 @@ confirmed commit workflow.
 
 ### Checkpoint: CLI Workflow
 
-- [ ] `commit` parser, help, and runner tests pass.
-- [ ] CLI runner tests prove rejection and interrupted input do not invoke commit
+- [x] `commit` parser, help, and runner tests pass.
+- [x] CLI runner tests prove rejection and interrupted input do not invoke commit
   execution.
-- [ ] CLI entrypoint remains deterministic and offline.
-- [ ] `commit-message` remains read-only and tested.
+- [x] CLI entrypoint remains deterministic and offline.
+- [x] `commit-message` remains read-only and tested.
 
 ### Phase 4: Documentation and Final Validation
 
