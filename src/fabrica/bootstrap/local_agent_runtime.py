@@ -46,6 +46,8 @@ from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     LocalAgentRunResult,
     LocalAgentRunStatus,
+    ModelCostEvidence,
+    ModelUsageEvidence,
     RuntimeObservation,
     SelectedSkill,
     SelectedSkillResource,
@@ -87,6 +89,9 @@ from fabrica.features.developer_workflow.adapters.outbound.commit_message_agent_
     AgentRuntimeCommitMessageSynthesizer,
     AgentRuntimeStagedFileCommitMessageAnalyzer,
 )
+from fabrica.features.developer_workflow.adapters.outbound.git_commit_subprocess import (
+    GitCommitSubprocessCreator,
+)
 from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_registered_tool import (
     create_git_staged_changes_registered_tools,
 )
@@ -95,6 +100,9 @@ from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_su
 )
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageRecommendation,
+    CreateGitCommitCommand,
+    GenerateCommitMessageResult,
+    GitCommitResult,
     GitStagedDiffBounds,
     SynthesizeCommitMessageCommand,
 )
@@ -102,10 +110,12 @@ from fabrica.features.developer_workflow.application.ports import (
     AsyncCommitMessageSynthesizer,
     CommitMessageAnalysisError,
     CommitMessageSynthesisError,
+    GitCommitError,
     GitStagedChangesLoadError,
 )
 from fabrica.features.developer_workflow.application.use_cases import (
     DEFAULT_COMMIT_MESSAGE_SKILL_ID,
+    CreateGitCommit,
     GenerateCommitMessage,
     GenerateCommitMessageError,
     GenerateCommitMessageOptions,
@@ -277,11 +287,25 @@ class CommitMessageRuntime(Protocol):
         """Run one prepared local agent command asynchronously."""
 
 
+class CommitMessageGenerator(Protocol):
+    """Generator protocol consumed by composed commit workflows."""
+
+    async def generate_async(self, *, skill_id: str) -> GenerateCommitMessageResult:
+        """Generate one commit-message recommendation result."""
+
+
+class GitCommitter(Protocol):
+    """Committer protocol consumed by the confirmed commit workflow."""
+
+    def create(self, command: CreateGitCommitCommand) -> GitCommitResult:
+        """Create a git commit from an approved command."""
+
+
 @dataclass(frozen=True, slots=True)
 class CommitMessageWorkflow:
     """Composed workflow that runs evidence-first commit-message generation."""
 
-    generator: GenerateCommitMessage
+    generator: CommitMessageGenerator
     evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
 
     def run(
@@ -350,6 +374,149 @@ class CommitMessageWorkflow:
             output_text=_format_commit_message_recommendation(result.recommendation),
             usage_evidence=self.evidence_recorder.usage_evidence if self.evidence_recorder is not None else (),
             cost_evidence=self.evidence_recorder.cost_evidence if self.evidence_recorder is not None else (),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmedCommitWorkflowResult:
+    """Result of generating a recommendation and attempting an approved commit."""
+
+    status: LocalAgentRunStatus
+    recommendation: CommitMessageRecommendation | None = None
+    commit_result: GitCommitResult | None = None
+    output_text: str | None = None
+    observations: tuple[RuntimeObservation, ...] = field(default_factory=tuple)
+    usage_evidence: tuple[ModelUsageEvidence, ...] = field(default_factory=tuple)
+    cost_evidence: tuple[ModelCostEvidence, ...] = field(default_factory=tuple)
+    commit_attempted: bool = False
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "observations", tuple(self.observations))
+        object.__setattr__(self, "usage_evidence", tuple(self.usage_evidence))
+        object.__setattr__(self, "cost_evidence", tuple(self.cost_evidence))
+
+    @property
+    def succeeded(self) -> bool:
+        """Return whether recommendation generation and commit creation succeeded."""
+        return self.status is LocalAgentRunStatus.SUCCESS
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmedCommitWorkflow:
+    """Composed workflow for an externally approved generated git commit."""
+
+    generator: CommitMessageGenerator
+    committer: GitCommitter
+    evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
+
+    def run(
+        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
+    ) -> ConfirmedCommitWorkflowResult:
+        """Generate a recommendation and create the approved git commit."""
+        return asyncio.run(self.run_async(command, skill_id=skill_id))
+
+    async def run_async(
+        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
+    ) -> ConfirmedCommitWorkflowResult:
+        """Generate a recommendation asynchronously and create the approved git commit."""
+        selected_skill_id = getattr(command, "skill_id", skill_id)
+        if self.evidence_recorder is not None:
+            self.evidence_recorder.reset()
+        try:
+            result = await self.generator.generate_async(skill_id=selected_skill_id)
+        except GitStagedChangesLoadError as err:
+            return self._failure_result(
+                LocalAgentRunStatus.CONFIGURATION_ERROR,
+                RuntimeObservation(
+                    message=str(err),
+                    metadata={"category": err.category, **err.metadata},
+                ),
+            )
+        except SkillContextLoadError as err:
+            return self._failure_result(
+                LocalAgentRunStatus.CONFIGURATION_ERROR,
+                RuntimeObservation(
+                    message=str(err),
+                    metadata={"category": err.category, **err.metadata},
+                ),
+            )
+        except (GenerateCommitMessageError, ValueError) as err:
+            return self._failure_result(
+                LocalAgentRunStatus.CONFIGURATION_ERROR,
+                RuntimeObservation(
+                    message=str(err),
+                    metadata={
+                        "category": "invalid_commit_message_input",
+                        **getattr(err, "metadata", {}),
+                    },
+                ),
+            )
+        except (CommitMessageAnalysisError, CommitMessageSynthesisError) as err:
+            return self._failure_result(
+                LocalAgentRunStatus.MODEL_ERROR,
+                RuntimeObservation(
+                    message=str(err),
+                    metadata={
+                        "category": "commit_message_model_failure",
+                        **err.metadata,
+                    },
+                ),
+            )
+
+        recommendation = result.recommendation
+        output_text = _format_commit_message_recommendation(recommendation)
+        try:
+            commit_result = self.committer.create(
+                CreateGitCommitCommand(message=recommendation.commit_message),
+            )
+        except GitCommitError as err:
+            return ConfirmedCommitWorkflowResult(
+                status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+                recommendation=recommendation,
+                output_text=output_text,
+                observations=(
+                    RuntimeObservation(
+                        message=str(err),
+                        metadata={
+                            "category": "git_commit_failed",
+                            "commit_attempted": True,
+                            **err.metadata,
+                        },
+                    ),
+                ),
+                usage_evidence=self._usage_evidence,
+                cost_evidence=self._cost_evidence,
+                commit_attempted=True,
+            )
+
+        return ConfirmedCommitWorkflowResult(
+            status=LocalAgentRunStatus.SUCCESS,
+            recommendation=recommendation,
+            commit_result=commit_result,
+            output_text=output_text,
+            usage_evidence=self._usage_evidence,
+            cost_evidence=self._cost_evidence,
+            commit_attempted=True,
+        )
+
+    @property
+    def _usage_evidence(self):
+        return self.evidence_recorder.usage_evidence if self.evidence_recorder is not None else ()
+
+    @property
+    def _cost_evidence(self):
+        return self.evidence_recorder.cost_evidence if self.evidence_recorder is not None else ()
+
+    def _failure_result(
+        self,
+        status: LocalAgentRunStatus,
+        observation: RuntimeObservation,
+    ) -> ConfirmedCommitWorkflowResult:
+        return ConfirmedCommitWorkflowResult(
+            status=status,
+            observations=(observation,),
+            usage_evidence=self._usage_evidence,
+            cost_evidence=self._cost_evidence,
         )
 
 
@@ -560,28 +727,66 @@ def create_commit_message_workflow(
     """Create the selected-skill commit-message workflow with injected runtime."""
     workflow_options = options or CommitMessageWorkflowOptions()
     evidence_recording_runtime = EvidenceRecordingCommitMessageRuntime(runtime)
-    staged_changes_loader = GitStagedChangesSubprocessLoader(
-        working_directory=workflow_options.git_working_directory,
-        bounds=workflow_options.staged_diff_bounds,
-        timeout_seconds=workflow_options.git_timeout_seconds,
-        verbose_diagnostics=workflow_options.verbose_diagnostics,
-    )
-    skill_context_loader = create_skill_context_loader(
-        skill_roots=workflow_options.skill_roots,
-        bounds=workflow_options.skill_bounds,
-        verbose_diagnostics=workflow_options.verbose_diagnostics,
+    generator = _create_commit_message_generator(
+        runtime=evidence_recording_runtime,
+        options=workflow_options,
     )
     return CommitMessageWorkflow(
-        generator=GenerateCommitMessage(
-            staged_changes_loader=staged_changes_loader,
-            analyzer=AgentRuntimeStagedFileCommitMessageAnalyzer(evidence_recording_runtime),
-            synthesizer=SkillContextCommitMessageSynthesizer(
-                synthesizer=AgentRuntimeCommitMessageSynthesizer(evidence_recording_runtime),
-                skill_context_loader=skill_context_loader,
+        generator=generator,
+        evidence_recorder=evidence_recording_runtime,
+    )
+
+
+def create_confirmed_commit_workflow(
+    *,
+    runtime: CommitMessageRuntime,
+    options: CommitMessageWorkflowOptions | None = None,
+) -> ConfirmedCommitWorkflow:
+    """Create the selected-skill confirmed commit workflow with injected runtime."""
+    workflow_options = options or CommitMessageWorkflowOptions()
+    evidence_recording_runtime = EvidenceRecordingCommitMessageRuntime(runtime)
+    generator = _create_commit_message_generator(
+        runtime=evidence_recording_runtime,
+        options=workflow_options,
+    )
+    return ConfirmedCommitWorkflow(
+        generator=generator,
+        committer=CreateGitCommit(
+            commit_creator=GitCommitSubprocessCreator(
+                working_directory=workflow_options.git_working_directory,
+                timeout_seconds=workflow_options.git_timeout_seconds,
+                verbose_diagnostics=workflow_options.verbose_diagnostics,
             ),
-            options=GenerateCommitMessageOptions(max_parallel_analysis=workflow_options.max_parallel_analysis),
         ),
         evidence_recorder=evidence_recording_runtime,
+    )
+
+
+def _create_commit_message_generator(
+    *,
+    runtime: CommitMessageRuntime,
+    options: CommitMessageWorkflowOptions,
+) -> GenerateCommitMessage:
+    """Create the evidence-first commit-message generator shared by commit workflows."""
+    staged_changes_loader = GitStagedChangesSubprocessLoader(
+        working_directory=options.git_working_directory,
+        bounds=options.staged_diff_bounds,
+        timeout_seconds=options.git_timeout_seconds,
+        verbose_diagnostics=options.verbose_diagnostics,
+    )
+    skill_context_loader = create_skill_context_loader(
+        skill_roots=options.skill_roots,
+        bounds=options.skill_bounds,
+        verbose_diagnostics=options.verbose_diagnostics,
+    )
+    return GenerateCommitMessage(
+        staged_changes_loader=staged_changes_loader,
+        analyzer=AgentRuntimeStagedFileCommitMessageAnalyzer(runtime),
+        synthesizer=SkillContextCommitMessageSynthesizer(
+            synthesizer=AgentRuntimeCommitMessageSynthesizer(runtime),
+            skill_context_loader=skill_context_loader,
+        ),
+        options=GenerateCommitMessageOptions(max_parallel_analysis=options.max_parallel_analysis),
     )
 
 
@@ -591,6 +796,27 @@ def create_codex_commit_message_workflow(
     """Create the Codex-backed selected-skill commit-message workflow."""
     workflow_options = options or CommitMessageWorkflowOptions()
     return create_commit_message_workflow(
+        runtime=create_codex_local_agent_runtime(
+            auth_file_path=workflow_options.codex_auth_file_path,
+            http_client=workflow_options.codex_http_client,
+            timeout=workflow_options.codex_timeout,
+            request_settings=CodexBackendRequestSettings(
+                model=workflow_options.codex_model or DEFAULT_COMMIT_MESSAGE_CODEX_MODEL,
+                reasoning_effort=(
+                    workflow_options.codex_reasoning_effort or DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT
+                ),
+            ),
+        ),
+        options=workflow_options,
+    )
+
+
+def create_codex_confirmed_commit_workflow(
+    options: CommitMessageWorkflowOptions | None = None,
+) -> ConfirmedCommitWorkflow:
+    """Create the Codex-backed selected-skill confirmed commit workflow."""
+    workflow_options = options or CommitMessageWorkflowOptions()
+    return create_confirmed_commit_workflow(
         runtime=create_codex_local_agent_runtime(
             auth_file_path=workflow_options.codex_auth_file_path,
             http_client=workflow_options.codex_http_client,

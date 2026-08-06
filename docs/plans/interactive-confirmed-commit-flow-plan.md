@@ -203,24 +203,24 @@ create a git commit after the CLI confirms approval.
 
 **Acceptance criteria:**
 
-- [ ] Adds a workflow class/result shape for the confirmed commit path, distinct
+- [x] Adds a workflow class/result shape for the confirmed commit path, distinct
   from read-only `CommitMessageWorkflow`.
-- [ ] Reuses the existing `CommitMessageWorkflow` or `GenerateCommitMessage` path
+- [x] Reuses the existing `CommitMessageWorkflow` or `GenerateCommitMessage` path
   rather than duplicating model orchestration.
-- [ ] Passes exactly `CommitMessageRecommendation.commit_message` into
+- [x] Passes exactly `CommitMessageRecommendation.commit_message` into
   `CreateGitCommitCommand`.
-- [ ] Carries the original recommendation object/value through the confirmed
+- [x] Carries the original recommendation object/value through the confirmed
   commit path; implementation does not parse the commit message back out of
   formatted `LocalAgentRunResult.output_text`.
-- [ ] Preserves usage and cost evidence from recommendation generation for
+- [x] Preserves usage and cost evidence from recommendation generation for
   optional CLI evidence output.
-- [ ] Maps `GitCommitError` to safe user-facing runtime failure results that
+- [x] Maps `GitCommitError` to safe user-facing runtime failure results that
   indicate commit mutation was attempted.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/integration/features/developer_workflow/test_confirmed_commit_composition.py`
-- [ ] `uv run pytest tests/integration/features/developer_workflow/test_commit_message_composition.py`
+- [x] `uv run pytest tests/integration/features/developer_workflow/test_confirmed_commit_composition.py`
+- [x] `uv run pytest tests/integration/features/developer_workflow/test_commit_message_composition.py`
 
 **Dependencies:** Tasks 1-2
 
