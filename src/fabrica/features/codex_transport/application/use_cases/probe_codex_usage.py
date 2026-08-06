@@ -1,9 +1,9 @@
 """Use case for probing Codex usage and quota evidence."""
 
 from fabrica.features.codex_transport.application.dtos import (
+    CodexTransportStatus,
     CodexUsageProbeCommand,
     CodexUsageResult,
-    CodexUsageStatus,
 )
 from fabrica.features.codex_transport.application.exceptions import (
     CodexCredentialAuthenticationError,
@@ -28,13 +28,13 @@ class ProbeCodexUsage:
             credentials = self._credential_store.load()
         except CodexCredentialAuthenticationError as err:
             return credential_usage_failure_result(
-                status=CodexUsageStatus.AUTHENTICATION_FAILED,
+                status=CodexTransportStatus.AUTHENTICATION_FAILED,
                 message="credential loading failed authentication",
                 err=err,
             )
         except CodexCredentialStoreError as err:
             return credential_usage_failure_result(
-                status=CodexUsageStatus.CREDENTIAL_ERROR,
+                status=CodexTransportStatus.CREDENTIAL_ERROR,
                 message="credential loading failed",
                 err=err,
             )

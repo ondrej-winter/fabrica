@@ -1,17 +1,16 @@
-"""Backend execution port for Codex transport probing."""
+"""Backend execution port for Codex transport completions."""
 
 from typing import Protocol
 
 from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
     CodexCredentials,
-    CodexTransportProbeCommand,
     CodexTransportResult,
 )
 
 
 class CodexBackend(Protocol):
-    """Outbound port for Codex backend completions and compatibility probes."""
+    """Outbound port for Codex backend completions."""
 
     def complete(
         self,
@@ -19,12 +18,4 @@ class CodexBackend(Protocol):
         credentials: CodexCredentials,
     ) -> CodexTransportResult:
         """Execute one Codex completion and return a normalized result."""
-        ...
-
-    def execute_probe(
-        self,
-        command: CodexTransportProbeCommand,
-        credentials: CodexCredentials,
-    ) -> CodexTransportResult:
-        """Execute a probe with application-owned command and credentials."""
         ...

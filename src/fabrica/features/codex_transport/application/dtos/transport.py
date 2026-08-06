@@ -1,4 +1,4 @@
-"""Transport probe command and result DTOs."""
+"""Transport completion command and result DTOs."""
 
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -8,7 +8,7 @@ from fabrica.features.codex_transport.application.dtos.observations import Codex
 
 
 class CodexTransportStatus(StrEnum):
-    """Normalized outcomes for a Codex backend transport probe."""
+    """Normalized outcomes for Codex backend calls."""
 
     SUCCESS = "success"
     AUTHENTICATION_FAILED = "authentication_failed"
@@ -30,18 +30,8 @@ class CodexCompletionCommand:
 
 
 @dataclass(frozen=True, slots=True)
-class CodexTransportProbeCommand:
-    """Application command for one normalized Codex backend probe result."""
-
-    prompt: str
-
-    def __post_init__(self) -> None:
-        _validate_prompt(self.prompt)
-
-
-@dataclass(frozen=True, slots=True)
 class CodexTransportResult:
-    """Normalized, application-safe result of a Codex transport probe."""
+    """Normalized, application-safe result of a Codex transport completion."""
 
     status: CodexTransportStatus
     output_text: str | None = None
@@ -62,7 +52,7 @@ class CodexTransportResult:
 
     @property
     def succeeded(self) -> bool:
-        """Return whether the probe completed successfully."""
+        """Return whether the completion finished successfully."""
         return self.status is CodexTransportStatus.SUCCESS
 
 

@@ -14,7 +14,6 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
     CodexCredentials,
     CodexTransportObservation,
-    CodexTransportProbeCommand,
     CodexUsageProbeCommand,
 )
 
@@ -110,7 +109,7 @@ class CodexUsageRequest:
 
 def build_codex_backend_request(
     *,
-    command: CodexCompletionCommand | CodexTransportProbeCommand,
+    command: CodexCompletionCommand,
     credentials: CodexCredentials,
     settings: CodexBackendRequestSettings | None = None,
 ) -> CodexBackendRequest:

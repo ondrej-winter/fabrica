@@ -23,7 +23,6 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.respo
 from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
     CodexCredentials,
-    CodexTransportProbeCommand,
     CodexTransportResult,
     CodexUsageProbeCommand,
     CodexUsageResult,
@@ -47,17 +46,6 @@ class CodexBackendHttpAdapter:
     usage_request_settings: CodexUsageRequestSettings | None = None
     timeout: float | httpx.Timeout = DEFAULT_CODEX_BACKEND_TIMEOUT_SECONDS
     client: httpx.Client | None = None
-
-    def execute_probe(
-        self,
-        command: CodexTransportProbeCommand,
-        credentials: CodexCredentials,
-    ) -> CodexTransportResult:
-        """Execute one Codex backend probe and return a normalized result."""
-        return self.complete(
-            command=CodexCompletionCommand(prompt=command.prompt),
-            credentials=credentials,
-        )
 
     def complete(
         self,

@@ -8,10 +8,10 @@ import pytest
 from fabrica.features.codex_transport.application.dtos import (
     CodexCredentials,
     CodexTransportObservation,
+    CodexTransportStatus,
     CodexUsageEvidence,
     CodexUsageProbeCommand,
     CodexUsageResult,
-    CodexUsageStatus,
     SafeUsageEvidenceValue,
 )
 from fabrica.features.codex_transport.application.exceptions import (
@@ -57,7 +57,7 @@ def test_probe_loads_credentials_and_fetches_usage_evidence() -> None:
     )
     command = CodexUsageProbeCommand()
     backend_result = CodexUsageResult(
-        status=CodexUsageStatus.SUCCESS,
+        status=CodexTransportStatus.SUCCESS,
         evidence=CodexUsageEvidence({"plan_type": "synthetic-pro"}),
         observations=(CodexTransportObservation(message="usage evidence retrieved"),),
     )
@@ -73,11 +73,11 @@ def test_probe_loads_credentials_and_fetches_usage_evidence() -> None:
 
 def test_probe_returns_credential_error_when_credentials_cannot_be_loaded() -> None:
     credential_store = FakeCredentialStore(error=CodexCredentialUnavailableError("synthetic missing auth file"))
-    backend = FakeUsageBackend(result=CodexUsageResult(status=CodexUsageStatus.TRANSPORT_ERROR))
+    backend = FakeUsageBackend(result=CodexUsageResult(status=CodexTransportStatus.TRANSPORT_ERROR))
 
     result = ProbeCodexUsage(credential_store=credential_store, backend=backend).probe(CodexUsageProbeCommand())
 
-    assert result.status is CodexUsageStatus.CREDENTIAL_ERROR
+    assert result.status is CodexTransportStatus.CREDENTIAL_ERROR
     assert result.succeeded is False
     assert result.evidence is None
     assert result.observations == (
@@ -91,11 +91,11 @@ def test_probe_returns_credential_error_when_credentials_cannot_be_loaded() -> N
 
 def test_probe_returns_authentication_failed_for_credential_authentication_failures() -> None:
     credential_store = FakeCredentialStore(error=CodexCredentialAuthenticationError("synthetic unsupported auth mode"))
-    backend = FakeUsageBackend(result=CodexUsageResult(status=CodexUsageStatus.TRANSPORT_ERROR))
+    backend = FakeUsageBackend(result=CodexUsageResult(status=CodexTransportStatus.TRANSPORT_ERROR))
 
     result = ProbeCodexUsage(credential_store=credential_store, backend=backend).probe(CodexUsageProbeCommand())
 
-    assert result.status is CodexUsageStatus.AUTHENTICATION_FAILED
+    assert result.status is CodexTransportStatus.AUTHENTICATION_FAILED
     assert result.observations == (
         CodexTransportObservation(
             message="credential loading failed authentication",
@@ -126,12 +126,12 @@ def test_usage_evidence_rejects_non_scalar_values() -> None:
 
 def test_success_usage_result_requires_evidence() -> None:
     with pytest.raises(ValueError, match="must include evidence"):
-        CodexUsageResult(status=CodexUsageStatus.SUCCESS)
+        CodexUsageResult(status=CodexTransportStatus.SUCCESS)
 
 
 def test_non_success_usage_result_rejects_evidence() -> None:
     with pytest.raises(ValueError, match="must not include evidence"):
         CodexUsageResult(
-            status=CodexUsageStatus.TRANSPORT_ERROR,
+            status=CodexTransportStatus.TRANSPORT_ERROR,
             evidence=CodexUsageEvidence({"plan_type": "synthetic-pro"}),
         )

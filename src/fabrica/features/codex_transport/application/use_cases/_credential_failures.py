@@ -5,7 +5,6 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexTransportResult,
     CodexTransportStatus,
     CodexUsageResult,
-    CodexUsageStatus,
 )
 from fabrica.features.codex_transport.application.exceptions import CodexCredentialStoreError
 
@@ -25,7 +24,7 @@ def credential_transport_failure_result(
 
 def credential_usage_failure_result(
     *,
-    status: CodexUsageStatus,
+    status: CodexTransportStatus,
     message: str,
     err: CodexCredentialStoreError,
 ) -> CodexUsageResult:

@@ -8,14 +8,13 @@ from fabrica.features.codex_transport.application.ports import (
 )
 from fabrica.features.codex_transport.application.use_cases import (
     CompleteWithCodexTransport,
-    ProbeCodexTransport,
     ProbeCodexUsage,
 )
 
 
 def test_application_package_exports_public_use_cases_and_ports() -> None:
     assert application.CompleteWithCodexTransport is CompleteWithCodexTransport
-    assert application.ProbeCodexTransport is ProbeCodexTransport
+    assert application.CompleteWithCodexTransport is CompleteWithCodexTransport
     assert application.ProbeCodexUsage is ProbeCodexUsage
     assert application.CodexBackend is CodexBackend
     assert application.CodexCredentialStore is CodexCredentialStore

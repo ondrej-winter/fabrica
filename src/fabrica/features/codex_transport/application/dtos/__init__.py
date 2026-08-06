@@ -7,7 +7,6 @@ from fabrica.features.codex_transport.application.dtos.observations import (
 )
 from fabrica.features.codex_transport.application.dtos.transport import (
     CodexCompletionCommand,
-    CodexTransportProbeCommand,
     CodexTransportResult,
     CodexTransportStatus,
 )
@@ -15,7 +14,6 @@ from fabrica.features.codex_transport.application.dtos.usage import (
     CodexUsageEvidence,
     CodexUsageProbeCommand,
     CodexUsageResult,
-    CodexUsageStatus,
     SafeUsageEvidenceValue,
 )
 
@@ -23,13 +21,11 @@ __all__ = [
     "CodexCompletionCommand",
     "CodexCredentials",
     "CodexTransportObservation",
-    "CodexTransportProbeCommand",
     "CodexTransportResult",
     "CodexTransportStatus",
     "CodexUsageEvidence",
     "CodexUsageProbeCommand",
     "CodexUsageResult",
-    "CodexUsageStatus",
     "SafeObservationValue",
     "SafeUsageEvidenceValue",
 ]

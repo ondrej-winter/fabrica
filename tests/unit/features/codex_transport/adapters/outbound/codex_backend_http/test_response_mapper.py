@@ -17,7 +17,7 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.respo
     map_codex_usage_response,
     map_codex_usage_transport_error,
 )
-from fabrica.features.codex_transport.application.dtos import CodexTransportStatus, CodexUsageStatus
+from fabrica.features.codex_transport.application.dtos import CodexTransportStatus
 
 RESPONSE_INPUT_TOKENS = 10
 RESPONSE_OUTPUT_TOKENS = 4
@@ -395,7 +395,7 @@ def test_map_usage_success_response_extracts_safe_usage_evidence() -> None:
 
     result = map_codex_usage_response(response)
 
-    assert result.status is CodexUsageStatus.SUCCESS
+    assert result.status is CodexTransportStatus.SUCCESS
     assert result.evidence is not None
     assert result.evidence.values == {
         "plan_type": "synthetic-pro",
@@ -418,7 +418,7 @@ def test_map_usage_authentication_failure_for_401() -> None:
 
     result = map_codex_usage_response(response)
 
-    assert result.status is CodexUsageStatus.AUTHENTICATION_FAILED
+    assert result.status is CodexTransportStatus.AUTHENTICATION_FAILED
     assert result.evidence is None
     assert result.observations[0].metadata["category"] == "authentication"
     assert result.observations[0].metadata["error_type"] == "invalid_token"
@@ -434,7 +434,7 @@ def test_map_usage_429_with_quota_body_to_quota_exceeded() -> None:
 
     result = map_codex_usage_response(response)
 
-    assert result.status is CodexUsageStatus.QUOTA_EXCEEDED
+    assert result.status is CodexTransportStatus.QUOTA_EXCEEDED
     assert result.observations[0].metadata["category"] == "quota"
 
 
@@ -443,7 +443,7 @@ def test_map_usage_rate_limit_header_signal_to_rate_limited() -> None:
 
     result = map_codex_usage_response(response)
 
-    assert result.status is CodexUsageStatus.RATE_LIMITED
+    assert result.status is CodexTransportStatus.RATE_LIMITED
 
 
 def test_map_usage_unexpected_success_shape_to_backend_shape_mismatch() -> None:
@@ -451,7 +451,7 @@ def test_map_usage_unexpected_success_shape_to_backend_shape_mismatch() -> None:
 
     result = map_codex_usage_response(response)
 
-    assert result.status is CodexUsageStatus.BACKEND_SHAPE_MISMATCH
+    assert result.status is CodexTransportStatus.BACKEND_SHAPE_MISMATCH
     assert result.observations[0].metadata["category"] == "shape_mismatch"
 
 
@@ -460,7 +460,7 @@ def test_map_usage_transport_exception_to_transport_error_without_error_message(
 
     result = map_codex_usage_transport_error(err)
 
-    assert result.status is CodexUsageStatus.TRANSPORT_ERROR
+    assert result.status is CodexTransportStatus.TRANSPORT_ERROR
     assert result.evidence is None
     assert result.observations[0].metadata == {"category": "client_error", "error_type": "TimeoutError"}
     assert "example.invalid" not in str(result.observations)

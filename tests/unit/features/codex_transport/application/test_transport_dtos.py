@@ -19,7 +19,6 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
     CodexCredentials,
     CodexTransportObservation,
-    CodexTransportProbeCommand,
     CodexTransportResult,
     CodexTransportStatus,
     SafeObservationValue,
@@ -38,18 +37,15 @@ def test_transport_status_values_match_normalized_contract() -> None:
     }
 
 
-def test_probe_command_carries_prompt_without_backend_shape() -> None:
-    command = CodexTransportProbeCommand(prompt="Reply with the single word: pong")
+def test_completion_command_carries_prompt_without_backend_shape() -> None:
+    command = CodexCompletionCommand(prompt="Reply with the single word: pong")
 
     assert command.prompt == "Reply with the single word: pong"
 
 
-@pytest.mark.parametrize("command_type", [CodexCompletionCommand, CodexTransportProbeCommand])
-def test_prompt_commands_reject_empty_prompts(
-    command_type: type[CodexCompletionCommand | CodexTransportProbeCommand],
-) -> None:
+def test_completion_command_rejects_empty_prompts() -> None:
     with pytest.raises(ValueError, match="must not be empty"):
-        command_type(prompt="  ")
+        CodexCompletionCommand(prompt="  ")
 
 
 def test_result_exposes_success_helper_and_safe_observations() -> None:

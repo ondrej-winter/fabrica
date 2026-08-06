@@ -9,7 +9,7 @@ SafeObservationValue = str | int | float | bool | None
 
 @dataclass(frozen=True, slots=True)
 class CodexTransportObservation:
-    """Redacted diagnostic information for a Codex transport probe.
+    """Redacted diagnostic information for Codex transport interactions.
 
     The ``metadata`` mapping is safe-by-construction: callers must provide only
     redacted, bounded values such as status codes, error categories, counts, or

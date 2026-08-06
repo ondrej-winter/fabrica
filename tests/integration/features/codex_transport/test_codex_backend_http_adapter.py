@@ -4,11 +4,10 @@ import httpx
 
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http import CodexBackendHttpAdapter
 from fabrica.features.codex_transport.application.dtos import (
+    CodexCompletionCommand,
     CodexCredentials,
-    CodexTransportProbeCommand,
     CodexTransportStatus,
     CodexUsageProbeCommand,
-    CodexUsageStatus,
 )
 
 
@@ -21,8 +20,8 @@ def test_codex_backend_http_adapter_executes_probe_with_mock_transport() -> None
 
     adapter = CodexBackendHttpAdapter(client=httpx.Client(transport=httpx.MockTransport(handler)))
 
-    result = adapter.execute_probe(
-        command=CodexTransportProbeCommand(prompt="Reply with the single word: pong"),
+    result = adapter.complete(
+        command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
         credentials=CodexCredentials(
             access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
             account_id="synthetic-account",
@@ -56,7 +55,7 @@ def test_codex_backend_http_adapter_fetches_usage_with_mock_transport() -> None:
         ),
     )
 
-    assert result.status is CodexUsageStatus.SUCCESS
+    assert result.status is CodexTransportStatus.SUCCESS
     assert result.evidence is not None
     assert result.evidence.values == {
         "plan_type": "synthetic-pro",

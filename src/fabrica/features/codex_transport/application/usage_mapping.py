@@ -17,7 +17,7 @@ from fabrica.features.agent_runtime.application.dtos.usage import (
     SafeModelUsageObservationValue,
 )
 from fabrica.features.codex_transport.application.dtos.transport import CodexTransportStatus
-from fabrica.features.codex_transport.application.dtos.usage import CodexUsageResult, CodexUsageStatus
+from fabrica.features.codex_transport.application.dtos.usage import CodexUsageResult
 
 CODEX_PROVIDER = "codex"
 _COMPLETE_QUOTA_FIELD_COUNT = 4
@@ -139,7 +139,7 @@ def _usage_endpoint_evidence(result: CodexUsageResult) -> ModelUsageEvidence:
     )
 
 
-def _usage_endpoint_cost_evidence(status: CodexUsageStatus) -> ModelCostEvidence:
+def _usage_endpoint_cost_evidence(status: CodexTransportStatus) -> ModelCostEvidence:
     return ModelCostEvidence(
         pricing_status=ModelPricingStatus.NOT_AVAILABLE,
         source=ModelUsageEvidenceSource.USAGE_ENDPOINT,
@@ -178,16 +178,16 @@ def _quota_evidence(result: CodexUsageResult) -> ModelQuotaEvidence | None:
 
 def _usage_endpoint_collection_status(
     *,
-    status: CodexUsageStatus,
+    status: CodexTransportStatus,
     quota: ModelQuotaEvidence | None,
 ) -> ModelUsageCollectionStatus:
     if status in {
-        CodexUsageStatus.AUTHENTICATION_FAILED,
-        CodexUsageStatus.CREDENTIAL_ERROR,
-        CodexUsageStatus.TRANSPORT_ERROR,
+        CodexTransportStatus.AUTHENTICATION_FAILED,
+        CodexTransportStatus.CREDENTIAL_ERROR,
+        CodexTransportStatus.TRANSPORT_ERROR,
     }:
         return ModelUsageCollectionStatus.FAILED
-    if status is not CodexUsageStatus.SUCCESS:
+    if status is not CodexTransportStatus.SUCCESS:
         return ModelUsageCollectionStatus.UNAVAILABLE
     if quota is None:
         return ModelUsageCollectionStatus.UNAVAILABLE
@@ -210,7 +210,7 @@ def _quota_field_count(quota: ModelQuotaEvidence) -> int:
 
 def _usage_endpoint_observation(
     *,
-    status: CodexUsageStatus,
+    status: CodexTransportStatus,
     collection_status: ModelUsageCollectionStatus,
     evidence_values: object,
     quota: ModelQuotaEvidence | None,
@@ -246,13 +246,13 @@ def _safe_usage_endpoint_observation_metadata(
 
 def _usage_endpoint_observation_message(
     *,
-    status: CodexUsageStatus,
+    status: CodexTransportStatus,
     collection_status: ModelUsageCollectionStatus,
     quota: ModelQuotaEvidence | None,
 ) -> str:
     if quota is not None:
         return "Codex usage endpoint quota or rate-limit evidence was extracted"
-    if status is CodexUsageStatus.SUCCESS:
+    if status is CodexTransportStatus.SUCCESS:
         return "Codex usage endpoint did not include usable quota or rate-limit evidence"
     if collection_status is ModelUsageCollectionStatus.FAILED:
         return "Codex usage endpoint evidence collection failed"

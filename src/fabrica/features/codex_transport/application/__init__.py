@@ -12,7 +12,6 @@ from fabrica.features.codex_transport.application.ports import (
 )
 from fabrica.features.codex_transport.application.use_cases import (
     CompleteWithCodexTransport,
-    ProbeCodexTransport,
     ProbeCodexUsage,
 )
 
@@ -24,6 +23,5 @@ __all__ = [
     "CodexCredentialUnavailableError",
     "CodexUsageBackend",
     "CompleteWithCodexTransport",
-    "ProbeCodexTransport",
     "ProbeCodexUsage",
 ]

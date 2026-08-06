@@ -8,7 +8,6 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
     CodexCredentials,
     CodexTransportObservation,
-    CodexTransportProbeCommand,
     CodexTransportResult,
     CodexTransportStatus,
 )
@@ -46,13 +45,6 @@ class FakeCodexBackend:
     ) -> CodexTransportResult:
         self.calls.append((command, credentials))
         return self.result
-
-    def execute_probe(
-        self,
-        command: CodexTransportProbeCommand,
-        credentials: CodexCredentials,
-    ) -> CodexTransportResult:
-        return self.complete(CodexCompletionCommand(prompt=command.prompt), credentials)
 
 
 def test_complete_loads_credentials_and_executes_backend_completion() -> None:

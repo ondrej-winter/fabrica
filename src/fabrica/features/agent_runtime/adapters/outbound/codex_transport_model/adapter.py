@@ -27,7 +27,7 @@ class _CodexTransportCompletion(Protocol):
 
 
 class CodexTransportAgentModel:
-    """Adapt the Codex transport probe use case to the runtime model port."""
+    """Adapt the Codex transport completion API to the runtime model port."""
 
     def __init__(self, transport: _CodexTransportCompletion) -> None:
         self._transport = transport

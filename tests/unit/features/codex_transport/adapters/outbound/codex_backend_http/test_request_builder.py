@@ -19,15 +19,15 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.reque
 )
 from fabrica.features.codex_transport.adapters.outbound.redaction import REDACTED_VALUE
 from fabrica.features.codex_transport.application.dtos import (
+    CodexCompletionCommand,
     CodexCredentials,
-    CodexTransportProbeCommand,
     CodexUsageProbeCommand,
 )
 
 
 def test_build_codex_backend_request_uses_default_backend_url_and_headers() -> None:
     request = build_codex_backend_request(
-        command=CodexTransportProbeCommand(prompt="Reply with the single word: pong"),
+        command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
         credentials=CodexCredentials(
             access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
             account_id="synthetic-account",
@@ -45,7 +45,7 @@ def test_build_codex_backend_request_uses_default_backend_url_and_headers() -> N
 
 def test_build_codex_backend_request_produces_stream_backed_responses_payload() -> None:
     request = build_codex_backend_request(
-        command=CodexTransportProbeCommand(prompt="Reply with the single word: pong"),
+        command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
         credentials=CodexCredentials(
             access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
             account_id="synthetic-account",
@@ -69,7 +69,7 @@ def test_build_codex_backend_request_produces_stream_backed_responses_payload() 
 
 def test_build_codex_backend_request_allows_adapter_owned_backend_shape_overrides() -> None:
     request = build_codex_backend_request(
-        command=CodexTransportProbeCommand(prompt="synthetic prompt"),
+        command=CodexCompletionCommand(prompt="synthetic prompt"),
         credentials=CodexCredentials(
             access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
             account_id="synthetic-account",
@@ -89,7 +89,7 @@ def test_build_codex_backend_request_allows_adapter_owned_backend_shape_override
 
 def test_build_codex_backend_request_allows_low_reasoning_effort_override() -> None:
     request = build_codex_backend_request(
-        command=CodexTransportProbeCommand(prompt="synthetic prompt"),
+        command=CodexCompletionCommand(prompt="synthetic prompt"),
         credentials=CodexCredentials(
             access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
             account_id="synthetic-account",
@@ -106,7 +106,7 @@ def test_build_codex_backend_request_allows_low_reasoning_effort_override() -> N
 
 def test_backend_request_containers_are_copied_and_immutable() -> None:
     request = build_codex_backend_request(
-        command=CodexTransportProbeCommand(prompt="synthetic prompt"),
+        command=CodexCompletionCommand(prompt="synthetic prompt"),
         credentials=CodexCredentials(
             access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
             account_id="synthetic-account",
@@ -121,7 +121,7 @@ def test_backend_request_containers_are_copied_and_immutable() -> None:
 
 def test_backend_request_redacted_observation_excludes_raw_tokens_and_account_identifiers() -> None:
     request = build_codex_backend_request(
-        command=CodexTransportProbeCommand(prompt="Reply with the single word: pong"),
+        command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
         credentials=CodexCredentials(
             access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
             account_id="synthetic-account",

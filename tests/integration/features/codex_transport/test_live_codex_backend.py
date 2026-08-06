@@ -10,8 +10,8 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http impor
     CodexBackendHttpAdapter,
     CodexBackendRequestSettings,
 )
-from fabrica.features.codex_transport.application.dtos import CodexTransportProbeCommand, CodexTransportStatus
-from fabrica.features.codex_transport.application.use_cases import ProbeCodexTransport
+from fabrica.features.codex_transport.application.dtos import CodexCompletionCommand, CodexTransportStatus
+from fabrica.features.codex_transport.application.use_cases import CompleteWithCodexTransport
 
 _RUN_LIVE_CODEX_TESTS_ENV = "FABRICA_RUN_LIVE_CODEX_TESTS"
 _CODEX_AUTH_FILE_ENV = "FABRICA_CODEX_AUTH_FILE"
@@ -23,12 +23,12 @@ _PONG_PROMPT = "Reply with the single word: pong"
 
 
 @pytest.mark.live_codex
-def test_live_codex_backend_probe_returns_pong_when_explicitly_enabled() -> None:
-    """Run one credential-backed live probe only when explicitly enabled."""
+def test_live_codex_backend_completion_returns_pong_when_explicitly_enabled() -> None:
+    """Run one credential-backed live completion only when explicitly enabled."""
     if os.environ.get(_RUN_LIVE_CODEX_TESTS_ENV) != _LIVE_TEST_ENABLED_VALUE:
         pytest.skip(f"set {_RUN_LIVE_CODEX_TESTS_ENV}=1 to run live Codex backend tests")
 
-    use_case = ProbeCodexTransport(
+    use_case = CompleteWithCodexTransport(
         credential_store=CodexAuthFileCredentialStore(_resolve_auth_file_path()),
         backend=CodexBackendHttpAdapter(
             request_settings=CodexBackendRequestSettings(
@@ -38,11 +38,11 @@ def test_live_codex_backend_probe_returns_pong_when_explicitly_enabled() -> None
         ),
     )
 
-    result = use_case.probe(CodexTransportProbeCommand(prompt=_PONG_PROMPT))
+    result = use_case.complete(CodexCompletionCommand(prompt=_PONG_PROMPT))
 
     assert isinstance(result.status, CodexTransportStatus)
     if result.status is not CodexTransportStatus.SUCCESS:
-        pytest.fail(f"live Codex probe failed with redacted observations: {result.observations}")
+        pytest.fail(f"live Codex completion failed with redacted observations: {result.observations}")
 
     assert result.output_text is not None
     assert result.output_text.strip().lower() == "pong"

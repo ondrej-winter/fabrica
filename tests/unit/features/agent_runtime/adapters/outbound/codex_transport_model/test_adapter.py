@@ -56,7 +56,7 @@ def test_adapter_maps_successful_transport_result_to_runtime_result() -> None:
         result=CodexTransportResult(
             status=CodexTransportStatus.SUCCESS,
             output_text="pong",
-            observations=(CodexTransportObservation(message="backend probe succeeded"),),
+            observations=(CodexTransportObservation(message="backend completion succeeded"),),
             usage_evidence=(usage_evidence,),
             cost_evidence=(cost_evidence,),
         ),
@@ -69,7 +69,7 @@ def test_adapter_maps_successful_transport_result_to_runtime_result() -> None:
     assert result.succeeded is True
     assert result.output_text == "pong"
     assert result.observations == (
-        RuntimeObservation(message="backend probe succeeded", metadata={"transport_status": "success"}),
+        RuntimeObservation(message="backend completion succeeded", metadata={"transport_status": "success"}),
     )
     assert result.usage_evidence == (usage_evidence,)
     assert result.cost_evidence == (cost_evidence,)

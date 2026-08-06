@@ -12,7 +12,6 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexTransportStatus,
     CodexUsageEvidence,
     CodexUsageResult,
-    CodexUsageStatus,
 )
 from fabrica.features.codex_transport.application.usage_mapping import (
     CodexCompletionUsageFacts,
@@ -130,7 +129,7 @@ def test_codex_completion_usage_facts_reject_negative_token_counts() -> None:
 def test_map_codex_usage_endpoint_evidence_maps_safe_quota_fields() -> None:
     evidence = map_codex_usage_endpoint_evidence(
         CodexUsageResult(
-            status=CodexUsageStatus.SUCCESS,
+            status=CodexTransportStatus.SUCCESS,
             evidence=CodexUsageEvidence(
                 {
                     "limit": USAGE_LIMIT,
@@ -166,7 +165,7 @@ def test_map_codex_usage_endpoint_evidence_maps_safe_quota_fields() -> None:
 def test_map_codex_usage_endpoint_evidence_maps_partial_quota_without_coercion() -> None:
     evidence = map_codex_usage_endpoint_evidence(
         CodexUsageResult(
-            status=CodexUsageStatus.SUCCESS,
+            status=CodexTransportStatus.SUCCESS,
             evidence=CodexUsageEvidence(
                 {
                     "remaining": USAGE_REMAINING,
@@ -191,7 +190,7 @@ def test_map_codex_usage_endpoint_evidence_maps_partial_quota_without_coercion()
 def test_map_codex_usage_endpoint_evidence_reports_success_without_quota_as_unavailable() -> None:
     evidence = map_codex_usage_endpoint_evidence(
         CodexUsageResult(
-            status=CodexUsageStatus.SUCCESS,
+            status=CodexTransportStatus.SUCCESS,
             evidence=CodexUsageEvidence({"plan_type": "synthetic-pro"}),
         ),
     )
@@ -207,16 +206,16 @@ def test_map_codex_usage_endpoint_evidence_reports_success_without_quota_as_unav
 @pytest.mark.parametrize(
     ("status", "expected_collection_status"),
     [
-        (CodexUsageStatus.AUTHENTICATION_FAILED, ModelUsageCollectionStatus.FAILED),
-        (CodexUsageStatus.CREDENTIAL_ERROR, ModelUsageCollectionStatus.FAILED),
-        (CodexUsageStatus.TRANSPORT_ERROR, ModelUsageCollectionStatus.FAILED),
-        (CodexUsageStatus.RATE_LIMITED, ModelUsageCollectionStatus.UNAVAILABLE),
-        (CodexUsageStatus.QUOTA_EXCEEDED, ModelUsageCollectionStatus.UNAVAILABLE),
-        (CodexUsageStatus.BACKEND_SHAPE_MISMATCH, ModelUsageCollectionStatus.UNAVAILABLE),
+        (CodexTransportStatus.AUTHENTICATION_FAILED, ModelUsageCollectionStatus.FAILED),
+        (CodexTransportStatus.CREDENTIAL_ERROR, ModelUsageCollectionStatus.FAILED),
+        (CodexTransportStatus.TRANSPORT_ERROR, ModelUsageCollectionStatus.FAILED),
+        (CodexTransportStatus.RATE_LIMITED, ModelUsageCollectionStatus.UNAVAILABLE),
+        (CodexTransportStatus.QUOTA_EXCEEDED, ModelUsageCollectionStatus.UNAVAILABLE),
+        (CodexTransportStatus.BACKEND_SHAPE_MISMATCH, ModelUsageCollectionStatus.UNAVAILABLE),
     ],
 )
 def test_map_codex_usage_endpoint_evidence_maps_non_success_statuses(
-    status: CodexUsageStatus,
+    status: CodexTransportStatus,
     expected_collection_status: ModelUsageCollectionStatus,
 ) -> None:
     evidence = map_codex_usage_endpoint_evidence(CodexUsageResult(status=status))
@@ -233,7 +232,7 @@ def test_map_codex_usage_endpoint_evidence_maps_non_success_statuses(
 def test_map_codex_usage_endpoint_evidence_does_not_expose_unsafe_values() -> None:
     evidence = map_codex_usage_endpoint_evidence(
         CodexUsageResult(
-            status=CodexUsageStatus.SUCCESS,
+            status=CodexTransportStatus.SUCCESS,
             evidence=CodexUsageEvidence(
                 {
                     "remaining": USAGE_REMAINING,
