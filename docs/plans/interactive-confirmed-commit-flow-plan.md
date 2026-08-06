@@ -150,29 +150,29 @@ commit message to a temporary file and invokes git safely.
 
 **Acceptance criteria:**
 
-- [ ] Adapter uses explicit argv with `shell=False` through an injectable runner
+- [x] Adapter uses explicit argv with `shell=False` through an injectable runner
   boundary.
-- [ ] Adapter writes the exact approved message to a temporary UTF-8
+- [x] Adapter writes the exact approved message to a temporary UTF-8
   commit-message file.
-- [ ] Adapter runs `git --no-pager commit --file <tempfile>` from the
+- [x] Adapter runs `git --no-pager commit --file <tempfile>` from the
   composition-owned working directory.
-- [ ] Single-line and multiline messages, including bodies and footers, are
+- [x] Single-line and multiline messages, including bodies and footers, are
   preserved exactly in the temp file.
-- [ ] The temporary commit-message file is cleaned up after success, git
+- [x] The temporary commit-message file is cleaned up after success, git
   non-zero failure, timeout, and subprocess start failure.
-- [ ] Git unavailable, not a repository, no staged changes, hook failure,
+- [x] Git unavailable, not a repository, no staged changes, hook failure,
   timeout, and generic non-zero failures map to `GitCommitError` with safe
   metadata.
-- [ ] On success, adapter obtains the new short hash when available, likely
+- [x] On success, adapter obtains the new short hash when available, likely
   through a second safe `git --no-pager rev-parse --short HEAD` call.
-- [ ] If `git commit --file <tempfile>` succeeds but short-hash lookup fails,
+- [x] If `git commit --file <tempfile>` succeeds but short-hash lookup fails,
   the adapter returns success with `short_hash=None` and safe diagnostic
   metadata rather than reporting the commit itself as failed.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_commit_subprocess/`
-- [ ] `uv run ty check src tests`
+- [x] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_commit_subprocess/`
+- [x] `uv run ty check src tests`
 
 **Dependencies:** Task 1
 
@@ -189,9 +189,9 @@ commit message to a temporary file and invokes git safely.
 
 ### Checkpoint: Commit Boundary
 
-- [ ] Developer-workflow application tests pass.
-- [ ] Git commit subprocess adapter unit tests pass.
-- [ ] Mutating git behavior is isolated under `git_commit_subprocess/` and not
+- [x] Developer-workflow application tests pass.
+- [x] Git commit subprocess adapter unit tests pass.
+- [x] Mutating git behavior is isolated under `git_commit_subprocess/` and not
   mixed into read-only staged-git modules.
 
 ### Phase 2: Composed Confirmed Commit Workflow
