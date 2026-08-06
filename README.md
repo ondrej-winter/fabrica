@@ -36,6 +36,19 @@ Pre-commit hooks can be installed with:
 uv run pre-commit install
 ```
 
+## Dependency inspection
+
+Use the focused dependency inspection targets when reviewing dependency health:
+
+```bash
+make deps-tree      # show the full resolved dependency tree from uv.lock
+make deps-outdated  # check top-level dependencies for newer available versions
+make deps-audit     # audit locked dependencies for known vulnerabilities
+```
+
+`deps-tree` is a local lockfile inspection. `deps-outdated` and `deps-audit` may
+query remote package or vulnerability indexes.
+
 ## Live Codex transport validation
 
 Live Codex backend validation is opt-in because it reads local Codex credentials
