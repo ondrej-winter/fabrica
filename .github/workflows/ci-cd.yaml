@@ -2,9 +2,8 @@ name: CI/CD
 
 "on":
   push:
-    branches: [master]
   pull_request:
-    branches: [master]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -63,7 +62,7 @@ jobs:
 
   patch-release:
     name: Create patch release and publish to PyPI
-    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && github.actor != 'github-actions[bot]'
     needs: [quality]
     runs-on: ubuntu-latest
     environment:
