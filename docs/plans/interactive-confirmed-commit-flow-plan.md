@@ -241,17 +241,21 @@ exactly one commit and rejection/failure paths do not create successful commits.
 
 **Acceptance criteria:**
 
-- [ ] Approval path creates exactly one commit with the generated
+- [x] Approval path creates exactly one commit with the generated
   subject/body/footer.
 - [ ] Rejection path creates no commit and preserves staged changes.
-- [ ] No staged changes fails before prompting and creates no commit.
-- [ ] Git commit failure returns non-zero and does not report success.
-- [ ] Tests configure local git identity only inside the temporary repository
+- [x] No staged changes fails before prompting and creates no commit.
+- [x] Git commit failure returns non-zero and does not report success.
+- [x] Tests configure local git identity only inside the temporary repository
   when required.
+
+**Note:** Rejection is intentionally left for the CLI-owned prompt behavior in
+Task 6 because the confirmed commit workflow is the already-approved application
+path and does not model rejection input.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/integration/features/developer_workflow/`
+- [x] `uv run pytest tests/integration/features/developer_workflow/`
 
 **Dependencies:** Tasks 2-3
 
@@ -264,10 +268,10 @@ exactly one commit and rejection/failure paths do not create successful commits.
 
 ### Checkpoint: End-to-End Commit Core
 
-- [ ] Recommendation generation remains staged-only.
-- [ ] Approved generated message creates a real commit in a temporary repo.
+- [x] Recommendation generation remains staged-only.
+- [x] Approved generated message creates a real commit in a temporary repo.
 - [ ] Failure and rejection paths do not create commits.
-- [ ] Existing `commit-message` composition tests still pass.
+- [x] Existing `commit-message` composition tests still pass.
 
 ### Phase 3: CLI Parser and Runner
 

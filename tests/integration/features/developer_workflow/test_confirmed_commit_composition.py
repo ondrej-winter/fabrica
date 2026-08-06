@@ -170,6 +170,38 @@ def test_confirmed_commit_workflow_stops_before_commit_when_staged_discovery_fai
     assert _git_commit_count(git_repository) == 0
 
 
+def test_confirmed_commit_workflow_reports_git_failure_without_creating_commit(tmp_path: Path) -> None:
+    runtime = FakeRuntime(
+        results=[
+            LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text=_analysis_json()),
+            LocalAgentRunResult(
+                status=LocalAgentRunStatus.SUCCESS,
+                output_text=_synthesis_text(commit_message="feat: add confirmed commit flow"),
+            ),
+        ],
+    )
+    git_repository = _create_repository_with_staged_diff(tmp_path)
+    _configure_git_identity(git_repository)
+    _install_failing_pre_commit_hook(git_repository)
+    skill_root = _write_commit_message_skill(tmp_path)
+    workflow = create_confirmed_commit_workflow(
+        runtime=runtime,
+        options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
+    )
+
+    result = workflow.run(skill_id="conventional-commits")
+
+    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.commit_attempted is True
+    assert result.commit_result is None
+    assert result.recommendation is not None
+    assert result.recommendation.commit_message == "feat: add confirmed commit flow"
+    assert result.observations[0].metadata["category"] == "git_failed"
+    assert result.observations[0].metadata["commit_attempted"] is True
+    assert _git_commit_count(git_repository) == 0
+    assert _git_staged_file_names(git_repository) == ("example.txt",)
+
+
 def test_confirmed_commit_workflow_maps_commit_error_after_preserving_recommendation() -> None:
     recommendation = CommitMessageRecommendation(
         summary="Summary text.",
@@ -284,6 +316,12 @@ def _configure_git_identity(git_repository: Path) -> None:
     _run_git(("git", "config", "user.email", "fabrica-test@example.invalid"), cwd=git_repository)
 
 
+def _install_failing_pre_commit_hook(git_repository: Path) -> None:
+    hook_path = git_repository / ".git" / "hooks" / "pre-commit"
+    hook_path.write_text("#!/bin/sh\necho failing test hook >&2\nexit 1\n", encoding="utf-8")
+    hook_path.chmod(0o755)
+
+
 def _git_commit_count(git_repository: Path) -> int:
     result = subprocess.run(
         ("git", "rev-list", "--count", "HEAD"),  # noqa: S607
@@ -295,6 +333,17 @@ def _git_commit_count(git_repository: Path) -> int:
     if result.returncode != 0:
         return 0
     return int(result.stdout.strip())
+
+
+def _git_staged_file_names(git_repository: Path) -> tuple[str, ...]:
+    result = subprocess.run(
+        ("git", "diff", "--cached", "--name-only"),  # noqa: S607
+        cwd=git_repository,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return tuple(line for line in result.stdout.splitlines() if line)
 
 
 def _git_log_message(git_repository: Path) -> str:
