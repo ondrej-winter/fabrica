@@ -3,14 +3,14 @@
 from dataclasses import dataclass, field
 from io import StringIO
 
-from fabrica.bootstrap import ConfirmedCommitWorkflowResult
-from fabrica.features.agent_runtime.adapters.inbound.cli import (
+from fabrica.adapters.inbound.cli import (
     CliCommandDependencies,
     CliCommitCommand,
     CliGlobalOptions,
     CliInvocation,
     run_cli_command,
 )
+from fabrica.bootstrap import ConfirmedCommitWorkflowResult
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunStatus,
     ModelTokenUsageEvidence,

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fabrica.features.agent_runtime.adapters.inbound.cli.parser import parse_args
-from fabrica.features.agent_runtime.adapters.inbound.cli.runner import run_cli_command
+from fabrica.adapters.inbound.cli.parser import parse_args
+from fabrica.adapters.inbound.cli.runner import run_cli_command
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from fabrica.features.agent_runtime.adapters.inbound.cli import (
+from fabrica.adapters.inbound.cli import (
     CliCommitCommand,
     CliCommitMessageCommand,
     CliGlobalOptions,

@@ -1,6 +1,6 @@
 """Command-line inbound adapter for local agent runtime workflows."""
 
-from fabrica.features.agent_runtime.adapters.inbound.cli.parser import (
+from fabrica.adapters.inbound.cli.parser import (
     CliCommand,
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -13,7 +13,7 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.parser import (
     build_parser,
     parse_args,
 )
-from fabrica.features.agent_runtime.adapters.inbound.cli.runner import (
+from fabrica.adapters.inbound.cli.runner import (
     CliCommandDependencies,
     CommandAugmenter,
     CommitMessageWorkflowRunner,

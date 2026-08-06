@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
 
-from fabrica.features.agent_runtime.adapters.inbound.cli import (
+from fabrica.adapters.inbound.cli import (
     CliCommandDependencies,
     CliCommitMessageCommand,
     CliGlobalOptions,

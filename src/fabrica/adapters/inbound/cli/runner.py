@@ -6,13 +6,13 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, TextIO
 
-from fabrica.features.agent_runtime.adapters.inbound.cli.output import (
+from fabrica.adapters.inbound.cli.output import (
     write_model_evidence_report,
     write_run_result,
     write_script_execution_result,
     write_script_policy_result,
 )
-from fabrica.features.agent_runtime.adapters.inbound.cli.parser import (
+from fabrica.adapters.inbound.cli.parser import (
     CliCommand,
     CliCommitCommand,
     CliCommitMessageCommand,

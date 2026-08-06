@@ -7,7 +7,7 @@ from hashlib import sha256
 from io import StringIO
 from pathlib import Path
 
-from fabrica.features.agent_runtime.adapters.inbound.cli import (
+from fabrica.adapters.inbound.cli import (
     CliCommandDependencies,
     CliScriptExecuteCommand,
     run_cli_command,

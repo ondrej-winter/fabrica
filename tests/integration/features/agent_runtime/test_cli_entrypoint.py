@@ -9,7 +9,7 @@ import sys
 
 def test_module_entrypoint_help_is_offline_and_lists_explicit_script_execution_command() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "fabrica.features.agent_runtime.adapters.inbound.cli", "--help"],
+        [sys.executable, "-m", "fabrica.adapters.inbound.cli", "--help"],
         check=False,
         capture_output=True,
         text=True,
