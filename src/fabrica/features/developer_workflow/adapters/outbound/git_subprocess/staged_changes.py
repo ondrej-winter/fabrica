@@ -7,18 +7,21 @@ import subprocess
 from time import monotonic
 from typing import TYPE_CHECKING
 
-from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_subprocess.command_runner import (
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.command_runner import (
     GitCommandResult,
     GitCommandRunner,
     run_git_command,
 )
-from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_subprocess.commands import (
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.parsing import (
+    parse_name_status_line,
+)
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.staged_changes_commands import (
     DEFAULT_GIT_TIMEOUT_SECONDS,
     GIT_STAGED_DIFF_ARGV,
     GIT_STAGED_FILE_LIST_ARGV,
     git_staged_file_diff_argv,
 )
-from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_subprocess.errors import (
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.staged_changes_errors import (
     DECODE_ERROR_MESSAGE,
     GIT_FAILED_MESSAGE,
     GIT_START_FAILED_MESSAGE,
@@ -30,9 +33,6 @@ from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_su
     UNSAFE_FILE_PATH_MESSAGE,
     UNSTAGED_FILE_PATH_MESSAGE,
     UNSUPPORTED_NAME_STATUS_MESSAGE,
-)
-from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_subprocess.parsing import (
-    parse_name_status_line,
 )
 from fabrica.features.developer_workflow.application.dtos import (
     GitStagedChangesFailureCategory,

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_subprocess import (
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess import (
     GitCommandResult,
     GitStagedChangesSubprocessLoader,
 )

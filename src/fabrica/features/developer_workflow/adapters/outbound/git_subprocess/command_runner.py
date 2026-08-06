@@ -1,4 +1,4 @@
-"""Subprocess runner boundary for staged git command execution."""
+"""Subprocess runner boundary for developer-workflow git commands."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ class GitCommandRunner(Protocol):
 
 
 def run_git_command(argv: Sequence[str], *, cwd: Path | None, timeout_seconds: float) -> GitCommandResult:
-    """Run a read-only git command and return captured process output."""
+    """Run a git command and return captured process output."""
     completed = subprocess.run(  # noqa: S603
         list(argv),
         check=False,

@@ -89,13 +89,11 @@ from fabrica.features.developer_workflow.adapters.outbound.commit_message_agent_
     AgentRuntimeCommitMessageSynthesizer,
     AgentRuntimeStagedFileCommitMessageAnalyzer,
 )
-from fabrica.features.developer_workflow.adapters.outbound.git_commit_subprocess import (
-    GitCommitSubprocessCreator,
-)
 from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_registered_tool import (
     create_git_staged_changes_registered_tools,
 )
-from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_subprocess import (
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess import (
+    GitCommitSubprocessCreator,
     GitStagedChangesSubprocessLoader,
 )
 from fabrica.features.developer_workflow.application.dtos import (

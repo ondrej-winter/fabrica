@@ -8,17 +8,17 @@ from pathlib import Path
 from time import monotonic
 from typing import TYPE_CHECKING
 
-from fabrica.features.developer_workflow.adapters.outbound.git_commit_subprocess.command_runner import (
-    GitCommitCommandResult,
-    GitCommitCommandRunner,
-    run_git_commit_command,
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.command_runner import (
+    GitCommandResult,
+    GitCommandRunner,
+    run_git_command,
 )
-from fabrica.features.developer_workflow.adapters.outbound.git_commit_subprocess.commands import (
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.commit_commands import (
     DEFAULT_GIT_COMMIT_TIMEOUT_SECONDS,
     GIT_REV_PARSE_SHORT_HEAD_ARGV,
     git_commit_file_argv,
 )
-from fabrica.features.developer_workflow.adapters.outbound.git_commit_subprocess.errors import (
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.commit_errors import (
     DECODE_ERROR_MESSAGE,
     GIT_COMMIT_FAILED_MESSAGE,
     GIT_COMMIT_START_FAILED_MESSAGE,
@@ -33,7 +33,7 @@ from fabrica.features.developer_workflow.application.ports import GitCommitError
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-__all__ = ["GitCommitCommandResult", "GitCommitSubprocessCreator"]
+__all__ = ["GitCommandResult", "GitCommandRunner", "GitCommitSubprocessCreator"]
 
 
 class GitCommitSubprocessCreator:
@@ -44,7 +44,7 @@ class GitCommitSubprocessCreator:
         *,
         working_directory: Path | None = None,
         timeout_seconds: float = DEFAULT_GIT_COMMIT_TIMEOUT_SECONDS,
-        runner: GitCommitCommandRunner | None = None,
+        runner: GitCommandRunner | None = None,
         verbose_diagnostics: bool = False,
     ) -> None:
         if timeout_seconds <= 0:
@@ -52,7 +52,7 @@ class GitCommitSubprocessCreator:
             raise ValueError(msg)
         self._working_directory = working_directory
         self._timeout_seconds = timeout_seconds
-        self._runner = runner or run_git_commit_command
+        self._runner = runner or run_git_command
         self._verbose_diagnostics = verbose_diagnostics
 
     def create_commit(self, command: CreateGitCommitCommand) -> GitCommitResult:
@@ -80,7 +80,7 @@ class GitCommitSubprocessCreator:
             return None
         return short_hash or None
 
-    def _run_git(self, argv: Sequence[str]) -> tuple[GitCommitCommandResult, float]:
+    def _run_git(self, argv: Sequence[str]) -> tuple[GitCommandResult, float]:
         started = monotonic()
         try:
             result = self._runner(

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from fabrica.features.developer_workflow.adapters.outbound.git_commit_subprocess import (
-    GitCommitCommandResult,
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess import (
+    GitCommandResult,
     GitCommitSubprocessCreator,
 )
 from fabrica.features.developer_workflow.application.dtos import CreateGitCommitCommand, GitCommitResult
@@ -20,14 +20,14 @@ TEST_TIMEOUT_SECONDS = 2.5
 
 @dataclass
 class FakeGitCommitRunner:
-    result: GitCommitCommandResult | None = None
-    results: list[GitCommitCommandResult] = field(default_factory=list)
+    result: GitCommandResult | None = None
+    results: list[GitCommandResult] = field(default_factory=list)
     error: BaseException | None = None
     errors_by_call: dict[int, BaseException] = field(default_factory=dict)
     calls: list[tuple[tuple[str, ...], Path | None, float]] = field(default_factory=list)
     observed_message_files: list[tuple[Path, str]] = field(default_factory=list)
 
-    def __call__(self, argv: Sequence[str], *, cwd: Path | None, timeout_seconds: float) -> GitCommitCommandResult:
+    def __call__(self, argv: Sequence[str], *, cwd: Path | None, timeout_seconds: float) -> GitCommandResult:
         self.calls.append((tuple(argv), cwd, timeout_seconds))
         if len(argv) >= GIT_COMMIT_FILE_ARGC and tuple(argv[:4]) == ("git", "--no-pager", "commit", "--file"):
             message_file_path = Path(argv[4])
@@ -40,12 +40,12 @@ class FakeGitCommitRunner:
             return self.results.pop(0)
         if self.result is not None:
             return self.result
-        return GitCommitCommandResult(returncode=0, stdout="abc1234\n")
+        return GitCommandResult(returncode=0, stdout="abc1234\n")
 
 
 def test_adapter_invokes_git_commit_file_command_with_exact_message() -> None:
     runner = FakeGitCommitRunner(
-        results=[GitCommitCommandResult(returncode=0), GitCommitCommandResult(returncode=0, stdout="abc1234\n")]
+        results=[GitCommandResult(returncode=0), GitCommandResult(returncode=0, stdout="abc1234\n")]
     )
     message = "feat: add commit flow\n\nBody.\n\nRefs: #123\n"
 
@@ -70,7 +70,7 @@ def test_adapter_invokes_git_commit_file_command_with_exact_message() -> None:
 
 def test_adapter_cleans_up_temporary_message_file_after_success() -> None:
     runner = FakeGitCommitRunner(
-        results=[GitCommitCommandResult(returncode=0), GitCommitCommandResult(returncode=0, stdout="abc1234\n")]
+        results=[GitCommandResult(returncode=0), GitCommandResult(returncode=0, stdout="abc1234\n")]
     )
 
     GitCommitSubprocessCreator(runner=runner).create_commit(CreateGitCommitCommand(message="feat: add commit flow"))
@@ -79,7 +79,7 @@ def test_adapter_cleans_up_temporary_message_file_after_success() -> None:
 
 
 def test_adapter_cleans_up_temporary_message_file_after_git_failure() -> None:
-    runner = FakeGitCommitRunner(result=GitCommitCommandResult(returncode=1, stderr="fatal: hook declined"))
+    runner = FakeGitCommitRunner(result=GitCommandResult(returncode=1, stderr="fatal: hook declined"))
 
     with pytest.raises(GitCommitError):
         GitCommitSubprocessCreator(runner=runner).create_commit(CreateGitCommitCommand(message="feat: add commit flow"))
@@ -91,20 +91,20 @@ def test_adapter_cleans_up_temporary_message_file_after_git_failure() -> None:
     ("result", "category", "message"),
     [
         (
-            GitCommitCommandResult(returncode=128, stderr="fatal: not a git repository"),
+            GitCommandResult(returncode=128, stderr="fatal: not a git repository"),
             "not_a_repository",
             "repository",
         ),
         (
-            GitCommitCommandResult(returncode=1, stderr="nothing to commit, working tree clean"),
+            GitCommandResult(returncode=1, stderr="nothing to commit, working tree clean"),
             "no_staged_changes",
             "staged",
         ),
-        (GitCommitCommandResult(returncode=1, stderr="fatal: hook declined"), "git_failed", "git commit failed"),
+        (GitCommandResult(returncode=1, stderr="fatal: hook declined"), "git_failed", "git commit failed"),
     ],
 )
 def test_adapter_maps_non_zero_commit_failures(
-    result: GitCommitCommandResult,
+    result: GitCommandResult,
     category: str,
     message: str,
 ) -> None:
@@ -137,7 +137,7 @@ def test_adapter_maps_subprocess_failures(error: BaseException, category: str, m
 
 
 def test_adapter_maps_decode_failure_without_raw_output_diagnostics() -> None:
-    runner = FakeGitCommitRunner(result=GitCommitCommandResult(returncode=1, stderr=b"\xff"))
+    runner = FakeGitCommitRunner(result=GitCommandResult(returncode=1, stderr=b"\xff"))
 
     with pytest.raises(GitCommitError, match="decoded") as exc_info:
         GitCommitSubprocessCreator(runner=runner).create_commit(CreateGitCommitCommand(message="feat: add commit flow"))
@@ -149,8 +149,8 @@ def test_adapter_maps_decode_failure_without_raw_output_diagnostics() -> None:
 def test_adapter_returns_success_without_hash_when_hash_lookup_fails() -> None:
     runner = FakeGitCommitRunner(
         results=[
-            GitCommitCommandResult(returncode=0),
-            GitCommitCommandResult(returncode=128, stderr="fatal: cannot resolve HEAD"),
+            GitCommandResult(returncode=0),
+            GitCommandResult(returncode=128, stderr="fatal: cannot resolve HEAD"),
         ],
     )
 
@@ -163,7 +163,7 @@ def test_adapter_returns_success_without_hash_when_hash_lookup_fails() -> None:
 
 def test_adapter_returns_success_without_hash_when_hash_lookup_start_fails() -> None:
     runner = FakeGitCommitRunner(
-        results=[GitCommitCommandResult(returncode=0)],
+        results=[GitCommandResult(returncode=0)],
         errors_by_call={2: subprocess.TimeoutExpired(cmd=["git", "rev-parse"], timeout=1.0)},
     )
 
