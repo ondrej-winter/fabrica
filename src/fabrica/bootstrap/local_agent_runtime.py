@@ -282,6 +282,7 @@ class CommitMessageWorkflow:
     """Composed workflow that runs evidence-first commit-message generation."""
 
     generator: GenerateCommitMessage
+    evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
 
     def run(
         self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
@@ -294,6 +295,8 @@ class CommitMessageWorkflow:
     ) -> LocalAgentRunResult:
         """Generate a recommendation asynchronously and map it to the runtime result contract."""
         selected_skill_id = getattr(command, "skill_id", skill_id)
+        if self.evidence_recorder is not None:
+            self.evidence_recorder.reset()
         try:
             result = await self.generator.generate_async(skill_id=selected_skill_id)
         except GitStagedChangesLoadError as err:
@@ -345,7 +348,64 @@ class CommitMessageWorkflow:
         return LocalAgentRunResult(
             status=LocalAgentRunStatus.SUCCESS,
             output_text=_format_commit_message_recommendation(result.recommendation),
+            usage_evidence=self.evidence_recorder.usage_evidence if self.evidence_recorder is not None else (),
+            cost_evidence=self.evidence_recorder.cost_evidence if self.evidence_recorder is not None else (),
         )
+
+
+class CommitMessageEvidenceRecorder(Protocol):
+    """Recorder for model evidence collected during a commit-message workflow run."""
+
+    @property
+    def usage_evidence(self):
+        """Return usage evidence observed during the active workflow run."""
+
+    @property
+    def cost_evidence(self):
+        """Return cost evidence observed during the active workflow run."""
+
+    def reset(self) -> None:
+        """Clear evidence from previous workflow runs."""
+
+
+class EvidenceRecordingCommitMessageRuntime:
+    """Runtime decorator that records model evidence from commit-message model calls."""
+
+    def __init__(self, runtime: CommitMessageRuntime) -> None:
+        self._runtime = runtime
+        self._usage_evidence = []
+        self._cost_evidence = []
+
+    @property
+    def usage_evidence(self):
+        """Return collected usage evidence in model-call order."""
+        return tuple(self._usage_evidence)
+
+    @property
+    def cost_evidence(self):
+        """Return collected cost evidence in model-call order."""
+        return tuple(self._cost_evidence)
+
+    def reset(self) -> None:
+        """Clear evidence from previous workflow runs."""
+        self._usage_evidence.clear()
+        self._cost_evidence.clear()
+
+    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        """Run the wrapped runtime and record any returned model evidence."""
+        result = self._runtime.run(command)
+        self._record(result)
+        return result
+
+    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        """Run the wrapped runtime asynchronously and record any returned model evidence."""
+        result = await self._runtime.run_async(command)
+        self._record(result)
+        return result
+
+    def _record(self, result: LocalAgentRunResult) -> None:
+        self._usage_evidence.extend(result.usage_evidence)
+        self._cost_evidence.extend(result.cost_evidence)
 
 
 @dataclass(frozen=True, slots=True)
@@ -499,6 +559,7 @@ def create_commit_message_workflow(
 ) -> CommitMessageWorkflow:
     """Create the selected-skill commit-message workflow with injected runtime."""
     workflow_options = options or CommitMessageWorkflowOptions()
+    evidence_recording_runtime = EvidenceRecordingCommitMessageRuntime(runtime)
     staged_changes_loader = GitStagedChangesSubprocessLoader(
         working_directory=workflow_options.git_working_directory,
         bounds=workflow_options.staged_diff_bounds,
@@ -513,13 +574,14 @@ def create_commit_message_workflow(
     return CommitMessageWorkflow(
         generator=GenerateCommitMessage(
             staged_changes_loader=staged_changes_loader,
-            analyzer=AgentRuntimeStagedFileCommitMessageAnalyzer(runtime),
+            analyzer=AgentRuntimeStagedFileCommitMessageAnalyzer(evidence_recording_runtime),
             synthesizer=SkillContextCommitMessageSynthesizer(
-                synthesizer=AgentRuntimeCommitMessageSynthesizer(runtime),
+                synthesizer=AgentRuntimeCommitMessageSynthesizer(evidence_recording_runtime),
                 skill_context_loader=skill_context_loader,
             ),
             options=GenerateCommitMessageOptions(max_parallel_analysis=workflow_options.max_parallel_analysis),
         ),
+        evidence_recorder=evidence_recording_runtime,
     )
 
 

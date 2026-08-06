@@ -18,6 +18,13 @@ from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     LocalAgentRunResult,
     LocalAgentRunStatus,
+    ModelCostEvidence,
+    ModelPricingStatus,
+    ModelTokenUsageEvidence,
+    ModelUsageCollectionStatus,
+    ModelUsageEvidence,
+    ModelUsageEvidenceConfidence,
+    ModelUsageEvidenceSource,
 )
 from fabrica.features.developer_workflow.application.dtos import (
     GitStagedChangesFailureCategory,
@@ -64,6 +71,57 @@ def test_commit_message_workflow_runs_per_file_analysis_then_final_synthesis(tmp
     ]
     assert "diff --git" in runtime.calls[0].context[0].text
     assert "diff --git" not in runtime.calls[1].context[0].text
+
+
+def test_commit_message_workflow_propagates_model_evidence_from_all_runtime_calls(tmp_path: Path) -> None:
+    analysis_usage = ModelUsageEvidence(
+        provider="codex",
+        status=ModelUsageCollectionStatus.COLLECTED,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.EXTRACTED,
+        model="gpt-5.3-codex-spark",
+        tokens=ModelTokenUsageEvidence(input_tokens=10, output_tokens=5, total_tokens=15),
+    )
+    synthesis_usage = ModelUsageEvidence(
+        provider="codex",
+        status=ModelUsageCollectionStatus.COLLECTED,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.EXTRACTED,
+        model="gpt-5.3-codex-spark",
+        tokens=ModelTokenUsageEvidence(input_tokens=20, output_tokens=8, total_tokens=28),
+    )
+    synthesis_cost = ModelCostEvidence(
+        pricing_status=ModelPricingStatus.UNKNOWN,
+        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+        confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+    )
+    runtime = FakeRuntime(
+        results=[
+            LocalAgentRunResult(
+                status=LocalAgentRunStatus.SUCCESS,
+                output_text=_analysis_json(),
+                usage_evidence=(analysis_usage,),
+            ),
+            LocalAgentRunResult(
+                status=LocalAgentRunStatus.SUCCESS,
+                output_text=_synthesis_text(),
+                usage_evidence=(synthesis_usage,),
+                cost_evidence=(synthesis_cost,),
+            ),
+        ],
+    )
+    git_repository = _create_repository_with_staged_diff(tmp_path)
+    skill_root = _write_commit_message_skill(tmp_path)
+    workflow = create_commit_message_workflow(
+        runtime=runtime,
+        options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
+    )
+
+    result = workflow.run(skill_id="conventional-commits")
+
+    assert result.succeeded
+    assert result.usage_evidence == (analysis_usage, synthesis_usage)
+    assert result.cost_evidence == (synthesis_cost,)
 
 
 def test_commit_message_workflow_stops_before_runtime_when_staged_discovery_fails(tmp_path: Path) -> None:
