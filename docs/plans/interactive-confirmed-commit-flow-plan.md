@@ -109,24 +109,24 @@ an already-approved generated message.
 
 **Acceptance criteria:**
 
-- [ ] Adds immutable DTOs for commit creation and result, e.g.
+- [x] Adds immutable DTOs for commit creation and result, e.g.
   `CreateGitCommitCommand(message: str)` and
   `GitCommitResult(short_hash: str | None = None)`.
-- [ ] `CreateGitCommitCommand` rejects empty or whitespace-only commit messages
+- [x] `CreateGitCommitCommand` rejects empty or whitespace-only commit messages
   while storing valid message text unchanged, including leading/trailing
   newlines or multiline body/footer formatting when present.
-- [ ] Adds a focused `GitCommitCreator` protocol and `GitCommitError` with safe
+- [x] Adds a focused `GitCommitCreator` protocol and `GitCommitError` with safe
   metadata.
-- [ ] Adds a thin application use case, e.g. `CreateGitCommit`, that validates
+- [x] Adds a thin application use case, e.g. `CreateGitCommit`, that validates
   the application command/result boundary and delegates execution to the
   `GitCommitCreator` outbound port.
-- [ ] Exports the new DTOs and port from developer-workflow application
+- [x] Exports the new DTOs and port from developer-workflow application
   `__init__.py` files.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/application/`
-- [ ] `uv run ty check src tests`
+- [x] `uv run pytest tests/unit/features/developer_workflow/application/`
+- [x] `uv run ty check src tests`
 
 **Dependencies:** None
 

@@ -11,6 +11,10 @@ from fabrica.features.developer_workflow.application.dtos.commit_message import 
     StagedFileCommitEvidence,
     SynthesizeCommitMessageCommand,
 )
+from fabrica.features.developer_workflow.application.dtos.git_commit import (
+    CreateGitCommitCommand,
+    GitCommitResult,
+)
 from fabrica.features.developer_workflow.application.dtos.git_staged_changes import (
     DEFAULT_MAX_STAGED_DIFF_CHARS,
     STAGED_DIFF_CONTEXT_LABEL,
@@ -32,7 +36,9 @@ __all__ = [
     "AnalyzeStagedFileForCommitMessageCommand",
     "CommitMessageEvidenceBundle",
     "CommitMessageRecommendation",
+    "CreateGitCommitCommand",
     "GenerateCommitMessageResult",
+    "GitCommitResult",
     "GitStagedChangesFailureCategory",
     "GitStagedDiff",
     "GitStagedDiffBounds",
