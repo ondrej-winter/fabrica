@@ -1,7 +1,7 @@
-"""Composition root for local agent runtime wiring.
+"""Composition root for Fabrica workflow and runtime wiring.
 
-This module is the consumer-facing bootstrap boundary for local Fabrica agent
-experiments. Factory functions here construct application use cases and wire
+This module is the consumer-facing bootstrap boundary for Fabrica workflows and
+runtime experiments. Factory functions here construct application use cases and wire
 concrete adapters, but construction must stay side-effect light: factories do
 not read Codex credentials, inspect skill roots, call model backends, execute
 tools or scripts, or prompt for approval unless a factory docstring explicitly
@@ -832,7 +832,7 @@ def create_codex_commit_message_workflow(
     """Create the Codex-backed selected-skill commit-message workflow."""
     workflow_options = options or CommitMessageWorkflowOptions()
     return create_commit_message_workflow(
-        runtime=create_codex_local_agent_runtime(
+        runtime=create_codex_runtime(
             auth_file_path=workflow_options.codex_auth_file_path,
             http_client=workflow_options.codex_http_client,
             timeout=workflow_options.codex_timeout,
@@ -853,7 +853,7 @@ def create_codex_confirmed_commit_workflow(
     """Create the Codex-backed selected-skill confirmed commit workflow."""
     workflow_options = options or CommitMessageWorkflowOptions()
     return create_confirmed_commit_workflow(
-        runtime=create_codex_local_agent_runtime(
+        runtime=create_codex_runtime(
             auth_file_path=workflow_options.codex_auth_file_path,
             http_client=workflow_options.codex_http_client,
             timeout=workflow_options.codex_timeout,
@@ -920,7 +920,7 @@ def create_skill_script_executor(
     return ExecuteSkillScript(policy_evaluator=policy_evaluator, executor=executor)
 
 
-def create_registered_tool_loop_runtime(
+def create_tool_loop_runtime(
     *,
     model: ToolAwareAgentModel,
     tools: tuple[RegisteredTool, ...] = (),
@@ -956,7 +956,7 @@ def create_staged_git_registered_tools(options: StagedGitToolOptions | None = No
     return create_git_staged_changes_registered_tools(loader)
 
 
-def create_pydantic_ai_registered_tool_loop_runtime(
+def create_pydantic_ai_tool_loop_runtime(
     *,
     turn_runner: PydanticAIToolAwareTurn,
     tools: tuple[RegisteredTool, ...] = (),
@@ -968,7 +968,7 @@ def create_pydantic_ai_registered_tool_loop_runtime(
     Codex credentials, call backends, read skill roots, execute scripts, prompt
     for approval, dynamically import callables, or perform network I/O.
     """
-    return create_registered_tool_loop_runtime(
+    return create_tool_loop_runtime(
         model=PydanticAIToolAwareAgentModel(turn_runner=turn_runner),
         tools=tools,
         limits=limits,
@@ -1036,7 +1036,7 @@ def create_pydantic_ai_model_driven_skill_runtime(
     )
 
 
-def create_codex_local_agent_runtime(
+def create_codex_runtime(
     *,
     auth_file_path: Path | None = None,
     http_client: httpx.Client | None = None,
@@ -1072,7 +1072,7 @@ def create_codex_local_agent_runtime(
     return RunLocalAgent(model=CodexTransportAgentModel(transport=transport))
 
 
-def create_pydantic_ai_local_agent_runtime(
+def create_pydantic_ai_runtime(
     *,
     completion: PydanticAICompletion,
     model_name: str = "synthetic-codex",
@@ -1086,7 +1086,7 @@ def create_pydantic_ai_local_agent_runtime(
     return RunLocalAgent(model=PydanticAIAgentModel(completion=completion, model_name=model_name))
 
 
-def create_codex_pydantic_ai_local_agent_runtime(
+def create_codex_pydantic_ai_runtime(
     *,
     auth_file_path: Path | None = None,
     http_client: httpx.Client | None = None,

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 
-from fabrica.bootstrap import create_pydantic_ai_registered_tool_loop_runtime, create_registered_tool_loop_runtime
+from fabrica.bootstrap import create_pydantic_ai_tool_loop_runtime, create_tool_loop_runtime
 from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model import PydanticAIToolAwareTurnRequest
 from fabrica.features.agent_runtime.adapters.outbound.registered_tool import RegisteredTool
 from fabrica.features.agent_runtime.application.dtos import (
@@ -67,7 +67,7 @@ def test_registered_tool_loop_composition_runs_synthetic_tool_to_final_output() 
     )
     command = LocalAgentRunCommand(prompt="Use the lookup tool")
 
-    runtime = create_registered_tool_loop_runtime(
+    runtime = create_tool_loop_runtime(
         model=model,
         tools=(tool,),
         limits=ToolLoopLimits(max_tool_iterations=2, max_tool_result_chars=100),
@@ -82,7 +82,7 @@ def test_registered_tool_loop_composition_runs_synthetic_tool_to_final_output() 
 
 
 def test_registered_tool_loop_composition_fails_closed_for_unknown_tool() -> None:
-    runtime = create_registered_tool_loop_runtime(
+    runtime = create_tool_loop_runtime(
         model=SyntheticToolAwareModel(),
         tools=(),
         limits=ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=100),
@@ -103,7 +103,7 @@ def test_registered_tool_loop_factory_does_not_call_model_or_registered_tool_dur
         called = True
         return "called"
 
-    runtime = create_registered_tool_loop_runtime(
+    runtime = create_tool_loop_runtime(
         model=model,
         tools=(
             RegisteredTool(
@@ -118,7 +118,7 @@ def test_registered_tool_loop_factory_does_not_call_model_or_registered_tool_dur
     assert called is False
 
 
-def test_pydantic_ai_registered_tool_loop_composition_runs_synthetic_tool_to_final_output() -> None:
+def test_pydantic_ai_tool_loop_composition_runs_synthetic_tool_to_final_output() -> None:
     turn = SyntheticPydanticAIToolAwareTurn()
     tool = RegisteredTool(
         definition=ToolDefinition(name="lookup_note", description="Lookup a synthetic note"),
@@ -126,7 +126,7 @@ def test_pydantic_ai_registered_tool_loop_composition_runs_synthetic_tool_to_fin
     )
     command = LocalAgentRunCommand(prompt="Use the lookup tool", model_hint="synthetic-codex")
 
-    runtime = create_pydantic_ai_registered_tool_loop_runtime(
+    runtime = create_pydantic_ai_tool_loop_runtime(
         turn_runner=turn,
         tools=(tool,),
         limits=ToolLoopLimits(max_tool_iterations=2, max_tool_result_chars=100),
@@ -143,7 +143,7 @@ def test_pydantic_ai_registered_tool_loop_composition_runs_synthetic_tool_to_fin
     assert turn.calls[1].tool_results == result.tool_results
 
 
-def test_pydantic_ai_registered_tool_loop_factory_does_not_call_turn_or_tool_during_construction() -> None:
+def test_pydantic_ai_tool_loop_factory_does_not_call_turn_or_tool_during_construction() -> None:
     turn = SyntheticPydanticAIToolAwareTurn()
     called = False
 
@@ -152,7 +152,7 @@ def test_pydantic_ai_registered_tool_loop_factory_does_not_call_turn_or_tool_dur
         called = True
         return "called"
 
-    runtime = create_pydantic_ai_registered_tool_loop_runtime(
+    runtime = create_pydantic_ai_tool_loop_runtime(
         turn_runner=turn,
         tools=(
             RegisteredTool(

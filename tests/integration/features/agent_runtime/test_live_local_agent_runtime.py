@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from fabrica.bootstrap import create_codex_local_agent_runtime
+from fabrica.bootstrap import create_codex_runtime
 from fabrica.features.agent_runtime.application.dtos import LocalAgentRunCommand, LocalAgentRunStatus
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http import CodexBackendRequestSettings
 
@@ -19,12 +19,12 @@ _PONG_PROMPT = "Reply with the single word: pong"
 
 
 @pytest.mark.live_codex
-def test_live_codex_backed_local_agent_runtime_returns_pong_when_explicitly_enabled() -> None:
+def test_live_codex_backed_runtime_returns_pong_when_explicitly_enabled() -> None:
     """Run one credential-backed live runtime call only when explicitly enabled."""
     if os.environ.get(_RUN_LIVE_CODEX_TESTS_ENV) != _LIVE_TEST_ENABLED_VALUE:
         pytest.skip(f"set {_RUN_LIVE_CODEX_TESTS_ENV}=1 to run live Codex runtime tests")
 
-    runtime = create_codex_local_agent_runtime(
+    runtime = create_codex_runtime(
         auth_file_path=_resolve_auth_file_path(),
         request_settings=CodexBackendRequestSettings(
             model=_LIVE_CODEX_MODEL,

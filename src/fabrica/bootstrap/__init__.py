@@ -1,6 +1,6 @@
 """Composition-root helpers and dependency wiring for Fabrica."""
 
-from fabrica.bootstrap.local_agent_runtime import (
+from fabrica.bootstrap.composition import (
     DEFAULT_CODEX_AUTH_FILE,
     DEFAULT_COMMIT_MESSAGE_CODEX_MODEL,
     DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT,
@@ -18,15 +18,14 @@ from fabrica.bootstrap.local_agent_runtime import (
     ToolLoopRuntime,
     create_codex_commit_message_workflow,
     create_codex_confirmed_commit_workflow,
-    create_codex_local_agent_runtime,
-    create_codex_pydantic_ai_local_agent_runtime,
+    create_codex_pydantic_ai_runtime,
+    create_codex_runtime,
     create_commit_message_workflow,
     create_confirmed_commit_workflow,
     create_model_driven_skill_runtime,
-    create_pydantic_ai_local_agent_runtime,
     create_pydantic_ai_model_driven_skill_runtime,
-    create_pydantic_ai_registered_tool_loop_runtime,
-    create_registered_tool_loop_runtime,
+    create_pydantic_ai_runtime,
+    create_pydantic_ai_tool_loop_runtime,
     create_skill_augmented_local_agent_command,
     create_skill_context_augmented_local_agent_command,
     create_skill_context_loader,
@@ -35,6 +34,7 @@ from fabrica.bootstrap.local_agent_runtime import (
     create_skill_script_executor,
     create_skill_script_policy_evaluator,
     create_staged_git_registered_tools,
+    create_tool_loop_runtime,
 )
 
 __all__ = [
@@ -55,15 +55,14 @@ __all__ = [
     "ToolLoopRuntime",
     "create_codex_commit_message_workflow",
     "create_codex_confirmed_commit_workflow",
-    "create_codex_local_agent_runtime",
-    "create_codex_pydantic_ai_local_agent_runtime",
+    "create_codex_pydantic_ai_runtime",
+    "create_codex_runtime",
     "create_commit_message_workflow",
     "create_confirmed_commit_workflow",
     "create_model_driven_skill_runtime",
-    "create_pydantic_ai_local_agent_runtime",
     "create_pydantic_ai_model_driven_skill_runtime",
-    "create_pydantic_ai_registered_tool_loop_runtime",
-    "create_registered_tool_loop_runtime",
+    "create_pydantic_ai_runtime",
+    "create_pydantic_ai_tool_loop_runtime",
     "create_skill_augmented_local_agent_command",
     "create_skill_context_augmented_local_agent_command",
     "create_skill_context_loader",
@@ -72,4 +71,5 @@ __all__ = [
     "create_skill_script_executor",
     "create_skill_script_policy_evaluator",
     "create_staged_git_registered_tools",
+    "create_tool_loop_runtime",
 ]

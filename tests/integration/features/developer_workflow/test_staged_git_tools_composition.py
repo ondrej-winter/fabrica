@@ -6,8 +6,8 @@ from pathlib import Path
 
 from fabrica.bootstrap import (
     StagedGitToolOptions,
-    create_registered_tool_loop_runtime,
     create_staged_git_registered_tools,
+    create_tool_loop_runtime,
 )
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
@@ -67,8 +67,8 @@ def test_staged_git_tools_are_exposed_only_when_explicitly_supplied(tmp_path: Pa
     tools = create_staged_git_registered_tools(StagedGitToolOptions(working_directory=tmp_path))
     model = StagedGitToolAwareModel()
 
-    runtime = create_registered_tool_loop_runtime(model=model, tools=tools)
-    empty_runtime = create_registered_tool_loop_runtime(model=StagedGitToolAwareModel(), tools=())
+    runtime = create_tool_loop_runtime(model=model, tools=tools)
+    empty_runtime = create_tool_loop_runtime(model=StagedGitToolAwareModel(), tools=())
 
     assert tuple(tool.name for tool in runtime.available_tools) == (
         "git_staged_files",
@@ -81,7 +81,7 @@ def test_staged_git_tools_are_exposed_only_when_explicitly_supplied(tmp_path: Pa
 def test_explicitly_composed_staged_git_tool_runs_through_tool_loop(tmp_path: Path) -> None:
     git_repository = _create_repository_with_staged_file(tmp_path)
     model = StagedGitToolAwareModel(requested_tool_name="git_staged_files")
-    runtime = create_registered_tool_loop_runtime(
+    runtime = create_tool_loop_runtime(
         model=model,
         tools=create_staged_git_registered_tools(StagedGitToolOptions(working_directory=git_repository)),
         limits=ToolLoopLimits(max_tool_iterations=2, max_tool_result_chars=200),

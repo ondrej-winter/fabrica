@@ -302,7 +302,7 @@ def _default_augment_command(
     skill_roots: tuple[Path, ...],
     verbose_diagnostics: bool,
 ) -> LocalAgentRunCommand:
-    from fabrica.bootstrap.local_agent_runtime import (  # noqa: PLC0415
+    from fabrica.bootstrap import (  # noqa: PLC0415
         SkillContextAugmentationOptions,
         create_skill_context_augmented_local_agent_command,
     )
@@ -319,9 +319,9 @@ def _default_augment_command(
 
 
 def _create_default_runtime() -> LocalAgentRuntime:
-    from fabrica.bootstrap.local_agent_runtime import create_codex_local_agent_runtime  # noqa: PLC0415
+    from fabrica.bootstrap import create_codex_runtime  # noqa: PLC0415
 
-    return create_codex_local_agent_runtime()
+    return create_codex_runtime()
 
 
 def _create_default_script_policy_evaluator(
@@ -329,7 +329,7 @@ def _create_default_script_policy_evaluator(
     *,
     global_options: CliGlobalOptions,
 ) -> ScriptPolicyEvaluator:
-    from fabrica.bootstrap.local_agent_runtime import (  # noqa: PLC0415
+    from fabrica.bootstrap import (  # noqa: PLC0415
         SkillScriptPolicyEvaluationOptions,
         create_skill_script_policy_evaluator,
     )
@@ -347,7 +347,7 @@ def _create_default_script_executor(
     *,
     global_options: CliGlobalOptions,
 ) -> ScriptExecutor:
-    from fabrica.bootstrap.local_agent_runtime import (  # noqa: PLC0415
+    from fabrica.bootstrap import (  # noqa: PLC0415
         SkillScriptExecutionOptions,
         create_skill_script_executor,
     )

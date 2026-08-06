@@ -244,7 +244,7 @@ def _create_default_commit_message_workflow(
     *,
     global_options: CliGlobalOptions,
 ) -> CommitMessageWorkflowRunner:
-    from fabrica.bootstrap.local_agent_runtime import (  # noqa: PLC0415
+    from fabrica.bootstrap import (  # noqa: PLC0415
         CommitMessageWorkflowOptions,
         create_codex_commit_message_workflow,
     )
@@ -264,7 +264,7 @@ def _create_default_confirmed_commit_workflow(
     *,
     global_options: CliGlobalOptions,
 ) -> ConfirmedCommitWorkflowRunner:
-    from fabrica.bootstrap.local_agent_runtime import (  # noqa: PLC0415
+    from fabrica.bootstrap import (  # noqa: PLC0415
         CommitMessageWorkflowOptions,
         create_codex_confirmed_commit_workflow,
     )

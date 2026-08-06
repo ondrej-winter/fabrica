@@ -23,15 +23,14 @@ EXPECTED_BOOTSTRAP_EXPORTS = [
     "ToolLoopRuntime",
     "create_codex_commit_message_workflow",
     "create_codex_confirmed_commit_workflow",
-    "create_codex_local_agent_runtime",
-    "create_codex_pydantic_ai_local_agent_runtime",
+    "create_codex_pydantic_ai_runtime",
+    "create_codex_runtime",
     "create_commit_message_workflow",
     "create_confirmed_commit_workflow",
     "create_model_driven_skill_runtime",
-    "create_pydantic_ai_local_agent_runtime",
     "create_pydantic_ai_model_driven_skill_runtime",
-    "create_pydantic_ai_registered_tool_loop_runtime",
-    "create_registered_tool_loop_runtime",
+    "create_pydantic_ai_runtime",
+    "create_pydantic_ai_tool_loop_runtime",
     "create_skill_augmented_local_agent_command",
     "create_skill_context_augmented_local_agent_command",
     "create_skill_context_loader",
@@ -40,6 +39,7 @@ EXPECTED_BOOTSTRAP_EXPORTS = [
     "create_skill_script_executor",
     "create_skill_script_policy_evaluator",
     "create_staged_git_registered_tools",
+    "create_tool_loop_runtime",
 ]
 
 

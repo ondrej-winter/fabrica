@@ -8,8 +8,8 @@ import httpx
 
 from fabrica.bootstrap import (
     SkillContextAugmentationOptions,
-    create_codex_pydantic_ai_local_agent_runtime,
-    create_pydantic_ai_local_agent_runtime,
+    create_codex_pydantic_ai_runtime,
+    create_pydantic_ai_runtime,
     create_skill_context_augmented_local_agent_command,
 )
 from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model import PydanticAICompletionRequest
@@ -31,9 +31,9 @@ class FakeCompletion:
         return self.output_text
 
 
-def test_pydantic_ai_local_agent_runtime_composition_runs_with_fake_completion() -> None:
+def test_pydantic_ai_runtime_composition_runs_with_fake_completion() -> None:
     completion = FakeCompletion(output_text="pong")
-    runtime = create_pydantic_ai_local_agent_runtime(completion=completion)
+    runtime = create_pydantic_ai_runtime(completion=completion)
 
     result = runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong"))
 
@@ -43,10 +43,10 @@ def test_pydantic_ai_local_agent_runtime_composition_runs_with_fake_completion()
     assert completion.calls[0].prompt == "Reply with the single word: pong"
 
 
-def test_pydantic_ai_local_agent_runtime_factory_does_not_call_completion_during_construction() -> None:
+def test_pydantic_ai_runtime_factory_does_not_call_completion_during_construction() -> None:
     completion = FakeCompletion()
 
-    runtime = create_pydantic_ai_local_agent_runtime(completion=completion)
+    runtime = create_pydantic_ai_runtime(completion=completion)
 
     assert completion.calls == []
 
@@ -55,9 +55,9 @@ def test_pydantic_ai_local_agent_runtime_factory_does_not_call_completion_during
     assert len(completion.calls) == 1
 
 
-def test_pydantic_ai_local_agent_runtime_composition_preserves_context_mapping() -> None:
+def test_pydantic_ai_runtime_composition_preserves_context_mapping() -> None:
     completion = FakeCompletion()
-    runtime = create_pydantic_ai_local_agent_runtime(completion=completion, model_name="codex-compatible")
+    runtime = create_pydantic_ai_runtime(completion=completion, model_name="codex-compatible")
 
     result = runtime.run(
         LocalAgentRunCommand(
@@ -76,7 +76,7 @@ def test_pydantic_ai_runtime_accepts_skill_augmented_command_without_pydanticai_
 ) -> None:
     _write_skill(tmp_path, "python-testing", "# Python Testing\n\nUse focused pytest tests.")
     completion = FakeCompletion()
-    runtime = create_pydantic_ai_local_agent_runtime(completion=completion)
+    runtime = create_pydantic_ai_runtime(completion=completion)
     command = create_skill_context_augmented_local_agent_command(
         LocalAgentRunCommand(prompt="Use the selected skill."),
         SkillContextAugmentationOptions(
@@ -92,7 +92,7 @@ def test_pydantic_ai_runtime_accepts_skill_augmented_command_without_pydanticai_
     assert "Use focused pytest tests." in completion.calls[0].prompt
 
 
-def test_codex_pydantic_ai_local_agent_runtime_composition_runs_with_mock_transport(tmp_path: Path) -> None:
+def test_codex_pydantic_ai_runtime_composition_runs_with_mock_transport(tmp_path: Path) -> None:
     auth_file_path = tmp_path / "auth.json"
     auth_file_path.write_text(
         json.dumps(
@@ -115,7 +115,7 @@ def test_codex_pydantic_ai_local_agent_runtime_composition_runs_with_mock_transp
         assert b"Reply with the single word: pong" in request.content
         return httpx.Response(200, json={"output_text": "pong"})
 
-    runtime = create_codex_pydantic_ai_local_agent_runtime(
+    runtime = create_codex_pydantic_ai_runtime(
         auth_file_path=auth_file_path,
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
@@ -129,10 +129,10 @@ def test_codex_pydantic_ai_local_agent_runtime_composition_runs_with_mock_transp
     assert "synthetic-account" not in str(result.observations)
 
 
-def test_codex_pydantic_ai_local_agent_runtime_factory_does_not_read_credentials_during_construction(
+def test_codex_pydantic_ai_runtime_factory_does_not_read_credentials_during_construction(
     tmp_path: Path,
 ) -> None:
-    runtime = create_codex_pydantic_ai_local_agent_runtime(auth_file_path=tmp_path / "missing-auth.json")
+    runtime = create_codex_pydantic_ai_runtime(auth_file_path=tmp_path / "missing-auth.json")
 
     result = runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong"))
 
