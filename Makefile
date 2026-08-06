@@ -1,4 +1,4 @@
-.PHONY: help test test-live-codex test-live-runtime run-live-cli commit-message
+.PHONY: help test test-live-codex test-live-runtime run-live-cli commit-message commit
 
 PROMPT ?= Reply with the single word: pong
 FABRICA_GLOBAL_OPTIONS ?=
@@ -10,6 +10,7 @@ help:
 	@echo "  make test-live-runtime Run opt-in live Codex-backed runtime test"
 	@echo "  make run-live-cli     Run explicit live CLI prompt via Codex-backed runtime"
 	@echo "  make commit-message   Propose a Conventional Commit message from staged changes"
+	@echo "  make commit           Interactively commit staged changes after confirmation"
 
 test:
 	uv run pytest
@@ -25,5 +26,10 @@ run-live-cli:
 
 commit-message:
 	uv run fabrica $(FABRICA_GLOBAL_OPTIONS) commit-message \
+	  --skill conventional-commits \
+	  --skill-root .agents/skills
+
+commit:
+	uv run fabrica $(FABRICA_GLOBAL_OPTIONS) commit \
 	  --skill conventional-commits \
 	  --skill-root .agents/skills

@@ -128,6 +128,13 @@ confirmation:
 uv run fabrica commit
 ```
 
+For the default `conventional-commits` skill and `.agents/skills` root, the same
+interactive workflow is available through `make`:
+
+```bash
+make commit
+```
+
 `commit` accepts the same selected skill, skill root, Codex model, and reasoning
 effort options as `commit-message`:
 
