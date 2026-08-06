@@ -24,6 +24,6 @@ run-live-cli:
 	uv run fabrica $(FABRICA_GLOBAL_OPTIONS) run --prompt "$(PROMPT)"
 
 commit-message:
-	uv run fabrica --print-usage --verbose-diagnostics $(FABRICA_GLOBAL_OPTIONS) commit-message \
+	uv run fabrica $(FABRICA_GLOBAL_OPTIONS) commit-message \
 	  --skill conventional-commits \
 	  --skill-root .agents/skills
