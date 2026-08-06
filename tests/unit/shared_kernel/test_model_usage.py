@@ -6,7 +6,7 @@ from typing import cast
 
 import pytest
 
-from fabrica.features.agent_runtime.application.dtos import (
+from fabrica.shared_kernel.model_usage import (
     DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS,
     ModelCostEvidence,
     ModelPricingStatus,

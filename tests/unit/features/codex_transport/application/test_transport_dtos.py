@@ -5,7 +5,15 @@ from typing import cast
 
 import pytest
 
-from fabrica.features.agent_runtime.application.dtos import (
+from fabrica.features.codex_transport.application.dtos import (
+    CodexCompletionCommand,
+    CodexCredentials,
+    CodexTransportObservation,
+    CodexTransportResult,
+    CodexTransportStatus,
+    SafeObservationValue,
+)
+from fabrica.shared_kernel.model_usage import (
     ModelCostEvidence,
     ModelPricingStatus,
     ModelTokenUsageEvidence,
@@ -14,14 +22,6 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageEvidenceConfidence,
     ModelUsageEvidenceSource,
     ModelUsageObservation,
-)
-from fabrica.features.codex_transport.application.dtos import (
-    CodexCompletionCommand,
-    CodexCredentials,
-    CodexTransportObservation,
-    CodexTransportResult,
-    CodexTransportStatus,
-    SafeObservationValue,
 )
 
 

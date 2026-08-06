@@ -1,4 +1,4 @@
-"""Provider-agnostic usage and cost evidence DTOs for model calls."""
+"""Provider-agnostic model usage and cost evidence shared by slices."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -183,3 +183,19 @@ def _validate_estimate(pricing_status: ModelPricingStatus, estimated_amount: Dec
 
 def _is_safe_observation_value(value: object) -> bool:
     return value is None or isinstance(value, str | int | float | bool)
+
+
+__all__ = [
+    "DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS",
+    "MODEL_USAGE_CURRENCY_CODE_CHARS",
+    "ModelCostEvidence",
+    "ModelPricingStatus",
+    "ModelQuotaEvidence",
+    "ModelTokenUsageEvidence",
+    "ModelUsageCollectionStatus",
+    "ModelUsageEvidence",
+    "ModelUsageEvidenceConfidence",
+    "ModelUsageEvidenceSource",
+    "ModelUsageObservation",
+    "SafeModelUsageObservationValue",
+]

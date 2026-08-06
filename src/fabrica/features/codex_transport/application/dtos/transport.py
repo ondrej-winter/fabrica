@@ -3,8 +3,8 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from fabrica.features.agent_runtime.application.dtos.usage import ModelCostEvidence, ModelUsageEvidence
 from fabrica.features.codex_transport.application.dtos.observations import CodexTransportObservation
+from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence
 
 
 class CodexTransportStatus(StrEnum):

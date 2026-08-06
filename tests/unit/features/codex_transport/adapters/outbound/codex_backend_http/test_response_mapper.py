@@ -4,11 +4,6 @@ from typing import cast
 
 import pytest
 
-from fabrica.features.agent_runtime.application.dtos import (
-    ModelPricingStatus,
-    ModelUsageCollectionStatus,
-    ModelUsageEvidenceSource,
-)
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.response_mapper import (
     CodexBackendResponse,
     CodexUsageResponse,
@@ -18,6 +13,11 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.respo
     map_codex_usage_transport_error,
 )
 from fabrica.features.codex_transport.application.dtos import CodexTransportStatus
+from fabrica.shared_kernel.model_usage import (
+    ModelPricingStatus,
+    ModelUsageCollectionStatus,
+    ModelUsageEvidenceSource,
+)
 
 RESPONSE_INPUT_TOKENS = 10
 RESPONSE_OUTPUT_TOKENS = 4

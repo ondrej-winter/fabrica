@@ -78,7 +78,7 @@ from fabrica.features.agent_runtime.application.dtos.tools import (
     ToolLoopRunResult,
     ToolLoopRunStatus,
 )
-from fabrica.features.agent_runtime.application.dtos.usage import (
+from fabrica.shared_kernel.model_usage import (
     DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS,
     MODEL_USAGE_CURRENCY_CODE_CHARS,
     ModelCostEvidence,

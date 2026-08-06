@@ -4,7 +4,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import cast
 
-from fabrica.features.agent_runtime.application.dtos.usage import (
+from fabrica.features.codex_transport.application.dtos.transport import CodexTransportStatus
+from fabrica.features.codex_transport.application.dtos.usage import CodexUsageResult
+from fabrica.shared_kernel.model_usage import (
     ModelCostEvidence,
     ModelPricingStatus,
     ModelQuotaEvidence,
@@ -16,8 +18,6 @@ from fabrica.features.agent_runtime.application.dtos.usage import (
     ModelUsageObservation,
     SafeModelUsageObservationValue,
 )
-from fabrica.features.codex_transport.application.dtos.transport import CodexTransportStatus
-from fabrica.features.codex_transport.application.dtos.usage import CodexUsageResult
 
 CODEX_PROVIDER = "codex"
 _COMPLETE_QUOTA_FIELD_COUNT = 4

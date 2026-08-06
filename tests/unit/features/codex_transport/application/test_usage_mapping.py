@@ -2,12 +2,6 @@
 
 import pytest
 
-from fabrica.features.agent_runtime.application.dtos import (
-    ModelPricingStatus,
-    ModelUsageCollectionStatus,
-    ModelUsageEvidenceConfidence,
-    ModelUsageEvidenceSource,
-)
 from fabrica.features.codex_transport.application.dtos import (
     CodexTransportStatus,
     CodexUsageEvidence,
@@ -17,6 +11,12 @@ from fabrica.features.codex_transport.application.usage_mapping import (
     CodexCompletionUsageFacts,
     map_codex_completion_evidence,
     map_codex_usage_endpoint_evidence,
+)
+from fabrica.shared_kernel.model_usage import (
+    ModelPricingStatus,
+    ModelUsageCollectionStatus,
+    ModelUsageEvidenceConfidence,
+    ModelUsageEvidenceSource,
 )
 
 COMPLETE_INPUT_TOKENS = 12

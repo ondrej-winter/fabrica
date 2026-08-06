@@ -4,9 +4,9 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import cast
 
-from fabrica.features.agent_runtime.application.dtos.usage import ModelUsageEvidenceSource
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.response_helpers import bounded
 from fabrica.features.codex_transport.application.usage_mapping import CodexCompletionUsageFacts
+from fabrica.shared_kernel.model_usage import ModelUsageEvidenceSource
 
 
 def extract_output_text(json_body: object) -> str | None:

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from types import MappingProxyType
 
-from fabrica.features.agent_runtime.application.dtos.usage import ModelCostEvidence, ModelUsageEvidence
+from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence
 
 MAX_PROMPT_CHARS = 20_000
 MAX_CONTEXT_TEXT_CHARS = 500_000
