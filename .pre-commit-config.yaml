@@ -15,14 +15,20 @@ repos:
         args: ["--fix=lf"]
       - id: trailing-whitespace
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.14
-    hooks:
-      - id: ruff-check
-      - id: ruff-format
-
   - repo: local
     hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check . --fix
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format .
+        language: system
+        types: [python]
+        pass_filenames: false
       - id: ty
         name: ty
         entry: uv run ty check src tests
