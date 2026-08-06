@@ -14,6 +14,7 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.output import (
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.parser import (
     CliCommand,
+    CliCommitCommand,
     CliCommitMessageCommand,
     CliGlobalOptions,
     CliInvocation,
@@ -24,6 +25,8 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.parser import (
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     LocalAgentRunResult,
+    LocalAgentRunStatus,
+    RuntimeObservation,
     SelectedSkill,
     SelectedSkillResource,
     SelectedSkillScript,
@@ -133,6 +136,18 @@ def run_cli_command(
             stdout=output_stream,
             stderr=error_stream,
         )
+
+    if isinstance(command, CliCommitCommand):
+        result = LocalAgentRunResult(
+            status=LocalAgentRunStatus.UNSUPPORTED_CAPABILITY,
+            observations=(
+                RuntimeObservation(
+                    message="commit command runner is not wired yet",
+                    metadata={"category": "unsupported_commit_command"},
+                ),
+            ),
+        )
+        return _write_runtime_result(result, global_options=global_options, stdout=output_stream, stderr=error_stream)
 
     runtime_command = LocalAgentRunCommand(prompt=command.prompt, model_hint=command.model_hint)
     if command.skill_ids or command.resources:

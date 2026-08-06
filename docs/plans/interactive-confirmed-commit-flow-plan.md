@@ -282,17 +282,17 @@ workflow.
 
 **Acceptance criteria:**
 
-- [ ] Parser recognizes `commit` as a separate subcommand from
+- [x] Parser recognizes `commit` as a separate subcommand from
   `commit-message`.
-- [ ] `commit` accepts `--skill`, `--model`, `--reasoning-effort`, and
+- [x] `commit` accepts `--skill`, `--model`, `--reasoning-effort`, and
   `--skill-root` consistently with `commit-message`.
-- [ ] Help text clearly marks `commit-message` as read-only and `commit` as
+- [x] Help text clearly marks `commit-message` as read-only and `commit` as
   mutating after confirmation.
-- [ ] Parsed command DTOs remain immutable.
+- [x] Parsed command DTOs remain immutable.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/agent_runtime/adapters/inbound/cli/test_parser.py`
+- [x] `uv run pytest tests/unit/features/agent_runtime/adapters/inbound/cli/test_parser.py`
 
 **Dependencies:** None, but should land after Task 1 to align names.
 

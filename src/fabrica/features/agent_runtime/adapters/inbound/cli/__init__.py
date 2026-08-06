@@ -2,6 +2,7 @@
 
 from fabrica.features.agent_runtime.adapters.inbound.cli.parser import (
     CliCommand,
+    CliCommitCommand,
     CliCommitMessageCommand,
     CliGlobalOptions,
     CliInvocation,
@@ -25,6 +26,7 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.runner import (
 __all__ = [
     "CliCommand",
     "CliCommandDependencies",
+    "CliCommitCommand",
     "CliCommitMessageCommand",
     "CliGlobalOptions",
     "CliInvocation",

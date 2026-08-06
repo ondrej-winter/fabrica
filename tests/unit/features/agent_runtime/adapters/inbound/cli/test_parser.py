@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from fabrica.features.agent_runtime.adapters.inbound.cli import (
+    CliCommitCommand,
     CliCommitMessageCommand,
     CliGlobalOptions,
     CliInvocation,
@@ -30,6 +31,7 @@ def test_build_parser_renders_help_without_runtime_side_effects(capsys: pytest.C
     assert exc_info.value.code == 0
     captured = capsys.readouterr()
     assert "run" in captured.out
+    assert "commit" in captured.out
     assert "commit-message" in captured.out
     assert "script-policy" in captured.out
     assert "script-execute" in captured.out
@@ -138,6 +140,46 @@ def test_parse_commit_message_command_rejects_unknown_reasoning_effort() -> None
     assert exc_info.value.code == ARGPARSE_USAGE_ERROR
 
 
+def test_parse_commit_command_defaults_to_conventional_commits_skill() -> None:
+    command = parse_args(["commit"])
+
+    assert command == CliInvocation(command=CliCommitCommand(skill_id="conventional-commits"))
+
+
+def test_parse_commit_command_supports_commit_message_generation_options() -> None:
+    command = parse_args(
+        [
+            "--verbose-diagnostics",
+            "commit",
+            "--skill",
+            "team-style",
+            "--model",
+            "gpt-5.6-sol",
+            "--reasoning-effort",
+            "medium",
+            "--skill-root",
+            "./skills",
+        ],
+    )
+
+    assert command == CliInvocation(
+        command=CliCommitCommand(
+            skill_id="team-style",
+            model="gpt-5.6-sol",
+            reasoning_effort="medium",
+            skill_roots=(Path("./skills"),),
+        ),
+        global_options=CliGlobalOptions(verbose_diagnostics=True),
+    )
+
+
+def test_parse_commit_command_rejects_unknown_reasoning_effort() -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        parse_args(["commit", "--reasoning-effort", "very-high"])
+
+    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
+
+
 def test_parse_run_command_rejects_malformed_resource_selection() -> None:
     with pytest.raises(SystemExit) as exc_info:
         parse_args(["run", "--prompt", "Reply with pong", "--resource", "python-testing"])
@@ -235,6 +277,7 @@ def test_parsed_commands_are_immutable_boundary_values() -> None:
         ],
     )
     commit_message_command = parse_args(["commit-message"])
+    commit_command = parse_args(["commit"])
 
     with pytest.raises(FrozenInstanceError):
         setattr(run_command, "command", CliRunCommand(prompt="changed"))  # noqa: B010
@@ -244,3 +287,5 @@ def test_parsed_commands_are_immutable_boundary_values() -> None:
         setattr(execution_command.command, "script_id", "changed")  # noqa: B010
     with pytest.raises(FrozenInstanceError):
         setattr(commit_message_command.command, "skill_id", "changed")  # noqa: B010
+    with pytest.raises(FrozenInstanceError):
+        setattr(commit_command.command, "skill_id", "changed")  # noqa: B010

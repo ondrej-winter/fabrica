@@ -57,6 +57,19 @@ class CliCommitMessageCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class CliCommitCommand:
+    """Parsed CLI arguments for interactive confirmed git commit creation."""
+
+    skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
+    model: str | None = None
+    reasoning_effort: str | None = None
+    skill_roots: tuple[Path, ...] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "skill_roots", tuple(self.skill_roots))
+
+
+@dataclass(frozen=True, slots=True)
 class CliScriptPolicyCommand:
     """Parsed CLI arguments for selected skill script policy evaluation."""
 
@@ -84,7 +97,9 @@ class CliScriptExecuteCommand:
         object.__setattr__(self, "skill_roots", tuple(self.skill_roots))
 
 
-type CliCommand = CliRunCommand | CliCommitMessageCommand | CliScriptPolicyCommand | CliScriptExecuteCommand
+type CliCommand = (
+    CliRunCommand | CliCommitMessageCommand | CliCommitCommand | CliScriptPolicyCommand | CliScriptExecuteCommand
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,27 +161,24 @@ def build_parser() -> argparse.ArgumentParser:
 
     commit_message_parser = subparsers.add_parser(
         "commit-message",
-        help="propose a commit message for staged git changes",
-        description="Load the selected commit-message Agent Skill and staged git diff context.",
+        help="preview a read-only commit message for staged git changes",
+        description="Read staged git diff context and propose a commit message without creating a commit.",
     )
-    commit_message_parser.add_argument(
-        "--skill",
-        dest="skill_id",
-        default=DEFAULT_COMMIT_MESSAGE_SKILL_ID,
-        help="Selected commit-message Agent Skill ID. Defaults to conventional-commits.",
-    )
-    commit_message_parser.add_argument(
-        "--model",
-        dest="model",
-        help="Optional Codex model override for commit-message generation.",
-    )
-    commit_message_parser.add_argument(
-        "--reasoning-effort",
-        choices=("low", "medium", "high", "xhigh", "max", "ultra"),
-        help="Optional Codex reasoning effort override for commit-message generation.",
-    )
+    _add_commit_message_generation_flags(commit_message_parser)
     _add_common_skill_root_flags(commit_message_parser)
     commit_message_parser.set_defaults(command_factory=_commit_message_command_from_namespace)
+
+    commit_parser = subparsers.add_parser(
+        "commit",
+        help="create a git commit from a generated message after confirmation",
+        description=(
+            "Generate a staged-changes commit message, prompt for confirmation, "
+            "then create a git commit only after approval."
+        ),
+    )
+    _add_commit_message_generation_flags(commit_parser)
+    _add_common_skill_root_flags(commit_parser)
+    commit_parser.set_defaults(command_factory=_commit_command_from_namespace)
 
     policy_parser = subparsers.add_parser(
         "script-policy",
@@ -241,6 +253,25 @@ def _add_common_skill_root_flags(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_commit_message_generation_flags(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--skill",
+        dest="skill_id",
+        default=DEFAULT_COMMIT_MESSAGE_SKILL_ID,
+        help="Selected commit-message Agent Skill ID. Defaults to conventional-commits.",
+    )
+    parser.add_argument(
+        "--model",
+        dest="model",
+        help="Optional Codex model override for commit-message generation.",
+    )
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=("low", "medium", "high", "xhigh", "max", "ultra"),
+        help="Optional Codex reasoning effort override for commit-message generation.",
+    )
+
+
 def _parse_resource_selection(value: str) -> CliSelectedResource:
     skill_id, separator, resource_id = value.partition(":")
     if not separator or not skill_id or not resource_id:
@@ -269,6 +300,15 @@ def _run_command_from_namespace(namespace: argparse.Namespace) -> CliRunCommand:
 
 def _commit_message_command_from_namespace(namespace: argparse.Namespace) -> CliCommitMessageCommand:
     return CliCommitMessageCommand(
+        skill_id=namespace.skill_id,
+        model=namespace.model,
+        reasoning_effort=namespace.reasoning_effort,
+        skill_roots=tuple(namespace.skill_roots),
+    )
+
+
+def _commit_command_from_namespace(namespace: argparse.Namespace) -> CliCommitCommand:
+    return CliCommitCommand(
         skill_id=namespace.skill_id,
         model=namespace.model,
         reasoning_effort=namespace.reasoning_effort,
