@@ -8,7 +8,7 @@ from fabrica.features.developer_workflow.application.dtos.git_staged_changes imp
 )
 
 DEFAULT_COMMIT_MESSAGE_SKILL_ID = "conventional-commits"
-DEFAULT_MAX_COMMIT_MESSAGE_STAGED_FILES = 25
+DEFAULT_MAX_COMMIT_MESSAGE_STAGED_FILES = 50
 DEFAULT_MAX_COMMIT_MESSAGE_EVIDENCE_CHARS = 50_000
 
 
