@@ -141,27 +141,27 @@ context values shared by worktree, commit, and ref/range tools.
 
 **Acceptance criteria:**
 
-- [ ] Defines safe relative path validation for read-only git context without
+- [x] Defines safe relative path validation for read-only git context without
   reusing staged-specific error wording.
-- [ ] Defines changed-file status DTOs that can represent name-status output,
+- [x] Defines changed-file status DTOs that can represent name-status output,
   including renamed/copied paths when supported.
-- [ ] Rename/copy DTOs expose canonical `path` as the new/destination path and
+- [x] Rename/copy DTOs expose canonical `path` as the new/destination path and
   expose `old_path` as metadata for the source path.
-- [ ] Defines bounded diff/log/count settings with conservative defaults and
+- [x] Defines bounded diff/log/count settings with conservative defaults and
   maximums.
-- [ ] Defines normalized failure categories covering git unavailable, not
+- [x] Defines normalized failure categories covering git unavailable, not
   repository, no matching changes, invalid ref/commit, oversized output, timeout,
   git failure, and decode failure.
-- [ ] Defines `INVALID_ARGUMENT` for invalid user/model inputs and
+- [x] Defines `INVALID_ARGUMENT` for invalid user/model inputs and
   `NO_MATCHING_CHANGES` for valid paths or refs that have no corresponding
   changed-file membership.
-- [ ] DTOs are immutable, typed, and exported from
+- [x] DTOs are immutable, typed, and exported from
   `developer_workflow.application.dtos`.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/application/test_git_context_dtos.py`
-- [ ] `uv run ty check src tests`
+- [x] `uv run pytest tests/unit/features/developer_workflow/application/test_git_context_dtos.py`
+- [x] `uv run ty check src tests`
 
 **Dependencies:** None
 
@@ -180,19 +180,19 @@ context inspection, plus layer-appropriate safe exceptions.
 
 **Acceptance criteria:**
 
-- [ ] Adds focused protocols for worktree, commit, and ref/range context rather
+- [x] Adds focused protocols for worktree, commit, and ref/range context rather
   than a catch-all git service.
-- [ ] Port signatures use application DTOs and primitive validated inputs only;
+- [x] Port signatures use application DTOs and primitive validated inputs only;
   no subprocess, CLI, or framework types leak into ports.
-- [ ] Safe application error exposes normalized category and safe metadata.
-- [ ] Safe application errors distinguish validation failures from subprocess git
+- [x] Safe application error exposes normalized category and safe metadata.
+- [x] Safe application errors distinguish validation failures from subprocess git
   failures with `INVALID_ARGUMENT` and `NO_MATCHING_CHANGES` categories.
-- [ ] Existing staged-git ports remain intact for staged-only workflows.
+- [x] Existing staged-git ports remain intact for staged-only workflows.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/application/test_git_context_ports.py`
-- [ ] `uv run pytest tests/unit/features/developer_workflow/application/test_git_staged_changes_dtos.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/application/test_git_context_ports.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/application/test_git_staged_changes_dtos.py`
 
 **Dependencies:** Task 1
 
@@ -206,9 +206,9 @@ context inspection, plus layer-appropriate safe exceptions.
 
 ### Checkpoint: Application Contract
 
-- [ ] DTO and port tests pass.
-- [ ] No adapter/subprocess/framework imports appear in application DTOs or ports.
-- [ ] Staged-git public contracts remain available and staged-only.
+- [x] DTO and port tests pass.
+- [x] No adapter/subprocess/framework imports appear in application DTOs or ports.
+- [x] Staged-git public contracts remain available and staged-only.
 
 ### Phase 2: Subprocess Adapter Foundation
 
