@@ -356,19 +356,19 @@ per-file commit diff for a validated commit.
 
 **Acceptance criteria:**
 
-- [ ] `git_commit_changed_files` validates commit-ish and returns changed
+- [x] `git_commit_changed_files` validates commit-ish and returns changed
   paths/statuses without raw diff.
-- [ ] `git_commit_diff` returns bounded full diff and fails with a safe narrowing
+- [x] `git_commit_diff` returns bounded full diff and fails with a safe narrowing
   suggestion when oversized.
-- [ ] `git_commit_file_diff` validates commit-ish, safe relative path, and
+- [x] `git_commit_file_diff` validates commit-ish, safe relative path, and
   changed-file membership before diffing.
-- [ ] Path validation accepts the canonical changed-file `path`; for
+- [x] Path validation accepts the canonical changed-file `path`; for
   renamed/copied files this is the new/destination path, while `old_path` remains
   metadata only.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_commit.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_commit.py`
 
 **Dependencies:** Task 6
 
@@ -382,9 +382,9 @@ per-file commit diff for a validated commit.
 
 ### Checkpoint: Commit Context
 
-- [ ] Commit context tests pass.
-- [ ] Commit validation runs before detail/diff commands.
-- [ ] Full diff failure suggests changed-files plus file-diff narrowing.
+- [x] Commit context tests pass.
+- [x] Commit validation runs before detail/diff commands.
+- [x] Full diff failure suggests changed-files plus file-diff narrowing.
 
 ### Phase 5: Ref/Range Context Slice
 

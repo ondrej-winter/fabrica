@@ -17,7 +17,10 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.contex
     GIT_HEAD_SHORT_HASH_ARGV,
     GIT_UNSTAGED_DIFF_ARGV,
     GIT_UNSTAGED_FILE_LIST_ARGV,
+    git_commit_changed_files_argv,
     git_commit_details_argv,
+    git_commit_diff_argv,
+    git_commit_file_diff_argv,
     git_commit_log_argv,
     git_commit_validation_argv,
     git_ref_validation_argv,
@@ -192,6 +195,66 @@ class GitContextSubprocessLoader:
                 category=GitContextFailureCategory.GIT_FAILED,
                 duration_seconds=duration_seconds,
             ) from err
+
+    def list_commit_changed_files(self, commit: str) -> GitContextChangedFileList:
+        """List files changed by one validated commit-ish without raw diff output."""
+        self._ensure_commit(commit)
+        result, duration_seconds = self._run_git(git_commit_changed_files_argv(commit))
+        stdout = self._decode(result.stdout)
+        stderr = self._decode(result.stderr)
+        if result.returncode != 0:
+            raise self._non_zero_error(stderr=stderr, returncode=result.returncode, duration_seconds=duration_seconds)
+        if not stdout.strip():
+            raise self._load_error(
+                NO_MATCHING_CHANGES_MESSAGE,
+                category=GitContextFailureCategory.NO_MATCHING_CHANGES,
+                duration_seconds=duration_seconds,
+            )
+        try:
+            files = tuple(parse_context_name_status_line(line) for line in stdout.splitlines() if line.strip())
+            return GitContextChangedFileList(files=files)
+        except ValueError as err:
+            raise self._load_error(
+                UNSUPPORTED_OUTPUT_MESSAGE,
+                category=GitContextFailureCategory.GIT_FAILED,
+                duration_seconds=duration_seconds,
+            ) from err
+
+    def load_commit_diff(self, commit: str) -> GitContextDiff:
+        """Load the bounded full diff for one validated commit-ish."""
+        self._ensure_commit(commit)
+        result, duration_seconds = self._run_git(git_commit_diff_argv(commit))
+        stdout = self._decode(result.stdout)
+        stderr = self._decode(result.stderr)
+        if result.returncode != 0:
+            raise self._non_zero_error(stderr=stderr, returncode=result.returncode, duration_seconds=duration_seconds)
+        if not stdout.strip():
+            raise self._load_error(
+                NO_MATCHING_CHANGES_MESSAGE,
+                category=GitContextFailureCategory.NO_MATCHING_CHANGES,
+                duration_seconds=duration_seconds,
+            )
+        return self._bounded_diff(
+            stdout,
+            duration_seconds=duration_seconds,
+            suggestion="Use git_commit_changed_files followed by git_commit_file_diff to inspect a narrower change.",
+        )
+
+    def load_commit_file_diff(self, commit: str, path: str) -> GitContextDiff:
+        """Load the bounded diff for one file changed by one validated commit-ish."""
+        safe_path = self._ensure_changed_path(path, self.list_commit_changed_files(commit))
+        result, duration_seconds = self._run_git(git_commit_file_diff_argv(commit, safe_path))
+        stdout = self._decode(result.stdout)
+        stderr = self._decode(result.stderr)
+        if result.returncode != 0:
+            raise self._non_zero_error(stderr=stderr, returncode=result.returncode, duration_seconds=duration_seconds)
+        if not stdout.strip():
+            raise self._load_error(
+                NO_MATCHING_CHANGES_MESSAGE,
+                category=GitContextFailureCategory.NO_MATCHING_CHANGES,
+                duration_seconds=duration_seconds,
+            )
+        return self._bounded_diff(stdout, duration_seconds=duration_seconds)
 
     def _run_git(self, argv: Sequence[str]) -> tuple[GitCommandResult, float]:
         started = monotonic()

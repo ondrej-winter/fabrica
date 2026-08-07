@@ -11,6 +11,7 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess import
     GitContextSubprocessLoader,
 )
 from fabrica.features.developer_workflow.application.dtos import (
+    GitContextDiffBounds,
     GitContextFailureCategory,
     GitContextLogCount,
 )
@@ -131,6 +132,89 @@ def test_commit_details_validates_commit_before_loading_metadata_and_message() -
     ]
 
 
+def test_commit_changed_files_validates_commit_before_listing_name_status() -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="abcdef123456\n"),
+            GitCommandResult(returncode=0, stdout="M\tsrc/file.py\nR100\told.py\tnew.py\n"),
+        ]
+    )
+
+    changed_files = GitContextSubprocessLoader(working_directory=Path("repo"), runner=runner).list_commit_changed_files(
+        "HEAD~1"
+    )
+
+    assert [(file.status.value, file.path, file.old_path) for file in changed_files.files] == [
+        ("M", "src/file.py", None),
+        ("R", "new.py", "old.py"),
+    ]
+    assert runner.calls == [
+        (("git", "--no-pager", "rev-parse", "--verify", "--quiet", "HEAD~1^{commit}"), Path("repo"), 10.0),
+        (
+            ("git", "--no-pager", "diff-tree", "--no-commit-id", "--name-status", "-r", "HEAD~1"),
+            Path("repo"),
+            10.0,
+        ),
+    ]
+
+
+def test_commit_diff_validates_commit_and_returns_bounded_diff_with_narrowing_suggestion() -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="abcdef123456\n"),
+            GitCommandResult(returncode=0, stdout="diff --git a/src/file.py b/src/file.py\n+change\n"),
+        ]
+    )
+
+    diff = GitContextSubprocessLoader(runner=runner).load_commit_diff("HEAD")
+
+    assert diff.text == "diff --git a/src/file.py b/src/file.py\n+change\n"
+    assert diff.metadata["suggestion"] == (
+        "Use git_commit_changed_files followed by git_commit_file_diff to inspect a narrower change."
+    )
+    assert runner.calls == [
+        (("git", "--no-pager", "rev-parse", "--verify", "--quiet", "HEAD^{commit}"), None, 10.0),
+        (("git", "--no-pager", "show", "--format=", "--no-ext-diff", "HEAD"), None, 10.0),
+    ]
+
+
+def test_commit_file_diff_validates_commit_path_and_changed_file_membership() -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="abcdef123456\n"),
+            GitCommandResult(returncode=0, stdout="M\tsrc/file.py\nR100\told.py\tnew.py\n"),
+            GitCommandResult(returncode=0, stdout="diff --git a/old.py b/new.py\n+change\n"),
+        ]
+    )
+
+    diff = GitContextSubprocessLoader(runner=runner).load_commit_file_diff("HEAD", "new.py")
+
+    assert diff.text == "diff --git a/old.py b/new.py\n+change\n"
+    assert runner.calls == [
+        (("git", "--no-pager", "rev-parse", "--verify", "--quiet", "HEAD^{commit}"), None, 10.0),
+        (("git", "--no-pager", "diff-tree", "--no-commit-id", "--name-status", "-r", "HEAD"), None, 10.0),
+        (("git", "--no-pager", "show", "--format=", "--no-ext-diff", "HEAD", "--", "new.py"), None, 10.0),
+    ]
+
+
+def test_commit_file_diff_rejects_old_rename_path_before_diffing() -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="abcdef123456\n"),
+            GitCommandResult(returncode=0, stdout="R100\told.py\tnew.py\n"),
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_commit_file_diff("HEAD", "old.py")
+
+    assert exc_info.value.category is GitContextFailureCategory.NO_MATCHING_CHANGES
+    assert runner.calls == [
+        (("git", "--no-pager", "rev-parse", "--verify", "--quiet", "HEAD^{commit}"), None, 10.0),
+        (("git", "--no-pager", "diff-tree", "--no-commit-id", "--name-status", "-r", "HEAD"), None, 10.0),
+    ]
+
+
 def test_commit_details_rejects_invalid_commit_before_loading_details() -> None:
     runner = FakeGitRunner(results=[GitCommandResult(returncode=1, stderr="fatal: bad revision private/ref")])
 
@@ -142,13 +226,19 @@ def test_commit_details_rejects_invalid_commit_before_loading_details() -> None:
     assert runner.calls == [(("git", "--no-pager", "rev-parse", "--verify", "--quiet", "missing^{commit}"), None, 10.0)]
 
 
-@pytest.mark.parametrize("method_name", ["list_commits", "load_commit_details"])
+@pytest.mark.parametrize(
+    "method_name",
+    ["list_commits", "load_commit_details", "list_commit_changed_files"],
+)
 def test_commit_context_maps_malformed_output_safely(method_name: str) -> None:
     results = [GitCommandResult(returncode=0, stdout="malformed")]
     loader = GitContextSubprocessLoader(runner=FakeGitRunner(results=results))
     if method_name == "load_commit_details":
         results.insert(0, GitCommandResult(returncode=0, stdout="abcdef123456\n"))
         action = lambda_load_commit_details(loader)
+    elif method_name == "list_commit_changed_files":
+        results.insert(0, GitCommandResult(returncode=0, stdout="abcdef123456\n"))
+        action = lambda_list_commit_changed_files(loader)
     else:
         action = loader.list_commits
 
@@ -159,6 +249,48 @@ def test_commit_context_maps_malformed_output_safely(method_name: str) -> None:
     assert "malformed" not in str(exc_info.value.metadata)
 
 
+def test_commit_changed_files_fails_when_commit_has_no_matching_changes() -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="abcdef123456\n"),
+            GitCommandResult(returncode=0, stdout=""),
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).list_commit_changed_files("HEAD")
+
+    assert exc_info.value.category is GitContextFailureCategory.NO_MATCHING_CHANGES
+
+
+def test_commit_diff_maps_empty_and_oversized_output_safely() -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="abcdef123456\n"),
+            GitCommandResult(returncode=0, stdout="abcd"),
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(bounds=GitContextDiffBounds(max_chars=3), runner=runner).load_commit_diff("HEAD")
+
+    assert exc_info.value.category is GitContextFailureCategory.OVERSIZED_OUTPUT
+    assert exc_info.value.metadata["suggestion"] == (
+        "Use git_commit_changed_files followed by git_commit_file_diff to inspect a narrower change."
+    )
+
+    empty_runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="abcdef123456\n"),
+            GitCommandResult(returncode=0, stdout=""),
+        ]
+    )
+    with pytest.raises(GitContextLoadError) as empty_exc_info:
+        GitContextSubprocessLoader(runner=empty_runner).load_commit_diff("HEAD")
+
+    assert empty_exc_info.value.category is GitContextFailureCategory.NO_MATCHING_CHANGES
+
+
 def lambda_load_commit_details(loader: GitContextSubprocessLoader):
     """Return a no-argument action that loads HEAD commit details."""
 
@@ -166,6 +298,15 @@ def lambda_load_commit_details(loader: GitContextSubprocessLoader):
         return loader.load_commit_details("HEAD")
 
     return load_head_details
+
+
+def lambda_list_commit_changed_files(loader: GitContextSubprocessLoader):
+    """Return a no-argument action that lists HEAD commit changed files."""
+
+    def list_head_changed_files() -> object:
+        return loader.list_commit_changed_files("HEAD")
+
+    return list_head_changed_files
 
 
 def test_commit_log_maps_non_zero_git_failure_without_raw_stderr() -> None:
