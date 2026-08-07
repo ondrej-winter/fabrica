@@ -1,13 +1,20 @@
 """Developer-workflow CLI command adapters."""
 
-from fabrica.features.developer_workflow.adapters.inbound.cli.commands import (
+from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
+)
+from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
     CommitMessageWorkflowRunner,
     ConfirmedCommitWorkflowRunner,
     DeveloperWorkflowCliDependencies,
     DeveloperWorkflowCliStreams,
+    EvidenceWriter,
+)
+from fabrica.features.developer_workflow.adapters.inbound.cli.registration import (
     register_developer_workflow_cli_commands,
+)
+from fabrica.features.developer_workflow.adapters.inbound.cli.runner import (
     run_developer_workflow_cli_command,
 )
 
@@ -18,6 +25,7 @@ __all__ = [
     "ConfirmedCommitWorkflowRunner",
     "DeveloperWorkflowCliDependencies",
     "DeveloperWorkflowCliStreams",
+    "EvidenceWriter",
     "register_developer_workflow_cli_commands",
     "run_developer_workflow_cli_command",
 ]
