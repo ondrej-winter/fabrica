@@ -17,6 +17,8 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.contex
     GIT_HEAD_SHORT_HASH_ARGV,
     GIT_UNSTAGED_DIFF_ARGV,
     GIT_UNSTAGED_FILE_LIST_ARGV,
+    git_commit_details_argv,
+    git_commit_log_argv,
     git_commit_validation_argv,
     git_ref_validation_argv,
     git_unstaged_file_diff_argv,
@@ -36,14 +38,19 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.contex
     UNSUPPORTED_OUTPUT_MESSAGE,
 )
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.context_parsing import (
+    parse_commit_details,
+    parse_commit_log,
     parse_context_name_status_line,
     parse_status_summary,
 )
 from fabrica.features.developer_workflow.application.dtos import (
+    GitCommitDetails,
+    GitCommitLog,
     GitContextChangedFileList,
     GitContextDiff,
     GitContextDiffBounds,
     GitContextFailureCategory,
+    GitContextLogCount,
     GitStatusSummary,
     validate_git_context_relative_path,
 )
@@ -152,6 +159,39 @@ class GitContextSubprocessLoader:
                 duration_seconds=duration_seconds,
             )
         return self._bounded_diff(stdout, duration_seconds=duration_seconds)
+
+    def list_commits(self, count: GitContextLogCount | None = None) -> GitCommitLog:
+        """List recent commits from HEAD with bounded metadata."""
+        result, duration_seconds = self._run_git(git_commit_log_argv(count))
+        stdout = self._decode(result.stdout)
+        stderr = self._decode(result.stderr)
+        if result.returncode != 0:
+            raise self._non_zero_error(stderr=stderr, returncode=result.returncode, duration_seconds=duration_seconds)
+        try:
+            return parse_commit_log(stdout)
+        except ValueError as err:
+            raise self._load_error(
+                UNSUPPORTED_OUTPUT_MESSAGE,
+                category=GitContextFailureCategory.GIT_FAILED,
+                duration_seconds=duration_seconds,
+            ) from err
+
+    def load_commit_details(self, commit: str) -> GitCommitDetails:
+        """Load metadata and message details for one validated commit-ish."""
+        self._ensure_commit(commit)
+        result, duration_seconds = self._run_git(git_commit_details_argv(commit))
+        stdout = self._decode(result.stdout)
+        stderr = self._decode(result.stderr)
+        if result.returncode != 0:
+            raise self._non_zero_error(stderr=stderr, returncode=result.returncode, duration_seconds=duration_seconds)
+        try:
+            return parse_commit_details(stdout)
+        except ValueError as err:
+            raise self._load_error(
+                UNSUPPORTED_OUTPUT_MESSAGE,
+                category=GitContextFailureCategory.GIT_FAILED,
+                duration_seconds=duration_seconds,
+            ) from err
 
     def _run_git(self, argv: Sequence[str]) -> tuple[GitCommandResult, float]:
         started = monotonic()

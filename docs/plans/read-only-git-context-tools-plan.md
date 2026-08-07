@@ -326,18 +326,18 @@ detail inspection.
 
 **Acceptance criteria:**
 
-- [ ] `git_commit_log` accepts optional bounded `count` and defaults to a
+- [x] `git_commit_log` accepts optional bounded `count` and defaults to a
   conservative configured count.
-- [ ] Commit log returns hash, short hash, subject, author date, and decorations
+- [x] Commit log returns hash, short hash, subject, author date, and decorations
   when available without raw diffs.
-- [ ] `git_commit_details` validates commit-ish as a commit object before
+- [x] `git_commit_details` validates commit-ish as a commit object before
   inspection.
-- [ ] Commit details return hash, short hash, parents, author, author date,
+- [x] Commit details return hash, short hash, parents, author, author date,
   committer date, subject, body, and refs without raw diff output.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_commit.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_commit.py`
 
 **Dependencies:** Tasks 1-4
 
