@@ -61,7 +61,7 @@ ignore = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=src --cov-report=term-missing"
+addopts = "-n=auto --cov=src --cov-report=term-missing"
 markers = [
     "live_codex: opt-in tests that read local Codex credentials and call the live Codex backend",
 ]
