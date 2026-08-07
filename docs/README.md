@@ -37,3 +37,5 @@ This directory contains durable project documentation and current reference note
   multi-call evidence-first commit-message target.
 - `specs/model-callable-staged-git-tools-spec.md` defines optional read-only
   staged git tools for explicit agent/tool-loop workflows.
+- `specs/read-only-git-context-tools-spec.md` defines broader read-only git
+  context capabilities for worktree, commit-history, and ref/range inspection.
