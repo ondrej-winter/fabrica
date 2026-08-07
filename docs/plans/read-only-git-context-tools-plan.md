@@ -437,18 +437,18 @@ and map safe results into deterministic text output.
 
 **Acceptance criteria:**
 
-- [ ] Adds one registered tool per spec-defined stable intent.
-- [ ] Tool definitions use narrow JSON schemas with `additionalProperties: false`.
-- [ ] Invalid arguments produce safe invalid request failures.
-- [ ] Application errors map to safe tool failures without raw private
+- [x] Adds one registered tool per spec-defined stable intent.
+- [x] Tool definitions use narrow JSON schemas with `additionalProperties: false`.
+- [x] Invalid arguments produce safe invalid request failures.
+- [x] Application errors map to safe tool failures without raw private
   diagnostics.
-- [ ] Tool result text is bounded by existing tool-loop limits.
-- [ ] Staged tools remain separate and are not replaced or overloaded.
+- [x] Tool result text is bounded by existing tool-loop limits.
+- [x] Staged tools remain separate and are not replaced or overloaded.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_context_registered_tool/test_adapter.py`
-- [ ] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_staged_changes_registered_tool/test_adapter.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_context_registered_tool/test_adapter.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_staged_changes_registered_tool/test_adapter.py`
 
 **Dependencies:** Tasks 5-8
 
@@ -499,7 +499,7 @@ registered tools only when requested.
 
 ### Checkpoint: Model-Callable Exposure
 
-- [ ] Registered-tool adapter tests pass.
+- [x] Registered-tool adapter tests pass.
 - [ ] Composition tests prove explicit opt-in behavior.
 - [ ] Existing staged-git registered-tool composition remains unchanged.
 - [ ] No CLI command surface has been added.
