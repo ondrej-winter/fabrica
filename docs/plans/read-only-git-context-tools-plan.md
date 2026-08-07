@@ -469,22 +469,22 @@ registered tools only when requested.
 
 **Acceptance criteria:**
 
-- [ ] Adds composition options for working directory, bounds, timeout, and verbose
+- [x] Adds composition options for working directory, bounds, timeout, and verbose
   diagnostics.
-- [ ] Factory construction remains side-effect light and does not inspect git
+- [x] Factory construction remains side-effect light and does not inspect git
   state.
-- [ ] Tools are not globally enabled for every tool-loop or model-driven runtime.
-- [ ] Read-only git context composition remains internal in v1 and is not exported
+- [x] Tools are not globally enabled for every tool-loop or model-driven runtime.
+- [x] Read-only git context composition remains internal in v1 and is not exported
   from `fabrica.bootstrap.__all__`.
-- [ ] Existing `create_staged_git_registered_tools` remains available and
+- [x] Existing `create_staged_git_registered_tools` remains available and
   staged-only.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/test_bootstrap_api.py`
-- [ ] `uv run pytest tests/integration/features/agent_runtime/test_tool_loop_composition.py`
-- [ ] `uv run pytest tests/integration/features/developer_workflow/test_staged_git_tools_composition.py`
-- [ ] `uv run pytest tests/integration/features/developer_workflow/test_read_only_git_context_tools_composition.py`
+- [x] `uv run pytest tests/unit/test_bootstrap_api.py`
+- [x] `uv run pytest tests/integration/features/agent_runtime/test_tool_loop_composition.py`
+- [x] `uv run pytest tests/integration/features/developer_workflow/test_staged_git_tools_composition.py`
+- [x] `uv run pytest tests/integration/features/developer_workflow/test_read_only_git_context_tools_composition.py`
 
 **Dependencies:** Task 9
 
@@ -500,8 +500,8 @@ registered tools only when requested.
 ### Checkpoint: Model-Callable Exposure
 
 - [x] Registered-tool adapter tests pass.
-- [ ] Composition tests prove explicit opt-in behavior.
-- [ ] Existing staged-git registered-tool composition remains unchanged.
+- [x] Composition tests prove explicit opt-in behavior.
+- [x] Existing staged-git registered-tool composition remains unchanged.
 - [ ] No CLI command surface has been added.
 
 ### Phase 7: Documentation and Final Validation

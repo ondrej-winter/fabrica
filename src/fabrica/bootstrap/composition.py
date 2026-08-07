@@ -89,11 +89,15 @@ from fabrica.features.developer_workflow.adapters.outbound.commit_message_agent_
     AgentRuntimeCommitMessageSynthesizer,
     AgentRuntimeStagedFileCommitMessageAnalyzer,
 )
+from fabrica.features.developer_workflow.adapters.outbound.git_context_registered_tool import (
+    create_git_context_registered_tools as create_git_context_registered_tool_adapters,
+)
 from fabrica.features.developer_workflow.adapters.outbound.git_staged_changes_registered_tool import (
     create_git_staged_changes_registered_tools,
 )
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess import (
     GitCommitSubprocessCreator,
+    GitContextSubprocessLoader,
     GitStagedChangesSubprocessLoader,
 )
 from fabrica.features.developer_workflow.application.dtos import (
@@ -101,6 +105,7 @@ from fabrica.features.developer_workflow.application.dtos import (
     CreateGitCommitCommand,
     GenerateCommitMessageResult,
     GitCommitResult,
+    GitContextDiffBounds,
     GitStagedDiffBounds,
     SynthesizeCommitMessageCommand,
 )
@@ -213,6 +218,22 @@ class StagedGitToolOptions:
 
     working_directory: Path | None = None
     bounds: GitStagedDiffBounds | None = None
+    timeout_seconds: float = 10.0
+    verbose_diagnostics: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ReadOnlyGitContextToolOptions:
+    """Composition options for optional read-only git context registered tools.
+
+    The configured working directory is a composition-owned trust boundary; the
+    model cannot choose it. Construction only wires subprocess-backed loaders and
+    does not inspect git state. ``bounds`` limits returned diff data and
+    ``timeout_seconds`` limits read-only git inspection commands.
+    """
+
+    working_directory: Path | None = None
+    bounds: GitContextDiffBounds | None = None
     timeout_seconds: float = 10.0
     verbose_diagnostics: bool = False
 
@@ -954,6 +975,30 @@ def create_staged_git_registered_tools(options: StagedGitToolOptions | None = No
         verbose_diagnostics=tool_options.verbose_diagnostics,
     )
     return create_git_staged_changes_registered_tools(loader)
+
+
+def create_read_only_git_context_registered_tools(
+    options: ReadOnlyGitContextToolOptions | None = None,
+) -> tuple[RegisteredTool, ...]:
+    """Create explicitly opt-in read-only git context registered tools.
+
+    This v1 helper is intentionally internal to the composition module rather
+    than exported from ``fabrica.bootstrap``. Construction only wires the
+    subprocess-backed git context loader. Git state is inspected lazily when one
+    of the returned tool handlers is invoked.
+    """
+    tool_options = options or ReadOnlyGitContextToolOptions()
+    loader = GitContextSubprocessLoader(
+        working_directory=tool_options.working_directory,
+        bounds=tool_options.bounds,
+        timeout_seconds=tool_options.timeout_seconds,
+        verbose_diagnostics=tool_options.verbose_diagnostics,
+    )
+    return create_git_context_registered_tool_adapters(
+        worktree_loader=loader,
+        commit_loader=loader,
+        ref_loader=loader,
+    )
 
 
 def create_pydantic_ai_tool_loop_runtime(

@@ -47,6 +47,10 @@ def test_bootstrap_exports_only_curated_composition_surface() -> None:
     """Document the stable consumer-facing bootstrap names."""
     assert bootstrap.__all__ == EXPECTED_BOOTSTRAP_EXPORTS
     assert all(hasattr(bootstrap, name) for name in bootstrap.__all__)
+    assert "ReadOnlyGitContextToolOptions" not in bootstrap.__all__
+    assert "create_read_only_git_context_registered_tools" not in bootstrap.__all__
+    assert not hasattr(bootstrap, "ReadOnlyGitContextToolOptions")
+    assert not hasattr(bootstrap, "create_read_only_git_context_registered_tools")
 
 
 def test_bootstrap_option_defaults_preserve_safe_composition_contract() -> None:
