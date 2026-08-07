@@ -5,6 +5,7 @@ from fabrica.features.developer_workflow.application.dtos import GitContextLogCo
 DEFAULT_GIT_CONTEXT_TIMEOUT_SECONDS = 10.0
 
 GIT_CONTEXT_STATUS_SUMMARY_ARGV = ("git", "--no-pager", "status", "--short", "--branch")
+GIT_HEAD_SHORT_HASH_ARGV = ("git", "--no-pager", "rev-parse", "--short", "HEAD")
 GIT_UNSTAGED_FILE_LIST_ARGV = ("git", "--no-pager", "diff", "--name-status")
 GIT_UNSTAGED_DIFF_ARGV = ("git", "--no-pager", "diff")
 

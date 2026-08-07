@@ -7,6 +7,7 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.contex
     GIT_COMMIT_DETAILS_FORMAT,
     GIT_COMMIT_LOG_FORMAT,
     GIT_CONTEXT_STATUS_SUMMARY_ARGV,
+    GIT_HEAD_SHORT_HASH_ARGV,
     GIT_MERGE_BASE_ARGV_PREFIX,
     GIT_UNSTAGED_DIFF_ARGV,
     GIT_UNSTAGED_FILE_LIST_ARGV,
@@ -50,12 +51,14 @@ def assert_read_only_git_argv(argv: tuple[str, ...]) -> None:
 
 def test_worktree_command_builders_use_fixed_no_pager_argv_and_path_separator() -> None:
     assert GIT_CONTEXT_STATUS_SUMMARY_ARGV == ("git", "--no-pager", "status", "--short", "--branch")
+    assert GIT_HEAD_SHORT_HASH_ARGV == ("git", "--no-pager", "rev-parse", "--short", "HEAD")
     assert GIT_UNSTAGED_FILE_LIST_ARGV == ("git", "--no-pager", "diff", "--name-status")
     assert GIT_UNSTAGED_DIFF_ARGV == ("git", "--no-pager", "diff")
     assert git_unstaged_file_diff_argv("--stat") == ("git", "--no-pager", "diff", "--", "--stat")
 
     for argv in (
         GIT_CONTEXT_STATUS_SUMMARY_ARGV,
+        GIT_HEAD_SHORT_HASH_ARGV,
         GIT_UNSTAGED_FILE_LIST_ARGV,
         GIT_UNSTAGED_DIFF_ARGV,
         git_unstaged_file_diff_argv("src/file.py"),
@@ -175,6 +178,7 @@ def test_ref_context_builders_use_three_dot_ranges_and_read_only_ref_helpers() -
 def test_all_builders_avoid_mutating_and_network_git_commands() -> None:
     commands = (
         GIT_CONTEXT_STATUS_SUMMARY_ARGV,
+        GIT_HEAD_SHORT_HASH_ARGV,
         GIT_UNSTAGED_FILE_LIST_ARGV,
         GIT_UNSTAGED_DIFF_ARGV,
         git_unstaged_file_diff_argv("src/file.py"),

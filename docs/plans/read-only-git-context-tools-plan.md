@@ -290,22 +290,22 @@ port and subprocess adapter.
 
 **Acceptance criteria:**
 
-- [ ] Status summary includes branch/detached state, HEAD short hash, upstream
+- [x] Status summary includes branch/detached state, HEAD short hash, upstream
   when available, staged/unstaged/untracked counts, and a bounded untracked path
   list by default.
-- [ ] Unstaged files list includes tracked unstaged paths/statuses and excludes
+- [x] Unstaged files list includes tracked unstaged paths/statuses and excludes
   staged-only changes.
-- [ ] Unstaged full diff is bounded and fails clearly when no unstaged tracked
+- [x] Unstaged full diff is bounded and fails clearly when no unstaged tracked
   changes exist.
-- [ ] Unstaged file diff validates safe relative path and confirms the path
+- [x] Unstaged file diff validates safe relative path and confirms the path
   appears in the unstaged file list before diffing.
-- [ ] Worktree tools do not affect existing staged commit-message evidence
+- [x] Worktree tools do not affect existing staged commit-message evidence
   loading.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_worktree.py`
-- [ ] `uv run pytest tests/unit/features/developer_workflow/application/test_generate_commit_message.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_worktree.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/application/test_generate_commit_message.py`
 
 **Dependencies:** Tasks 1-4
 
