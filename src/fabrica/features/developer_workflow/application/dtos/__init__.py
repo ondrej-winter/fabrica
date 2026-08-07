@@ -11,17 +11,17 @@ from fabrica.features.developer_workflow.application.dtos.commit_message import 
     StagedFileCommitEvidence,
     SynthesizeCommitMessageCommand,
 )
-from fabrica.features.developer_workflow.application.dtos.git_commit import (
-    CreateGitCommitCommand,
-    GitCommitResult,
-)
-from fabrica.features.developer_workflow.application.dtos.git_context import (
+from fabrica.features.developer_workflow.application.dtos.git import (
     DEFAULT_GIT_CONTEXT_LOG_COUNT,
     DEFAULT_MAX_GIT_CONTEXT_DIFF_CHARS,
+    DEFAULT_MAX_STAGED_DIFF_CHARS,
     MAX_GIT_CONTEXT_LOG_COUNT,
+    STAGED_DIFF_CONTEXT_LABEL,
+    CreateGitCommitCommand,
     GitBranchAheadBehind,
     GitCommitDetails,
     GitCommitLog,
+    GitCommitResult,
     GitCommitSummary,
     GitContextChangedFile,
     GitContextChangedFileList,
@@ -31,20 +31,16 @@ from fabrica.features.developer_workflow.application.dtos.git_context import (
     GitContextFailureCategory,
     GitContextLogCount,
     GitMergeBase,
-    GitStatusSummary,
-    SafeGitContextMetadataValue,
-    validate_git_context_relative_path,
-)
-from fabrica.features.developer_workflow.application.dtos.git_staged_changes import (
-    DEFAULT_MAX_STAGED_DIFF_CHARS,
-    STAGED_DIFF_CONTEXT_LABEL,
     GitStagedChangesFailureCategory,
     GitStagedDiff,
     GitStagedDiffBounds,
     GitStagedFile,
     GitStagedFileList,
     GitStagedFileStatus,
+    GitStatusSummary,
+    SafeGitContextMetadataValue,
     SafeGitStagedChangesMetadataValue,
+    validate_git_context_relative_path,
 )
 
 __all__ = [

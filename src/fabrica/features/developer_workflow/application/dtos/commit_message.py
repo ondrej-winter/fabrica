@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 
-from fabrica.features.developer_workflow.application.dtos.git_staged_changes import (
+from fabrica.features.developer_workflow.application.dtos.git import (
     GitStagedDiff,
     GitStagedFile,
 )
