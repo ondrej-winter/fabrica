@@ -219,17 +219,17 @@ commit, and ref/range commands.
 
 **Acceptance criteria:**
 
-- [ ] All argv builders include `git --no-pager` or the project's equivalent
+- [x] All argv builders include `git --no-pager` or the project's equivalent
   no-pager pattern.
-- [ ] No builder accepts arbitrary model/user git flags or command names.
-- [ ] Path arguments are placed only after `--` and only after validation.
-- [ ] Commit/ref validation builders use read-only inspection commands.
-- [ ] Name-status and log/detail parsers produce bounded application DTOs.
+- [x] No builder accepts arbitrary model/user git flags or command names.
+- [x] Path arguments are placed only after `--` and only after validation.
+- [x] Commit/ref validation builders use read-only inspection commands.
+- [x] Name-status and log/detail parsers produce bounded application DTOs.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_commands.py`
-- [ ] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_parsing.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_commands.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_parsing.py`
 
 **Dependencies:** Tasks 1-2
 
@@ -275,10 +275,10 @@ new context adapter without disrupting existing staged-git behavior.
 
 ### Checkpoint: Subprocess Foundation
 
-- [ ] Command-builder and parser tests pass.
+- [x] Command-builder and parser tests pass.
 - [ ] New adapter error mapping tests pass.
-- [ ] Existing staged subprocess tests pass unchanged.
-- [ ] Review confirms no mutating/network git command appears in argv builders.
+- [x] Existing staged subprocess tests pass unchanged.
+- [x] Review confirms no mutating/network git command appears in argv builders.
 
 ### Phase 3: Worktree Context Slice
 
