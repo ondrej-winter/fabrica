@@ -8,14 +8,13 @@ without exposing arbitrary git command execution or mutating repository state.
 
 The primary users are:
 
-- a developer using CLI commands to inspect local repository context;
 - an agent runtime using opt-in model-callable tools for self-context during
   coding;
 - review and debugging workflows that need commit archaeology or PR-like branch
   comparison context.
 
-The target design is a small set of atomic tools and CLI commands grouped by
-stable user intent, not a generic git wrapper.
+The target design is a small set of atomic adapters and model-callable tools
+grouped by stable intent, not a generic git wrapper.
 
 ## Current context
 
@@ -39,8 +38,6 @@ stable user intent, not a generic git wrapper.
 
 - Read-only git context should be exposed through explicit composition, not as
   ambient global model powers.
-- CLI commands should reuse the same application ports as model-callable tools so
-  behavior and tests stay aligned.
 - Changed-file/status tools should exist before full-diff tools because they are
   cheaper, safer, and help the model decide whether a narrower diff is needed.
 - Full-diff tools should be deliberately requested and bounded.
@@ -247,28 +244,6 @@ Return the merge base for two refs.
 - Returns the merge-base hash and short hash.
 - Does not mutate refs or contact remotes.
 
-## CLI commands
-
-Expose human-facing CLI commands that reuse the same application ports. Exact
-command names may be refined during implementation, but the CLI should mirror the
-capability groups:
-
-```text
-uv run fabrica git status-summary
-uv run fabrica git unstaged-files
-uv run fabrica git unstaged-diff [--path <path>]
-uv run fabrica git commit-log [--count <n>]
-uv run fabrica git commit-details <commit>
-uv run fabrica git commit-files <commit>
-uv run fabrica git commit-diff <commit> [--path <path>]
-uv run fabrica git ref-files <base-ref> <head-ref>
-uv run fabrica git ref-diff <base-ref> <head-ref> [--path <path>]
-uv run fabrica git ahead-behind [--base-ref <ref>]
-```
-
-CLI commands must clearly state that they are read-only. They must not provide a
-path to arbitrary git execution.
-
 ## Tool atomicity rule
 
 Use one tool per stable intent and output shape. Each tool must have:
@@ -303,8 +278,6 @@ Implementation should preserve hexagonal boundaries:
     into `RegisteredTool` instances.
   - These adapters may import agent-runtime tool DTOs because they bridge
     developer-workflow capabilities into the agent-runtime tool system.
-- Inbound CLI adapters:
-  - Add CLI command handlers under the existing CLI adapter structure.
 - Composition root:
   - Add explicit helpers that register read-only git context tools only when a
     composed runtime requests them.
@@ -371,11 +344,6 @@ Implementation should preserve hexagonal boundaries:
   - invalid arguments map to safe failures;
   - adapter failures map to safe tool failures;
   - output remains bounded by tool-loop limits.
-- Unit-test CLI commands:
-  - parse expected arguments;
-  - call application ports rather than subprocess adapters directly;
-  - render read-only results clearly;
-  - map failures to user-safe messages and non-zero exit codes where appropriate.
 - Preserve existing staged git and commit-message tests to prove staged-only
   workflows remain unchanged.
 
@@ -390,7 +358,6 @@ depend on the developer's ambient repository state.
 - Test: `uv run pytest`
 - Focused tests during iteration:
   - `uv run pytest tests/unit/features/developer_workflow`
-  - `uv run pytest tests/unit/adapters/inbound/cli`
 
 Manual verification after implementation may use a temporary local git
 repository with staged changes, unstaged changes, branches, and sample commits.
@@ -405,9 +372,7 @@ repository with staged changes, unstaged changes, branches, and sample commits.
    avoid exposing unexpected local paths to the model?
 4. Should tool outputs be plain text, JSON-ish structured text, or strict JSON
    strings for easier parsing by agents?
-5. Should CLI commands be grouped under `fabrica git ...`, or should they use
-   more explicit top-level names such as `fabrica git-commit-log`?
-6. What default diff and log bounds should apply before asking the user to narrow
+5. What default diff and log bounds should apply before asking the user to narrow
    by file or count?
 
 ## Proposed implementation slices
@@ -418,8 +383,8 @@ repository with staged changes, unstaged changes, branches, and sample commits.
 4. Implement ref/range context adapter behavior and tests.
 5. Implement unstaged/worktree context adapter behavior and tests.
 6. Add registered-tool factories for explicit model-callable exposure.
-7. Add CLI commands that reuse the same application ports.
-8. Update README usage documentation and docs index.
+7. Update README usage documentation and docs index if registered-tool exposure
+   changes user-facing or developer-facing documentation.
 
 ## Success criteria
 
@@ -432,6 +397,6 @@ repository with staged changes, unstaged changes, branches, and sample commits.
 - The spec forbids arbitrary git command execution and all mutating/network git
   operations.
 - The spec requires explicit composition for model-callable tools.
-- The spec defines CLI exposure, architecture boundaries, testing strategy,
-  validation commands, non-goals, and open questions.
+- The spec defines architecture boundaries, testing strategy, validation commands,
+  non-goals, and open questions.
 - Existing staged-only `commit-message` behavior remains unchanged.
