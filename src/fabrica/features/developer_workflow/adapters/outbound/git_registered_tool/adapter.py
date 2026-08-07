@@ -1,7 +1,7 @@
-"""Public interface for read-only git context registered tools."""
+"""Public factories for read-only git registered tools."""
 
 from fabrica.features.agent_runtime.application.ports import RegisteredTool
-from fabrica.features.developer_workflow.adapters.outbound.git_context_registered_tool.definitions import (
+from fabrica.features.developer_workflow.adapters.outbound.git_registered_tool.context_definitions import (
     GIT_BRANCH_AHEAD_BEHIND_TOOL_DEFINITION,
     GIT_COMMIT_CHANGED_FILES_TOOL_DEFINITION,
     GIT_COMMIT_DETAILS_TOOL_DEFINITION,
@@ -17,7 +17,7 @@ from fabrica.features.developer_workflow.adapters.outbound.git_context_registere
     GIT_UNSTAGED_FILE_DIFF_TOOL_DEFINITION,
     GIT_UNSTAGED_FILES_TOOL_DEFINITION,
 )
-from fabrica.features.developer_workflow.adapters.outbound.git_context_registered_tool.handlers import (
+from fabrica.features.developer_workflow.adapters.outbound.git_registered_tool.context_handlers import (
     handle_branch_ahead_behind,
     handle_commit_changed_files,
     handle_commit_details,
@@ -33,13 +33,42 @@ from fabrica.features.developer_workflow.adapters.outbound.git_context_registere
     handle_unstaged_file_diff,
     handle_unstaged_files,
 )
+from fabrica.features.developer_workflow.adapters.outbound.git_registered_tool.staged_definitions import (
+    STAGED_GIT_FILE_DIFF_TOOL_DEFINITION,
+    STAGED_GIT_FILES_TOOL_DEFINITION,
+    STAGED_GIT_FULL_DIFF_TOOL_DEFINITION,
+)
+from fabrica.features.developer_workflow.adapters.outbound.git_registered_tool.staged_handlers import (
+    handle_staged_diff,
+    handle_staged_file_diff,
+    handle_staged_files,
+)
 from fabrica.features.developer_workflow.application.ports import (
     GitCommitContextLoader,
     GitRefContextLoader,
+    GitStagedChangesLoader,
     GitWorktreeContextLoader,
 )
 
-__all__ = ["create_git_context_registered_tools"]
+__all__ = ["create_git_context_registered_tools", "create_git_staged_changes_registered_tools"]
+
+
+def create_git_staged_changes_registered_tools(loader: GitStagedChangesLoader) -> tuple[RegisteredTool, ...]:
+    """Create model-callable tools for explicitly supplied staged git loading."""
+    return (
+        RegisteredTool(
+            definition=STAGED_GIT_FILES_TOOL_DEFINITION,
+            handler=lambda arguments: handle_staged_files(loader, arguments),
+        ),
+        RegisteredTool(
+            definition=STAGED_GIT_FULL_DIFF_TOOL_DEFINITION,
+            handler=lambda arguments: handle_staged_diff(loader, arguments),
+        ),
+        RegisteredTool(
+            definition=STAGED_GIT_FILE_DIFF_TOOL_DEFINITION,
+            handler=lambda arguments: handle_staged_file_diff(loader, arguments),
+        ),
+    )
 
 
 def create_git_context_registered_tools(

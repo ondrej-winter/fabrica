@@ -12,7 +12,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolDefinition,
     ToolLoopLimits,
 )
-from fabrica.features.developer_workflow.adapters.outbound.git_context_registered_tool import (
+from fabrica.features.developer_workflow.adapters.outbound.git_registered_tool import (
     create_git_context_registered_tools,
 )
 from fabrica.features.developer_workflow.application.dtos import (
