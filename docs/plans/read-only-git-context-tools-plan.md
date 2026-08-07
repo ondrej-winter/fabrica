@@ -541,18 +541,18 @@ behavior where user-facing or developer-facing documentation needs it.
 
 **Acceptance criteria:**
 
-- [ ] Focused developer workflow tests pass.
-- [ ] Full formatting, linting, type checking, and tests pass.
-- [ ] Handoff notes include files changed, validation performed, assumptions, and
+- [x] Focused developer workflow tests pass.
+- [x] Full formatting, linting, type checking, and tests pass.
+- [x] Handoff notes include files changed, validation performed, assumptions, and
   any deviations.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow`
-- [ ] `uv run ruff format .`
-- [ ] `uv run ruff check .`
-- [ ] `uv run ty check src tests`
-- [ ] `uv run pytest`
+- [x] `uv run pytest tests/unit/features/developer_workflow`
+- [x] `uv run ruff format .`
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src tests`
+- [x] `uv run pytest`
 
 **Dependencies:** Tasks 1-11
 
@@ -565,13 +565,13 @@ behavior where user-facing or developer-facing documentation needs it.
 
 ### Checkpoint: Complete
 
-- [ ] All task acceptance criteria are complete.
-- [ ] Full local quality gate passes or documented unrun/failing checks have clear
+- [x] All task acceptance criteria are complete.
+- [x] Full local quality gate passes or documented unrun/failing checks have clear
   reasons.
-- [ ] Existing staged-only commit-message behavior is verified unchanged.
-- [ ] No arbitrary, mutating, or network git capabilities were introduced.
-- [ ] Tool exposure remains explicit opt-in.
-- [ ] No `fabrica git ...` CLI commands were introduced.
+- [x] Existing staged-only commit-message behavior is verified unchanged.
+- [x] No arbitrary, mutating, or network git capabilities were introduced.
+- [x] Tool exposure remains explicit opt-in.
+- [x] No `fabrica git ...` CLI commands were introduced.
 
 ## Dependency Graph
 
