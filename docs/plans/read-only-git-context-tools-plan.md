@@ -502,7 +502,7 @@ registered tools only when requested.
 - [x] Registered-tool adapter tests pass.
 - [x] Composition tests prove explicit opt-in behavior.
 - [x] Existing staged-git registered-tool composition remains unchanged.
-- [ ] No CLI command surface has been added.
+- [x] No CLI command surface has been added.
 
 ### Phase 7: Documentation and Final Validation
 
@@ -513,17 +513,17 @@ behavior where user-facing or developer-facing documentation needs it.
 
 **Acceptance criteria:**
 
-- [ ] Documentation states read-only git context is adapters/tools only, not a
+- [x] Documentation states read-only git context is adapters/tools only, not a
   `fabrica git ...` CLI surface.
-- [ ] Documentation states registered tools are read-only and do not fetch or
+- [x] Documentation states registered tools are read-only and do not fetch or
   mutate repository state.
-- [ ] Documentation clarifies that `commit-message` remains staged-only.
-- [ ] `docs/README.md` continues to link to the spec and plan if the docs index
+- [x] Documentation clarifies that `commit-message` remains staged-only.
+- [x] `docs/README.md` continues to link to the spec and plan if the docs index
   pattern calls for it.
 
 **Verification:**
 
-- [ ] Documentation review against `docs/specs/read-only-git-context-tools-spec.md`.
+- [x] Documentation review against `docs/specs/read-only-git-context-tools-spec.md`.
 
 **Dependencies:** Task 10
 

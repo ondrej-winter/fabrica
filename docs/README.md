@@ -39,3 +39,6 @@ This directory contains durable project documentation and current reference note
   staged git tools for explicit agent/tool-loop workflows.
 - `specs/read-only-git-context-tools-spec.md` defines broader read-only git
   context capabilities for worktree, commit-history, and ref/range inspection.
+- `plans/read-only-git-context-tools-plan.md` tracks implementation progress for
+  the read-only git context adapters, registered-tool composition, documentation,
+  and final validation work.

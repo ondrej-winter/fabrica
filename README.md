@@ -755,6 +755,37 @@ per-file staged diffs before model invocation and does not depend on model tool
 calls. No environment-variable or settings surface is introduced for staged git
 tool composition.
 
+### Optional read-only git context registered tools
+
+Developer workflows can also explicitly compose broader read-only git context
+tools for model-driven worktree, commit-history, and ref/range inspection. These
+tools are exposed only through Python composition in
+`fabrica.bootstrap.composition`, not through a human-facing `fabrica git ...` CLI
+surface. The helper remains internal in v1 and is intentionally not exported from
+the curated `fabrica.bootstrap` package API.
+
+The registered tools are atomic and grouped by stable intent:
+
+- worktree tools: `git_status_summary`, `git_unstaged_files`,
+  `git_unstaged_diff`, and `git_unstaged_file_diff`
+- commit-history tools: `git_commit_log`, `git_commit_details`,
+  `git_commit_changed_files`, `git_commit_diff`, and `git_commit_file_diff`
+- ref/range tools: `git_ref_changed_files`, `git_ref_diff`,
+  `git_ref_file_diff`, `git_branch_ahead_behind`, and `git_merge_base`
+
+Construction wires adapters only; git state is inspected lazily when one of the
+registered tool handlers is invoked by an explicitly composed tool-loop runtime.
+The model cannot choose the repository working directory, arbitrary git commands,
+arbitrary git flags, or pathspecs. The subprocess adapter uses fixed read-only
+git argument lists, disables paging, bounds diff/log output, validates refs,
+commit-ish values, and file paths before inspection, and does not fetch or mutate
+repository state.
+
+These broader read-only context tools are separate from the staged git tools and
+from the deterministic `commit-message` workflow. `commit-message` remains
+staged-only: it does not inspect unstaged changes, commit history, or ref/range
+context, and it does not depend on model-callable git context tools.
+
 ## Model-driven selected Agent Skills composition
 
 Model-driven selected Agent Skills are currently available only through the
