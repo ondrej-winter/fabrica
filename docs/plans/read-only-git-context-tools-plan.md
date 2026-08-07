@@ -249,18 +249,18 @@ new context adapter without disrupting existing staged-git behavior.
 
 **Acceptance criteria:**
 
-- [ ] Uses injectable `GitCommandRunner` and composition-owned working directory.
-- [ ] Maps git unavailable, timeout, decode failure, not-repository, invalid
+- [x] Uses injectable `GitCommandRunner` and composition-owned working directory.
+- [x] Maps git unavailable, timeout, decode failure, not-repository, invalid
   ref/commit, non-zero git failure, and oversized output to safe application
   errors.
-- [ ] Does not expose full stderr unless safe verbose diagnostics are explicitly
+- [x] Does not expose full stderr unless safe verbose diagnostics are explicitly
   enabled and still redacted/bounded.
-- [ ] Existing staged-git subprocess tests continue to pass.
+- [x] Existing staged-git subprocess tests continue to pass.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context.py`
-- [ ] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_staged_changes.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_staged_changes.py`
 
 **Dependencies:** Tasks 1-3
 
@@ -276,7 +276,7 @@ new context adapter without disrupting existing staged-git behavior.
 ### Checkpoint: Subprocess Foundation
 
 - [x] Command-builder and parser tests pass.
-- [ ] New adapter error mapping tests pass.
+- [x] New adapter error mapping tests pass.
 - [x] Existing staged subprocess tests pass unchanged.
 - [x] Review confirms no mutating/network git command appears in argv builders.
 
