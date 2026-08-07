@@ -395,22 +395,22 @@ validated refs and bounded output.
 
 **Acceptance criteria:**
 
-- [ ] `git_ref_changed_files` validates both refs and uses the chosen three-dot
+- [x] `git_ref_changed_files` validates both refs and uses the chosen three-dot
   comparison semantics for v1.
-- [ ] `git_ref_diff` validates refs, applies bounds, and suggests
+- [x] `git_ref_diff` validates refs, applies bounds, and suggests
   `git_ref_changed_files` plus `git_ref_file_diff` when oversized.
-- [ ] `git_ref_file_diff` validates refs, safe path, and membership in changed
+- [x] `git_ref_file_diff` validates refs, safe path, and membership in changed
   files before diffing.
-- [ ] Ref file-diff path membership follows the changed-file DTO contract:
+- [x] Ref file-diff path membership follows the changed-file DTO contract:
   renamed/copied files are addressed by their new/destination `path` only.
-- [ ] `git_branch_ahead_behind` defaults to upstream when available and never
+- [x] `git_branch_ahead_behind` defaults to upstream when available and never
   fetches.
-- [ ] `git_merge_base` returns full and short merge-base hashes without mutating
+- [x] `git_merge_base` returns full and short merge-base hashes without mutating
   refs.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_refs.py`
+- [x] `uv run pytest tests/unit/features/developer_workflow/adapters/outbound/git_subprocess/test_context_refs.py`
 
 **Dependencies:** Tasks 1-4
 
@@ -424,9 +424,9 @@ validated refs and bounded output.
 
 ### Checkpoint: Core Git Context Adapter
 
-- [ ] Worktree, commit, and ref/range adapter tests pass.
-- [ ] No mutating/network commands are present.
-- [ ] All full diff paths have bounded-output behavior and narrowing guidance.
+- [x] Worktree, commit, and ref/range adapter tests pass.
+- [x] No mutating/network commands are present.
+- [x] All full diff paths have bounded-output behavior and narrowing guidance.
 
 ### Phase 6: Registered Tool Exposure
 

@@ -17,12 +17,17 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.contex
     GIT_HEAD_SHORT_HASH_ARGV,
     GIT_UNSTAGED_DIFF_ARGV,
     GIT_UNSTAGED_FILE_LIST_ARGV,
+    git_branch_ahead_behind_argv,
     git_commit_changed_files_argv,
     git_commit_details_argv,
     git_commit_diff_argv,
     git_commit_file_diff_argv,
     git_commit_log_argv,
     git_commit_validation_argv,
+    git_merge_base_argv,
+    git_ref_changed_files_argv,
+    git_ref_diff_argv,
+    git_ref_file_diff_argv,
     git_ref_validation_argv,
     git_unstaged_file_diff_argv,
 )
@@ -41,12 +46,15 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.contex
     UNSUPPORTED_OUTPUT_MESSAGE,
 )
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.context_parsing import (
+    parse_ahead_behind_counts,
     parse_commit_details,
     parse_commit_log,
     parse_context_name_status_line,
+    parse_merge_base,
     parse_status_summary,
 )
 from fabrica.features.developer_workflow.application.dtos import (
+    GitBranchAheadBehind,
     GitCommitDetails,
     GitCommitLog,
     GitContextChangedFileList,
@@ -54,6 +62,7 @@ from fabrica.features.developer_workflow.application.dtos import (
     GitContextDiffBounds,
     GitContextFailureCategory,
     GitContextLogCount,
+    GitMergeBase,
     GitStatusSummary,
     validate_git_context_relative_path,
 )
@@ -256,6 +265,111 @@ class GitContextSubprocessLoader:
             )
         return self._bounded_diff(stdout, duration_seconds=duration_seconds)
 
+    def list_ref_changed_files(self, base_ref: str, head_ref: str) -> GitContextChangedFileList:
+        """List files changed between two validated refs without raw diff output."""
+        self._ensure_ref_pair(base_ref, head_ref)
+        result, duration_seconds = self._run_git(git_ref_changed_files_argv(base_ref, head_ref))
+        stdout = self._decode(result.stdout)
+        stderr = self._decode(result.stderr)
+        if result.returncode != 0:
+            raise self._non_zero_error(stderr=stderr, returncode=result.returncode, duration_seconds=duration_seconds)
+        if not stdout.strip():
+            raise self._load_error(
+                NO_MATCHING_CHANGES_MESSAGE,
+                category=GitContextFailureCategory.NO_MATCHING_CHANGES,
+                duration_seconds=duration_seconds,
+            )
+        try:
+            files = tuple(parse_context_name_status_line(line) for line in stdout.splitlines() if line.strip())
+            return GitContextChangedFileList(files=files)
+        except ValueError as err:
+            raise self._load_error(
+                UNSUPPORTED_OUTPUT_MESSAGE,
+                category=GitContextFailureCategory.GIT_FAILED,
+                duration_seconds=duration_seconds,
+            ) from err
+
+    def load_ref_diff(self, base_ref: str, head_ref: str) -> GitContextDiff:
+        """Load the bounded full diff between two validated refs."""
+        self._ensure_ref_pair(base_ref, head_ref)
+        result, duration_seconds = self._run_git(git_ref_diff_argv(base_ref, head_ref))
+        stdout = self._decode(result.stdout)
+        stderr = self._decode(result.stderr)
+        if result.returncode != 0:
+            raise self._non_zero_error(stderr=stderr, returncode=result.returncode, duration_seconds=duration_seconds)
+        if not stdout.strip():
+            raise self._load_error(
+                NO_MATCHING_CHANGES_MESSAGE,
+                category=GitContextFailureCategory.NO_MATCHING_CHANGES,
+                duration_seconds=duration_seconds,
+            )
+        return self._bounded_diff(
+            stdout,
+            duration_seconds=duration_seconds,
+            suggestion="Use git_ref_changed_files followed by git_ref_file_diff to inspect a narrower change.",
+        )
+
+    def load_ref_file_diff(self, base_ref: str, head_ref: str, path: str) -> GitContextDiff:
+        """Load the bounded diff for one file changed between two validated refs."""
+        safe_path = self._ensure_changed_path(path, self.list_ref_changed_files(base_ref, head_ref))
+        result, duration_seconds = self._run_git(git_ref_file_diff_argv(base_ref, head_ref, safe_path))
+        stdout = self._decode(result.stdout)
+        stderr = self._decode(result.stderr)
+        if result.returncode != 0:
+            raise self._non_zero_error(stderr=stderr, returncode=result.returncode, duration_seconds=duration_seconds)
+        if not stdout.strip():
+            raise self._load_error(
+                NO_MATCHING_CHANGES_MESSAGE,
+                category=GitContextFailureCategory.NO_MATCHING_CHANGES,
+                duration_seconds=duration_seconds,
+            )
+        return self._bounded_diff(stdout, duration_seconds=duration_seconds)
+
+    def load_branch_ahead_behind(self, base_ref: str | None = None) -> GitBranchAheadBehind:
+        """Load current branch ahead/behind counts against upstream or a validated base ref."""
+        status_summary = self.load_status_summary()
+        if status_summary.branch is None:
+            raise self._load_error(INVALID_REF_MESSAGE, category=GitContextFailureCategory.INVALID_REF)
+        resolved_base_ref = base_ref or status_summary.upstream
+        if resolved_base_ref is None:
+            raise self._load_error(INVALID_REF_MESSAGE, category=GitContextFailureCategory.INVALID_REF)
+        if base_ref is not None:
+            self._ensure_ref(base_ref)
+        result, duration_seconds = self._run_git(git_branch_ahead_behind_argv(base_ref))
+        stdout = self._decode(result.stdout)
+        stderr = self._decode(result.stderr)
+        if result.returncode != 0:
+            raise self._non_zero_error(stderr=stderr, returncode=result.returncode, duration_seconds=duration_seconds)
+        try:
+            return parse_ahead_behind_counts(
+                stdout,
+                current_branch=status_summary.branch,
+                base_ref=resolved_base_ref,
+            )
+        except ValueError as err:
+            raise self._load_error(
+                UNSUPPORTED_OUTPUT_MESSAGE,
+                category=GitContextFailureCategory.GIT_FAILED,
+                duration_seconds=duration_seconds,
+            ) from err
+
+    def load_merge_base(self, base_ref: str, head_ref: str) -> GitMergeBase:
+        """Load merge-base hashes for two validated refs."""
+        self._ensure_ref_pair(base_ref, head_ref)
+        result, duration_seconds = self._run_git(git_merge_base_argv(base_ref, head_ref))
+        stdout = self._decode(result.stdout)
+        stderr = self._decode(result.stderr)
+        if result.returncode != 0:
+            raise self._non_zero_error(stderr=stderr, returncode=result.returncode, duration_seconds=duration_seconds)
+        try:
+            return parse_merge_base(stdout)
+        except ValueError as err:
+            raise self._load_error(
+                UNSUPPORTED_OUTPUT_MESSAGE,
+                category=GitContextFailureCategory.GIT_FAILED,
+                duration_seconds=duration_seconds,
+            ) from err
+
     def _run_git(self, argv: Sequence[str]) -> tuple[GitCommandResult, float]:
         started = monotonic()
         try:
@@ -317,6 +431,10 @@ class GitContextSubprocessLoader:
                 invalid_category=GitContextFailureCategory.INVALID_REF,
                 invalid_message=INVALID_REF_MESSAGE,
             )
+
+    def _ensure_ref_pair(self, base_ref: str, head_ref: str) -> None:
+        self._ensure_ref(base_ref)
+        self._ensure_ref(head_ref)
 
     def _ensure_changed_path(self, path: str, changed_files: GitContextChangedFileList) -> str:
         try:
