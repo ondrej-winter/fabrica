@@ -1,20 +1,47 @@
-"""Application-owned ports for read-only git context inspection."""
+"""Git workflow ports for developer workflow use cases."""
 
 from collections.abc import Mapping
 from typing import Protocol
 
 from fabrica.features.developer_workflow.application.dtos import (
+    CreateGitCommitCommand,
     GitBranchAheadBehind,
     GitCommitDetails,
     GitCommitLog,
+    GitCommitResult,
     GitContextChangedFileList,
     GitContextDiff,
     GitContextFailureCategory,
     GitContextLogCount,
     GitMergeBase,
+    GitStagedChangesFailureCategory,
+    GitStagedDiff,
+    GitStagedFileList,
     GitStatusSummary,
     SafeGitContextMetadataValue,
+    SafeGitStagedChangesMetadataValue,
 )
+
+
+class GitCommitError(Exception):
+    """Application-safe failure raised when approved git commit creation fails."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        metadata: Mapping[str, SafeGitStagedChangesMetadataValue] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.metadata = dict(metadata or {})
+
+
+class GitCommitCreator(Protocol):
+    """Outbound port for creating a git commit from an approved message."""
+
+    def create_commit(self, command: CreateGitCommitCommand) -> GitCommitResult:
+        """Create a git commit from the already-approved commit message."""
+        ...
 
 
 class GitContextLoadError(Exception):
@@ -98,3 +125,64 @@ class GitRefContextLoader(Protocol):
     def load_merge_base(self, base_ref: str, head_ref: str) -> GitMergeBase:
         """Load merge-base hashes for two validated refs."""
         ...
+
+
+class GitStagedChangesLoadError(Exception):
+    """Application-safe failure raised when staged git changes cannot load."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        category: GitStagedChangesFailureCategory,
+        metadata: Mapping[str, SafeGitStagedChangesMetadataValue] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.category = category
+        self.metadata = dict(metadata or {})
+
+
+class GitStagedDiffLoader(Protocol):
+    """Outbound port for loading full staged git diff context."""
+
+    def load_diff(self) -> GitStagedDiff:
+        """Load currently staged git diff text."""
+        ...
+
+
+class GitStagedChangesLoader(GitStagedDiffLoader, Protocol):
+    """Outbound port for read-only staged git change inspection."""
+
+    def list_files(self) -> GitStagedFileList:
+        """List currently staged file paths and statuses."""
+        ...
+
+    def load_file_diff(self, path: str) -> GitStagedDiff:
+        """Load currently staged git diff text for one safe relative path."""
+        ...
+
+
+class AsyncGitStagedChangesLoader(Protocol):
+    """Async outbound port for read-only staged git change inspection."""
+
+    async def list_files_async(self) -> GitStagedFileList:
+        """List currently staged file paths and statuses."""
+        ...
+
+    async def load_file_diff_async(self, path: str) -> GitStagedDiff:
+        """Load currently staged git diff text for one safe relative path."""
+        ...
+
+
+__all__ = [
+    "AsyncGitStagedChangesLoader",
+    "GitCommitContextLoader",
+    "GitCommitCreator",
+    "GitCommitError",
+    "GitContextLoadError",
+    "GitRefContextLoader",
+    "GitStagedChangesLoadError",
+    "GitStagedChangesLoader",
+    "GitStagedDiffLoader",
+    "GitWorktreeContextLoader",
+]

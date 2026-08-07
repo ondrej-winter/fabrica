@@ -1,4 +1,4 @@
-"""Application-owned ports for evidence-first commit-message generation."""
+"""Commit-message generation ports for developer workflow use cases."""
 
 from collections.abc import Mapping
 from typing import Protocol
@@ -68,3 +68,13 @@ class AsyncCommitMessageSynthesizer(Protocol):
     async def synthesize_async(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
         """Synthesize a final Conventional Commit recommendation."""
         ...
+
+
+__all__ = [
+    "AsyncCommitMessageSynthesizer",
+    "AsyncStagedFileCommitMessageAnalyzer",
+    "CommitMessageAnalysisError",
+    "CommitMessageSynthesisError",
+    "CommitMessageSynthesizer",
+    "StagedFileCommitMessageAnalyzer",
+]

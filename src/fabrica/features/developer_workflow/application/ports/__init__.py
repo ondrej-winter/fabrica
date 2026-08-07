@@ -8,21 +8,17 @@ from fabrica.features.developer_workflow.application.ports.commit_message import
     CommitMessageSynthesizer,
     StagedFileCommitMessageAnalyzer,
 )
-from fabrica.features.developer_workflow.application.ports.git_commit import (
+from fabrica.features.developer_workflow.application.ports.git import (
+    AsyncGitStagedChangesLoader,
+    GitCommitContextLoader,
     GitCommitCreator,
     GitCommitError,
-)
-from fabrica.features.developer_workflow.application.ports.git_context import (
-    GitCommitContextLoader,
     GitContextLoadError,
     GitRefContextLoader,
-    GitWorktreeContextLoader,
-)
-from fabrica.features.developer_workflow.application.ports.git_staged_changes import (
-    AsyncGitStagedChangesLoader,
     GitStagedChangesLoader,
     GitStagedChangesLoadError,
     GitStagedDiffLoader,
+    GitWorktreeContextLoader,
 )
 
 __all__ = [
