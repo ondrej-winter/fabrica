@@ -1,4 +1,4 @@
-"""Use case for evidence-first commit-message generation."""
+"""Use cases for evidence-first commit-message and commit workflows."""
 
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping
@@ -10,7 +10,9 @@ from fabrica.features.developer_workflow.application.dtos import (
     DEFAULT_MAX_COMMIT_MESSAGE_STAGED_FILES,
     AnalyzeStagedFileForCommitMessageCommand,
     CommitMessageEvidenceBundle,
+    CreateGitCommitCommand,
     GenerateCommitMessageResult,
+    GitCommitResult,
     SafeGitStagedChangesMetadataValue,
     StagedFileCommitEvidence,
     SynthesizeCommitMessageCommand,
@@ -19,6 +21,7 @@ from fabrica.features.developer_workflow.application.ports import (
     AsyncCommitMessageSynthesizer,
     AsyncGitStagedChangesLoader,
     AsyncStagedFileCommitMessageAnalyzer,
+    GitCommitCreator,
     GitStagedChangesLoader,
     GitStagedChangesLoadError,
 )
@@ -36,6 +39,21 @@ class _SyncCommitMessageSynthesizer(Protocol):
     def synthesize(self, command: SynthesizeCommitMessageCommand):
         """Synthesize a final Conventional Commit recommendation."""
         ...
+
+
+class CreateGitCommit:
+    """Create a git commit through the application-owned outbound port."""
+
+    def __init__(self, *, commit_creator: GitCommitCreator) -> None:
+        self._commit_creator = commit_creator
+
+    def create(self, command: CreateGitCommitCommand) -> GitCommitResult:
+        """Create a git commit from the already-approved command message."""
+        result = self._commit_creator.create_commit(command)
+        if not isinstance(result, GitCommitResult):
+            msg = "git commit creator returned an invalid result"
+            raise TypeError(msg)
+        return result
 
 
 class GenerateCommitMessageError(Exception):
