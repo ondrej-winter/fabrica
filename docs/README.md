@@ -31,8 +31,10 @@ This directory contains durable project documentation and current reference note
 
 ### Specs
 
-- `specs/subscription-backed-python-agent-runtime-spec.md` defines the original
-  transport spike target and preserves later errata.
+- `specs/python-agent-runtime-spec.md` defines the local Python agent runtime
+  direction and its provider-agnostic boundaries.
+- `specs/codex-transport-support-spec.md` defines the subscription-backed Codex
+  transport support path and preserves private-backend errata.
 - `specs/evidence-first-commit-message-generation-spec.md` defines the current
   multi-call evidence-first commit-message target.
 - `specs/interactive-confirmed-commit-flow-spec.md` defines the interactive
