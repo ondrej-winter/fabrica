@@ -5,14 +5,12 @@ from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model.adapter 
     PydanticAICompletion,
     PydanticAICompletionError,
     PydanticAICompletionRequest,
-)
-from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model.codex_completion import (
-    CodexTransportPydanticAICompletion,
-)
-from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model.tool_aware_adapter import (
     PydanticAIToolAwareAgentModel,
     PydanticAIToolAwareTurn,
     PydanticAIToolAwareTurnRequest,
+)
+from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model.codex_completion import (
+    CodexTransportPydanticAICompletion,
 )
 
 __all__ = [

@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model.adapter import (
+from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model.completion import (
     PydanticAICompletionError,
     PydanticAICompletionRequest,
 )

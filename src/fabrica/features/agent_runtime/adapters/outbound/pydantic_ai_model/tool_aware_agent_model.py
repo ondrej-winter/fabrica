@@ -14,7 +14,7 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model.adapter import _build_user_prompt
+from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model.message_rendering import build_user_prompt
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     RuntimeObservation,
@@ -60,7 +60,7 @@ class PydanticAIToolAwareAgentModel:
         tool_results: tuple[ToolCallResult, ...] = (),
     ) -> ToolAwareModelResponse:
         """Run one tool-aware model turn and normalize PydanticAI message parts."""
-        prompt = _build_user_prompt(command)
+        prompt = build_user_prompt(command)
         messages = _build_messages(prompt, tool_results)
         try:
             response = self._turn_runner.run_turn(
