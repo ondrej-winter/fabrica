@@ -1,4 +1,10 @@
-"""Application exceptions for Codex transport orchestration."""
+"""Application-safe exceptions for Codex transport credential loading."""
+
+__all__ = [
+    "CodexCredentialAuthenticationError",
+    "CodexCredentialStoreError",
+    "CodexCredentialUnavailableError",
+]
 
 
 class CodexCredentialStoreError(Exception):
