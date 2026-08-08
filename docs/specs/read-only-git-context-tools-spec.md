@@ -254,6 +254,22 @@ Return metadata and the full message for one commit.
   body, and refs when available.
 - Does not include raw diff output.
 
+Initial argument schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "commit": {
+      "type": "string",
+      "description": "Commit-ish to inspect as a commit object."
+    }
+  },
+  "required": ["commit"],
+  "additionalProperties": false
+}
+```
+
 #### `git_commit_changed_files`
 
 List changed paths and statuses for one commit.
@@ -263,6 +279,8 @@ List changed paths and statuses for one commit.
 - Uses a read-only command equivalent to `git diff-tree --name-status` or
   `git show --name-status --format=...` with fixed arguments.
 - Does not include raw diff output.
+
+Initial argument schema should match `git_commit_details`.
 
 #### `git_commit_diff`
 
@@ -274,6 +292,8 @@ Return the bounded full diff for one commit.
 - Fails clearly when the commit diff exceeds configured bounds and suggests using
   `git_commit_changed_files` followed by `git_commit_file_diff`.
 
+Initial argument schema should match `git_commit_details`.
+
 #### `git_commit_file_diff`
 
 Return the bounded diff for one file in one commit.
@@ -283,6 +303,26 @@ Return the bounded diff for one file in one commit.
 - Validates that `path` is a safe relative path and is changed by the commit.
 - Uses a read-only command equivalent to `git show <commit> -- <path>` after
   validation.
+
+Initial argument schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "commit": {
+      "type": "string",
+      "description": "Commit-ish to inspect as a commit object."
+    },
+    "path": {
+      "type": "string",
+      "description": "Relative path changed by the commit. Must be listed by git_commit_changed_files."
+    }
+  },
+  "required": ["commit", "path"],
+  "additionalProperties": false
+}
+```
 
 ### Ref/range context
 
@@ -299,6 +339,20 @@ List changed paths and statuses between two refs.
   or another explicitly chosen comparison form.
 - Does not include raw diff output.
 
+Initial argument schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "base_ref": {"type": "string", "description": "Base git ref for the comparison."},
+    "head_ref": {"type": "string", "description": "Head git ref for the comparison."}
+  },
+  "required": ["base_ref", "head_ref"],
+  "additionalProperties": false
+}
+```
+
 #### `git_ref_diff`
 
 Return the bounded full diff between two refs.
@@ -309,6 +363,8 @@ Return the bounded full diff between two refs.
 - Fails clearly when the diff exceeds configured bounds and suggests using
   `git_ref_changed_files` followed by `git_ref_file_diff`.
 
+Initial argument schema should match `git_ref_changed_files`.
+
 #### `git_ref_file_diff`
 
 Return the bounded diff for one file between two refs.
@@ -317,6 +373,24 @@ Return the bounded diff for one file between two refs.
 - Validates both refs before inspection.
 - Validates that `path` is safe and appears in `git_ref_changed_files` for the
   same ref pair.
+
+Initial argument schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "base_ref": {"type": "string", "description": "Base git ref for the comparison."},
+    "head_ref": {"type": "string", "description": "Head git ref for the comparison."},
+    "path": {
+      "type": "string",
+      "description": "Relative path changed between refs. Must be listed by git_ref_changed_files."
+    }
+  },
+  "required": ["base_ref", "head_ref", "path"],
+  "additionalProperties": false
+}
+```
 
 #### `git_branch_ahead_behind`
 
@@ -327,6 +401,21 @@ Return current branch ahead/behind counts against an upstream or explicit base.
 - Returns current branch, base ref, ahead count, and behind count.
 - Does not fetch from remotes.
 
+Initial argument schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "base_ref": {
+      "type": "string",
+      "description": "Optional base ref. Defaults to the current branch upstream when omitted."
+    }
+  },
+  "additionalProperties": false
+}
+```
+
 #### `git_merge_base`
 
 Return the merge base for two refs.
@@ -335,6 +424,29 @@ Return the merge base for two refs.
 - Validates both refs.
 - Returns the merge-base hash and short hash.
 - Does not mutate refs or contact remotes.
+
+Initial argument schema should match `git_ref_changed_files`.
+
+## Implemented v1 decisions
+
+- Ref/range comparisons use three-dot semantics by default for PR-like review
+  workflows.
+- `git_commit_log` lists recent commits from `HEAD` only in v1.
+- `git_status_summary` may include bounded untracked path names as well as the
+  untracked count.
+- Registered-tool outputs use deterministic tab-separated structured text rather
+  than strict JSON strings.
+- Default implementation bounds are 500,000 diff characters, 20 default recent
+  commits, and 50 maximum recent commits.
+- Renamed and copied files are represented by destination/new `path` plus
+  `old_path` metadata. File-diff tools accept the destination/new path in v1.
+- Broader read-only git context tools may be composed into explicitly configured
+  generic tool-loop runtimes. They are not ambient global powers.
+- V1 composition uses a helper named
+  `create_read_only_git_context_registered_tools(...)` in
+  `fabrica.bootstrap.composition`; the broader helper is intentionally not part
+  of the curated `fabrica.bootstrap` package API unless a future API decision
+  promotes it.
 
 ## Tool atomicity rule
 
@@ -488,39 +600,17 @@ depend on the developer's ambient repository state.
 Manual verification after implementation may use a temporary local git
 repository with staged changes, unstaged changes, branches, and sample commits.
 
-## Open questions
+## Remaining cleanup backlog
 
-1. Should ref comparisons use two-dot or three-dot diff semantics by default for
-   PR-like review workflows?
-2. Should `git_commit_log` accept a validated `ref` argument in v1, or only list
-   recent commits from `HEAD`?
-3. Should untracked file names appear in `git_status_summary`, or only counts to
-   avoid exposing unexpected local paths to the model?
-4. Should tool outputs be plain text, JSON-ish structured text, or strict JSON
-   strings for easier parsing by agents?
-5. What default diff and log bounds should apply before asking the user to narrow
-   by file or count?
-6. Should staged per-file diff support renamed files in v1, and if so what path
-   should the model pass: old path, new path, or both?
-7. Should read-only git context tools be associated with selected skills only, or
-   also be available to explicitly configured generic tool-loop runtimes?
-8. Should composition use dedicated helpers such as
-   `create_read_only_git_context_registered_tools(...)`, or fold tool registration
-   into an existing model-driven skill runtime options object?
-
-## Proposed implementation slices
-
-1. Add this spec and keep existing behavior unchanged.
-2. Add read-only git context DTOs and focused application ports.
-3. Extend staged git adapter/application boundaries to support staged file listing
-   and per-file staged diff where not already implemented.
-4. Add `git_staged_files`, `git_staged_diff`, and `git_staged_file_diff`
-   registered-tool factories.
-5. Implement commit context adapter behavior and tests.
-6. Implement ref/range context adapter behavior and tests.
-7. Implement unstaged/worktree context adapter behavior and tests.
-8. Add registered-tool factories for explicit model-callable exposure.
-9. Update README usage documentation and docs index if registered-tool exposure
+1. Keep commit-ish and ref argument validation explicit before git argv
+   construction so option-like or whitespace/control-character values cannot be
+   interpreted as model-supplied flags or malformed revision tokens.
+2. Keep staged and read-only context file-diff command builders validating safe
+   relative paths before appending them after `--`.
+3. Consider splitting the concrete read-only context subprocess adapter into
+   smaller worktree, commit, and ref modules if future changes make the current
+   shared adapter difficult to review.
+4. Update README usage documentation and docs index if registered-tool exposure
    changes user-facing or developer-facing documentation.
 
 ## Success criteria

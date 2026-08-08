@@ -24,6 +24,7 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.contex
     git_ref_file_diff_argv,
     git_ref_validation_argv,
     git_unstaged_file_diff_argv,
+    validate_git_revision_argument,
 )
 from fabrica.features.developer_workflow.application.dtos import GitContextLogCount
 
@@ -85,6 +86,26 @@ def test_commit_context_builders_use_fixed_formats_and_validation_commands() -> 
         "--quiet",
         "HEAD^{commit}",
     )
+
+
+@pytest.mark.parametrize("revision", ["", " HEAD", "HEAD ", "--all", "-n1", "feature branch", "HEAD\nmain"])
+def test_commit_and_ref_builders_reject_unsafe_revision_arguments(revision: str) -> None:
+    with pytest.raises(ValueError, match="commit must"):
+        validate_git_revision_argument(revision, field_name="commit")
+    with pytest.raises(ValueError, match="commit must"):
+        git_commit_validation_argv(revision)
+    with pytest.raises(ValueError, match="commit must"):
+        git_commit_details_argv(revision)
+    with pytest.raises(ValueError, match="ref must"):
+        git_ref_validation_argv(revision)
+    with pytest.raises(ValueError, match="head_ref must"):
+        git_ref_changed_files_argv("origin/main", revision)
+
+
+def test_commit_and_ref_builders_accept_common_safe_revision_syntax() -> None:
+    assert validate_git_revision_argument("HEAD~1", field_name="commit") == "HEAD~1"
+    assert git_commit_validation_argv("feature/read-only")[-1] == "feature/read-only^{commit}"
+    assert git_ref_changed_files_argv("origin/main", "HEAD")[-1] == "origin/main...HEAD"
     assert git_commit_log_argv(GitContextLogCount(count=3)) == (
         "git",
         "--no-pager",

@@ -41,6 +41,7 @@ from fabrica.features.developer_workflow.application.dtos.git import (
     SafeGitContextMetadataValue,
     SafeGitStagedChangesMetadataValue,
     validate_git_context_relative_path,
+    validate_git_staged_relative_path,
 )
 
 __all__ = [
@@ -82,4 +83,5 @@ __all__ = [
     "StagedFileCommitEvidence",
     "SynthesizeCommitMessageCommand",
     "validate_git_context_relative_path",
+    "validate_git_staged_relative_path",
 ]

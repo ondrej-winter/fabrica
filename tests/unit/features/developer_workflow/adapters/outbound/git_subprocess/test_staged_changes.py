@@ -11,6 +11,9 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess import
     GitCommandResult,
     GitStagedChangesSubprocessLoader,
 )
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.staged_changes_commands import (
+    git_staged_file_diff_argv,
+)
 from fabrica.features.developer_workflow.application.dtos import (
     GitStagedChangesFailureCategory,
     GitStagedDiffBounds,
@@ -144,6 +147,23 @@ def test_adapter_keeps_file_diff_path_after_separator_so_it_cannot_be_git_flags(
     GitStagedChangesSubprocessLoader(runner=runner).load_file_diff("--stat")
 
     assert runner.calls[-1][0] == ("git", "--no-pager", "diff", "--staged", "--", "--stat")
+
+
+@pytest.mark.parametrize("path", ["", " file.py", "/absolute/file.py", "../file.py", "src/../file.py", "."])
+def test_staged_file_diff_command_builder_validates_safe_relative_paths(path: str) -> None:
+    with pytest.raises(ValueError, match="staged file path"):
+        git_staged_file_diff_argv(path)
+
+
+def test_staged_file_diff_command_builder_places_safe_path_after_separator() -> None:
+    assert git_staged_file_diff_argv("src/file.py") == (
+        "git",
+        "--no-pager",
+        "diff",
+        "--staged",
+        "--",
+        "src/file.py",
+    )
 
 
 @pytest.mark.parametrize(

@@ -3,6 +3,8 @@
 from fabrica.features.developer_workflow.application.dtos import GitContextLogCount, validate_git_context_relative_path
 
 DEFAULT_GIT_CONTEXT_TIMEOUT_SECONDS = 10.0
+FIRST_CONTROL_CHARACTER_CODEPOINT = 32
+DELETE_CONTROL_CHARACTER_CODEPOINT = 127
 
 GIT_CONTEXT_STATUS_SUMMARY_ARGV = ("git", "--no-pager", "status", "--short", "--branch")
 GIT_HEAD_SHORT_HASH_ARGV = ("git", "--no-pager", "rev-parse", "--short", "HEAD")
@@ -30,6 +32,7 @@ def git_unstaged_file_diff_argv(path: str) -> tuple[str, ...]:
 
 def git_commit_validation_argv(commit: str) -> tuple[str, ...]:
     """Build argv that validates a commit-ish resolves to a commit object."""
+    commit = validate_git_revision_argument(commit, field_name="commit")
     return ("git", "--no-pager", "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}")
 
 
@@ -48,16 +51,19 @@ def git_commit_log_argv(count: GitContextLogCount | None = None) -> tuple[str, .
 
 def git_commit_details_argv(commit: str) -> tuple[str, ...]:
     """Build argv for one commit's metadata and message without diff output."""
+    commit = validate_git_revision_argument(commit, field_name="commit")
     return ("git", "--no-pager", "show", "--no-patch", f"--format={GIT_COMMIT_DETAILS_FORMAT}", commit)
 
 
 def git_commit_changed_files_argv(commit: str) -> tuple[str, ...]:
     """Build argv for files changed by one commit without raw diff output."""
+    commit = validate_git_revision_argument(commit, field_name="commit")
     return ("git", "--no-pager", "diff-tree", "--no-commit-id", "--name-status", "-r", commit)
 
 
 def git_commit_diff_argv(commit: str) -> tuple[str, ...]:
     """Build argv for one commit's raw diff using fixed read-only flags."""
+    commit = validate_git_revision_argument(commit, field_name="commit")
     return ("git", "--no-pager", "show", "--format=", "--no-ext-diff", commit)
 
 
@@ -68,6 +74,7 @@ def git_commit_file_diff_argv(commit: str, path: str) -> tuple[str, ...]:
 
 def git_ref_validation_argv(ref: str) -> tuple[str, ...]:
     """Build argv that validates a ref resolves to a commit object."""
+    ref = validate_git_revision_argument(ref, field_name="ref")
     return ("git", "--no-pager", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
 
 
@@ -95,8 +102,36 @@ def git_branch_ahead_behind_argv(base_ref: str | None = None) -> tuple[str, ...]
 
 def git_merge_base_argv(base_ref: str, head_ref: str) -> tuple[str, ...]:
     """Build argv for the merge base of two refs without mutating refs."""
-    return (*GIT_MERGE_BASE_ARGV_PREFIX, base_ref, head_ref)
+    return (
+        *GIT_MERGE_BASE_ARGV_PREFIX,
+        validate_git_revision_argument(base_ref, field_name="base_ref"),
+        validate_git_revision_argument(head_ref, field_name="head_ref"),
+    )
+
+
+def validate_git_revision_argument(value: str, *, field_name: str) -> str:
+    """Validate a commit-ish/ref token before constructing any git argv."""
+    if not value:
+        msg = f"{field_name} must not be empty"
+        raise ValueError(msg)
+    if value != value.strip():
+        msg = f"{field_name} must not contain leading or trailing whitespace"
+        raise ValueError(msg)
+    if value.startswith("-"):
+        msg = f"{field_name} must not start with '-'"
+        raise ValueError(msg)
+    if any(
+        char.isspace()
+        or ord(char) < FIRST_CONTROL_CHARACTER_CODEPOINT
+        or ord(char) == DELETE_CONTROL_CHARACTER_CODEPOINT
+        for char in value
+    ):
+        msg = f"{field_name} must not contain whitespace or control characters"
+        raise ValueError(msg)
+    return value
 
 
 def _three_dot_range(base_ref: str, head_ref: str) -> str:
-    return f"{base_ref}...{head_ref}"
+    safe_base_ref = validate_git_revision_argument(base_ref, field_name="base_ref")
+    safe_head_ref = validate_git_revision_argument(head_ref, field_name="head_ref")
+    return f"{safe_base_ref}...{safe_head_ref}"

@@ -234,3 +234,14 @@ def test_ref_context_rejects_invalid_ref_before_inspection_without_raw_stderr() 
     assert exc_info.value.category is GitContextFailureCategory.INVALID_REF
     assert "private ref" not in str(exc_info.value.metadata)
     assert runner.calls == [(("git", "--no-pager", "rev-parse", "--verify", "--quiet", "missing^{commit}"), None, 10.0)]
+
+
+@pytest.mark.parametrize("ref", ["", "--all", "HEAD\nmain"])
+def test_ref_context_rejects_unsafe_ref_before_calling_git(ref: str) -> None:
+    runner = FakeGitRunner(results=[])
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_ref_diff(ref, "HEAD")
+
+    assert exc_info.value.category is GitContextFailureCategory.INVALID_REF
+    assert runner.calls == []

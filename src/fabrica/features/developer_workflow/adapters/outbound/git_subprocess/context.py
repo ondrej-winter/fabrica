@@ -409,7 +409,11 @@ class GitContextSubprocessLoader:
         return stdout.strip() or None
 
     def _ensure_commit(self, commit: str) -> None:
-        result, duration_seconds = self._run_git(git_commit_validation_argv(commit))
+        try:
+            validation_argv = git_commit_validation_argv(commit)
+        except ValueError as err:
+            raise self._load_error(INVALID_COMMIT_MESSAGE, category=GitContextFailureCategory.INVALID_COMMIT) from err
+        result, duration_seconds = self._run_git(validation_argv)
         stderr = self._decode(result.stderr)
         if result.returncode != 0:
             raise self._non_zero_error(
@@ -421,7 +425,11 @@ class GitContextSubprocessLoader:
             )
 
     def _ensure_ref(self, ref: str) -> None:
-        result, duration_seconds = self._run_git(git_ref_validation_argv(ref))
+        try:
+            validation_argv = git_ref_validation_argv(ref)
+        except ValueError as err:
+            raise self._load_error(INVALID_REF_MESSAGE, category=GitContextFailureCategory.INVALID_REF) from err
+        result, duration_seconds = self._run_git(validation_argv)
         stderr = self._decode(result.stderr)
         if result.returncode != 0:
             raise self._non_zero_error(

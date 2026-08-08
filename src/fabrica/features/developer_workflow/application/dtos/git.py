@@ -397,6 +397,11 @@ def validate_git_context_relative_path(path: str) -> str:
     return path
 
 
+def validate_git_staged_relative_path(path: str) -> str:
+    """Validate a safe relative path for staged git operations."""
+    return _validate_safe_relative_path(path)
+
+
 def _validate_non_empty_text(value: str, *, field_name: str) -> None:
     if not value.strip():
         msg = f"{field_name} must not be empty"

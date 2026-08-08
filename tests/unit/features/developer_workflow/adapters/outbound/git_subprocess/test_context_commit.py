@@ -226,6 +226,17 @@ def test_commit_details_rejects_invalid_commit_before_loading_details() -> None:
     assert runner.calls == [(("git", "--no-pager", "rev-parse", "--verify", "--quiet", "missing^{commit}"), None, 10.0)]
 
 
+@pytest.mark.parametrize("commit", ["", "--all", "HEAD\nmain"])
+def test_commit_context_rejects_unsafe_commitish_before_calling_git(commit: str) -> None:
+    runner = FakeGitRunner(results=[])
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_commit_details(commit)
+
+    assert exc_info.value.category is GitContextFailureCategory.INVALID_COMMIT
+    assert runner.calls == []
+
+
 @pytest.mark.parametrize(
     "method_name",
     ["list_commits", "load_commit_details", "list_commit_changed_files"],
