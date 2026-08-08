@@ -5,15 +5,13 @@ them from their concrete modules in focused tests or adapter-local tooling.
 """
 
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.adapter import (
-    DEFAULT_CODEX_BACKEND_TIMEOUT_SECONDS,
-    CodexBackendHttpAdapter,
-)
-from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.request_builder import (
     DEFAULT_CODEX_BACKEND_BASE_URL,
     DEFAULT_CODEX_BACKEND_PATH,
+    DEFAULT_CODEX_BACKEND_TIMEOUT_SECONDS,
     DEFAULT_CODEX_MODEL,
     DEFAULT_CODEX_PRODUCT_SKU,
     DEFAULT_CODEX_USAGE_PATH,
+    CodexBackendHttpAdapter,
     CodexBackendRequestSettings,
     CodexUsageRequestSettings,
 )

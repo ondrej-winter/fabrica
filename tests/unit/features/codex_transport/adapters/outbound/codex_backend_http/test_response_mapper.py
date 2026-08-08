@@ -4,7 +4,7 @@ from typing import cast
 
 import pytest
 
-from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.response_mapper import (
+from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.response_mapping import (
     CodexBackendResponse,
     CodexUsageResponse,
     map_codex_backend_response,

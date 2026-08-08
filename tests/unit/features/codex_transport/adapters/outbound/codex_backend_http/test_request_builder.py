@@ -13,7 +13,7 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http impor
     CodexBackendRequestSettings,
     CodexUsageRequestSettings,
 )
-from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.request_builder import (
+from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.adapter import (
     build_codex_backend_request,
     build_codex_usage_request,
 )
