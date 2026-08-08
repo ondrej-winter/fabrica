@@ -37,9 +37,8 @@ This directory contains durable project documentation and current reference note
   multi-call evidence-first commit-message target.
 - `specs/interactive-confirmed-commit-flow-spec.md` defines the interactive
   `fabrica commit` workflow that creates commits only after explicit approval.
-- `specs/model-callable-staged-git-tools-spec.md` defines optional read-only
-  staged git tools for explicit agent/tool-loop workflows.
 - `specs/provider-agnostic-usage-cost-evidence-spec.md` defines the generic usage
   and pricing evidence model for model-call results.
 - `specs/read-only-git-context-tools-spec.md` defines broader read-only git
-  context capabilities for worktree, commit-history, and ref/range inspection.
+  context capabilities for worktree, staged, commit-history, and ref/range
+  inspection.

@@ -34,14 +34,10 @@ grouped by stable intent, not a generic git wrapper.
   broader read-only git context must not silently change that command's safety
   contract.
 - This spec is the canonical home for model-callable read-only git context tools,
-  including the staged tools originally described in
-  `docs/specs/model-callable-staged-git-tools-spec.md`.
+  including staged tools.
 
 ## Relationship to other git workflow specs
 
-- `docs/specs/model-callable-staged-git-tools-spec.md` is superseded by this
-  spec for canonical read-only staged tool contracts. It remains useful as
-  historical context for why staged model-callable tools were introduced.
 - `docs/specs/evidence-first-commit-message-generation-spec.md` continues to own
   the deterministic `fabrica commit-message` workflow. That workflow may use
   staged git primitives internally, but it must not silently expose broader
