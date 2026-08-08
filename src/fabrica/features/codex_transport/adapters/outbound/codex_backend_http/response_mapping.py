@@ -14,7 +14,7 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexUsageResult,
     SafeUsageEvidenceValue,
 )
-from fabrica.features.codex_transport.application.usage_mapping import (
+from fabrica.features.codex_transport.application.mappers import (
     CodexCompletionUsageFacts,
     map_codex_completion_evidence,
 )

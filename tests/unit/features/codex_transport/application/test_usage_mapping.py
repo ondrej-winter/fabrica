@@ -7,7 +7,7 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexUsageEvidence,
     CodexUsageResult,
 )
-from fabrica.features.codex_transport.application.usage_mapping import (
+from fabrica.features.codex_transport.application.mappers import (
     CodexCompletionUsageFacts,
     map_codex_completion_evidence,
     map_codex_usage_endpoint_evidence,
