@@ -4,8 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import cast
 
-from fabrica.features.codex_transport.application.dtos.transport import CodexTransportStatus
-from fabrica.features.codex_transport.application.dtos.usage import CodexUsageResult
+from fabrica.features.codex_transport.application.dtos import CodexTransportStatus, CodexUsageResult
 from fabrica.shared_kernel.model_usage import (
     ModelCostEvidence,
     ModelPricingStatus,

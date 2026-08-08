@@ -3,7 +3,7 @@
 from collections.abc import Mapping, Sequence
 from types import MappingProxyType
 
-from fabrica.features.codex_transport.application.dtos.observations import SafeObservationValue
+from fabrica.features.codex_transport.application.dtos import SafeObservationValue
 
 DiagnosticValue = SafeObservationValue | Mapping[str, "DiagnosticValue"] | tuple["DiagnosticValue", ...]
 

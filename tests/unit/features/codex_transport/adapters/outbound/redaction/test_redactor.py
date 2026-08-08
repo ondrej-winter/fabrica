@@ -12,7 +12,7 @@ from fabrica.features.codex_transport.adapters.outbound.redaction import (
     redact_metadata_value,
     redact_value,
 )
-from fabrica.features.codex_transport.application.dtos.observations import SafeObservationValue
+from fabrica.features.codex_transport.application.dtos import SafeObservationValue
 
 MAX_REDACTED_STRING_LENGTH = 160
 
