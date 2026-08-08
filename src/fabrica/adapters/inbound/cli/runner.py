@@ -16,6 +16,7 @@ from fabrica.adapters.inbound.cli.parser import (
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli import (
     AgentRuntimeCliDependencies,
+    AgentRuntimeCliStreams,
     CliRunCommand,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
@@ -153,8 +154,7 @@ def _run_agent_runtime_command(
             script_policy_evaluator=dependencies.script_policy_evaluator,
             script_executor=dependencies.script_executor,
         ),
-        stdout=stdout,
-        stderr=stderr,
+        streams=AgentRuntimeCliStreams(stdout=stdout, stderr=stderr),
     )
 
 
