@@ -1,5 +1,10 @@
 # Spec: Model-Callable Staged Git Tools
 
+> Status: Superseded for canonical tool contracts by
+> `docs/specs/read-only-git-context-tools-spec.md`. This spec remains as
+> historical context for why model-callable staged tools were introduced and how
+> they relate to the deterministic `fabrica commit-message` workflow.
+
 ## Objective
 
 Add optional model-callable tools for read-only staged git context so general
