@@ -334,10 +334,11 @@ credential files, account identifiers, and backend payloads are not copied,
 persisted, printed, or logged by the runtime path. Runtime failures return
 normalized statuses and bounded, redacted observations.
 
-Deferred follow-up work remains explicit: live/private PydanticAI provider
-integration, streaming support, tool calls and tool-result loops, model-driven
-Agent Skills use, OAuth refresh or credential mutation, production sandboxing,
-and UI entry points.
+Still-deferred runtime work remains explicit: streaming support, OAuth refresh or
+credential mutation, production sandboxing, and UI entry points. Tool loops,
+PydanticAI-shaped composition proofs, and model-driven selected Agent Skills
+composition are documented below as explicit, bounded Python API paths rather
+than ambient runtime powers.
 
 ## Offline PydanticAI runtime compatibility proof
 
@@ -824,13 +825,23 @@ payloads from application results and observations.
 
 ## Architecture
 
-The project uses a `src/` layout and is prepared for hexagonal architecture organized by vertical feature slices:
+The project uses a `src/` layout and hexagonal architecture organized by vertical
+feature slices:
 
-- `src/fabrica/features/` contains future business capabilities. Each feature slice should own its `domain/`, `application/`, and `adapters/` packages when those responsibilities are needed.
-- `src/fabrica/shared_kernel/` is reserved for pure domain concepts that are genuinely shared by multiple slices.
-- `src/fabrica/bootstrap/` is reserved for composition-root code, dependency wiring, and startup helpers.
-- `tests/unit/` and `tests/integration/` mirror source ownership for fast unit checks and explicit I/O-facing integration checks.
-
-The current `codex_transport` feature slice contains transport and usage-evidence
-spikes for probing subscription-backed Codex backend access behind
-application-owned ports and outbound adapters.
+- `src/fabrica/features/agent_runtime/` owns local runtime orchestration, runtime
+  DTOs, selected Agent Skills context/policy/execution boundaries, and bounded
+  tool-loop contracts.
+- `src/fabrica/features/codex_transport/` owns Codex credential loading, backend
+  transport, usage probing, response mapping, and provider-specific usage/cost
+  evidence mapping behind application-owned ports and outbound adapters.
+- `src/fabrica/features/developer_workflow/` owns staged-change commit-message
+  generation, confirmed commit creation, and explicit read-only git registered
+  tools for developer workflows.
+- `src/fabrica/features/query_execution/` owns bounded async query fan-out
+  execution.
+- `src/fabrica/shared_kernel/` contains pure concepts genuinely shared by slices,
+  such as provider-neutral model usage and pricing evidence DTOs.
+- `src/fabrica/bootstrap/` contains composition-root code, dependency wiring, and
+  startup helpers.
+- `tests/unit/` and `tests/integration/` mirror source ownership for fast unit
+  checks and explicit I/O-facing integration checks.

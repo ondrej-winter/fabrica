@@ -18,14 +18,13 @@ source attribution, and pricing confidence independently of any single backend.
 
 ## Current context
 
-- `docs/ideas/provider-agnostic-usage-cost-evidence.md` identifies the need to
-  collect reliable model usage evidence before claiming exact pricing.
-- Runtime result DTOs currently live in
-  `src/fabrica/features/agent_runtime/application/dtos/runtime.py` and do not yet
-  expose provider-agnostic usage evidence on `LocalAgentRunResult`.
-- Codex transport result DTOs currently live in
+- Runtime result DTOs live in
+  `src/fabrica/features/agent_runtime/application/dtos/runtime.py` and expose
+  provider-agnostic usage evidence on `LocalAgentRunResult`.
+- Codex transport result DTOs live in
   `src/fabrica/features/codex_transport/application/dtos/transport.py` and expose
-  normalized completion output plus redacted observations.
+  normalized completion output, redacted observations, and provider-agnostic
+  usage/cost evidence tuples.
 - Codex-specific usage probing already exists in
   `src/fabrica/features/codex_transport/application/dtos/usage.py` as
   `CodexUsageEvidence`, `CodexUsageResult`, and `CodexUsageStatus`.
@@ -158,10 +157,10 @@ CI validation path.
 ## Project structure
 
 - Spec: `docs/specs/provider-agnostic-usage-cost-evidence-spec.md`.
-- Generic usage and cost evidence DTO location for v1:
-  `src/fabrica/features/agent_runtime/application/dtos/usage.py`.
-- Do not create a standalone `model_usage` feature slice in v1. Reconsider that
-  only after usage/cost evidence grows into its own use case family.
+- Generic usage and cost evidence DTO location:
+  `src/fabrica/shared_kernel/model_usage.py`.
+- Do not create a standalone `model_usage` feature slice. Reconsider that only
+  after usage/cost evidence grows into its own use case family.
 - Existing Codex-specific usage DTOs:
   `src/fabrica/features/codex_transport/application/dtos/usage.py`.
 - Codex usage mapping should live in the Codex transport slice, either in
@@ -174,9 +173,8 @@ CI validation path.
   evidence with distinct provenance.
 - Unit tests should mirror the owning source location under `tests/unit/features/`.
 
-Avoid `shared_kernel` for v1 unless the usage evidence types become pure domain
-concepts genuinely reused by multiple slices. These DTOs are more likely to be
-application boundary types than shared-kernel domain concepts.
+The usage evidence DTOs now live in `shared_kernel` because both `agent_runtime`
+and `codex_transport` use them as provider-neutral boundary concepts.
 
 ## Conventions
 
@@ -238,7 +236,8 @@ application boundary types than shared-kernel domain concepts.
 - Always represent unknown or unavailable pricing explicitly.
 - Always keep provider-specific extraction behind provider-owned code.
 - Always redact observations and avoid raw provider payload persistence.
-- Always keep generic usage/cost evidence DTOs under `agent_runtime` for v1.
+- Keep generic usage/cost evidence DTOs provider-neutral and free of adapter or
+  transport payload details.
 - Ask before introducing a new `model_usage` feature slice.
 - Ask before adding generic provider-specific extension fields to the usage DTO.
 - Ask before adding live probes to developer workflows, CI, or default quality
@@ -268,8 +267,8 @@ application boundary types than shared-kernel domain concepts.
 ## Resolved v1 decisions
 
 - Generic usage and cost evidence DTOs live in
-  `src/fabrica/features/agent_runtime/application/dtos/usage.py` for v1.
-- Do not create a new `model_usage` feature slice in v1.
+  `src/fabrica/shared_kernel/model_usage.py`.
+- Do not create a new `model_usage` feature slice.
 - Represent provider-specific facts only as safe normalized observations in v1;
   do not add a generic provider-specific extension map.
 - Use the v1 confidence vocabulary `observed`, `extracted`, `inferred`,
@@ -286,7 +285,7 @@ application boundary types than shared-kernel domain concepts.
 ## Proposed first implementation slice
 
 1. Add generic usage and cost evidence DTOs in
-   `src/fabrica/features/agent_runtime/application/dtos/usage.py`.
+   `src/fabrica/shared_kernel/model_usage.py`.
 2. Add focused DTO validation tests for token counts, source attribution,
    confidence, status, and pricing states.
 3. Add Codex mapping from safe response usage or existing `CodexUsageEvidence`

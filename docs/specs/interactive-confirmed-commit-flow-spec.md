@@ -21,19 +21,14 @@ read-only safety contract of `fabrica commit-message`.
 - The current evidence-first commit-message workflow is specified in
   `docs/specs/evidence-first-commit-message-generation-spec.md` and implemented
   under the `developer_workflow` feature slice.
-- The CLI parser and runner live in
-  `src/fabrica/features/agent_runtime/adapters/inbound/cli/parser.py` and
-  `src/fabrica/features/agent_runtime/adapters/inbound/cli/runner.py`.
-- The composed commit-message workflow is wired in
-  `src/fabrica/bootstrap/local_agent_runtime.py` through
-  `CommitMessageWorkflowOptions`, `CommitMessageWorkflow`,
-  `create_commit_message_workflow()`, and
-  `create_codex_commit_message_workflow()`.
-- Read-only staged git access is exposed through the developer-workflow
-  application port in
-  `src/fabrica/features/developer_workflow/application/ports/git_staged_changes.py`
-  and implemented by the subprocess adapter in
-  `src/fabrica/features/developer_workflow/adapters/outbound/git_staged_changes_subprocess/`.
+- The CLI parser and runner live in `src/fabrica/adapters/inbound/cli/`, with
+  developer-workflow command models and runner contracts under
+  `src/fabrica/features/developer_workflow/adapters/inbound/cli/`.
+- Commit-message and confirmed-commit composition are wired in
+  `src/fabrica/bootstrap/composition.py` through explicit composition helpers.
+- Read-only staged git access is exposed through developer-workflow application
+  ports and implemented by subprocess adapters under
+  `src/fabrica/features/developer_workflow/adapters/outbound/git_subprocess/`.
 - The current staged git subprocess adapter already uses explicit git argument
   lists, disables paging, applies bounds, supports a composition-owned working
   directory, and maps git failures to application-safe errors.
@@ -161,13 +156,13 @@ developer's ambient staged git state.
 ## Project structure
 
 - Spec: `docs/specs/interactive-confirmed-commit-flow-spec.md`.
-- Source idea: `docs/ideas/interactive-confirmed-commit-flow.md`.
 - CLI parser and parsed command DTOs:
-  `src/fabrica/features/agent_runtime/adapters/inbound/cli/parser.py`.
+  `src/fabrica/adapters/inbound/cli/parser.py` and
+  `src/fabrica/features/developer_workflow/adapters/inbound/cli/`.
 - CLI runner, prompt handling, and terminal output:
-  `src/fabrica/features/agent_runtime/adapters/inbound/cli/runner.py` and
-  `src/fabrica/features/agent_runtime/adapters/inbound/cli/output.py` if output
-  helpers are needed.
+  `src/fabrica/adapters/inbound/cli/runner.py`,
+  `src/fabrica/adapters/inbound/cli/output.py`, and developer-workflow CLI
+  adapter contracts.
 - Developer-workflow application DTOs:
   `src/fabrica/features/developer_workflow/application/dtos/`.
 - Developer-workflow application ports:
@@ -175,11 +170,10 @@ developer's ambient staged git state.
 - Developer-workflow application use cases:
   `src/fabrica/features/developer_workflow/application/use_cases/`.
 - Git commit subprocess adapter:
-  `src/fabrica/features/developer_workflow/adapters/outbound/` under a focused
-  adapter package such as `git_commit_subprocess/`.
-- Composition wiring: `src/fabrica/bootstrap/local_agent_runtime.py`.
+  `src/fabrica/features/developer_workflow/adapters/outbound/git_subprocess/`.
+- Composition wiring: `src/fabrica/bootstrap/composition.py`.
 - Unit tests:
-  `tests/unit/features/agent_runtime/adapters/inbound/cli/` and
+  `tests/unit/adapters/inbound/cli/` and
   `tests/unit/features/developer_workflow/`.
 - Integration tests:
   `tests/integration/features/developer_workflow/` and, if CLI entrypoint behavior
