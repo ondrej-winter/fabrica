@@ -2,136 +2,166 @@
 
 ## Objective
 
-Add explicit read-only git context capabilities so developers and model-driven
-agent workflows can inspect worktree state, commit history, and ref/range changes
-without exposing arbitrary git command execution or mutating repository state.
+Define the read-only git context tool set for local developer and agent
+workflows. These tools let a composed agent runtime inspect repository state,
+staged changes, unstaged tracked changes, commit history, and ref/range changes
+without granting arbitrary git command execution or mutating repository state.
+
+The tool set is intentionally small, atomic, and intent-based. Each tool exposes
+one stable capability with a predictable argument schema, bounded output, and a
+single risk profile.
+
+## Scope
+
+Git context tools provide local, read-only repository evidence for:
+
+- agent self-context during coding workflows;
+- review and pull-request-like branch summarization;
+- commit archaeology and debugging;
+- staged-change inspection for explicitly composed model-callable tools.
+
+The tools are not ambient runtime powers. They are available only when the
+composition root explicitly registers them for a runtime or workflow.
+
+`docs/specs/commit-workflows.md` owns the deterministic
+`fabrica commit-message` preview workflow and the explicitly confirmed mutating
+`fabrica commit` workflow. Git context tools must not change the staged-only,
+read-only safety contract of `fabrica commit-message`.
+
+## Users and workflows
 
 The primary users are:
 
-- an agent runtime using opt-in model-callable tools for self-context during
-  coding;
-- review and debugging workflows that need commit archaeology or PR-like branch
-  comparison context.
+- developers who want local agent workflows to understand the current worktree
+  or branch context;
+- model-driven coding agents that need bounded self-context before editing,
+  reviewing, or explaining changes;
+- review and debugging workflows that need commit metadata, changed-file lists,
+  or bounded diffs for specific commits and ref ranges.
 
-The target design is a small set of atomic adapters and model-callable tools
-grouped by stable intent, not a generic git wrapper.
+Typical workflows should start with cheap summary tools, then request narrower
+diff tools only when needed. For example, an agent should inspect changed-file
+lists before requesting a full diff, and should request a file-specific diff when
+the full diff exceeds configured bounds.
 
-## Current context
+## Tool model
 
-- The `developer_workflow` feature already owns git-oriented workflow behavior.
-- Existing staged-git ports and DTOs live under
-  `src/fabrica/features/developer_workflow/application/`.
-- Existing git subprocess execution is isolated under
-  `src/fabrica/features/developer_workflow/adapters/outbound/git_subprocess/`.
-- Existing staged tools cover:
-  - `git_staged_files`;
-  - `git_staged_diff`;
-  - `git_staged_file_diff`.
-- Existing staged-git subprocess behavior uses explicit argument lists, disables
-  paging, controls the working directory through composition, applies output
-  bounds, and normalizes safe application errors.
-- The `commit-message` workflow must remain staged-only and read-only. Adding
-  broader read-only git context must not silently change that command's safety
-  contract.
-- This spec is the canonical home for model-callable read-only git context tools,
-  including staged tools.
+Each model-callable git context tool must have:
 
-## Relationship to other git workflow specs
+- one stable intent;
+- one predictable output shape;
+- a narrow JSON argument schema;
+- deterministic, bounded behavior;
+- no hidden mutation;
+- safe failure messages that do not expose private diagnostics or raw sensitive
+  content.
 
-- `docs/specs/commit-workflows.md` owns the deterministic
-  `fabrica commit-message` workflow and the explicitly mutating,
-  human-confirmed `fabrica commit` workflow. The commit-message workflow may use
-  staged git primitives internally, but it must not silently expose broader
-  read-only worktree, unstaged, commit, or ref/range tools to the model.
-- Mutating commit creation is not part of this read-only tool set.
+Tools must be grouped by context type rather than multiplexed through a generic
+git interface. Do not provide a generic `git`, `git_context`, or `git_readonly`
+tool that accepts model-provided subcommands, flags, pathspecs, working
+directories, or arbitrary refs without validation.
 
-## Assumptions
+Tool results should use deterministic structured text that is easy for models and
+humans to scan. Tab-separated sections are acceptable where they keep output
+stable and compact. Strict JSON output may be introduced later only when a
+workflow needs machine-validated structured results.
 
-- Read-only git context should be exposed through explicit composition, not as
-  ambient global model powers.
-- Changed-file/status tools should exist before full-diff tools because they are
-  cheaper, safer, and help the model decide whether a narrower diff is needed.
-- Full-diff tools should be deliberately requested and bounded.
-- Ref/range tools are required early because PR/review summarization often asks
-  what changed between the current branch and a base ref.
-- Unstaged worktree tools are useful, but they must remain separate from staged
-  commit-message evidence.
-
-## Desired behavior
-
-Add read-only git context capabilities in five groups.
+## Tool contracts
 
 ### Status context
 
-Status tools inspect current local state without changing the index or working
-tree and without returning raw diffs.
+Status context tools inspect the current local repository state without changing
+the index or working tree and without returning raw diffs.
 
 #### `git_status_summary`
 
-Return a bounded summary of the repository's current local state.
+Return a bounded summary of the repository's local state.
 
-- Includes current branch or detached HEAD state when available.
-- Includes HEAD short hash when available.
-- Includes upstream branch when available.
-- Includes counts and optionally paths for staged, unstaged, and untracked files.
-- Does not include raw diffs.
-- Uses read-only commands equivalent to `git status --short --branch` and related
-  metadata lookups.
+The result includes, when available:
 
-Initial argument schema should be empty.
+- current branch or detached HEAD state;
+- HEAD short hash;
+- upstream branch;
+- counts for staged, unstaged, and untracked files;
+- bounded path listings for staged, unstaged, and untracked files.
+
+The result does not include raw diffs or file contents.
+
+Argument schema:
+
+```json
+{
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
 
 ### Staged context
 
-Staged context tools inspect currently staged changes without changing the index
-or working tree. These are the canonical model-callable staged git tools and must
-remain separate from deterministic `fabrica commit-message` evidence loading.
+Staged context tools inspect changes currently staged in the index without
+changing the index or working tree. These are the canonical model-callable staged
+git tools. Deterministic commit-message evidence loading remains owned by the
+commit-message workflow rather than by ambient model tool access.
 
 #### `git_staged_files`
 
 List staged file paths and staged change statuses.
 
-- Returns a bounded textual or structured-text representation of staged files.
-- Uses a read-only command equivalent to `git diff --staged --name-status`.
-- Fails clearly when:
-  - `git` is unavailable;
-  - the working directory is not inside a git repository;
-  - there are no staged files;
-  - git execution times out or fails;
-  - output cannot be decoded safely.
-- Does not include unstaged-only changes.
-- Does not include raw diffs.
+The result:
 
-Initial argument schema should be empty.
+- includes staged file paths and status metadata;
+- is bounded;
+- does not include unstaged-only changes;
+- does not include raw diffs or file contents;
+- fails clearly when there are no staged files.
+
+Argument schema:
+
+```json
+{
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
 
 #### `git_staged_diff`
 
-Return the full staged diff as bounded tool output.
+Return the bounded full staged diff.
 
-- Reuses existing staged diff loading capability where practical.
-- Uses a read-only command equivalent to `git diff --staged`.
-- Applies existing or equivalent `GitStagedDiffBounds` before returning output.
-- Also remains subject to `ToolLoopLimits.max_tool_result_chars` when returned
-  through the tool loop.
-- Fails before returning raw output when there are no staged changes or the staged
-  diff exceeds configured bounds.
+The result:
 
-Initial argument schema should be empty.
+- includes only staged changes;
+- is subject to git diff bounds and tool-loop result bounds;
+- fails before returning output when there are no staged changes;
+- fails before returning output when the staged diff exceeds configured bounds.
+
+Argument schema:
+
+```json
+{
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
 
 #### `git_staged_file_diff`
 
-Return the staged diff for one staged file path.
+Return the bounded staged diff for one staged file path.
 
-- Accepts a single `path` argument.
-- Validates that `path` is a safe relative path and refers to a file that is
-  currently staged.
-- Rejects absolute paths, parent-directory traversal, empty paths, and paths not
-  present in the staged file list.
-- Uses a read-only command equivalent to `git diff --staged -- <path>` after
-  validation.
-- Applies staged diff and tool output bounds.
-- Fails clearly when the requested path is not staged or the output is empty.
+The tool accepts a single `path` argument. The path must be a safe relative path
+and must appear in the staged file list for the same repository state.
 
-Initial argument schema:
+The tool rejects:
+
+- absolute paths;
+- empty paths;
+- parent-directory traversal;
+- paths not present in the staged file list.
+
+Argument schema:
 
 ```json
 {
@@ -147,49 +177,74 @@ Initial argument schema:
 }
 ```
 
-Do not split staged tools further by status category, such as `added`,
-`modified`, or `deleted`, unless a future workflow proves the need.
-`git_staged_files` can return status metadata.
+Staged tools should not be split further by status category, such as `added`,
+`modified`, or `deleted`, unless a future workflow demonstrates a concrete need.
+`git_staged_files` carries the status metadata needed to choose narrower diffs.
 
 ### Unstaged context
 
-Unstaged context tools inspect current tracked worktree changes that are not
-staged, without changing the index or working tree.
+Unstaged context tools inspect tracked worktree changes that are not staged,
+without changing the index or working tree. They do not expose untracked file
+contents.
 
 #### `git_unstaged_files`
 
 List unstaged tracked file paths and statuses.
 
-- Does not include staged-only changes.
-- Does not include untracked file contents.
-- Uses a read-only command equivalent to `git diff --name-status`.
-- Fails clearly when no unstaged tracked changes exist.
+The result:
 
-Initial argument schema should be empty.
+- includes tracked files with unstaged changes;
+- does not include staged-only changes;
+- does not include untracked file contents;
+- does not include raw diffs;
+- fails clearly when no unstaged tracked changes exist.
+
+Argument schema:
+
+```json
+{
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
 
 #### `git_unstaged_diff`
 
 Return the bounded full unstaged diff for tracked files.
 
-- Uses a read-only command equivalent to `git diff`.
-- Applies git diff bounds and tool-loop result bounds.
-- Fails clearly when there are no unstaged tracked changes or output exceeds
-  configured bounds.
+The result:
 
-Initial argument schema should be empty.
+- includes only unstaged tracked changes;
+- is subject to git diff bounds and tool-loop result bounds;
+- fails before returning output when there are no unstaged tracked changes;
+- fails before returning output when the unstaged diff exceeds configured bounds.
+
+Argument schema:
+
+```json
+{
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
+```
 
 #### `git_unstaged_file_diff`
 
 Return the bounded unstaged diff for one tracked file.
 
-- Accepts a single `path` argument.
-- Validates that `path` is a safe relative path and currently has unstaged tracked
-  changes.
-- Rejects absolute paths, parent-directory traversal, empty paths, and paths not
-  present in the unstaged file list.
-- Uses a read-only command equivalent to `git diff -- <path>` after validation.
+The tool accepts a single `path` argument. The path must be a safe relative path
+and must appear in the unstaged tracked file list for the same repository state.
 
-Initial argument schema:
+The tool rejects:
+
+- absolute paths;
+- empty paths;
+- parent-directory traversal;
+- paths not present in the unstaged tracked file list.
+
+Argument schema:
 
 ```json
 {
@@ -208,21 +263,25 @@ Initial argument schema:
 ### Commit context
 
 Commit context tools inspect committed history without changing refs or local
-state.
+state. Commit arguments must resolve to commit objects before detail, changed
+file, or diff commands are executed.
 
 #### `git_commit_log`
 
 List recent commits with bounded metadata.
 
-- Accepts an optional bounded `count` argument.
-- May accept an optional `ref` argument after ref validation is implemented.
-- Returns hash, short hash, subject, author date, and ref decorations when
-  available.
-- Does not include full commit messages or diffs.
-- Uses a read-only command equivalent to `git log` with a fixed format and
-  bounded count.
+The result includes, when available:
 
-Initial argument schema:
+- full hash;
+- short hash;
+- subject;
+- author date;
+- ref decorations.
+
+The result does not include full commit messages or raw diffs. The baseline log
+scope is recent commits reachable from `HEAD`.
+
+Argument schema:
 
 ```json
 {
@@ -232,7 +291,7 @@ Initial argument schema:
       "type": "integer",
       "minimum": 1,
       "maximum": 50,
-      "description": "Maximum number of recent commits to return. Defaults to a small configured count."
+      "description": "Maximum number of recent commits to return. Defaults to the configured recent commit count."
     }
   },
   "additionalProperties": false
@@ -241,15 +300,23 @@ Initial argument schema:
 
 #### `git_commit_details`
 
-Return metadata and the full message for one commit.
+Return metadata and the full commit message for one commit.
 
-- Accepts a single `commit` argument.
-- Validates the commit-ish as a commit object before inspection.
-- Returns hash, short hash, parents, author, author date, committer date, subject,
-  body, and refs when available.
-- Does not include raw diff output.
+The result includes, when available:
 
-Initial argument schema:
+- full hash;
+- short hash;
+- parent hashes;
+- author;
+- author date;
+- committer date;
+- subject;
+- body;
+- refs.
+
+The result does not include raw diff output.
+
+Argument schema:
 
 ```json
 {
@@ -269,37 +336,39 @@ Initial argument schema:
 
 List changed paths and statuses for one commit.
 
-- Accepts a single `commit` argument.
-- Validates the commit-ish as a commit object before inspection.
-- Uses a read-only command equivalent to `git diff-tree --name-status` or
-  `git show --name-status --format=...` with fixed arguments.
-- Does not include raw diff output.
+The result:
 
-Initial argument schema should match `git_commit_details`.
+- includes paths and status metadata changed by the commit;
+- may include old path metadata for renamed or copied files;
+- does not include raw diffs.
+
+Argument schema matches `git_commit_details`.
 
 #### `git_commit_diff`
 
 Return the bounded full diff for one commit.
 
-- Accepts a single `commit` argument.
-- Validates the commit-ish as a commit object before inspection.
-- Applies git diff bounds and tool-loop result bounds.
-- Fails clearly when the commit diff exceeds configured bounds and suggests using
-  `git_commit_changed_files` followed by `git_commit_file_diff`.
+The result:
 
-Initial argument schema should match `git_commit_details`.
+- is subject to git diff bounds and tool-loop result bounds;
+- fails before returning output when the commit diff exceeds configured bounds;
+- suggests `git_commit_changed_files` followed by `git_commit_file_diff` when the
+  full diff is too large.
+
+Argument schema matches `git_commit_details`.
 
 #### `git_commit_file_diff`
 
 Return the bounded diff for one file in one commit.
 
-- Accepts `commit` and `path` arguments.
-- Validates the commit-ish as a commit object.
-- Validates that `path` is a safe relative path and is changed by the commit.
-- Uses a read-only command equivalent to `git show <commit> -- <path>` after
-  validation.
+The tool accepts `commit` and `path` arguments. The commit must resolve to a
+commit object. The path must be a safe relative path and must appear in
+`git_commit_changed_files` for the same commit.
 
-Initial argument schema:
+For renamed and copied files, the accepted path is the destination or new path.
+Old path metadata may appear in changed-file output for context.
+
+Argument schema:
 
 ```json
 {
@@ -322,26 +391,35 @@ Initial argument schema:
 ### Ref/range context
 
 Ref/range context tools inspect differences between validated refs, such as a
-feature branch and `main`, without changing refs or local state.
+feature branch and a base branch, without changing refs or contacting remotes.
+
+Range comparisons use three-dot semantics for pull-request-like review workflows
+unless a future spec introduces an explicit comparison-mode argument.
 
 #### `git_ref_changed_files`
 
 List changed paths and statuses between two refs.
 
-- Accepts `base_ref` and `head_ref` arguments.
-- Validates both refs before inspection.
-- Uses a read-only command equivalent to `git diff --name-status <base_ref>...<head_ref>`
-  or another explicitly chosen comparison form.
-- Does not include raw diff output.
+The result:
 
-Initial argument schema:
+- includes paths and status metadata changed between `base_ref` and `head_ref`;
+- may include old path metadata for renamed or copied files;
+- does not include raw diffs.
+
+Argument schema:
 
 ```json
 {
   "type": "object",
   "properties": {
-    "base_ref": {"type": "string", "description": "Base git ref for the comparison."},
-    "head_ref": {"type": "string", "description": "Head git ref for the comparison."}
+    "base_ref": {
+      "type": "string",
+      "description": "Base git ref for the comparison."
+    },
+    "head_ref": {
+      "type": "string",
+      "description": "Head git ref for the comparison."
+    }
   },
   "required": ["base_ref", "head_ref"],
   "additionalProperties": false
@@ -352,31 +430,40 @@ Initial argument schema:
 
 Return the bounded full diff between two refs.
 
-- Accepts `base_ref` and `head_ref` arguments.
-- Validates both refs before inspection.
-- Applies git diff bounds and tool-loop result bounds.
-- Fails clearly when the diff exceeds configured bounds and suggests using
-  `git_ref_changed_files` followed by `git_ref_file_diff`.
+The result:
 
-Initial argument schema should match `git_ref_changed_files`.
+- is subject to git diff bounds and tool-loop result bounds;
+- fails before returning output when the range diff exceeds configured bounds;
+- suggests `git_ref_changed_files` followed by `git_ref_file_diff` when the full
+  diff is too large.
+
+Argument schema matches `git_ref_changed_files`.
 
 #### `git_ref_file_diff`
 
 Return the bounded diff for one file between two refs.
 
-- Accepts `base_ref`, `head_ref`, and `path` arguments.
-- Validates both refs before inspection.
-- Validates that `path` is safe and appears in `git_ref_changed_files` for the
-  same ref pair.
+The tool accepts `base_ref`, `head_ref`, and `path` arguments. Both refs must
+validate before inspection. The path must be safe and must appear in
+`git_ref_changed_files` for the same ref pair.
 
-Initial argument schema:
+For renamed and copied files, the accepted path is the destination or new path.
+Old path metadata may appear in changed-file output for context.
+
+Argument schema:
 
 ```json
 {
   "type": "object",
   "properties": {
-    "base_ref": {"type": "string", "description": "Base git ref for the comparison."},
-    "head_ref": {"type": "string", "description": "Head git ref for the comparison."},
+    "base_ref": {
+      "type": "string",
+      "description": "Base git ref for the comparison."
+    },
+    "head_ref": {
+      "type": "string",
+      "description": "Head git ref for the comparison."
+    },
     "path": {
       "type": "string",
       "description": "Relative path changed between refs. Must be listed by git_ref_changed_files."
@@ -391,12 +478,17 @@ Initial argument schema:
 
 Return current branch ahead/behind counts against an upstream or explicit base.
 
-- Accepts an optional `base_ref` argument.
-- Defaults to upstream when one exists.
-- Returns current branch, base ref, ahead count, and behind count.
-- Does not fetch from remotes.
+The result includes:
 
-Initial argument schema:
+- current branch;
+- base ref;
+- ahead count;
+- behind count.
+
+The tool defaults to the current branch upstream when `base_ref` is omitted and
+an upstream exists. It does not fetch from remotes.
+
+Argument schema:
 
 ```json
 {
@@ -415,210 +507,209 @@ Initial argument schema:
 
 Return the merge base for two refs.
 
-- Accepts `base_ref` and `head_ref` arguments.
-- Validates both refs.
-- Returns the merge-base hash and short hash.
-- Does not mutate refs or contact remotes.
+The result includes the merge-base full hash and short hash. The tool does not
+mutate refs or contact remotes.
 
-Initial argument schema should match `git_ref_changed_files`.
+Argument schema matches `git_ref_changed_files`.
 
-## Implemented v1 decisions
+## Shared output and bounds requirements
 
-- Ref/range comparisons use three-dot semantics by default for PR-like review
-  workflows.
-- `git_commit_log` lists recent commits from `HEAD` only in v1.
-- `git_status_summary` may include bounded untracked path names as well as the
-  untracked count.
-- Registered-tool outputs use deterministic tab-separated structured text rather
-  than strict JSON strings.
-- Default implementation bounds are 500,000 diff characters, 20 default recent
-  commits, and 50 maximum recent commits.
-- Renamed and copied files are represented by destination/new `path` plus
-  `old_path` metadata. File-diff tools accept the destination/new path in v1.
-- Broader read-only git context tools may be composed into explicitly configured
-  generic tool-loop runtimes. They are not ambient global powers.
-- V1 composition uses a helper named
-  `create_read_only_git_context_registered_tools(...)` in
-  `fabrica.bootstrap.composition`; the broader helper is intentionally not part
-  of the curated `fabrica.bootstrap` package API unless a future API decision
-  promotes it.
+All tools must apply deterministic output bounds before returning model-callable
+results. Diff-producing tools are subject to both git diff bounds and the runtime
+tool-loop result limit.
 
-## Tool atomicity rule
+Default bounds:
 
-Use one tool per stable intent and output shape. Each tool must have:
+- maximum diff output: 500,000 characters;
+- default recent commit count: 20;
+- maximum recent commit count: 50.
 
-- one clear risk profile;
-- one predictable output shape;
-- a narrow argument schema;
-- bounded deterministic behavior;
-- no hidden mutation.
+Changed-file outputs should represent renamed and copied files with the
+destination or new `path` plus `old_path` metadata when available. File-diff tools
+accept the destination or new path.
 
-Do not add a generic `git`, `git_context`, or `git_readonly` tool that multiplexes
-subcommands through model-provided arguments.
+Tools must normalize common git failures into safe application-level errors,
+including:
 
-## Architecture and project structure
+- `git` unavailable;
+- working directory not inside a git repository;
+- missing staged, unstaged, commit, or ref/range changes for the requested
+  context;
+- invalid commit or ref arguments;
+- command timeout;
+- non-zero git failure;
+- output decode failure;
+- output exceeding configured bounds.
 
-Implementation should preserve hexagonal boundaries:
-
-- Application DTOs:
-  - `src/fabrica/features/developer_workflow/application/dtos/`
-  - Add read-only git context DTOs for status summaries, staged and unstaged
-    changed files, commit metadata, ref comparisons, and bounded diffs.
-  - Add staged file/status DTOs if needed, such as `GitStagedFile`,
-    `GitStagedFileList`, or `GitStagedFileStatus`.
-- Application ports:
-  - `src/fabrica/features/developer_workflow/application/ports/`
-  - Prefer focused protocols such as `GitWorktreeContextLoader`,
-    `GitStagedContextLoader`, `GitCommitContextLoader`, and
-    `GitRefContextLoader` over a broad catch-all git service.
-  - The staged application boundary may generalize the existing staged changes
-    port or keep smaller focused ports for staged file listing, full staged diff,
-    and per-file staged diff loading.
-- Outbound subprocess adapters:
-  - `src/fabrica/features/developer_workflow/adapters/outbound/git_subprocess/`
-  - Keep all git subprocess execution here or in consistently named subpackages.
-- Registered-tool adapters:
-  - Add developer-workflow-owned adapters that convert read-only git context ports
-    into `RegisteredTool` instances.
-  - These adapters may import agent-runtime tool DTOs because they bridge
-    developer-workflow capabilities into the agent-runtime tool system.
-- Composition root:
-  - Add explicit helpers that register read-only git context tools only when a
-    composed runtime requests them.
-
-## Desired API shape
-
-Prefer small, focused application-facing abstractions that avoid a vague catch-all
-git service. A coherent staged boundary may look like:
-
-```python
-class GitStagedChanges(Protocol):
-    def list_files(self) -> GitStagedFileList: ...
-    def load_diff(self) -> GitStagedDiff: ...
-    def load_file_diff(self, path: str) -> GitStagedDiff: ...
-```
-
-Alternatively, keep smaller protocols such as `GitStagedFilesLister`,
-`GitStagedDiffLoader`, and `GitStagedFileDiffLoader` if that better matches the
-implementation. Commit, ref/range, and unstaged/worktree capabilities should use
-similarly narrow protocols by stable intent and output shape.
+Error messages must be useful for the caller without exposing raw command stderr,
+private diagnostics, secrets, or raw file contents.
 
 ## Safety boundaries
 
-- Always keep these tools read-only.
-- Always use explicit git argument lists with `shell=False`.
+- Always keep git context tools read-only.
+- Always execute git with explicit argument lists and `shell=False`.
 - Always disable git paging with `--no-pager`.
-- Always keep the working directory controlled by composition/options, not model
-  arguments.
-- Always bound diff output and tool result output.
-- Always expose staged git tools only by explicit composition.
-- Always validate commit-ish and ref arguments before running diff/detail commands.
+- Always control the working directory through composition or application options,
+  never through model arguments.
+- Always validate commit-ish and ref arguments before commands that inspect
+  details, changed files, or diffs.
 - Always validate file paths as safe relative paths before passing them after
   `--` to git.
+- Always place validated path arguments after `--` in git argv.
 - Always separate staged, unstaged, commit, and ref/range tools by name.
+- Always register model-callable git context tools through explicit composition.
 - Never expose arbitrary git command execution.
-- Never run `git add`, `git reset`, `git checkout`, `git switch`, `git stash`,
-  `git commit`, `git push`, `git pull`, `git fetch`, merge, rebase, tag creation,
-  or any other mutating or network operation in this capability.
-- Never let the model supply arbitrary git flags, pathspecs, working directories,
-  or command names.
-- Never change the staged-only behavior of `fabrica commit-message`.
-- Never silently inspect unstaged changes inside staged commit-message workflows.
+- Never run mutating git operations such as `git add`, `git reset`,
+  `git checkout`, `git switch`, `git stash`, `git commit`, merge, rebase, tag
+  creation, or branch deletion.
+- Never run network git operations such as `git fetch`, `git pull`, or
+  `git push`.
+- Never let the model supply arbitrary git flags, command names, pathspecs,
+  working directories, or unvalidated revision tokens.
+- Never inspect unstaged changes inside staged commit-message workflows.
+- Never change the staged-only behavior of `fabrica commit-message` through this
+  tool set.
+
+## Architecture and project structure
+
+Implementation must preserve hexagonal boundaries in the
+`developer_workflow` feature slice.
+
+- Spec: `docs/specs/git-context-tools.md`.
+- Developer-workflow DTOs:
+  `src/fabrica/features/developer_workflow/application/dtos/`.
+- Developer-workflow ports:
+  `src/fabrica/features/developer_workflow/application/ports/`.
+- Developer-workflow git subprocess adapters:
+  `src/fabrica/features/developer_workflow/adapters/outbound/git_subprocess/`.
+- Developer-workflow registered-tool adapters:
+  `src/fabrica/features/developer_workflow/adapters/outbound/` or another
+  consistently named developer-workflow-owned adapter package.
+- Composition wiring: `src/fabrica/bootstrap/`.
+- Unit tests: `tests/unit/features/developer_workflow/`.
+- Integration tests: `tests/integration/features/developer_workflow/`.
+
+Application-facing abstractions should be focused by stable intent instead of a
+broad catch-all git service. Suitable boundaries include staged context,
+worktree context, commit context, and ref/range context ports. Port signatures
+must use application DTOs or approved domain/application boundary types rather
+than subprocess results, transport schemas, or model-provider schemas.
+
+Git subprocess execution belongs in outbound adapters. Registered-tool adapters
+bridge developer-workflow capabilities into the agent-runtime tool system and may
+depend on agent-runtime tool DTOs at that adapter boundary. Composition helpers
+must register these tools only when the composed runtime requests read-only git
+context access.
+
+## Relationship to commit workflows
+
+`fabrica commit-message` remains a deterministic, read-only staged-change
+preview workflow. It may use staged git primitives internally, but it must not
+silently expose broader worktree, unstaged, commit, or ref/range tools to the
+model.
+
+`fabrica commit` remains the explicitly confirmed mutating commit workflow owned
+by `docs/specs/commit-workflows.md`. Mutating commit creation is not part of the
+git context tool set.
 
 ## Non-goals
 
 - Do not implement arbitrary read-only shell or git command execution.
 - Do not add mutating git workflows in this spec.
-- Do not add remote/network-backed operations such as fetch, pull, or querying a
-  hosting provider API.
-- Do not add blame/provenance tools in the MVP.
-- Do not add tag/release/changelog tools in the MVP.
-- Do not replace existing staged-git tools with broader overloaded tools.
+- Do not add remote or network-backed operations such as fetch, pull, push, or
+  hosting-provider API queries.
+- Do not add blame or provenance tools in this spec.
+- Do not add tag, release, or changelog tools in this spec.
+- Do not replace focused staged, unstaged, commit, or ref/range tools with broader
+  overloaded tools.
 - Do not expose raw private diagnostics, full command stderr, secrets, or raw file
   contents in error messages.
 
 ## Testing strategy
 
-- Unit-test DTO validation:
-  - bounded counts;
-  - safe relative paths;
-  - commit/ref identifier validation shape;
-  - changed-file status parsing;
-  - diff bounds.
-  - staged file/status DTO validation, including non-empty relative paths and
-    bounded list/context output.
-- Unit-test subprocess command builders:
-  - fixed argv only;
-  - `--no-pager` where applicable;
-  - path arguments placed only after `--`;
-  - no model-supplied flags.
-- Unit-test subprocess adapters with injectable runners:
-  - success for each tool group;
-  - staged file listing success;
-  - full staged diff success;
-  - per-file staged diff success;
-  - git unavailable;
-  - not a repository;
-  - invalid commit/ref;
-  - no matching changes;
-  - timeout;
-  - non-zero git failure;
-  - decode failure;
-  - oversized output.
-- Unit-test path validation for file-diff tools:
-  - rejects absolute paths;
-  - rejects `..` traversal;
-  - rejects unknown, non-staged, non-unstaged, or non-changed paths for the
-    relevant tool group;
-  - accepts known changed paths with normal relative components.
-- Unit-test registered-tool wrappers:
-  - expected tool names, descriptions, and argument schemas;
-  - successful output mapping;
-  - invalid arguments map to safe failures;
-  - adapter failures map to safe tool failures;
-  - output remains bounded by tool-loop limits.
-- Preserve existing staged git and commit-message tests to prove staged-only
-  workflows remain unchanged.
+Automated tests must remain deterministic and offline. They must not depend on
+the developer's ambient repository state.
 
-Default automated tests must remain deterministic and offline. They must not
-depend on the developer's ambient repository state.
+Unit tests should cover DTO validation for:
+
+- bounded counts;
+- safe relative paths;
+- commit/ref identifier validation shape;
+- changed-file status parsing;
+- renamed and copied path metadata;
+- diff bounds.
+
+Unit tests should cover subprocess command construction for:
+
+- fixed argv only;
+- `--no-pager` where applicable;
+- path arguments placed only after `--`;
+- no model-supplied flags;
+- no mutating or network git commands.
+
+Unit tests should cover subprocess adapters with injectable runners for:
+
+- success for each tool group;
+- git unavailable;
+- not a repository;
+- invalid commit/ref;
+- no matching changes;
+- timeout;
+- non-zero git failure;
+- decode failure;
+- oversized output.
+
+Unit tests should cover path validation for file-diff tools:
+
+- rejects absolute paths;
+- rejects empty paths;
+- rejects `..` traversal;
+- rejects unknown, non-staged, non-unstaged, or non-changed paths for the relevant
+  tool group;
+- accepts known changed paths with normal relative components.
+
+Unit tests should cover registered-tool wrappers for:
+
+- expected tool names, descriptions, and argument schemas;
+- successful output mapping;
+- invalid arguments mapped to safe failures;
+- adapter failures mapped to safe tool failures;
+- output remaining bounded by tool-loop limits.
+
+Tests for staged-only commit-message behavior must prove that commit-message
+workflows remain staged-only and do not gain broader read-only git context as
+ambient model tools.
 
 ## Commands and validation
+
+Documentation-only changes should be reviewed for clarity and consistency.
+Implementation changes should use the project quality gate:
 
 - Format: `uv run ruff format .`
 - Lint: `uv run ruff check .`
 - Type check: `uv run ty check src tests`
 - Test: `uv run pytest`
-- Focused tests during iteration:
-  - `uv run pytest tests/unit/features/developer_workflow`
+- Focused developer-workflow tests during iteration:
+  `uv run pytest tests/unit/features/developer_workflow`
 
-Manual verification after implementation may use a temporary local git
-repository with staged changes, unstaged changes, branches, and sample commits.
-
-## Remaining cleanup backlog
-
-1. Keep commit-ish and ref argument validation explicit before git argv
-   construction so option-like or whitespace/control-character values cannot be
-   interpreted as model-supplied flags or malformed revision tokens.
-2. Keep staged and read-only context file-diff command builders validating safe
-   relative paths before appending them after `--`.
-3. Consider splitting the concrete read-only context subprocess adapter into
-   smaller worktree, commit, and ref modules if future changes make the current
-   shared adapter difficult to review.
-4. Update README usage documentation and docs index if registered-tool exposure
-   changes user-facing or developer-facing documentation.
+Manual verification for implementation changes may use a temporary local git
+repository with staged changes, unstaged tracked changes, branches, and sample
+commits.
 
 ## Success criteria
 
 - The spec defines read-only git context capabilities for status, staged,
   unstaged, commit, and ref/range workflows.
-- The proposed tool set covers agent self-context, PR/review summarization, and
-  commit archaeology/debugging.
-- The spec keeps staged, unstaged, commit, and ref/range concerns explicit and
-  separately named.
-- The spec forbids arbitrary git command execution and all mutating/network git
-  operations.
-- The spec requires explicit composition for model-callable tools.
-- The spec defines architecture boundaries, testing strategy, validation commands,
-  non-goals, and open questions.
-- Existing staged-only `commit-message` behavior remains unchanged.
+- The tool set covers agent self-context, review summarization, and commit
+  archaeology/debugging.
+- Staged, unstaged, commit, and ref/range concerns are explicit and separately
+  named.
+- Arbitrary git command execution and all mutating or network git operations are
+  forbidden.
+- Model-callable git context tools require explicit composition.
+- Tool outputs and diff results are bounded.
+- Architecture boundaries keep git subprocess execution in developer-workflow
+  outbound adapters and model tool registration behind explicit adapter and
+  composition boundaries.
+- Default automated tests remain deterministic and offline.
+- `fabrica commit-message` remains staged-only and read-only.
