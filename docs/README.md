@@ -7,22 +7,13 @@ This directory contains durable project documentation and current reference note
 - `ideas/` is temporary. Delete an idea after it is promoted into a spec,
   implementation, or decision record.
 - `plans/` is temporary. Delete a plan after the planned work is complete.
-- `specs/`, `adr/`, and dated `observations/` are durable records. Keep them when
-  they explain current behavior, historical context, or decisions that future work
-  still needs to understand.
+- `specs/` and `adr/` are durable records. Keep them when they explain current
+  behavior, historical context, or decisions that future work still needs to
+  understand.
 - Prefer a short status note over rewriting historical spec content when later
   implementation evidence changes an earlier assumption.
 
 ## Current map
-
-### Observations and viability records
-
-- `observations/README.md` is the canonical guide for redacted runtime viability
-  observations and source-comparison notes.
-- `observations/2026-08-01-codex-runtime-viability-decision.md` records the
-  current subscription-backed Codex runtime viability label.
-- `observations/2026-08-01-redacted-live-evidence-collection.md` records the
-  dated repeated-session live validation evidence behind that label.
 
 ### Specs
 

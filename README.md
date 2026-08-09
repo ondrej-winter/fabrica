@@ -54,8 +54,9 @@ query remote package or vulnerability indexes.
 Live Codex backend validation is opt-in because it reads local Codex credentials
 and sends one request to the live backend.
 
-For redacted viability evidence criteria, observation templates, and manual
-recording rules, see `docs/observations/README.md`.
+Keep live validation output redacted: do not copy credentials, auth headers,
+cookies, backend payloads, account identifiers, private paths, or personal data
+into logs, issue notes, or documentation.
 
 Prerequisite: authenticate the Codex CLI first:
 
@@ -84,7 +85,7 @@ FABRICA_CODEX_AUTH_FILE=/path/to/auth.json make test-live-codex
 ```
 
 The credential adapter is read-only: it does not copy, persist, print, or log raw
-credential values. Failure output uses normalized, redacted observations.
+credential values. Failure output uses normalized, redacted diagnostics.
 
 ## Local CLI entrypoint
 
