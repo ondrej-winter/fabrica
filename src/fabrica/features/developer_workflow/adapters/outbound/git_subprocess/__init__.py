@@ -10,6 +10,9 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.commit
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.context import (
     GitContextSubprocessLoader,
 )
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.pre_commit import (
+    PreCommitSubprocessRunner,
+)
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.staged_changes import (
     GitStagedChangesSubprocessLoader,
 )
@@ -20,4 +23,5 @@ __all__ = [
     "GitCommitSubprocessCreator",
     "GitContextSubprocessLoader",
     "GitStagedChangesSubprocessLoader",
+    "PreCommitSubprocessRunner",
 ]

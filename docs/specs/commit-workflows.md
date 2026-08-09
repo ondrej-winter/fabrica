@@ -431,8 +431,8 @@ developer's ambient staged git state.
   `src/fabrica/features/developer_workflow/application/ports/`.
 - Developer-workflow application use cases:
   `src/fabrica/features/developer_workflow/application/use_cases/`.
-- Git commit subprocess adapter:
-  `src/fabrica/features/developer_workflow/adapters/outbound/git_subprocess/`.
+- Git commit subprocess adapter contract:
+  `docs/specs/git-workflow-tools.md`.
 - Composition wiring: `src/fabrica/bootstrap/composition.py`.
 - Unit tests:
   `tests/unit/adapters/inbound/cli/` and

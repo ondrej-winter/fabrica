@@ -3,6 +3,7 @@
 from fabrica import bootstrap
 
 DEFAULT_STAGED_GIT_TOOL_TIMEOUT_SECONDS = 10.0
+DEFAULT_PRE_COMMIT_TOOL_TIMEOUT_SECONDS = 120.0
 
 
 EXPECTED_BOOTSTRAP_EXPORTS = [
@@ -16,6 +17,7 @@ EXPECTED_BOOTSTRAP_EXPORTS = [
     "DenyByDefaultSkillScriptApprovalLookup",
     "ModelDrivenSkillRuntime",
     "ModelDrivenSkillRuntimeOptions",
+    "PreCommitToolOptions",
     "SkillContextAugmentationOptions",
     "SkillScriptExecutionOptions",
     "SkillScriptPolicyEvaluationOptions",
@@ -28,6 +30,7 @@ EXPECTED_BOOTSTRAP_EXPORTS = [
     "create_commit_message_workflow",
     "create_confirmed_commit_workflow",
     "create_model_driven_skill_runtime",
+    "create_pre_commit_registered_tool_adapters",
     "create_pydantic_ai_model_driven_skill_runtime",
     "create_pydantic_ai_runtime",
     "create_pydantic_ai_tool_loop_runtime",
@@ -57,12 +60,15 @@ def test_bootstrap_option_defaults_preserve_safe_composition_contract() -> None:
     """Document safety-relevant defaults for bootstrap option DTOs."""
     script_policy = bootstrap.SkillScriptPolicyEvaluationOptions()
     script_execution = bootstrap.SkillScriptExecutionOptions()
+    pre_commit_tools = bootstrap.PreCommitToolOptions()
     staged_git_tools = bootstrap.StagedGitToolOptions()
     model_skill_runtime = bootstrap.ModelDrivenSkillRuntimeOptions()
 
     assert script_policy.approval_lookup is None
     assert script_execution.approval_lookup is None
     assert script_execution.working_directory is None
+    assert pre_commit_tools.working_directory is None
+    assert pre_commit_tools.timeout_seconds == DEFAULT_PRE_COMMIT_TOOL_TIMEOUT_SECONDS
     assert staged_git_tools.working_directory is None
     assert staged_git_tools.timeout_seconds == DEFAULT_STAGED_GIT_TOOL_TIMEOUT_SECONDS
     assert model_skill_runtime.skill_tools == ()

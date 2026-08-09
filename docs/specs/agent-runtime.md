@@ -68,7 +68,7 @@ Fabrica should expose a local Python agent runtime that can:
    `docs/specs/model-usage-and-cost-evidence.md`.
 4. Add model-callable tools through explicit, bounded capabilities such as the
    read-only git context tools in
-   `docs/specs/git-context-tools.md`.
+   `docs/specs/git-workflow-tools.md`.
 5. Explore Agent Skills support only after runtime and transport boundaries are
    stable enough to keep script execution explicit and policy-controlled.
 

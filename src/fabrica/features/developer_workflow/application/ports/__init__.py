@@ -19,6 +19,8 @@ from fabrica.features.developer_workflow.application.ports.git import (
     GitStagedChangesLoadError,
     GitStagedDiffLoader,
     GitWorktreeContextLoader,
+    PreCommitRunError,
+    PreCommitRunner,
 )
 
 __all__ = [
@@ -37,5 +39,7 @@ __all__ = [
     "GitStagedChangesLoader",
     "GitStagedDiffLoader",
     "GitWorktreeContextLoader",
+    "PreCommitRunError",
+    "PreCommitRunner",
     "StagedFileCommitMessageAnalyzer",
 ]

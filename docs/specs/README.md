@@ -15,8 +15,9 @@ ownership, validation expectations, and preserved historical decisions.
   validation rules.
 - `model-usage-and-cost-evidence.md` defines provider-neutral usage and pricing
   evidence for model-call results.
-- `git-context-tools.md` defines read-only git context capabilities for status,
-  staged, unstaged, commit-history, and ref/range inspection.
+- `git-workflow-tools.md` defines git-related developer workflow tools and
+  adapters, including read-only git context, approved commit creation, and
+  explicitly composed pre-commit execution.
 - `commit-workflows.md` defines developer-facing commit workflows, including the
   read-only `fabrica commit-message` preview and the explicitly confirmed
   mutating `fabrica commit` flow.
@@ -31,4 +32,4 @@ ownership, validation expectations, and preserved historical decisions.
   `codex-transport.md`, instead of hiding it inside generic runtime or usage
   specifications.
 - Keep mutating workflows separate from read-only tool or preview concerns unless
-  one spec explicitly owns the whole user-facing surface.
+  one spec explicitly owns the relevant safety categories.

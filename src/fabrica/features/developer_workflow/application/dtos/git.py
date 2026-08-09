@@ -9,6 +9,8 @@ from types import MappingProxyType
 DEFAULT_MAX_STAGED_DIFF_CHARS = 500_000
 STAGED_DIFF_CONTEXT_LABEL = "Git staged diff"
 SafeGitStagedChangesMetadataValue = str | int | float | bool | None
+DEFAULT_MAX_PRE_COMMIT_OUTPUT_CHARS = 50_000
+SafePreCommitMetadataValue = str | int | float | bool | None
 
 
 class GitStagedFileStatus(StrEnum):
@@ -184,6 +186,25 @@ class GitContextFailureCategory(StrEnum):
     TIMED_OUT = "timed_out"
     GIT_FAILED = "git_failed"
     DECODE_ERROR = "decode_error"
+
+
+class PreCommitRunStatus(StrEnum):
+    """Normalized pre-commit execution outcomes."""
+
+    PASSED = "passed"
+    FAILED = "failed"
+    MODIFIED_FILES = "modified_files"
+
+
+class PreCommitFailureCategory(StrEnum):
+    """Application-safe failure categories for pre-commit execution."""
+
+    PRE_COMMIT_UNAVAILABLE = "pre_commit_unavailable"
+    NOT_A_REPOSITORY = "not_a_repository"
+    TIMED_OUT = "timed_out"
+    EXECUTION_FAILED = "execution_failed"
+    DECODE_ERROR = "decode_error"
+    OVERSIZED_OUTPUT = "oversized_output"
 
 
 @dataclass(frozen=True, slots=True)
@@ -397,6 +418,38 @@ class GitMergeBase:
         _validate_non_empty_text(self.short_hash, field_name="short_hash")
 
 
+@dataclass(frozen=True, slots=True)
+class PreCommitRunCommand:
+    """Command for running a narrow pre-commit hook invocation."""
+
+    hook_id: str | None = None
+    all_files: bool = False
+
+    def __post_init__(self) -> None:
+        if self.hook_id is not None:
+            object.__setattr__(self, "hook_id", validate_pre_commit_hook_id(self.hook_id))
+
+
+@dataclass(frozen=True, slots=True)
+class PreCommitRunResult:
+    """Bounded output from one pre-commit execution."""
+
+    status: PreCommitRunStatus
+    stdout: str = ""
+    stderr: str = ""
+    returncode: int | None = None
+    metadata: Mapping[str, SafePreCommitMetadataValue] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if len(self.stdout) > DEFAULT_MAX_PRE_COMMIT_OUTPUT_CHARS:
+            msg = "pre-commit stdout exceeds the configured bound"
+            raise ValueError(msg)
+        if len(self.stderr) > DEFAULT_MAX_PRE_COMMIT_OUTPUT_CHARS:
+            msg = "pre-commit stderr exceeds the configured bound"
+            raise ValueError(msg)
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+
 def validate_git_context_relative_path(path: str) -> str:
     """Validate a safe relative path for read-only git context operations."""
     if not path:
@@ -421,6 +474,24 @@ def validate_git_context_relative_path(path: str) -> str:
 def validate_git_staged_relative_path(path: str) -> str:
     """Validate a safe relative path for staged git operations."""
     return _validate_safe_relative_path(path)
+
+
+def validate_pre_commit_hook_id(hook_id: str) -> str:
+    """Validate a narrow pre-commit hook identifier, not arbitrary flags."""
+    if not hook_id:
+        msg = "pre-commit hook id must not be empty"
+        raise ValueError(msg)
+    if hook_id != hook_id.strip():
+        msg = "pre-commit hook id must not contain leading or trailing whitespace"
+        raise ValueError(msg)
+    if hook_id.startswith("-"):
+        msg = "pre-commit hook id must not be a flag"
+        raise ValueError(msg)
+    allowed_characters = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-")
+    if any(character not in allowed_characters for character in hook_id):
+        msg = "pre-commit hook id contains unsupported characters"
+        raise ValueError(msg)
+    return hook_id
 
 
 def _validate_non_empty_text(value: str, *, field_name: str) -> None:

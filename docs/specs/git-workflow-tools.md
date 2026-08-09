@@ -1,32 +1,58 @@
-# Spec: Git Context Tools
+# Spec: Git Workflow Tools
 
 ## Objective
 
-Define the read-only git context tool set for local developer and agent
-workflows. These tools let a composed agent runtime inspect repository state,
-staged changes, unstaged tracked changes, commit history, and ref/range changes
-without granting arbitrary git command execution or mutating repository state.
+Define the git-related tool and adapter set for local developer and agent
+workflows. These capabilities let a composed runtime inspect repository state,
+staged changes, unstaged tracked changes, commit history, and ref/range changes;
+create an explicitly approved git commit; and run explicitly composed developer
+quality checks such as pre-commit hooks without granting arbitrary git or shell
+command execution.
 
-The tool set is intentionally small, atomic, and intent-based. Each tool exposes
-one stable capability with a predictable argument schema, bounded output, and a
-single risk profile.
+The tool set is intentionally small, atomic, intent-based, and separated by
+safety category. Each tool or adapter exposes one stable capability with a
+predictable argument schema, bounded output, explicit side-effect semantics, and
+a single risk profile.
 
-## Scope
+## Scope and safety categories
 
-Git context tools provide local, read-only repository evidence for:
+Git workflow tools provide local repository capabilities for:
 
 - agent self-context during coding workflows;
 - review and pull-request-like branch summarization;
 - commit archaeology and debugging;
-- staged-change inspection for explicitly composed model-callable tools.
+- staged-change inspection for explicitly composed model-callable tools;
+- explicitly approved commit creation;
+- explicitly composed pre-commit quality checks.
 
 The tools are not ambient runtime powers. They are available only when the
-composition root explicitly registers them for a runtime or workflow.
+composition root explicitly registers them for a runtime or workflow. Read-only
+tools and mutating tools must be registered separately so a workflow can grant
+inspection capabilities without also granting mutation.
 
 `docs/specs/commit-workflows.md` owns the deterministic
 `fabrica commit-message` preview workflow and the explicitly confirmed mutating
-`fabrica commit` workflow. Git context tools must not change the staged-only,
-read-only safety contract of `fabrica commit-message`.
+`fabrica commit` user flow. This spec owns the git subprocess and registered-tool
+adapter contracts used by those workflows. Git workflow tools must not change the
+staged-only, read-only safety contract of `fabrica commit-message`.
+
+### Read-only tools
+
+Read-only tools inspect repository state and must not change the index, working
+tree, refs, remotes, or hook state. They include status, staged, unstaged,
+commit-history, and ref/range inspection.
+
+### Mutating tools and adapters
+
+Mutating tools and adapters may change local developer state and therefore have a
+stricter opt-in boundary. They include:
+
+- approved git commit creation through the `fabrica commit` workflow; and
+- pre-commit hook execution, because hooks may rewrite files and create or update
+  pre-commit caches.
+
+Mutating capabilities must be explicitly named, separately composed from
+read-only tools, and documented with their side effects.
 
 ## Users and workflows
 
@@ -44,29 +70,30 @@ diff tools only when needed. For example, an agent should inspect changed-file
 lists before requesting a full diff, and should request a file-specific diff when
 the full diff exceeds configured bounds.
 
-## Tool model
+## Tool and adapter model
 
-Each model-callable git context tool must have:
+Each model-callable git workflow tool and each git subprocess adapter must have:
 
 - one stable intent;
 - one predictable output shape;
 - a narrow JSON argument schema;
 - deterministic, bounded behavior;
-- no hidden mutation;
+- explicit read-only or mutating side-effect semantics;
 - safe failure messages that do not expose private diagnostics or raw sensitive
   content.
 
-Tools must be grouped by context type rather than multiplexed through a generic
-git interface. Do not provide a generic `git`, `git_context`, or `git_readonly`
-tool that accepts model-provided subcommands, flags, pathspecs, working
-directories, or arbitrary refs without validation.
+Tools must be grouped by stable intent and safety category rather than
+multiplexed through a generic git interface. Do not provide a generic `git`,
+`git_context`, `git_readonly`, `git_mutate`, `pre_commit`, or shell-like tool
+that accepts model-provided subcommands, flags, pathspecs, working directories,
+or arbitrary refs without validation.
 
 Tool results should use deterministic structured text that is easy for models and
 humans to scan. Tab-separated sections are acceptable where they keep output
 stable and compact. Strict JSON output may be introduced later only when a
 workflow needs machine-validated structured results.
 
-## Tool contracts
+## Read-only tool contracts
 
 ### Status context
 
@@ -512,11 +539,104 @@ mutate refs or contact remotes.
 
 Argument schema matches `git_ref_changed_files`.
 
+## Mutating adapter and tool contracts
+
+Mutating capabilities are not read-only context tools. They may change local
+developer state and must be composed separately from read-only git context tools.
+They must never be exposed through a generic git or shell command surface.
+
+### Approved git commit creation
+
+The approved git commit adapter creates a commit from an already-approved commit
+message. It is used by the `fabrica commit` workflow after
+`docs/specs/commit-workflows.md` has generated a recommendation, displayed it to
+the user, and received explicit approval.
+
+The adapter contract:
+
+- accepts an application command containing only the approved commit message;
+- writes the approved message to a temporary commit-message file;
+- runs `git --no-pager commit --file <tempfile>` with an explicit argument list
+  and `shell=False`;
+- preserves subject, body, and Conventional Commits footers exactly;
+- uses the composition-owned working directory;
+- never stages files, amends commits, bypasses hooks, opens an editor, fetches,
+  pulls, pushes, or accepts model-provided git flags;
+- maps git unavailable, not-a-repository, no-staged-changes, hook failure,
+  timeout, non-zero git failure, decode failure, and unsupported output to
+  application-safe errors;
+- returns a concise commit result with the new short hash when available.
+
+The user-facing confirmation prompt, approval/rejection behavior, and terminal
+output remain owned by `docs/specs/commit-workflows.md`. This spec owns only the
+git subprocess adapter safety contract.
+
+### `run_pre_commit`
+
+Run explicitly selected pre-commit hooks through the project-managed
+`pre-commit` executable.
+
+The tool is mutating because hooks may rewrite tracked files and may create or
+update pre-commit caches. It must be registered only when a workflow explicitly
+requests mutating developer quality tools.
+
+The default command is equivalent to:
+
+```text
+uv run pre-commit run
+```
+
+Argument schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "hook_id": {
+      "type": "string",
+      "description": "Optional pre-commit hook id to run. Must be a simple hook identifier, not flags or shell syntax."
+    },
+    "all_files": {
+      "type": "boolean",
+      "description": "When true, run against all files using --all-files. Defaults to false."
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+The adapter contract:
+
+- runs `uv run pre-commit run` through an explicit argument list and
+  `shell=False`;
+- appends a validated `hook_id` only as a positional hook id;
+- appends `--all-files` only when `all_files` is true;
+- never accepts arbitrary pre-commit args, arbitrary executables, environment
+  overrides, repository paths, shell snippets, or model-provided flags;
+- uses the composition-owned working directory;
+- bounds stdout and stderr before returning model-callable output;
+- reports whether hooks passed, failed, modified files, timed out, or could not
+  start;
+- does not run `git add`, `git commit`, or any network git operation.
+
+The result should be deterministic structured text that includes:
+
+- status;
+- exit code when available;
+- bounded stdout and stderr sections;
+- duration in seconds;
+- a side-effect note when hooks may have modified files.
+
+Failures must be application-safe and must not expose raw private diagnostics,
+secrets, full file contents, or unbounded hook output.
+
 ## Shared output and bounds requirements
 
 All tools must apply deterministic output bounds before returning model-callable
-results. Diff-producing tools are subject to both git diff bounds and the runtime
-tool-loop result limit.
+results. Diff-producing read-only tools are subject to both git diff bounds and
+the runtime tool-loop result limit. Mutating adapters that return subprocess
+output must bound stdout and stderr before exposing them to the application or
+tool layer.
 
 Default bounds:
 
@@ -546,7 +666,7 @@ private diagnostics, secrets, or raw file contents.
 
 ## Safety boundaries
 
-- Always keep git context tools read-only.
+- Always keep read-only git context tools read-only.
 - Always execute git with explicit argument lists and `shell=False`.
 - Always disable git paging with `--no-pager`.
 - Always control the working directory through composition or application options,
@@ -556,16 +676,23 @@ private diagnostics, secrets, or raw file contents.
 - Always validate file paths as safe relative paths before passing them after
   `--` to git.
 - Always place validated path arguments after `--` in git argv.
-- Always separate staged, unstaged, commit, and ref/range tools by name.
-- Always register model-callable git context tools through explicit composition.
+- Always separate staged, unstaged, commit, ref/range, commit-creation, and
+  pre-commit capabilities by name.
+- Always register model-callable git workflow tools through explicit composition.
+- Always register mutating tools separately from read-only tools.
+- Always document mutating tool side effects at the tool contract boundary.
 - Never expose arbitrary git command execution.
 - Never run mutating git operations such as `git add`, `git reset`,
-  `git checkout`, `git switch`, `git stash`, `git commit`, merge, rebase, tag
-  creation, or branch deletion.
+  `git checkout`, `git switch`, `git stash`, merge, rebase, tag creation, or
+  branch deletion.
+- Never run `git commit` except through the approved commit creation adapter after
+  the owning workflow has established explicit approval.
 - Never run network git operations such as `git fetch`, `git pull`, or
   `git push`.
 - Never let the model supply arbitrary git flags, command names, pathspecs,
   working directories, or unvalidated revision tokens.
+- Never expose arbitrary pre-commit command execution or model-provided
+  pre-commit flags.
 - Never inspect unstaged changes inside staged commit-message workflows.
 - Never change the staged-only behavior of `fabrica commit-message` through this
   tool set.
@@ -575,7 +702,7 @@ private diagnostics, secrets, or raw file contents.
 Implementation must preserve hexagonal boundaries in the
 `developer_workflow` feature slice.
 
-- Spec: `docs/specs/git-context-tools.md`.
+- Spec: `docs/specs/git-workflow-tools.md`.
 - Developer-workflow DTOs:
   `src/fabrica/features/developer_workflow/application/dtos/`.
 - Developer-workflow ports:
@@ -591,15 +718,16 @@ Implementation must preserve hexagonal boundaries in the
 
 Application-facing abstractions should be focused by stable intent instead of a
 broad catch-all git service. Suitable boundaries include staged context,
-worktree context, commit context, and ref/range context ports. Port signatures
-must use application DTOs or approved domain/application boundary types rather
-than subprocess results, transport schemas, or model-provider schemas.
+worktree context, commit context, ref/range context, commit creation, and
+pre-commit execution ports. Port signatures must use application DTOs or
+approved domain/application boundary types rather than subprocess results,
+transport schemas, or model-provider schemas.
 
 Git subprocess execution belongs in outbound adapters. Registered-tool adapters
 bridge developer-workflow capabilities into the agent-runtime tool system and may
 depend on agent-runtime tool DTOs at that adapter boundary. Composition helpers
-must register these tools only when the composed runtime requests read-only git
-context access.
+must register read-only and mutating tools independently based on the composed
+runtime's requested capabilities.
 
 ## Relationship to commit workflows
 
@@ -608,20 +736,21 @@ preview workflow. It may use staged git primitives internally, but it must not
 silently expose broader worktree, unstaged, commit, or ref/range tools to the
 model.
 
-`fabrica commit` remains the explicitly confirmed mutating commit workflow owned
-by `docs/specs/commit-workflows.md`. Mutating commit creation is not part of the
-git context tool set.
+`fabrica commit` remains the explicitly confirmed mutating user workflow owned by
+`docs/specs/commit-workflows.md`. The git commit subprocess adapter contract is
+owned here so all git subprocess safety rules live in one spec.
 
 ## Non-goals
 
 - Do not implement arbitrary read-only shell or git command execution.
-- Do not add mutating git workflows in this spec.
+- Do not add generic mutating git workflows in this spec.
 - Do not add remote or network-backed operations such as fetch, pull, push, or
   hosting-provider API queries.
 - Do not add blame or provenance tools in this spec.
 - Do not add tag, release, or changelog tools in this spec.
 - Do not replace focused staged, unstaged, commit, or ref/range tools with broader
   overloaded tools.
+- Do not expose arbitrary pre-commit command execution.
 - Do not expose raw private diagnostics, full command stderr, secrets, or raw file
   contents in error messages.
 
@@ -706,7 +835,7 @@ commits.
   named.
 - Arbitrary git command execution and all mutating or network git operations are
   forbidden.
-- Model-callable git context tools require explicit composition.
+- Model-callable git workflow tools require explicit composition.
 - Tool outputs and diff results are bounded.
 - Architecture boundaries keep git subprocess execution in developer-workflow
   outbound adapters and model tool registration behind explicit adapter and

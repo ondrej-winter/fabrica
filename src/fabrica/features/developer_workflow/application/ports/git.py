@@ -18,8 +18,12 @@ from fabrica.features.developer_workflow.application.dtos import (
     GitStagedDiff,
     GitStagedFileList,
     GitStatusSummary,
+    PreCommitFailureCategory,
+    PreCommitRunCommand,
+    PreCommitRunResult,
     SafeGitContextMetadataValue,
     SafeGitStagedChangesMetadataValue,
+    SafePreCommitMetadataValue,
 )
 
 
@@ -41,6 +45,29 @@ class GitCommitCreator(Protocol):
 
     def create_commit(self, command: CreateGitCommitCommand) -> GitCommitResult:
         """Create a git commit from the already-approved commit message."""
+        ...
+
+
+class PreCommitRunError(Exception):
+    """Application-safe failure raised when pre-commit execution cannot run."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        category: PreCommitFailureCategory,
+        metadata: Mapping[str, SafePreCommitMetadataValue] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.category = category
+        self.metadata = dict(metadata or {})
+
+
+class PreCommitRunner(Protocol):
+    """Outbound port for explicitly composed pre-commit execution."""
+
+    def run_pre_commit(self, command: PreCommitRunCommand) -> PreCommitRunResult:
+        """Run one narrow pre-commit invocation."""
         ...
 
 
@@ -185,4 +212,6 @@ __all__ = [
     "GitStagedChangesLoader",
     "GitStagedDiffLoader",
     "GitWorktreeContextLoader",
+    "PreCommitRunError",
+    "PreCommitRunner",
 ]

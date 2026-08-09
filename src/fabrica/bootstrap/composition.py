@@ -99,6 +99,10 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess import
     GitCommitSubprocessCreator,
     GitContextSubprocessLoader,
     GitStagedChangesSubprocessLoader,
+    PreCommitSubprocessRunner,
+)
+from fabrica.features.developer_workflow.adapters.outbound.pre_commit_registered_tool import (
+    create_pre_commit_registered_tools,
 )
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageRecommendation,
@@ -235,6 +239,21 @@ class ReadOnlyGitContextToolOptions:
     working_directory: Path | None = None
     bounds: GitContextDiffBounds | None = None
     timeout_seconds: float = 10.0
+    verbose_diagnostics: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class PreCommitToolOptions:
+    """Composition options for optional mutating pre-commit registered tools.
+
+    The configured working directory is a composition-owned trust boundary; the
+    model cannot choose it. Construction only wires a subprocess-backed runner.
+    Pre-commit hooks are executed lazily when the returned tool handler is
+    invoked and may modify files or pre-commit caches.
+    """
+
+    working_directory: Path | None = None
+    timeout_seconds: float = 120.0
     verbose_diagnostics: bool = False
 
 
@@ -998,6 +1017,25 @@ def create_read_only_git_context_registered_tools(
         worktree_loader=loader,
         commit_loader=loader,
         ref_loader=loader,
+    )
+
+
+def create_pre_commit_registered_tool_adapters(
+    options: PreCommitToolOptions | None = None,
+) -> tuple[RegisteredTool, ...]:
+    """Create explicitly opt-in mutating pre-commit registered tools.
+
+    Construction only wires the subprocess-backed pre-commit runner. Hooks are
+    executed lazily when the returned tool handler is invoked and may modify files
+    or pre-commit caches.
+    """
+    tool_options = options or PreCommitToolOptions()
+    return create_pre_commit_registered_tools(
+        PreCommitSubprocessRunner(
+            working_directory=tool_options.working_directory,
+            timeout_seconds=tool_options.timeout_seconds,
+            verbose_diagnostics=tool_options.verbose_diagnostics,
+        ),
     )
 
 

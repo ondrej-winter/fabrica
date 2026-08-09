@@ -24,8 +24,9 @@ This directory contains durable project documentation and current reference note
   support path and preserves private-backend errata.
 - `specs/model-usage-and-cost-evidence.md` defines the generic usage and pricing
   evidence model for model-call results.
-- `specs/git-context-tools.md` defines broader read-only git context capabilities
-  for worktree, staged, commit-history, and ref/range inspection.
+- `specs/git-workflow-tools.md` defines git-related developer workflow tools and
+  adapters, including read-only git context, approved commit creation, and
+  explicitly composed pre-commit execution.
 - `specs/commit-workflows.md` defines read-only commit-message generation and the
   interactive `fabrica commit` workflow that creates commits only after explicit
   approval.
