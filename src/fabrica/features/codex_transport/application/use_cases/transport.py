@@ -27,7 +27,7 @@ class CompleteWithCodexTransport:
         self._backend = backend
 
     def complete(self, command: CodexCompletionCommand) -> CodexTransportResult:
-        """Run one non-streaming Codex completion."""
+        """Run one Codex completion through the configured backend."""
         try:
             credentials = self._credential_store.load()
         except CodexCredentialAuthenticationError as err:

@@ -4,6 +4,10 @@
 > Later implementation and observation notes found that the private Codex backend
 > request path requires `stream: true`; older non-streaming MVP assumptions should
 > be treated as historical context, not the current adapter contract.
+> Current implementation notes also treat exact per-call subscription billing
+> attribution as unavailable unless the backend exposes a safe reactive signal;
+> repeated-session success plus documented billing ambiguity can support a
+> conditional viability decision.
 
 ## Objective
 
@@ -28,6 +32,9 @@ The broader runtime direction is owned by
 - Codex transport source lives under `src/fabrica/features/codex_transport/`.
 - Runtime source lives under `src/fabrica/features/agent_runtime/` and should
   consume Codex through application-level transport contracts only.
+- Current implementation includes a thin PydanticAI completion bridge and
+  composition experiment, but the Codex transport slice remains the boundary for
+  private backend details.
 - Default automated tests must remain deterministic and offline.
 
 ## Assumptions
@@ -49,8 +56,8 @@ The broader runtime direction is owned by
   WebSocket endpoint.
 - Direct Codex backend use appears intended to be covered by the user's existing
   ChatGPT/Codex subscription rather than separately billed public OpenAI API
-  usage. Implementation must collect repeated-session evidence and documented
-  billing/quota observations before declaring viability.
+  usage. Implementation must collect repeated-session evidence and document the
+  limits of available billing/quota attribution before declaring viability.
 - Authentication failures can be handled safely by reloading credentials and
   instructing the user to run `codex login`.
 
@@ -81,9 +88,11 @@ viable only if the support path demonstrates:
   established;
 - distinguishable authentication, rate-limit, quota, backend-shape, and transport
   failures;
-- observable Codex subscription usage or quota signals, including
-  `/api/codex/usage`, Codex rate-limit headers or events, and billing/quota
-  observations that do not indicate public OpenAI API billing;
+- observable Codex subscription usage or quota signals when the backend exposes
+  them, including `/api/codex/usage`, Codex rate-limit headers or events, and
+  redacted billing/quota observations;
+- documented billing-attribution limits when exact per-session or per-call
+  subscription telemetry is unavailable;
 - enough Responses-shape compatibility to justify runtime integration work.
 
 ## Observed request and usage signals
@@ -96,6 +105,9 @@ viable only if the support path demonstrates:
 - The backend rejected `gpt-5-codex` for ChatGPT auth, so direct probes should use
   a ChatGPT-account-compatible Codex model such as the local model reported by
   `codex doctor --json`.
+- Adapter and composition defaults are volatile observed defaults and may be
+  overridden for live validation; `codex doctor --json` remains the safest source
+  for the locally configured ChatGPT-account-compatible model.
 - The backend requires `input` to be a list, not a bare prompt string.
 - The backend requires `store: false`.
 - The backend requires `stream: true`.
@@ -116,8 +128,9 @@ viable only if the support path demonstrates:
 
 - Treating `codex exec` as the main integration path.
 - OAuth refresh or mutation of Codex credentials.
-- Full PydanticAI agent orchestration.
-- Custom PydanticAI `Model` implementation.
+- Full PydanticAI agent orchestration beyond thin bridge experiments.
+- Custom PydanticAI `Model` implementation beyond explicit runtime composition
+  experiments.
 - Full Agent Skills resource/script runtime.
 - Production sandboxing.
 - RAG or vector search for skills.
