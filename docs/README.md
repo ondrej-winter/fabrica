@@ -15,11 +15,6 @@ This directory contains durable project documentation and current reference note
 
 ## Current map
 
-### Architecture decisions
-
-- `adr/0001-experimental-agent-skill-script-execution.md` records the accepted
-  boundary for experimental selected Agent Skill script execution.
-
 ### Observations and viability records
 
 - `observations/README.md` is the canonical guide for redacted runtime viability
