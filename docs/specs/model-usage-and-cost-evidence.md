@@ -1,4 +1,4 @@
-# Spec: Provider-Agnostic Usage and Cost Evidence
+# Spec: Model Usage and Cost Evidence
 
 ## Objective
 
@@ -156,7 +156,7 @@ CI validation path.
 
 ## Project structure
 
-- Spec: `docs/specs/provider-agnostic-usage-cost-evidence-spec.md`.
+- Spec: `docs/specs/model-usage-and-cost-evidence.md`.
 - Generic usage and cost evidence DTO location:
   `src/fabrica/shared_kernel/model_usage.py`.
 - Do not create a standalone `model_usage` feature slice. Reconsider that only

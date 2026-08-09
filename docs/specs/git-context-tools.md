@@ -1,4 +1,4 @@
-# Spec: Read-Only Git Context Tools
+# Spec: Git Context Tools
 
 ## Objective
 
@@ -38,13 +38,12 @@ grouped by stable intent, not a generic git wrapper.
 
 ## Relationship to other git workflow specs
 
-- `docs/specs/evidence-first-commit-message-generation-spec.md` continues to own
-  the deterministic `fabrica commit-message` workflow. That workflow may use
+- `docs/specs/commit-workflows.md` owns the deterministic
+  `fabrica commit-message` workflow and the explicitly mutating,
+  human-confirmed `fabrica commit` workflow. The commit-message workflow may use
   staged git primitives internally, but it must not silently expose broader
   read-only worktree, unstaged, commit, or ref/range tools to the model.
-- `docs/specs/interactive-confirmed-commit-flow-spec.md` remains separate because
-  it describes the explicitly mutating, human-confirmed `fabrica commit` workflow.
-  Mutating commit creation is not part of this read-only tool set.
+- Mutating commit creation is not part of this read-only tool set.
 
 ## Assumptions
 

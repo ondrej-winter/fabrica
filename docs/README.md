@@ -17,16 +17,15 @@ This directory contains durable project documentation and current reference note
 
 ### Specs
 
-- `specs/python-agent-runtime-spec.md` defines the local Python agent runtime
-  direction and its provider-agnostic boundaries.
-- `specs/codex-transport-support-spec.md` defines the subscription-backed Codex
-  transport support path and preserves private-backend errata.
-- `specs/evidence-first-commit-message-generation-spec.md` defines the current
-  multi-call evidence-first commit-message target.
-- `specs/interactive-confirmed-commit-flow-spec.md` defines the interactive
-  `fabrica commit` workflow that creates commits only after explicit approval.
-- `specs/provider-agnostic-usage-cost-evidence-spec.md` defines the generic usage
-  and pricing evidence model for model-call results.
-- `specs/read-only-git-context-tools-spec.md` defines broader read-only git
-  context capabilities for worktree, staged, commit-history, and ref/range
-  inspection.
+- `specs/README.md` explains the concern-oriented spec taxonomy.
+- `specs/agent-runtime.md` defines the local Python agent runtime direction and
+  its provider-agnostic boundaries.
+- `specs/codex-transport.md` defines the subscription-backed Codex transport
+  support path and preserves private-backend errata.
+- `specs/model-usage-and-cost-evidence.md` defines the generic usage and pricing
+  evidence model for model-call results.
+- `specs/git-context-tools.md` defines broader read-only git context capabilities
+  for worktree, staged, commit-history, and ref/range inspection.
+- `specs/commit-workflows.md` defines read-only commit-message generation and the
+  interactive `fabrica commit` workflow that creates commits only after explicit
+  approval.

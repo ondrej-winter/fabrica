@@ -1,4 +1,4 @@
-# Spec: Codex Transport Support
+# Spec: Codex Transport
 
 > Status note: this spec preserves findings from the original transport spike.
 > Later implementation and observation notes found that the private Codex backend
@@ -19,8 +19,9 @@ The immediate goal is a narrow transport support path that validates direct,
 subscription-backed Codex backend access and keeps volatile private-backend
 details isolated behind replaceable hexagonal boundaries.
 
-The broader runtime direction is owned by
-`docs/specs/python-agent-runtime-spec.md`.
+The broader runtime direction is owned by `docs/specs/agent-runtime.md`.
+Provider-neutral usage and pricing evidence is owned by
+`docs/specs/model-usage-and-cost-evidence.md`.
 
 ## Current context
 
@@ -138,8 +139,8 @@ viable only if the support path demonstrates:
 
 ## Project structure
 
-- Spec: `docs/specs/codex-transport-support-spec.md`.
-- Runtime spec: `docs/specs/python-agent-runtime-spec.md`.
+- Spec: `docs/specs/codex-transport.md`.
+- Runtime spec: `docs/specs/agent-runtime.md`.
 - Transport source: `src/fabrica/features/codex_transport/`.
 - Application ports and DTOs: under the owning slice's `application/ports/` and
   `application/dtos/` packages.

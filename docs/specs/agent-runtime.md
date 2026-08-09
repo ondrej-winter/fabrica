@@ -1,4 +1,4 @@
-# Spec: Python Agent Runtime
+# Spec: Agent Runtime
 
 ## Objective
 
@@ -10,8 +10,9 @@ with clear runtime contracts, opt-in tool access, and subscription-backed Codex
 support as the first high-risk transport capability.
 
 This spec owns the runtime-level design. Codex-specific authentication,
-private-backend request details, usage evidence, and live validation rules belong
-in `docs/specs/codex-transport-support-spec.md`.
+private-backend request details, and live validation rules belong in
+`docs/specs/codex-transport.md`. Provider-neutral usage and pricing evidence
+belongs in `docs/specs/model-usage-and-cost-evidence.md`.
 
 ## Current context
 
@@ -60,14 +61,14 @@ Fabrica should expose a local Python agent runtime that can:
 ### Runtime milestones
 
 1. Validate Codex transport support separately in
-   `docs/specs/codex-transport-support-spec.md`.
+   `docs/specs/codex-transport.md`.
 2. Use the validated Codex transport through application-level runtime ports and
    DTOs.
 3. Add provider-agnostic usage and cost evidence according to
-   `docs/specs/provider-agnostic-usage-cost-evidence-spec.md`.
+   `docs/specs/model-usage-and-cost-evidence.md`.
 4. Add model-callable tools through explicit, bounded capabilities such as the
    read-only git context tools in
-   `docs/specs/read-only-git-context-tools-spec.md`.
+   `docs/specs/git-context-tools.md`.
 5. Explore Agent Skills support only after runtime and transport boundaries are
    stable enough to keep script execution explicit and policy-controlled.
 
@@ -83,8 +84,8 @@ Fabrica should expose a local Python agent runtime that can:
 
 ## Project structure
 
-- Spec: `docs/specs/python-agent-runtime-spec.md`.
-- Codex support spec: `docs/specs/codex-transport-support-spec.md`.
+- Spec: `docs/specs/agent-runtime.md`.
+- Codex support spec: `docs/specs/codex-transport.md`.
 - Runtime source: `src/fabrica/features/agent_runtime/`.
 - Runtime application ports and DTOs: under the owning slice's
   `application/ports/` and `application/dtos/` packages.
