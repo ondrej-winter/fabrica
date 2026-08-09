@@ -225,6 +225,23 @@ def test_ref_context_maps_empty_oversized_and_malformed_outputs_safely() -> None
     assert malformed_exc_info.value.category is GitContextFailureCategory.GIT_FAILED
 
 
+def test_ref_changed_files_maps_oversized_file_list_safely() -> None:
+    output = "".join(f"M\tsrc/file_{index}.py\n" for index in range(201))
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="base\n"),
+            GitCommandResult(returncode=0, stdout="head\n"),
+            GitCommandResult(returncode=0, stdout=output),
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).list_ref_changed_files("origin/main", "HEAD")
+
+    assert exc_info.value.category is GitContextFailureCategory.OVERSIZED_OUTPUT
+    assert "src/file_" not in str(exc_info.value.metadata)
+
+
 def test_ref_context_rejects_invalid_ref_before_inspection_without_raw_stderr() -> None:
     runner = FakeGitRunner(results=[GitCommandResult(returncode=1, stderr="fatal: private ref")])
 

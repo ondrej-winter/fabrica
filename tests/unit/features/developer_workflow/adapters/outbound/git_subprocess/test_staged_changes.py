@@ -75,6 +75,18 @@ def test_adapter_lists_staged_files_with_statuses() -> None:
     assert runner.calls == [(("git", "--no-pager", "diff", "--staged", "--name-status"), Path("repo"), 2.5)]
 
 
+def test_adapter_maps_oversized_staged_file_list_safely() -> None:
+    output = "".join(f"M\tsrc/file_{index}.py\n" for index in range(201))
+
+    with pytest.raises(GitStagedChangesLoadError) as exc_info:
+        GitStagedChangesSubprocessLoader(
+            runner=FakeGitRunner(result=GitCommandResult(returncode=0, stdout=output)),
+        ).list_files()
+
+    assert exc_info.value.category is GitStagedChangesFailureCategory.OVERSIZED_OUTPUT
+    assert "src/file_" not in str(exc_info.value.metadata)
+
+
 def test_adapter_lists_rename_and_copy_records_by_canonical_new_path() -> None:
     runner = FakeGitRunner(
         result=GitCommandResult(

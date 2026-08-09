@@ -55,6 +55,8 @@ def test_worktree_status_summary_loads_status_and_head_hash_with_configured_runn
     assert summary.staged_count == 1
     assert summary.unstaged_count == 1
     assert summary.untracked_count == 1
+    assert summary.staged_paths == ("staged.py",)
+    assert summary.unstaged_paths == ("unstaged.py",)
     assert summary.untracked_paths == ("notes.txt",)
     assert runner.calls == [
         (("git", "--no-pager", "status", "--short", "--branch"), Path("repo"), 2.5),
@@ -72,6 +74,18 @@ def test_worktree_unstaged_files_lists_tracked_unstaged_changes() -> None:
         ("R", "new.py", "old.py"),
     ]
     assert runner.calls == [(("git", "--no-pager", "diff", "--name-status"), None, 10.0)]
+
+
+def test_worktree_unstaged_files_maps_oversized_file_list_safely() -> None:
+    output = "".join(f"M\tsrc/file_{index}.py\n" for index in range(201))
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(
+            runner=FakeGitRunner(results=[GitCommandResult(returncode=0, stdout=output)])
+        ).list_unstaged_files()
+
+    assert exc_info.value.category is GitContextFailureCategory.OVERSIZED_OUTPUT
+    assert "src/file_" not in str(exc_info.value.metadata)
 
 
 @pytest.mark.parametrize("method_name", ["list_unstaged_files", "load_unstaged_diff"])

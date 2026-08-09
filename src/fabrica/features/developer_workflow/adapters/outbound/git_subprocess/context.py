@@ -41,6 +41,7 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.contex
     INVALID_REF_MESSAGE,
     NO_MATCHING_CHANGES_MESSAGE,
     NOT_REPOSITORY_MESSAGE,
+    OVERSIZED_CHANGED_FILE_LIST_MESSAGE,
     OVERSIZED_OUTPUT_MESSAGE,
     UNSAFE_ARGUMENT_MESSAGE,
     UNSUPPORTED_OUTPUT_MESSAGE,
@@ -131,6 +132,12 @@ class GitContextSubprocessLoader:
             files = tuple(parse_context_name_status_line(line) for line in stdout.splitlines() if line.strip())
             return GitContextChangedFileList(files=files)
         except ValueError as err:
+            if "configured bound" in str(err):
+                raise self._load_error(
+                    OVERSIZED_CHANGED_FILE_LIST_MESSAGE,
+                    category=GitContextFailureCategory.OVERSIZED_OUTPUT,
+                    duration_seconds=duration_seconds,
+                ) from err
             raise self._load_error(
                 UNSUPPORTED_OUTPUT_MESSAGE,
                 category=GitContextFailureCategory.GIT_FAILED,
@@ -199,6 +206,12 @@ class GitContextSubprocessLoader:
         try:
             return parse_commit_details(stdout)
         except ValueError as err:
+            if "configured bound" in str(err):
+                raise self._load_error(
+                    OVERSIZED_OUTPUT_MESSAGE,
+                    category=GitContextFailureCategory.OVERSIZED_OUTPUT,
+                    duration_seconds=duration_seconds,
+                ) from err
             raise self._load_error(
                 UNSUPPORTED_OUTPUT_MESSAGE,
                 category=GitContextFailureCategory.GIT_FAILED,
@@ -223,6 +236,12 @@ class GitContextSubprocessLoader:
             files = tuple(parse_context_name_status_line(line) for line in stdout.splitlines() if line.strip())
             return GitContextChangedFileList(files=files)
         except ValueError as err:
+            if "configured bound" in str(err):
+                raise self._load_error(
+                    OVERSIZED_CHANGED_FILE_LIST_MESSAGE,
+                    category=GitContextFailureCategory.OVERSIZED_OUTPUT,
+                    duration_seconds=duration_seconds,
+                ) from err
             raise self._load_error(
                 UNSUPPORTED_OUTPUT_MESSAGE,
                 category=GitContextFailureCategory.GIT_FAILED,
@@ -283,6 +302,12 @@ class GitContextSubprocessLoader:
             files = tuple(parse_context_name_status_line(line) for line in stdout.splitlines() if line.strip())
             return GitContextChangedFileList(files=files)
         except ValueError as err:
+            if "configured bound" in str(err):
+                raise self._load_error(
+                    OVERSIZED_CHANGED_FILE_LIST_MESSAGE,
+                    category=GitContextFailureCategory.OVERSIZED_OUTPUT,
+                    duration_seconds=duration_seconds,
+                ) from err
             raise self._load_error(
                 UNSUPPORTED_OUTPUT_MESSAGE,
                 category=GitContextFailureCategory.GIT_FAILED,

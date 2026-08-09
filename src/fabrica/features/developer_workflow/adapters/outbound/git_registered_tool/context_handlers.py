@@ -169,6 +169,8 @@ def _format_status_summary(summary: GitStatusSummary) -> str:
         f"unstaged_count\t{summary.unstaged_count}",
         f"untracked_count\t{summary.untracked_count}",
     ]
+    lines.extend(f"staged\t{path}" for path in summary.staged_paths)
+    lines.extend(f"unstaged\t{path}" for path in summary.unstaged_paths)
     lines.extend(f"untracked\t{path}" for path in summary.untracked_paths)
     return "\n".join(lines)
 

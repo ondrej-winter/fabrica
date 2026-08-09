@@ -30,6 +30,7 @@ class GitStagedChangesFailureCategory(StrEnum):
     NOT_A_REPOSITORY = "not_a_repository"
     NO_STAGED_CHANGES = "no_staged_changes"
     OVERSIZED_DIFF = "oversized_diff"
+    OVERSIZED_OUTPUT = "oversized_output"
     TIMED_OUT = "timed_out"
     GIT_FAILED = "git_failed"
     DECODE_ERROR = "decode_error"
@@ -56,6 +57,9 @@ class GitStagedFileList:
         files = tuple(self.files)
         if not files:
             msg = "staged file list must not be empty"
+            raise ValueError(msg)
+        if len(files) > DEFAULT_MAX_GIT_CONTEXT_CHANGED_FILES:
+            msg = "staged file list exceeds the configured bound"
             raise ValueError(msg)
         object.__setattr__(self, "files", files)
 
@@ -147,6 +151,9 @@ class GitCommitResult:
 
 DEFAULT_MAX_GIT_CONTEXT_DIFF_CHARS = 500_000
 DEFAULT_GIT_CONTEXT_LOG_COUNT = 20
+DEFAULT_MAX_GIT_CONTEXT_CHANGED_FILES = 200
+DEFAULT_MAX_GIT_CONTEXT_STATUS_PATHS = 20
+DEFAULT_MAX_GIT_COMMIT_MESSAGE_CHARS = 100_000
 MAX_GIT_CONTEXT_LOG_COUNT = 50
 
 SafeGitContextMetadataValue = str | int | float | bool | None
@@ -210,6 +217,9 @@ class GitContextChangedFileList:
         files = tuple(self.files)
         if not files:
             msg = "git context changed-file list must not be empty"
+            raise ValueError(msg)
+        if len(files) > DEFAULT_MAX_GIT_CONTEXT_CHANGED_FILES:
+            msg = "git context changed-file list exceeds the configured bound"
             raise ValueError(msg)
         object.__setattr__(self, "files", files)
 
@@ -278,16 +288,24 @@ class GitStatusSummary:
     staged_count: int = 0
     unstaged_count: int = 0
     untracked_count: int = 0
+    staged_paths: tuple[str, ...] = ()
+    unstaged_paths: tuple[str, ...] = ()
     untracked_paths: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         _validate_non_negative_count(self.staged_count, field_name="staged_count")
         _validate_non_negative_count(self.unstaged_count, field_name="unstaged_count")
         _validate_non_negative_count(self.untracked_count, field_name="untracked_count")
+        object.__setattr__(self, "staged_paths", _validate_bounded_paths(self.staged_paths, field_name="staged_paths"))
+        object.__setattr__(
+            self,
+            "unstaged_paths",
+            _validate_bounded_paths(self.unstaged_paths, field_name="unstaged_paths"),
+        )
         object.__setattr__(
             self,
             "untracked_paths",
-            tuple(validate_git_context_relative_path(path) for path in self.untracked_paths),
+            _validate_bounded_paths(self.untracked_paths, field_name="untracked_paths"),
         )
 
 
@@ -344,6 +362,9 @@ class GitCommitDetails:
         _validate_non_empty_text(self.author_date, field_name="author_date")
         _validate_non_empty_text(self.committer_date, field_name="committer_date")
         _validate_non_empty_text(self.subject, field_name="subject")
+        if len(self.body) > DEFAULT_MAX_GIT_COMMIT_MESSAGE_CHARS:
+            msg = "commit message body exceeds the configured bound"
+            raise ValueError(msg)
         object.__setattr__(self, "parents", tuple(self.parents))
         object.__setattr__(self, "refs", tuple(self.refs))
 
@@ -412,3 +433,11 @@ def _validate_non_negative_count(value: int, *, field_name: str) -> None:
     if value < 0:
         msg = f"{field_name} must not be negative"
         raise ValueError(msg)
+
+
+def _validate_bounded_paths(paths: tuple[str, ...], *, field_name: str) -> tuple[str, ...]:
+    bounded_paths = tuple(validate_git_context_relative_path(path) for path in paths)
+    if len(bounded_paths) > DEFAULT_MAX_GIT_CONTEXT_STATUS_PATHS:
+        msg = f"{field_name} exceeds the configured bound"
+        raise ValueError(msg)
+    return bounded_paths

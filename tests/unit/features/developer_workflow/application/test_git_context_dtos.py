@@ -6,7 +6,10 @@ from typing import cast
 import pytest
 
 from fabrica.features.developer_workflow.application.dtos import (
+    DEFAULT_MAX_GIT_COMMIT_MESSAGE_CHARS,
+    DEFAULT_MAX_GIT_CONTEXT_CHANGED_FILES,
     DEFAULT_MAX_GIT_CONTEXT_DIFF_CHARS,
+    DEFAULT_MAX_GIT_CONTEXT_STATUS_PATHS,
     MAX_GIT_CONTEXT_LOG_COUNT,
     GitBranchAheadBehind,
     GitCommitDetails,
@@ -86,6 +89,16 @@ def test_changed_file_list_rejects_empty_list() -> None:
         GitContextChangedFileList(files=())
 
 
+def test_changed_file_list_rejects_oversized_lists() -> None:
+    files = tuple(
+        GitContextChangedFile(path=f"src/file_{index}.py", status=GitContextChangedFileStatus.MODIFIED)
+        for index in range(DEFAULT_MAX_GIT_CONTEXT_CHANGED_FILES + 1)
+    )
+
+    with pytest.raises(ValueError, match="configured bound"):
+        GitContextChangedFileList(files=files)
+
+
 def test_diff_bounds_and_log_count_use_conservative_maximums() -> None:
     with pytest.raises(ValueError, match="at least 1"):
         GitContextDiffBounds(max_chars=0)
@@ -123,12 +136,23 @@ def test_status_summary_validates_counts_and_untracked_paths() -> None:
         staged_count=1,
         unstaged_count=2,
         untracked_count=1,
+        staged_paths=("src/staged.py",),
+        unstaged_paths=("src/unstaged.py",),
         untracked_paths=("notes.txt",),
     )
 
+    assert summary.staged_paths == ("src/staged.py",)
+    assert summary.unstaged_paths == ("src/unstaged.py",)
     assert summary.untracked_paths == ("notes.txt",)
     with pytest.raises(ValueError, match="staged_count"):
         GitStatusSummary(branch="main", head_short_hash="abc1234", staged_count=-1)
+
+
+def test_status_summary_rejects_oversized_path_lists() -> None:
+    paths = tuple(f"src/file_{index}.py" for index in range(DEFAULT_MAX_GIT_CONTEXT_STATUS_PATHS + 1))
+
+    with pytest.raises(ValueError, match="staged_paths"):
+        GitStatusSummary(branch="main", head_short_hash="abc1234", staged_paths=paths)
 
 
 def test_commit_and_ref_result_dtos_are_immutable_boundary_values() -> None:
@@ -158,6 +182,20 @@ def test_commit_and_ref_result_dtos_are_immutable_boundary_values() -> None:
     assert merge_base.short_hash == "1234567"
     with pytest.raises(FrozenInstanceError):
         setattr(commit, "subject", "changed")  # noqa: B010
+
+
+def test_commit_details_rejects_oversized_message_body() -> None:
+    with pytest.raises(ValueError, match="body exceeds"):
+        GitCommitDetails(
+            commit_hash="abcdef1234567890",
+            short_hash="abcdef1",
+            parents=(),
+            author="Ada <ada@example.com>",
+            author_date="2026-08-07T18:00:00+00:00",
+            committer_date="2026-08-07T18:01:00+00:00",
+            subject="Add feature",
+            body="x" * (DEFAULT_MAX_GIT_COMMIT_MESSAGE_CHARS + 1),
+        )
 
 
 def test_failure_category_distinguishes_argument_validation_from_git_failures() -> None:

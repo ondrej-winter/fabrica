@@ -5,6 +5,7 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from fabrica.features.developer_workflow.application.dtos import (
+    DEFAULT_MAX_GIT_CONTEXT_CHANGED_FILES,
     DEFAULT_MAX_STAGED_DIFF_CHARS,
     GitStagedDiff,
     GitStagedDiffBounds,
@@ -86,3 +87,13 @@ def test_staged_file_list_is_immutable_and_validates_membership() -> None:
 def test_staged_file_list_rejects_empty_list() -> None:
     with pytest.raises(ValueError, match="must not be empty"):
         GitStagedFileList(files=())
+
+
+def test_staged_file_list_rejects_oversized_lists() -> None:
+    files = tuple(
+        GitStagedFile(path=f"src/file_{index}.py", status=GitStagedFileStatus.MODIFIED)
+        for index in range(DEFAULT_MAX_GIT_CONTEXT_CHANGED_FILES + 1)
+    )
+
+    with pytest.raises(ValueError, match="configured bound"):
+        GitStagedFileList(files=files)

@@ -1,6 +1,7 @@
 """Parsers for read-only git context subprocess output."""
 
 from fabrica.features.developer_workflow.application.dtos import (
+    DEFAULT_MAX_GIT_CONTEXT_STATUS_PATHS,
     GitBranchAheadBehind,
     GitCommitDetails,
     GitCommitLog,
@@ -45,7 +46,10 @@ def parse_context_name_status_line(line: str) -> GitContextChangedFile:
 
 
 def parse_status_summary(
-    output: str, *, head_short_hash: str | None, max_untracked_paths: int = 20
+    output: str,
+    *,
+    head_short_hash: str | None,
+    max_paths_per_category: int = DEFAULT_MAX_GIT_CONTEXT_STATUS_PATHS,
 ) -> GitStatusSummary:
     """Parse `git status --short --branch` output into a bounded worktree summary."""
     branch: str | None = None
@@ -53,6 +57,8 @@ def parse_status_summary(
     is_detached = False
     staged_count = 0
     unstaged_count = 0
+    staged_paths: list[str] = []
+    unstaged_paths: list[str] = []
     untracked_paths: list[str] = []
 
     for line in output.splitlines():
@@ -68,8 +74,10 @@ def parse_status_summary(
             continue
         if status[0] != " ":
             staged_count += 1
+            staged_paths.append(path)
         if status[1] != " ":
             unstaged_count += 1
+            unstaged_paths.append(path)
 
     return GitStatusSummary(
         branch=branch,
@@ -79,7 +87,9 @@ def parse_status_summary(
         staged_count=staged_count,
         unstaged_count=unstaged_count,
         untracked_count=len(untracked_paths),
-        untracked_paths=tuple(untracked_paths[:max_untracked_paths]),
+        staged_paths=tuple(staged_paths[:max_paths_per_category]),
+        unstaged_paths=tuple(unstaged_paths[:max_paths_per_category]),
+        untracked_paths=tuple(untracked_paths[:max_paths_per_category]),
     )
 
 

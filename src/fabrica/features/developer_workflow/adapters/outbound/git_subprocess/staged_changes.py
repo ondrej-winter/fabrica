@@ -30,6 +30,7 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.staged
     NO_STAGED_CHANGES_MESSAGE,
     NOT_REPOSITORY_MESSAGE,
     OVERSIZED_DIFF_MESSAGE,
+    OVERSIZED_FILE_LIST_MESSAGE,
     UNSAFE_FILE_PATH_MESSAGE,
     UNSTAGED_FILE_PATH_MESSAGE,
     UNSUPPORTED_NAME_STATUS_MESSAGE,
@@ -161,6 +162,12 @@ class GitStagedChangesSubprocessLoader:
             files = tuple(parse_name_status_line(line) for line in stdout.splitlines() if line.strip())
             return GitStagedFileList(files=files)
         except ValueError as err:
+            if "configured bound" in str(err):
+                raise self._load_error(
+                    OVERSIZED_FILE_LIST_MESSAGE,
+                    category=GitStagedChangesFailureCategory.OVERSIZED_OUTPUT,
+                    duration_seconds=duration_seconds,
+                ) from err
             raise self._load_error(
                 UNSUPPORTED_NAME_STATUS_MESSAGE,
                 category=GitStagedChangesFailureCategory.GIT_FAILED,

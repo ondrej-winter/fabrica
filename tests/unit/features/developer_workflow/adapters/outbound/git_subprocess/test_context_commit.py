@@ -274,6 +274,43 @@ def test_commit_changed_files_fails_when_commit_has_no_matching_changes() -> Non
     assert exc_info.value.category is GitContextFailureCategory.NO_MATCHING_CHANGES
 
 
+def test_commit_changed_files_maps_oversized_file_list_safely() -> None:
+    output = "".join(f"M\tsrc/file_{index}.py\n" for index in range(201))
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="abcdef123456\n"),
+            GitCommandResult(returncode=0, stdout=output),
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).list_commit_changed_files("HEAD")
+
+    assert exc_info.value.category is GitContextFailureCategory.OVERSIZED_OUTPUT
+    assert "src/file_" not in str(exc_info.value.metadata)
+
+
+def test_commit_details_maps_oversized_body_safely() -> None:
+    oversized_body = "x" * 100_001
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="abcdef123456\n"),
+            GitCommandResult(
+                returncode=0,
+                stdout="abcdef123456\x1fabcdef1\x1f\x1fAda <ada@example.com>\x1f"
+                "2026-08-07T18:00:00+00:00\x1f2026-08-07T18:01:00+00:00\x1f"
+                f"Add context\x1f\x1f{oversized_body}",
+            ),
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_commit_details("HEAD")
+
+    assert exc_info.value.category is GitContextFailureCategory.OVERSIZED_OUTPUT
+    assert "xxxx" not in str(exc_info.value.metadata)
+
+
 def test_commit_diff_maps_empty_and_oversized_output_safely() -> None:
     runner = FakeGitRunner(
         results=[

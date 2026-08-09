@@ -52,7 +52,7 @@ def test_status_summary_parser_maps_branch_counts_and_bounded_untracked_paths() 
         "?? notes.txt\n"
         "?? scratch.md\n",
         head_short_hash="abc1234",
-        max_untracked_paths=1,
+        max_paths_per_category=1,
     )
 
     assert summary.branch == "feature/read-only"
@@ -62,6 +62,8 @@ def test_status_summary_parser_maps_branch_counts_and_bounded_untracked_paths() 
     assert summary.staged_count == EXPECTED_MULTIPLE_COUNT
     assert summary.unstaged_count == EXPECTED_MULTIPLE_COUNT
     assert summary.untracked_count == EXPECTED_MULTIPLE_COUNT
+    assert summary.staged_paths == ("staged.py",)
+    assert summary.unstaged_paths == ("unstaged.py",)
     assert summary.untracked_paths == ("notes.txt",)
 
 

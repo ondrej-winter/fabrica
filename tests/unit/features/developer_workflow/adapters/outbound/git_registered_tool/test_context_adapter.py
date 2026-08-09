@@ -42,6 +42,8 @@ class FakeGitContextLoader:
             staged_count=1,
             unstaged_count=2,
             untracked_count=1,
+            staged_paths=("src/staged.py",),
+            unstaged_paths=("src/unstaged.py",),
             untracked_paths=("notes.txt",),
         ),
     )
@@ -238,6 +240,8 @@ def test_worktree_tools_return_deterministic_structured_text() -> None:
         "staged_count\t1\n"
         "unstaged_count\t2\n"
         "untracked_count\t1\n"
+        "staged\tsrc/staged.py\n"
+        "unstaged\tsrc/unstaged.py\n"
         "untracked\tnotes.txt"
     )
     assert files.result_text == "M\tsrc/app.py\nR\tdocs/new.md\told_path=docs/old.md"
