@@ -292,16 +292,19 @@ before generation. Do not serialize the analysis path.
 
 **Acceptance criteria:**
 
-- [ ] `GenerateCommitMessage` continues to use async per-file analysis.
-- [ ] `max_parallel_analysis` remains configurable and defaults to `4`.
-- [ ] Evidence remains ordered in the final bundle despite parallel execution.
-- [ ] Pre-commit runs before any async file-diff/model analysis starts in
+- [x] `GenerateCommitMessage` continues to use async per-file analysis.
+- [x] `max_parallel_analysis` remains configurable and defaults to `4`.
+- [x] Evidence remains ordered in the final bundle despite parallel execution.
+- [x] Pre-commit runs before any async file-diff/model analysis starts in
       `fabrica commit`.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/application/test_generate_commit_message.py`
-- [ ] New/updated confirmed commit tests prove pre-commit failure means no
+- [x] `uv run pytest tests/unit/features/developer_workflow/application/test_generate_commit_message.py`
+  - 2026-08-10: Passed together with confirmed commit workflow tests after
+    adding coverage for default/configured bounded parallelism and ordered
+    evidence through the query executor boundary.
+- [x] New/updated confirmed commit tests prove pre-commit failure means no
       generator/model calls happen.
 
 **Dependencies:** Tasks 3-4.
@@ -355,7 +358,7 @@ local pre-commit hook after the gate is wired.
 
 ### Checkpoint: Spec-critical behavior covered
 
-- [ ] No pre-commit failure path invokes model runtime.
+- [x] No pre-commit failure path invokes model runtime.
 - [ ] No rejection/failure path creates a commit.
 - [ ] Successful path preserves exact commit message.
 

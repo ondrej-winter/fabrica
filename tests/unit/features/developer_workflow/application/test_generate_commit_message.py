@@ -1,5 +1,6 @@
 """Tests for evidence-first commit-message orchestration."""
 
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 
 import pytest
@@ -98,6 +99,24 @@ class FakeSynthesizer:
         return self.synthesize(command)
 
 
+@dataclass
+class RecordingQueryExecutor:
+    """Fake async fanout executor that records concurrency and preserves input order."""
+
+    max_concurrency_values: list[int] = field(default_factory=list)
+    execution_order: list[int] = field(default_factory=list)
+
+    async def gather_ordered[T](
+        self, operations: Sequence[Callable[[], Awaitable[T]]], *, max_concurrency: int
+    ) -> tuple[T, ...]:
+        self.max_concurrency_values.append(max_concurrency)
+        indexed_results: dict[int, T] = {}
+        for index in reversed(range(len(operations))):
+            self.execution_order.append(index)
+            indexed_results[index] = await operations[index]()
+        return tuple(indexed_results[index] for index in range(len(operations)))
+
+
 def test_generate_commit_message_lists_files_before_loading_and_preserves_evidence_order() -> None:
     events: list[str] = []
     first = GitStagedFile(path="src/file.py", status=GitStagedFileStatus.MODIFIED)
@@ -133,6 +152,51 @@ def test_generate_commit_message_lists_files_before_loading_and_preserves_eviden
     assert result.recommendation.commit_message == (
         "feat(developer-workflow): generate commit messages from per-file evidence"
     )
+
+
+def test_generate_commit_message_uses_default_bounded_parallel_analysis_and_ordered_results() -> None:
+    events: list[str] = []
+    first = GitStagedFile(path="src/first.py", status=GitStagedFileStatus.MODIFIED)
+    second = GitStagedFile(path="src/second.py", status=GitStagedFileStatus.MODIFIED)
+    loader = FakeStagedChangesLoader(
+        staged_files=GitStagedFileList(files=(first, second)),
+        diffs={
+            first.path: GitStagedDiff(text="diff --git a/src/first.py b/src/first.py\n+first\n"),
+            second.path: GitStagedDiff(text="diff --git a/src/second.py b/src/second.py\n+second\n"),
+        },
+        events=events,
+    )
+    query_executor = RecordingQueryExecutor()
+
+    result = GenerateCommitMessage(
+        staged_changes_loader=loader,
+        analyzer=FakeAnalyzer(events=events),
+        synthesizer=FakeSynthesizer(events=events),
+        query_executor=query_executor,
+    ).generate()
+
+    assert query_executor.max_concurrency_values == [4]
+    assert query_executor.execution_order == [1, 0]
+    assert [item.staged_file.path for item in result.evidence_bundle.evidence] == [
+        "src/first.py",
+        "src/second.py",
+    ]
+
+
+def test_generate_commit_message_uses_configured_bounded_parallel_analysis() -> None:
+    events: list[str] = []
+    staged_file = GitStagedFile(path="src/file.py", status=GitStagedFileStatus.MODIFIED)
+    query_executor = RecordingQueryExecutor()
+
+    GenerateCommitMessage(
+        staged_changes_loader=_loader_for(staged_file, events=events),
+        analyzer=FakeAnalyzer(events=events),
+        synthesizer=FakeSynthesizer(events=events),
+        query_executor=query_executor,
+        options=GenerateCommitMessageOptions(max_parallel_analysis=2),
+    ).generate()
+
+    assert query_executor.max_concurrency_values == [2]
 
 
 def test_generate_commit_message_fails_before_analysis_when_staged_file_bound_is_exceeded() -> None:
