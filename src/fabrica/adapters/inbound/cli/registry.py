@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from fabrica.adapters.inbound.cli.composition import (
-    run_agent_runtime_contribution_command,
-    run_developer_workflow_contribution_command,
-)
+from fabrica.adapters.inbound.cli.agent_runtime_composition import run_agent_runtime_contribution_command
 from fabrica.adapters.inbound.cli.contributions import CliContribution
+from fabrica.adapters.inbound.cli.developer_workflow_composition import run_developer_workflow_contribution_command
 from fabrica.features.agent_runtime.adapters.inbound.cli.contribution import (
     AGENT_RUNTIME_CLI_COMMAND_TYPES,
     register_agent_runtime_cli_commands,

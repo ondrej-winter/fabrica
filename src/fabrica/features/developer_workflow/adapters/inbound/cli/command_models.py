@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from fabrica.features.developer_workflow.application.use_cases import DEFAULT_COMMIT_MESSAGE_SKILL_ID
+from fabrica.features.developer_workflow.application.dtos import DEFAULT_COMMIT_MESSAGE_SKILL_ID
 
 if TYPE_CHECKING:
     from pathlib import Path

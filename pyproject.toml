@@ -40,6 +40,7 @@ fabrica = "fabrica.adapters.inbound.cli.__main__:main"
 
 [dependency-groups]
 dev = [
+    "import-linter>=2.13",
     "pre-commit>=4.3.0",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
@@ -83,6 +84,46 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"] # pytest-native assertions are expected in tests
+
+[tool.importlinter]
+root_package = "fabrica"
+
+[[tool.importlinter.contracts]]
+id = "features-do-not-import-product-cli-or-bootstrap"
+name = "Feature slices must not import product CLI or bootstrap"
+type = "forbidden"
+source_modules = ["fabrica.features"]
+forbidden_modules = [
+    "fabrica.adapters.inbound.cli",
+    "fabrica.bootstrap",
+]
+
+[[tool.importlinter.contracts]]
+id = "applications-do-not-import-adapters-or-bootstrap"
+name = "Application layers must not import adapters or bootstrap"
+type = "forbidden"
+source_modules = ["fabrica.features.*.application"]
+forbidden_modules = [
+    "fabrica.adapters",
+    "fabrica.bootstrap",
+    "fabrica.features.*.adapters",
+]
+
+[[tool.importlinter.contracts]]
+id = "generic-cli-shell-stays-feature-agnostic"
+name = "Generic product CLI shell modules must not import features or bootstrap"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = [
+    "fabrica.adapters.inbound.cli.__main__",
+    "fabrica.adapters.inbound.cli.options",
+    "fabrica.adapters.inbound.cli.parser",
+    "fabrica.adapters.inbound.cli.runner",
+]
+forbidden_modules = [
+    "fabrica.features",
+    "fabrica.bootstrap",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

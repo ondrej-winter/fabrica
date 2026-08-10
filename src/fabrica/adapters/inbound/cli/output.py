@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, TextIO
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from fabrica.features.developer_workflow.application.use_cases import ConfirmedCommitWorkflowResult
+
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunResult,
     LocalAgentRunStatus,
@@ -124,6 +126,21 @@ def write_script_execution_result(result: SkillScriptExecutionResult, *, stdout:
         _write_line(stream, f"observation: {observation.message}{suffix}")
 
     return EXIT_CODE_BY_SCRIPT_EXECUTION_STATUS[result.status]
+
+
+def write_confirmed_commit_result(result: ConfirmedCommitWorkflowResult, *, stdout: TextIO, stderr: TextIO) -> int:
+    """Write a confirmed commit workflow result and return the matching process exit code."""
+    if result.output_text:
+        _write_line(stdout, result.output_text)
+
+    if not result.succeeded:
+        _write_line(stderr, f"status: {result.status.value}")
+        for observation in result.observations:
+            metadata = _format_metadata(observation.metadata)
+            suffix = f" {metadata}" if metadata else ""
+            _write_line(stderr, f"observation: {observation.message}{suffix}")
+
+    return EXIT_CODE_BY_STATUS[result.status]
 
 
 def _write_line(stream: TextIO, text: str) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from fabrica.features.agent_runtime.application.dtos import (
@@ -128,19 +129,12 @@ def _write_confirmed_commit_result(
     writers: DeveloperWorkflowCliWriters,
     output_already_written: bool = False,
 ) -> int:
-    runtime_result = LocalAgentRunResult(
-        status=result.status,
-        output_text=None if output_already_written else result.output_text,
-        observations=result.observations,
-        usage_evidence=result.usage_evidence,
-        cost_evidence=result.cost_evidence,
-    )
-    return _write_runtime_result(
-        runtime_result,
-        global_options=global_options,
-        streams=streams,
-        writers=writers,
-    )
+    if output_already_written:
+        result = replace(result, output_text=None)
+    exit_code = writers.confirmed_commit_result(result, stdout=streams.stdout, stderr=streams.stderr)
+    if global_options.print_usage or global_options.print_prices:
+        writers.evidence(result, global_options=global_options, stdout=streams.stdout)
+    return exit_code
 
 
 def _require_dependency(dependency: object | None, *, dependency_name: str):

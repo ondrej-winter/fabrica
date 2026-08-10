@@ -37,6 +37,13 @@ class RuntimeResultWriter(Protocol):
         """Write a runtime result and return a process exit code."""
 
 
+class ConfirmedCommitResultWriter(Protocol):
+    """Writer for confirmed commit workflow results."""
+
+    def __call__(self, result: ConfirmedCommitWorkflowResult, *, stdout: TextIO, stderr: TextIO) -> int:
+        """Write a confirmed commit workflow result and return a process exit code."""
+
+
 class CommitMessageWorkflowRunner(Protocol):
     """Protocol for commit-message workflow execution consumed by the CLI adapter."""
 
@@ -77,6 +84,7 @@ class DeveloperWorkflowCliWriters:
 
     evidence: EvidenceWriter
     runtime_result: RuntimeResultWriter
+    confirmed_commit_result: ConfirmedCommitResultWriter
 
 
 class EvidenceWriter(Protocol):
