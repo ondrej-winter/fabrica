@@ -163,6 +163,38 @@ def test_commit_command_generation_failure_skips_prompt_and_commit() -> None:
     assert workflow.commit_calls == []
 
 
+def test_commit_command_pre_commit_stop_skips_prompt_and_commit() -> None:
+    workflow = FakeConfirmedCommitWorkflow(
+        generation_result=ConfirmedCommitWorkflowResult(
+            status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+            observations=(
+                RuntimeObservation(
+                    message="pre-commit failed; no commit was created",
+                    metadata={"category": "pre_commit_failed"},
+                ),
+            ),
+        ),
+    )
+    stdout = StringIO()
+    stderr = StringIO()
+
+    exit_code = run_cli_command(
+        CliCommitCommand(),
+        dependencies=CliCommandDependencies(confirmed_commit_workflow=workflow),
+        stdin=StringIO("yes\n"),
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == EXPECTED_CONFIGURATION_ERROR_EXIT_CODE
+    assert stdout.getvalue() == ""
+    assert stderr.getvalue() == (
+        "status: configuration_error\n"
+        "observation: pre-commit failed; no commit was created category=pre_commit_failed\n"
+    )
+    assert workflow.commit_calls == []
+
+
 def test_commit_command_appends_evidence_on_rejection() -> None:
     workflow = FakeConfirmedCommitWorkflow(
         generation_result=_generation_success(_recommendation(), usage_evidence=(_usage_evidence(),)),

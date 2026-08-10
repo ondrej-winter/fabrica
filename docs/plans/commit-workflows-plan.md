@@ -177,14 +177,15 @@ generation.
 
 **Acceptance criteria:**
 
-- [ ] Pre-commit failure result produces a clear stderr observation and non-zero
+- [x] Pre-commit failure result produces a clear stderr observation and non-zero
       exit.
-- [ ] No confirmation prompt is written when recommendation generation is blocked.
-- [ ] `workflow.commit()` is not called.
+- [x] No confirmation prompt is written when recommendation generation is blocked.
+- [x] `workflow.commit()` is not called.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/adapters/inbound/cli/test_commit_command.py`
+- [x] `uv run pytest tests/unit/adapters/inbound/cli/test_commit_command.py`
+  - 2026-08-10: Passed after adding pre-commit-stop CLI regression coverage.
 
 **Dependencies:** Task 1.
 
