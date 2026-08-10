@@ -374,18 +374,18 @@ if needed.
 
 **Acceptance criteria:**
 
-- [ ] `fabrica commit --help` distinguishes mutating confirmed commit from
+- [x] `fabrica commit --help` distinguishes mutating confirmed commit from
       read-only preview.
-- [ ] `fabrica commit --help` mentions that the mutating workflow runs a
+- [x] `fabrica commit --help` mentions that the mutating workflow runs a
       pre-commit quality gate before message generation.
-- [ ] README mentions pre-commit gate and conservative approval behavior
+- [x] README mentions pre-commit gate and conservative approval behavior
       accurately.
-- [ ] No docs imply `commit-message` runs hooks or mutates state.
+- [x] No docs imply `commit-message` runs hooks or mutates state.
 
 **Verification:**
 
-- [ ] `uv run fabrica commit --help`
-- [ ] Documentation review of `README.md` and `docs/specs/commit-workflows.md`
+- [x] `uv run fabrica commit --help`
+- [x] Documentation review of `README.md` and `docs/specs/commit-workflows.md`
 
 **Dependencies:** Tasks 3-6.
 

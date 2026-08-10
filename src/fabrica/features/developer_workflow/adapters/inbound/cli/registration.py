@@ -28,10 +28,10 @@ def register_developer_workflow_cli_commands(subparsers: argparse._SubParsersAct
 
     commit_parser = subparsers.add_parser(
         "commit",
-        help="create a git commit from a generated message after confirmation",
+        help="run pre-commit, then create a git commit from a generated message after confirmation",
         description=(
-            "Generate a staged-changes commit message, prompt for confirmation, "
-            "then create a git commit only after approval."
+            "Run the staged pre-commit quality gate before message generation, "
+            "prompt for confirmation, then create a git commit only after approval."
         ),
     )
     _add_commit_message_generation_flags(commit_parser)

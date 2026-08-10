@@ -142,6 +142,12 @@ confirmation:
 uv run fabrica commit
 ```
 
+Before generating that recommendation, `commit` runs the configured pre-commit
+quality gate against the staged workflow. If pre-commit fails, cannot run, times
+out, or modifies files, Fabrica stops before model invocation, skips the prompt,
+and creates no commit. Formatter rewrites are treated as modified files: review
+and stage the resulting changes, then rerun `fabrica commit`.
+
 For the default `conventional-commits` skill and `.agents/skills` root, the same
 interactive workflow is available through `make`:
 

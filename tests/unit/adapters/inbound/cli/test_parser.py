@@ -146,6 +146,18 @@ def test_parse_commit_command_defaults_to_conventional_commits_skill() -> None:
     assert command == CliInvocation(command=CliCommitCommand(skill_id="conventional-commits"))
 
 
+def test_commit_command_help_documents_mutating_pre_commit_gate(capsys: pytest.CaptureFixture[str]) -> None:
+    parser = build_parser()
+
+    with pytest.raises(SystemExit) as exc_info:
+        parser.parse_args(["commit", "--help"])
+
+    assert exc_info.value.code == 0
+    captured = capsys.readouterr()
+    assert "Run the staged pre-commit quality gate before message generation" in captured.out
+    assert "create a git commit only after approval" in captured.out
+
+
 def test_parse_commit_command_supports_commit_message_generation_options() -> None:
     command = parse_args(
         [
