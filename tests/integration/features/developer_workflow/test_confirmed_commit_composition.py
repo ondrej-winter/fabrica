@@ -185,6 +185,54 @@ def test_confirmed_commit_workflow_stops_before_commit_when_staged_discovery_fai
     assert _git_commit_count(git_repository) == 0
 
 
+def test_confirmed_commit_workflow_stops_before_runtime_when_pre_commit_fails(tmp_path: Path) -> None:
+    runtime = FakeRuntime(results=[])
+    git_repository = _create_repository_with_staged_diff(tmp_path)
+    _configure_git_identity(git_repository)
+    _write_failing_pre_commit_config(git_repository)
+    skill_root = _write_commit_message_skill(tmp_path)
+    workflow = create_confirmed_commit_workflow(
+        runtime=runtime,
+        options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
+    )
+
+    result = workflow.run(skill_id="conventional-commits")
+
+    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.recommendation is None
+    assert result.commit_attempted is False
+    assert result.commit_result is None
+    assert result.observations[0].metadata["category"] == "pre_commit_failed"
+    assert runtime.calls == []
+    assert _git_commit_count(git_repository) == 0
+    assert _git_staged_file_names(git_repository) == ("example.txt",)
+
+
+def test_confirmed_commit_workflow_stops_before_runtime_when_pre_commit_modifies_files(tmp_path: Path) -> None:
+    runtime = FakeRuntime(results=[])
+    git_repository = _create_repository_with_staged_diff(tmp_path)
+    _configure_git_identity(git_repository)
+    _write_modifying_pre_commit_config(git_repository)
+    skill_root = _write_commit_message_skill(tmp_path)
+    workflow = create_confirmed_commit_workflow(
+        runtime=runtime,
+        options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
+    )
+
+    result = workflow.run(skill_id="conventional-commits")
+
+    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.recommendation is None
+    assert result.commit_attempted is False
+    assert result.commit_result is None
+    assert result.observations[0].metadata["category"] == "pre_commit_modified_files"
+    assert "review and stage changed files" in result.observations[0].message
+    assert runtime.calls == []
+    assert _git_commit_count(git_repository) == 0
+    assert _git_staged_file_names(git_repository) == ("example.txt",)
+    assert _git_unstaged_file_names(git_repository) == ("example.txt",)
+
+
 def test_confirmed_commit_workflow_reports_git_failure_without_creating_commit(tmp_path: Path) -> None:
     runtime = FakeRuntime(
         results=[
@@ -334,7 +382,47 @@ def _configure_git_identity(git_repository: Path) -> None:
 
 
 def _write_passing_pre_commit_config(git_repository: Path) -> None:
-    (git_repository / ".pre-commit-config.yaml").write_text("repos: []\n", encoding="utf-8")
+    _write_local_pre_commit_config(git_repository, script="import sys\nsys.exit(0)\n")
+
+
+def _write_failing_pre_commit_config(git_repository: Path) -> None:
+    _write_local_pre_commit_config(
+        git_repository,
+        script=("import sys\nsys.stderr.write('failing local pre-commit hook\\n')\nsys.exit(1)\n"),
+    )
+
+
+def _write_modifying_pre_commit_config(git_repository: Path) -> None:
+    _write_local_pre_commit_config(
+        git_repository,
+        script=(
+            "from pathlib import Path\n"
+            "import sys\n"
+            "Path('example.txt').write_text('example\\nmodified by hook\\n', encoding='utf-8')\n"
+            "sys.exit(1)\n"
+        ),
+    )
+
+
+def _write_local_pre_commit_config(git_repository: Path, *, script: str) -> None:
+    hooks_directory = git_repository / "hooks"
+    hooks_directory.mkdir()
+    hook_path = hooks_directory / "fabrica_test_hook.py"
+    hook_path.write_text(script, encoding="utf-8")
+    (git_repository / ".pre-commit-config.yaml").write_text(
+        """
+repos:
+  - repo: local
+    hooks:
+      - id: fabrica-test-hook
+        name: Fabrica test hook
+        entry: python hooks/fabrica_test_hook.py
+        language: system
+        pass_filenames: false
+        always_run: true
+""".lstrip(),
+        encoding="utf-8",
+    )
 
 
 def _install_failing_pre_commit_hook(git_repository: Path) -> None:
@@ -359,6 +447,17 @@ def _git_commit_count(git_repository: Path) -> int:
 def _git_staged_file_names(git_repository: Path) -> tuple[str, ...]:
     result = subprocess.run(
         ("git", "diff", "--cached", "--name-only"),  # noqa: S607
+        cwd=git_repository,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return tuple(line for line in result.stdout.splitlines() if line)
+
+
+def _git_unstaged_file_names(git_repository: Path) -> tuple[str, ...]:
+    result = subprocess.run(
+        ("git", "diff", "--name-only"),  # noqa: S607
         cwd=git_repository,
         check=True,
         capture_output=True,

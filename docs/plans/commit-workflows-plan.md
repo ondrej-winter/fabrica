@@ -332,21 +332,23 @@ local pre-commit hook after the gate is wired.
 
 **Acceptance criteria:**
 
-- [ ] Passing pre-commit path creates exactly one commit with the generated
+- [x] Passing pre-commit path creates exactly one commit with the generated
       message.
-- [ ] Failing pre-commit path creates no commit and does not invoke the fake
+- [x] Failing pre-commit path creates no commit and does not invoke the fake
       runtime/model.
-- [ ] Modifying pre-commit path creates no commit and leaves the user to
+- [x] Modifying pre-commit path creates no commit and leaves the user to
       review/stage changed files.
-- [ ] Success-path tests use a temp-repo-local passing pre-commit hook.
-- [ ] Failure and modification tests use temp-repo-local hooks and remain fully
+- [x] Success-path tests use a temp-repo-local passing pre-commit hook.
+- [x] Failure and modification tests use temp-repo-local hooks and remain fully
       offline/deterministic.
-- [ ] Existing git hook failure after approval remains covered separately as a
+- [x] Existing git hook failure after approval remains covered separately as a
       git commit failure, if still relevant.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/integration/features/developer_workflow/test_confirmed_commit_composition.py`
+- [x] `uv run pytest tests/integration/features/developer_workflow/test_confirmed_commit_composition.py`
+  - 2026-08-10: Passed after adding temp-repo-local passing, failing, and
+    modifying pre-commit hook fixtures.
 
 **Dependencies:** Tasks 3-4.
 
@@ -359,8 +361,8 @@ local pre-commit hook after the gate is wired.
 ### Checkpoint: Spec-critical behavior covered
 
 - [x] No pre-commit failure path invokes model runtime.
-- [ ] No rejection/failure path creates a commit.
-- [ ] Successful path preserves exact commit message.
+- [x] No rejection/failure path creates a commit.
+- [x] Successful path preserves exact commit message.
 
 ### Phase 4: Documentation and final validation
 
