@@ -141,18 +141,21 @@ non-passing pre-commit outcomes.
 
 **Acceptance criteria:**
 
-- [ ] A passing pre-commit result allows recommendation generation to proceed.
-- [ ] `FAILED` pre-commit result skips generator/model invocation and commit
+- [x] A passing pre-commit result allows recommendation generation to proceed.
+- [x] `FAILED` pre-commit result skips generator/model invocation and commit
       execution.
-- [ ] `MODIFIED_FILES` pre-commit result skips generator/model invocation and
+- [x] `MODIFIED_FILES` pre-commit result skips generator/model invocation and
       reports that the user must review/stage changes before retrying.
-- [ ] `PreCommitRunError` skips generator/model invocation and commit execution.
-- [ ] The pre-commit command uses `PreCommitRunCommand()` and does not enable
+- [x] `PreCommitRunError` skips generator/model invocation and commit execution.
+- [x] The pre-commit command uses `PreCommitRunCommand()` and does not enable
       `all_files`.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/application/`
+- [x] `uv run pytest tests/unit/features/developer_workflow/application/`
+  - 2026-08-10: Expected red-test failure captured. New tests fail because
+    `ConfirmedCommitWorkflow.__init__()` does not yet accept `pre_commit_runner`.
+  - 2026-08-10: Passed after implementing the confirmed commit pre-commit gate.
 
 **Dependencies:** None.
 
@@ -211,24 +214,24 @@ owned by `src/fabrica/features/developer_workflow/application/use_cases/commit_w
 
 **Acceptance criteria:**
 
-- [ ] `PreCommitRunner.run_pre_commit(PreCommitRunCommand())` is called before
+- [x] `PreCommitRunner.run_pre_commit(PreCommitRunCommand())` is called before
       generator invocation.
-- [ ] `PreCommitRunStatus.PASSED` continues to existing async bounded-parallel
+- [x] `PreCommitRunStatus.PASSED` continues to existing async bounded-parallel
       recommendation generation.
-- [ ] `FAILED` and `MODIFIED_FILES` return a safe failure status with
+- [x] `FAILED` and `MODIFIED_FILES` return a safe failure status with
       observations and `commit_attempted=False`.
-- [ ] `PreCommitRunError` returns a safe failure result with category metadata
+- [x] `PreCommitRunError` returns a safe failure result with category metadata
       and `commit_attempted=False`.
-- [ ] Model usage/cost evidence remains empty when generation never starts.
-- [ ] Direct `ConfirmedCommitWorkflow` tests use an explicit passing fake
+- [x] Model usage/cost evidence remains empty when generation never starts.
+- [x] Direct `ConfirmedCommitWorkflow` tests use an explicit passing fake
       pre-commit runner; production composition must not rely on a default that
       silently disables the gate.
-- [ ] `bootstrap/composition.py` remains side-effect-light and contains wiring,
+- [x] `bootstrap/composition.py` remains side-effect-light and contains wiring,
       not confirmed commit business decision logic.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/unit/features/developer_workflow/application/`
+- [x] `uv run pytest tests/unit/features/developer_workflow/application/`
 
 **Dependencies:** Task 1.
 
@@ -250,16 +253,16 @@ the composition-owned working directory, timeout, and diagnostics options.
 
 **Acceptance criteria:**
 
-- [ ] Confirmed commit workflow construction injects `PreCommitSubprocessRunner`.
-- [ ] Construction remains side-effect-light: no pre-commit execution happens
+- [x] Confirmed commit workflow construction injects `PreCommitSubprocessRunner`.
+- [x] Construction remains side-effect-light: no pre-commit execution happens
       until workflow run.
-- [ ] `commit-message` composition remains unchanged and does not run pre-commit.
-- [ ] Existing pre-commit registered-tool composition remains separate from the
+- [x] `commit-message` composition remains unchanged and does not run pre-commit.
+- [x] Existing pre-commit registered-tool composition remains separate from the
       confirmed commit workflow gate.
 
 **Verification:**
 
-- [ ] `uv run pytest tests/integration/features/developer_workflow/test_confirmed_commit_composition.py tests/integration/features/developer_workflow/test_commit_message_composition.py tests/integration/features/developer_workflow/test_pre_commit_tool_composition.py`
+- [x] `uv run pytest tests/integration/features/developer_workflow/test_confirmed_commit_composition.py tests/integration/features/developer_workflow/test_commit_message_composition.py tests/integration/features/developer_workflow/test_pre_commit_tool_composition.py`
 
 **Dependencies:** Task 3.
 
@@ -274,8 +277,8 @@ the composition-owned working directory, timeout, and diagnostics options.
 
 ### Checkpoint: Confirmed commit pre-commit gate wired end-to-end
 
-- [ ] Focused unit tests pass.
-- [ ] Focused developer-workflow integration tests pass.
+- [x] Focused unit tests pass.
+- [x] Focused developer-workflow integration tests pass.
 - [ ] Manual review confirms `commit-message` remains read-only.
 
 ### Phase 3: Tighten spec alignment and edge cases

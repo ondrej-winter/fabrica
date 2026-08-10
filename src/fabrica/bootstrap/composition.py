@@ -111,6 +111,9 @@ from fabrica.features.developer_workflow.application.dtos import (
     GitCommitResult,
     GitContextDiffBounds,
     GitStagedDiffBounds,
+    PreCommitRunCommand,
+    PreCommitRunResult,
+    PreCommitRunStatus,
     SynthesizeCommitMessageCommand,
 )
 from fabrica.features.developer_workflow.application.ports import (
@@ -119,6 +122,8 @@ from fabrica.features.developer_workflow.application.ports import (
     CommitMessageSynthesisError,
     GitCommitError,
     GitStagedChangesLoadError,
+    PreCommitRunError,
+    PreCommitRunner,
 )
 from fabrica.features.developer_workflow.application.use_cases import (
     DEFAULT_COMMIT_MESSAGE_SKILL_ID,
@@ -445,6 +450,7 @@ class ConfirmedCommitWorkflow:
 
     generator: CommitMessageGenerator
     committer: GitCommitter
+    pre_commit_runner: PreCommitRunner
     evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
 
     def run(
@@ -480,6 +486,9 @@ class ConfirmedCommitWorkflow:
         selected_skill_id = getattr(command, "skill_id", skill_id)
         if self.evidence_recorder is not None:
             self.evidence_recorder.reset()
+        pre_commit_result = self._run_pre_commit_gate()
+        if pre_commit_result is not None:
+            return pre_commit_result
         try:
             result = await self.generator.generate_async(skill_id=selected_skill_id)
         except GitStagedChangesLoadError as err:
@@ -594,6 +603,48 @@ class ConfirmedCommitWorkflow:
             usage_evidence=self._usage_evidence,
             cost_evidence=self._cost_evidence,
         )
+
+    def _run_pre_commit_gate(self) -> ConfirmedCommitWorkflowResult | None:
+        try:
+            result = self.pre_commit_runner.run_pre_commit(PreCommitRunCommand())
+        except PreCommitRunError as err:
+            return self._pre_commit_failure_result(
+                RuntimeObservation(
+                    message=str(err),
+                    metadata={"category": err.category, **err.metadata},
+                ),
+            )
+        if result.status is PreCommitRunStatus.PASSED:
+            return None
+        if result.status is PreCommitRunStatus.MODIFIED_FILES:
+            return self._pre_commit_failure_result(
+                RuntimeObservation(
+                    message=(
+                        "pre-commit modified files; no commit was created. "
+                        "review and stage changed files before retrying."
+                    ),
+                    metadata={"category": "pre_commit_modified_files", **_pre_commit_metadata(result)},
+                ),
+            )
+        return self._pre_commit_failure_result(
+            RuntimeObservation(
+                message="pre-commit failed; no commit was created.",
+                metadata={"category": "pre_commit_failed", **_pre_commit_metadata(result)},
+            ),
+        )
+
+    def _pre_commit_failure_result(self, observation: RuntimeObservation) -> ConfirmedCommitWorkflowResult:
+        return ConfirmedCommitWorkflowResult(
+            status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+            observations=(observation,),
+        )
+
+
+def _pre_commit_metadata(result: PreCommitRunResult) -> dict[str, str | int | float | bool | None]:
+    metadata = dict(result.metadata)
+    if result.returncode is not None:
+        metadata["returncode"] = result.returncode
+    return metadata
 
 
 class CommitMessageEvidenceRecorder(Protocol):
@@ -833,6 +884,11 @@ def create_confirmed_commit_workflow(
                 timeout_seconds=workflow_options.git_timeout_seconds,
                 verbose_diagnostics=workflow_options.verbose_diagnostics,
             ),
+        ),
+        pre_commit_runner=PreCommitSubprocessRunner(
+            working_directory=workflow_options.git_working_directory,
+            timeout_seconds=workflow_options.git_timeout_seconds,
+            verbose_diagnostics=workflow_options.verbose_diagnostics,
         ),
         evidence_recorder=evidence_recording_runtime,
     )

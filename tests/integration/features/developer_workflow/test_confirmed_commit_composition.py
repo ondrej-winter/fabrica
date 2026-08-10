@@ -31,6 +31,9 @@ from fabrica.features.developer_workflow.application.dtos import (
     GitStagedChangesFailureCategory,
     GitStagedFile,
     GitStagedFileStatus,
+    PreCommitRunCommand,
+    PreCommitRunResult,
+    PreCommitRunStatus,
     StagedFileCommitEvidence,
 )
 from fabrica.features.developer_workflow.application.ports import GitCommitError
@@ -77,6 +80,15 @@ class FakeEvidenceRecorder:
         self.reset_count += 1
 
 
+@dataclass
+class PassingPreCommitRunner:
+    commands: list[PreCommitRunCommand] = field(default_factory=list)
+
+    def run_pre_commit(self, command: PreCommitRunCommand) -> PreCommitRunResult:
+        self.commands.append(command)
+        return PreCommitRunResult(status=PreCommitRunStatus.PASSED)
+
+
 def test_confirmed_commit_workflow_creates_commit_from_parsed_recommendation_message(tmp_path: Path) -> None:
     commit_message = "feat: add confirmed commit flow\n\nPreserve exact body.\n\nRefs: #123"
     runtime = FakeRuntime(
@@ -90,6 +102,7 @@ def test_confirmed_commit_workflow_creates_commit_from_parsed_recommendation_mes
     )
     git_repository = _create_repository_with_staged_diff(tmp_path)
     _configure_git_identity(git_repository)
+    _write_passing_pre_commit_config(git_repository)
     skill_root = _write_commit_message_skill(tmp_path)
     workflow = create_confirmed_commit_workflow(
         runtime=runtime,
@@ -137,6 +150,7 @@ def test_confirmed_commit_workflow_preserves_model_evidence(tmp_path: Path) -> N
     )
     git_repository = _create_repository_with_staged_diff(tmp_path)
     _configure_git_identity(git_repository)
+    _write_passing_pre_commit_config(git_repository)
     skill_root = _write_commit_message_skill(tmp_path)
     workflow = create_confirmed_commit_workflow(
         runtime=runtime,
@@ -155,6 +169,7 @@ def test_confirmed_commit_workflow_stops_before_commit_when_staged_discovery_fai
     git_repository = tmp_path / "repo"
     git_repository.mkdir()
     _run_git(("git", "init"), cwd=git_repository)
+    _write_passing_pre_commit_config(git_repository)
     workflow = create_confirmed_commit_workflow(
         runtime=runtime,
         options=CommitMessageWorkflowOptions(git_working_directory=git_repository),
@@ -182,6 +197,7 @@ def test_confirmed_commit_workflow_reports_git_failure_without_creating_commit(t
     )
     git_repository = _create_repository_with_staged_diff(tmp_path)
     _configure_git_identity(git_repository)
+    _write_passing_pre_commit_config(git_repository)
     _install_failing_pre_commit_hook(git_repository)
     skill_root = _write_commit_message_skill(tmp_path)
     workflow = create_confirmed_commit_workflow(
@@ -215,6 +231,7 @@ def test_confirmed_commit_workflow_maps_commit_error_after_preserving_recommenda
         committer=FailingCommitter(
             GitCommitError("git commit failed", metadata={"category": "git_failed", "returncode": 1})
         ),
+        pre_commit_runner=PassingPreCommitRunner(),
         evidence_recorder=recorder,
     )
 
@@ -314,6 +331,10 @@ def _create_repository_with_staged_diff(tmp_path: Path) -> Path:
 def _configure_git_identity(git_repository: Path) -> None:
     _run_git(("git", "config", "user.name", "Fabrica Test"), cwd=git_repository)
     _run_git(("git", "config", "user.email", "fabrica-test@example.invalid"), cwd=git_repository)
+
+
+def _write_passing_pre_commit_config(git_repository: Path) -> None:
+    (git_repository / ".pre-commit-config.yaml").write_text("repos: []\n", encoding="utf-8")
 
 
 def _install_failing_pre_commit_hook(git_repository: Path) -> None:
