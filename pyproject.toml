@@ -99,15 +99,46 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
-id = "applications-do-not-import-adapters-or-bootstrap"
-name = "Application layers must not import adapters or bootstrap"
+id = "feature-slices-follow-hexagonal-layers"
+name = "Feature slices follow adapters -> application -> domain dependency direction"
+type = "layers"
+containers = ["fabrica.features.*"]
+layers = [
+    "(adapters)",
+    "application",
+    "(domain)",
+]
+
+[[tool.importlinter.contracts]]
+id = "feature-slice-dependencies-are-acyclic"
+name = "Feature slice dependencies must remain acyclic"
+type = "acyclic_siblings"
+ancestors = ["fabrica.features"]
+depth = 0
+
+[[tool.importlinter.contracts]]
+id = "shared-kernel-stays-pure"
+name = "Shared kernel must not import feature, adapter, or bootstrap code"
 type = "forbidden"
-source_modules = ["fabrica.features.*.application"]
+source_modules = ["fabrica.shared_kernel"]
 forbidden_modules = [
     "fabrica.adapters",
     "fabrica.bootstrap",
-    "fabrica.features.*.adapters",
+    "fabrica.features",
 ]
+
+[[tool.importlinter.contracts]]
+id = "feature-adapters-do-not-import-cross-slice-adapters"
+name = "Feature adapters must not import adapters from other slices"
+type = "forbidden"
+source_modules = ["fabrica.features.*.adapters"]
+forbidden_modules = ["fabrica.features.*.adapters"]
+ignore_imports = [
+    "fabrica.features.agent_runtime.adapters.** -> fabrica.features.agent_runtime.adapters.**",
+    "fabrica.features.codex_transport.adapters.** -> fabrica.features.codex_transport.adapters.**",
+    "fabrica.features.developer_workflow.adapters.** -> fabrica.features.developer_workflow.adapters.**",
+]
+unmatched_ignore_imports_alerting = "none"
 
 [[tool.importlinter.contracts]]
 id = "generic-cli-shell-stays-feature-agnostic"
