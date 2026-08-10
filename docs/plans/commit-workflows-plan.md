@@ -197,9 +197,9 @@ generation.
 
 ### Checkpoint: Pre-commit gate behavior specified by tests
 
-- [ ] Focused application and CLI tests fail for the expected missing
+- [x] Focused application and CLI tests fail for the expected missing
       implementation reason before production changes.
-- [ ] No unrelated behavior changes have been introduced.
+- [x] No unrelated behavior changes have been introduced.
 
 ### Phase 2: Implement pre-commit gate in the confirmed workflow
 
@@ -280,7 +280,10 @@ the composition-owned working directory, timeout, and diagnostics options.
 
 - [x] Focused unit tests pass.
 - [x] Focused developer-workflow integration tests pass.
-- [ ] Manual review confirms `commit-message` remains read-only.
+- [x] Manual review confirms `commit-message` remains read-only.
+  - 2026-08-10: Confirmed `create_commit_message_workflow()` still wires only
+    staged-change loading, evidence analysis, and synthesis; the pre-commit
+    runner is injected only by `create_confirmed_commit_workflow()`.
 
 ### Phase 3: Tighten spec alignment and edge cases
 
@@ -404,10 +407,10 @@ the full formatting/lint/type/test gate.
 
 **Acceptance criteria:**
 
-- [ ] Focused application tests pass.
-- [ ] Focused CLI tests pass.
-- [ ] Focused developer-workflow integration tests pass.
-- [ ] Full project quality gate passes.
+- [x] Focused application tests pass.
+- [x] Focused CLI tests pass.
+- [x] Focused developer-workflow integration tests pass.
+- [x] Full project quality gate passes.
 
 **Verification:**
 
@@ -420,6 +423,8 @@ uv run ruff check .
 uv run ty check src tests
 uv run pytest
 ```
+
+- [x] 2026-08-10: All focused checks and the full project quality gate passed.
 
 **Dependencies:** All implementation tasks.
 

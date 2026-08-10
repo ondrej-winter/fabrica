@@ -46,8 +46,6 @@ from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     LocalAgentRunResult,
     LocalAgentRunStatus,
-    ModelCostEvidence,
-    ModelUsageEvidence,
     RuntimeObservation,
     SelectedSkill,
     SelectedSkillResource,
@@ -106,31 +104,26 @@ from fabrica.features.developer_workflow.adapters.outbound.pre_commit_registered
 )
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageRecommendation,
-    CreateGitCommitCommand,
-    GenerateCommitMessageResult,
-    GitCommitResult,
     GitContextDiffBounds,
     GitStagedDiffBounds,
-    PreCommitRunCommand,
-    PreCommitRunResult,
-    PreCommitRunStatus,
     SynthesizeCommitMessageCommand,
 )
 from fabrica.features.developer_workflow.application.ports import (
     AsyncCommitMessageSynthesizer,
     CommitMessageAnalysisError,
     CommitMessageSynthesisError,
-    GitCommitError,
     GitStagedChangesLoadError,
-    PreCommitRunError,
-    PreCommitRunner,
 )
 from fabrica.features.developer_workflow.application.use_cases import (
     DEFAULT_COMMIT_MESSAGE_SKILL_ID,
+    CommitMessageEvidenceRecorder,
+    CommitMessageGenerator,
+    ConfirmedCommitWorkflow,
     CreateGitCommit,
     GenerateCommitMessage,
     GenerateCommitMessageError,
     GenerateCommitMessageOptions,
+    format_commit_message_recommendation,
 )
 
 DEFAULT_CODEX_AUTH_FILE = Path.home() / ".codex" / "auth.json"
@@ -330,20 +323,6 @@ class CommitMessageRuntime(Protocol):
         """Run one prepared local agent command asynchronously."""
 
 
-class CommitMessageGenerator(Protocol):
-    """Generator protocol consumed by composed commit workflows."""
-
-    async def generate_async(self, *, skill_id: str) -> GenerateCommitMessageResult:
-        """Generate one commit-message recommendation result."""
-
-
-class GitCommitter(Protocol):
-    """Committer protocol consumed by the confirmed commit workflow."""
-
-    def create(self, command: CreateGitCommitCommand) -> GitCommitResult:
-        """Create a git commit from an approved command."""
-
-
 @dataclass(frozen=True, slots=True)
 class CommitMessageWorkflow:
     """Composed workflow that runs evidence-first commit-message generation."""
@@ -414,252 +393,10 @@ class CommitMessageWorkflow:
             )
         return LocalAgentRunResult(
             status=LocalAgentRunStatus.SUCCESS,
-            output_text=_format_commit_message_recommendation(result.recommendation),
+            output_text=format_commit_message_recommendation(result.recommendation),
             usage_evidence=self.evidence_recorder.usage_evidence if self.evidence_recorder is not None else (),
             cost_evidence=self.evidence_recorder.cost_evidence if self.evidence_recorder is not None else (),
         )
-
-
-@dataclass(frozen=True, slots=True)
-class ConfirmedCommitWorkflowResult:
-    """Result of generating a recommendation and attempting an approved commit."""
-
-    status: LocalAgentRunStatus
-    recommendation: CommitMessageRecommendation | None = None
-    commit_result: GitCommitResult | None = None
-    output_text: str | None = None
-    observations: tuple[RuntimeObservation, ...] = field(default_factory=tuple)
-    usage_evidence: tuple[ModelUsageEvidence, ...] = field(default_factory=tuple)
-    cost_evidence: tuple[ModelCostEvidence, ...] = field(default_factory=tuple)
-    commit_attempted: bool = False
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "observations", tuple(self.observations))
-        object.__setattr__(self, "usage_evidence", tuple(self.usage_evidence))
-        object.__setattr__(self, "cost_evidence", tuple(self.cost_evidence))
-
-    @property
-    def succeeded(self) -> bool:
-        """Return whether recommendation generation and commit creation succeeded."""
-        return self.status is LocalAgentRunStatus.SUCCESS
-
-
-@dataclass(frozen=True, slots=True)
-class ConfirmedCommitWorkflow:
-    """Composed workflow for an externally approved generated git commit."""
-
-    generator: CommitMessageGenerator
-    committer: GitCommitter
-    pre_commit_runner: PreCommitRunner
-    evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
-
-    def run(
-        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
-    ) -> ConfirmedCommitWorkflowResult:
-        """Generate a recommendation and create the approved git commit."""
-        return asyncio.run(self.run_async(command, skill_id=skill_id))
-
-    def generate(
-        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
-    ) -> ConfirmedCommitWorkflowResult:
-        """Generate a recommendation without creating a git commit."""
-        return asyncio.run(self.generate_async(command, skill_id=skill_id))
-
-    async def run_async(
-        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
-    ) -> ConfirmedCommitWorkflowResult:
-        """Generate a recommendation asynchronously and create the approved git commit."""
-        generation_result = await self.generate_async(command, skill_id=skill_id)
-        if not generation_result.succeeded or generation_result.recommendation is None:
-            return generation_result
-        return self.commit(
-            generation_result.recommendation,
-            output_text=generation_result.output_text,
-            usage_evidence=generation_result.usage_evidence,
-            cost_evidence=generation_result.cost_evidence,
-        )
-
-    async def generate_async(
-        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
-    ) -> ConfirmedCommitWorkflowResult:
-        """Generate a recommendation asynchronously without creating a git commit."""
-        selected_skill_id = getattr(command, "skill_id", skill_id)
-        if self.evidence_recorder is not None:
-            self.evidence_recorder.reset()
-        pre_commit_result = self._run_pre_commit_gate()
-        if pre_commit_result is not None:
-            return pre_commit_result
-        try:
-            result = await self.generator.generate_async(skill_id=selected_skill_id)
-        except GitStagedChangesLoadError as err:
-            return self._failure_result(
-                LocalAgentRunStatus.CONFIGURATION_ERROR,
-                RuntimeObservation(
-                    message=str(err),
-                    metadata={"category": err.category, **err.metadata},
-                ),
-            )
-        except SkillContextLoadError as err:
-            return self._failure_result(
-                LocalAgentRunStatus.CONFIGURATION_ERROR,
-                RuntimeObservation(
-                    message=str(err),
-                    metadata={"category": err.category, **err.metadata},
-                ),
-            )
-        except (GenerateCommitMessageError, ValueError) as err:
-            return self._failure_result(
-                LocalAgentRunStatus.CONFIGURATION_ERROR,
-                RuntimeObservation(
-                    message=str(err),
-                    metadata={
-                        "category": "invalid_commit_message_input",
-                        **getattr(err, "metadata", {}),
-                    },
-                ),
-            )
-        except (CommitMessageAnalysisError, CommitMessageSynthesisError) as err:
-            return self._failure_result(
-                LocalAgentRunStatus.MODEL_ERROR,
-                RuntimeObservation(
-                    message=str(err),
-                    metadata={
-                        "category": "commit_message_model_failure",
-                        **err.metadata,
-                    },
-                ),
-            )
-
-        recommendation = result.recommendation
-        output_text = _format_commit_message_recommendation(recommendation)
-
-        return ConfirmedCommitWorkflowResult(
-            status=LocalAgentRunStatus.SUCCESS,
-            recommendation=recommendation,
-            output_text=output_text,
-            usage_evidence=self._usage_evidence,
-            cost_evidence=self._cost_evidence,
-        )
-
-    def commit(
-        self,
-        recommendation: CommitMessageRecommendation,
-        *,
-        output_text: str | None = None,
-        usage_evidence: tuple[ModelUsageEvidence, ...] | None = None,
-        cost_evidence: tuple[ModelCostEvidence, ...] | None = None,
-    ) -> ConfirmedCommitWorkflowResult:
-        """Create a git commit from an externally approved recommendation."""
-        try:
-            commit_result = self.committer.create(
-                CreateGitCommitCommand(message=recommendation.commit_message),
-            )
-        except GitCommitError as err:
-            return ConfirmedCommitWorkflowResult(
-                status=LocalAgentRunStatus.CONFIGURATION_ERROR,
-                recommendation=recommendation,
-                output_text=output_text,
-                observations=(
-                    RuntimeObservation(
-                        message=str(err),
-                        metadata={
-                            "category": "git_commit_failed",
-                            "commit_attempted": True,
-                            **err.metadata,
-                        },
-                    ),
-                ),
-                usage_evidence=usage_evidence or self._usage_evidence,
-                cost_evidence=cost_evidence or self._cost_evidence,
-                commit_attempted=True,
-            )
-
-        return ConfirmedCommitWorkflowResult(
-            status=LocalAgentRunStatus.SUCCESS,
-            recommendation=recommendation,
-            commit_result=commit_result,
-            output_text=output_text,
-            usage_evidence=usage_evidence or self._usage_evidence,
-            cost_evidence=cost_evidence or self._cost_evidence,
-            commit_attempted=True,
-        )
-
-    @property
-    def _usage_evidence(self):
-        return self.evidence_recorder.usage_evidence if self.evidence_recorder is not None else ()
-
-    @property
-    def _cost_evidence(self):
-        return self.evidence_recorder.cost_evidence if self.evidence_recorder is not None else ()
-
-    def _failure_result(
-        self,
-        status: LocalAgentRunStatus,
-        observation: RuntimeObservation,
-    ) -> ConfirmedCommitWorkflowResult:
-        return ConfirmedCommitWorkflowResult(
-            status=status,
-            observations=(observation,),
-            usage_evidence=self._usage_evidence,
-            cost_evidence=self._cost_evidence,
-        )
-
-    def _run_pre_commit_gate(self) -> ConfirmedCommitWorkflowResult | None:
-        try:
-            result = self.pre_commit_runner.run_pre_commit(PreCommitRunCommand())
-        except PreCommitRunError as err:
-            return self._pre_commit_failure_result(
-                RuntimeObservation(
-                    message=str(err),
-                    metadata={"category": err.category, **err.metadata},
-                ),
-            )
-        if result.status is PreCommitRunStatus.PASSED:
-            return None
-        if result.status is PreCommitRunStatus.MODIFIED_FILES:
-            return self._pre_commit_failure_result(
-                RuntimeObservation(
-                    message=(
-                        "pre-commit modified files; no commit was created. "
-                        "review and stage changed files before retrying."
-                    ),
-                    metadata={"category": "pre_commit_modified_files", **_pre_commit_metadata(result)},
-                ),
-            )
-        return self._pre_commit_failure_result(
-            RuntimeObservation(
-                message="pre-commit failed; no commit was created.",
-                metadata={"category": "pre_commit_failed", **_pre_commit_metadata(result)},
-            ),
-        )
-
-    def _pre_commit_failure_result(self, observation: RuntimeObservation) -> ConfirmedCommitWorkflowResult:
-        return ConfirmedCommitWorkflowResult(
-            status=LocalAgentRunStatus.CONFIGURATION_ERROR,
-            observations=(observation,),
-        )
-
-
-def _pre_commit_metadata(result: PreCommitRunResult) -> dict[str, str | int | float | bool | None]:
-    metadata = dict(result.metadata)
-    if result.returncode is not None:
-        metadata["returncode"] = result.returncode
-    return metadata
-
-
-class CommitMessageEvidenceRecorder(Protocol):
-    """Recorder for model evidence collected during a commit-message workflow run."""
-
-    @property
-    def usage_evidence(self):
-        """Return usage evidence observed during the active workflow run."""
-
-    @property
-    def cost_evidence(self):
-        """Return cost evidence observed during the active workflow run."""
-
-    def reset(self) -> None:
-        """Clear evidence from previous workflow runs."""
 
 
 class EvidenceRecordingCommitMessageRuntime:
@@ -723,15 +460,6 @@ class SkillContextCommitMessageSynthesizer:
                 skill_markdown=skill_markdown,
             ),
         )
-
-
-def _format_commit_message_recommendation(recommendation: CommitMessageRecommendation) -> str:
-    """Format a recommendation with the stable terminal output labels."""
-    return (
-        f"Summary:\n{recommendation.summary}\n\n"
-        f"Rationale:\n{recommendation.rationale}\n\n"
-        f"Commit message:\n{recommendation.commit_message}"
-    )
 
 
 class DenyByDefaultSkillScriptApprovalLookup:

@@ -6,8 +6,6 @@ from fabrica.bootstrap.composition import (
     DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT,
     CommitMessageWorkflow,
     CommitMessageWorkflowOptions,
-    ConfirmedCommitWorkflow,
-    ConfirmedCommitWorkflowResult,
     DenyByDefaultSkillScriptApprovalLookup,
     ModelDrivenSkillRuntime,
     ModelDrivenSkillRuntimeOptions,
@@ -37,6 +35,10 @@ from fabrica.bootstrap.composition import (
     create_skill_script_policy_evaluator,
     create_staged_git_registered_tools,
     create_tool_loop_runtime,
+)
+from fabrica.features.developer_workflow.application.use_cases import (
+    ConfirmedCommitWorkflow,
+    ConfirmedCommitWorkflowResult,
 )
 
 __all__ = [
