@@ -8,10 +8,9 @@ from fabrica.adapters.inbound.cli import (
     CliCommandDependencies,
     CliGlobalOptions,
     CliInvocation,
-    CliRunCommand,
-    CliSelectedResource,
     run_cli_command,
 )
+from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import CliRunCommand, CliSelectedResource
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentContextBlock,
     LocalAgentRunCommand,

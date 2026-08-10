@@ -41,6 +41,21 @@ def test_application_modules_do_not_import_adapters_or_bootstrap() -> None:
     assert violations == []
 
 
+def test_product_cli_runner_does_not_import_feature_cli_command_models() -> None:
+    """Keep top-level CLI dispatch contribution-driven instead of feature-specific."""
+    runner_path = SRC_ROOT / "adapters" / "inbound" / "cli" / "runner.py"
+    tree = ast.parse(runner_path.read_text(encoding="utf-8"), filename=str(runner_path))
+
+    forbidden_prefixes = (
+        "fabrica.features.agent_runtime.adapters.inbound.cli",
+        "fabrica.features.developer_workflow.adapters.inbound.cli",
+    )
+
+    violations = [import_name for import_name in _import_names(tree) if _is_forbidden(import_name, forbidden_prefixes)]
+
+    assert violations == []
+
+
 def _import_violations(root: Path, forbidden_prefixes: tuple[str, ...]) -> list[str]:
     violations: list[str] = []
     for path in sorted(root.rglob("*.py")):

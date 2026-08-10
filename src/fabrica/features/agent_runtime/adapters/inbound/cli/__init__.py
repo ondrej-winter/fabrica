@@ -19,6 +19,7 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     ScriptPolicyEvaluator,
     ScriptPolicyResultWriter,
 )
+from fabrica.features.agent_runtime.adapters.inbound.cli.contribution import AGENT_RUNTIME_CLI_COMMAND_TYPES
 from fabrica.features.agent_runtime.adapters.inbound.cli.registration import (
     register_agent_runtime_cli_commands,
 )
@@ -27,6 +28,7 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.runner import (
 )
 
 __all__ = [
+    "AGENT_RUNTIME_CLI_COMMAND_TYPES",
     "AgentRuntimeCliCommandOptions",
     "AgentRuntimeCliDependencies",
     "AgentRuntimeCliStreams",

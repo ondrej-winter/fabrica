@@ -6,7 +6,6 @@ from pathlib import Path
 
 from fabrica.adapters.inbound.cli import (
     CliCommandDependencies,
-    CliCommitMessageCommand,
     CliGlobalOptions,
     CliInvocation,
     run_cli_command,
@@ -24,6 +23,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageObservation,
     RuntimeObservation,
 )
+from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import CliCommitMessageCommand
 from fabrica.features.developer_workflow.application.dtos import GenerateCommitMessageCommand
 
 EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2

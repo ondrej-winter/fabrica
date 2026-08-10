@@ -14,6 +14,7 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
     EvidenceWriter,
     RuntimeResultWriter,
 )
+from fabrica.features.developer_workflow.adapters.inbound.cli.contribution import DEVELOPER_WORKFLOW_CLI_COMMAND_TYPES
 from fabrica.features.developer_workflow.adapters.inbound.cli.registration import (
     register_developer_workflow_cli_commands,
 )
@@ -22,6 +23,7 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.runner import (
 )
 
 __all__ = [
+    "DEVELOPER_WORKFLOW_CLI_COMMAND_TYPES",
     "CliCommitCommand",
     "CliCommitMessageCommand",
     "CommitMessageWorkflowRunner",

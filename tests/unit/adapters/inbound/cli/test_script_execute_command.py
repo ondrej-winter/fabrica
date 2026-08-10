@@ -9,9 +9,9 @@ from pathlib import Path
 
 from fabrica.adapters.inbound.cli import (
     CliCommandDependencies,
-    CliScriptExecuteCommand,
     run_cli_command,
 )
+from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import CliScriptExecuteCommand
 from fabrica.features.agent_runtime.application.dtos import (
     SelectedSkillScript,
     SkillScriptApprovalBinding,

@@ -6,18 +6,22 @@ from pathlib import Path
 import pytest
 
 from fabrica.adapters.inbound.cli import (
-    CliCommitCommand,
-    CliCommitMessageCommand,
     CliGlobalOptions,
     CliInvocation,
+    build_parser,
+    parse_args,
+)
+from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliRunCommand,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
     CliSelectedResource,
-    build_parser,
-    parse_args,
 )
 from fabrica.features.agent_runtime.application.dtos import SkillScriptType
+from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
+    CliCommitCommand,
+    CliCommitMessageCommand,
+)
 
 ARGPARSE_USAGE_ERROR = 2
 

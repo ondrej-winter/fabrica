@@ -6,21 +6,9 @@ import argparse
 from dataclasses import dataclass, field
 
 from fabrica.adapters.inbound.cli.options import CliGlobalOptions
-from fabrica.features.agent_runtime.adapters.inbound.cli import (
-    CliRunCommand,
-    CliScriptExecuteCommand,
-    CliScriptPolicyCommand,
-    register_agent_runtime_cli_commands,
-)
-from fabrica.features.developer_workflow.adapters.inbound.cli import (
-    CliCommitCommand,
-    CliCommitMessageCommand,
-    register_developer_workflow_cli_commands,
-)
+from fabrica.adapters.inbound.cli.registry import default_cli_contributions
 
-type CliCommand = (
-    CliRunCommand | CliCommitMessageCommand | CliCommitCommand | CliScriptPolicyCommand | CliScriptExecuteCommand
-)
+type CliCommand = object
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,8 +41,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Include additional diagnostics without exposing secrets or executing scripts.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    register_agent_runtime_cli_commands(subparsers)
-    register_developer_workflow_cli_commands(subparsers)
+    for contribution in default_cli_contributions():
+        contribution.register_commands(subparsers)
 
     return parser
 

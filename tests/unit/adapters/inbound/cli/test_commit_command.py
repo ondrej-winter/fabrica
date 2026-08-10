@@ -5,7 +5,6 @@ from io import StringIO
 
 from fabrica.adapters.inbound.cli import (
     CliCommandDependencies,
-    CliCommitCommand,
     CliGlobalOptions,
     CliInvocation,
     run_cli_command,
@@ -20,6 +19,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageEvidenceSource,
     RuntimeObservation,
 )
+from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import CliCommitCommand
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageRecommendation,
     GenerateCommitMessageCommand,
