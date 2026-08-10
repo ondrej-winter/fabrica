@@ -61,6 +61,9 @@ It:
 Running pre-commit before message generation keeps the recommendation aligned
 with the staged state that is ready to commit. When hooks modify files, the user
 must review and stage the resulting changes before rerunning `fabrica commit`.
+Formatter hooks are treated the same as any other modifying hook: Fabrica stops
+after the hook changes files and waits for the user to inspect the formatter
+output, stage the desired result, and start the commit workflow again.
 
 ## Shared commit-message generation model
 
@@ -184,6 +187,8 @@ pre-commit:
 
 When pre-commit modifies files, the command reports that the commit was not
 created and the user must review and stage the changed files before retrying.
+This includes formatter hooks that rewrite code. The workflow must not auto-stage
+formatter output or continue with a stale staged snapshot.
 
 `fabrica commit-message` does not run this pre-commit step because it is a
 read-only preview command.

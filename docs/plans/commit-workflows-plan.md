@@ -113,6 +113,9 @@ Bring the current implementation fully in line with the commit workflow spec.
 
 The modified-files observation message must tell the user that no commit was
 created and they must review and stage changed files before retrying.
+Formatter hooks that rewrite files are part of this `MODIFIED_FILES` path: stop
+without model invocation, prompting, or commit creation; do not auto-stage the
+formatter output; wait for the user to review, stage, and rerun `fabrica commit`.
 
 ## Progress Tracking
 
@@ -420,6 +423,7 @@ uv run pytest
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | Pre-commit hooks can modify files | High: committing stale or unreviewed state | Stop before model invocation on `MODIFIED_FILES`; integration-test no commit/runtime calls |
+| Formatter hooks rewrite files | High: generated message could be based on stale staged evidence or formatter output could be auto-staged without review | Treat formatter rewrites as `MODIFIED_FILES`; stop and require the user to review/stage/rerun |
 | Pre-commit may not be installed/configured | Medium: confusing failures | Map `PreCommitRunError` to safe, clear CLI observation |
 | Existing tests may assume commit happens without pre-commit | Medium: test churn | Update tests to use passing fake pre-commit where commit behavior is under test |
 | Async analysis ordering can regress | Medium: misleading final synthesis | Keep `gather_ordered(...)` and test ordered evidence bundle semantics |
