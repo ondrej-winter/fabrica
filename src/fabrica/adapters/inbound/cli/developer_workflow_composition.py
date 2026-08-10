@@ -14,8 +14,6 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.command_models imp
     CliCommitMessageCommand,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
-    CommitMessageWorkflowRunner,
-    ConfirmedCommitWorkflowRunner,
     DeveloperWorkflowCliCommandOptions,
     DeveloperWorkflowCliDependencies,
     DeveloperWorkflowCliStreams,
@@ -28,6 +26,10 @@ if TYPE_CHECKING:
     from fabrica.features.agent_runtime.application.dtos import (
         ModelCostEvidence,
         ModelUsageEvidence,
+    )
+    from fabrica.features.developer_workflow.application.ports import (
+        CommitMessageWorkflowRunner,
+        ConfirmedCommitWorkflowRunner,
     )
 
 

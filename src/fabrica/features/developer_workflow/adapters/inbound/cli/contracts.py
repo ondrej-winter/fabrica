@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Protocol, TextIO
 
 if TYPE_CHECKING:
     from fabrica.features.agent_runtime.application.dtos import LocalAgentRunResult
-    from fabrica.features.developer_workflow.application.dtos import (
-        CommitMessageRecommendation,
-        GenerateCommitMessageCommand,
+    from fabrica.features.developer_workflow.application.ports import (
+        CommitMessageWorkflowRunner,
+        ConfirmedCommitWorkflowRunner,
     )
     from fabrica.features.developer_workflow.application.use_cases import ConfirmedCommitWorkflowResult
 
@@ -42,23 +42,6 @@ class ConfirmedCommitResultWriter(Protocol):
 
     def __call__(self, result: ConfirmedCommitWorkflowResult, *, stdout: TextIO, stderr: TextIO) -> int:
         """Write a confirmed commit workflow result and return a process exit code."""
-
-
-class CommitMessageWorkflowRunner(Protocol):
-    """Protocol for commit-message workflow execution consumed by the CLI adapter."""
-
-    def run(self, command: GenerateCommitMessageCommand) -> LocalAgentRunResult:
-        """Run selected-skill commit-message generation."""
-
-
-class ConfirmedCommitWorkflowRunner(Protocol):
-    """Protocol for interactive confirmed commit workflow execution."""
-
-    def generate(self, command: GenerateCommitMessageCommand) -> ConfirmedCommitWorkflowResult:
-        """Generate a commit-message recommendation without creating a commit."""
-
-    def commit(self, recommendation: CommitMessageRecommendation) -> ConfirmedCommitWorkflowResult:
-        """Create a git commit from an approved recommendation."""
 
 
 @dataclass(frozen=True, slots=True)

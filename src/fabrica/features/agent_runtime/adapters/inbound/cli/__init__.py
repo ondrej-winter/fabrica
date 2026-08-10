@@ -12,11 +12,9 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     AgentRuntimeCliStreams,
     AgentRuntimeCliWriters,
     CommandAugmenter,
-    LocalAgentRuntime,
+    EvidenceWriter,
     RunResultWriter,
     ScriptExecutionResultWriter,
-    ScriptExecutor,
-    ScriptPolicyEvaluator,
     ScriptPolicyResultWriter,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.contribution import AGENT_RUNTIME_CLI_COMMAND_TYPES
@@ -25,6 +23,11 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.registration import (
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.runner import (
     run_agent_runtime_cli_command,
+)
+from fabrica.features.agent_runtime.application.ports import (
+    LocalAgentRuntime,
+    SkillScriptPolicyEvaluator,
+    SkillScriptRunner,
 )
 
 __all__ = [
@@ -38,12 +41,13 @@ __all__ = [
     "CliScriptPolicyCommand",
     "CliSelectedResource",
     "CommandAugmenter",
+    "EvidenceWriter",
     "LocalAgentRuntime",
     "RunResultWriter",
     "ScriptExecutionResultWriter",
-    "ScriptExecutor",
-    "ScriptPolicyEvaluator",
     "ScriptPolicyResultWriter",
+    "SkillScriptPolicyEvaluator",
+    "SkillScriptRunner",
     "register_agent_runtime_cli_commands",
     "run_agent_runtime_cli_command",
 ]

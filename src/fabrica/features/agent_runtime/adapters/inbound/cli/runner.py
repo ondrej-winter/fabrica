@@ -25,9 +25,8 @@ if TYPE_CHECKING:
         AgentRuntimeCliStreams,
         AgentRuntimeCliWriters,
         CommandAugmenter,
-        ScriptExecutor,
-        ScriptPolicyEvaluator,
     )
+    from fabrica.features.agent_runtime.application.ports import SkillScriptPolicyEvaluator, SkillScriptRunner
 
 
 def run_agent_runtime_cli_command(
@@ -63,13 +62,16 @@ def run_agent_runtime_cli_command(
         )
     active_runtime = _require_dependency(dependencies.runtime, dependency_name="runtime")
     result = active_runtime.run(runtime_command)
-    return writers.run_result(result, stdout=streams.stdout, stderr=streams.stderr)
+    exit_code = writers.run_result(result, stdout=streams.stdout, stderr=streams.stderr)
+    if global_options.print_usage or global_options.print_prices:
+        writers.evidence(result, global_options=global_options, stdout=streams.stdout)
+    return exit_code
 
 
 def _run_script_policy_command(
     command: CliScriptPolicyCommand,
     *,
-    script_policy_evaluator: ScriptPolicyEvaluator | None,
+    script_policy_evaluator: SkillScriptPolicyEvaluator | None,
     streams: AgentRuntimeCliStreams,
     writers: AgentRuntimeCliWriters,
 ) -> int:
@@ -82,7 +84,7 @@ def _run_script_policy_command(
 def _run_script_execute_command(
     command: CliScriptExecuteCommand,
     *,
-    script_executor: ScriptExecutor | None,
+    script_executor: SkillScriptRunner | None,
     streams: AgentRuntimeCliStreams,
     writers: AgentRuntimeCliWriters,
 ) -> int:

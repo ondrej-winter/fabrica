@@ -16,6 +16,14 @@ from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     LocalAgentRunResult,
     LocalAgentRunStatus,
+    ModelCostEvidence,
+    ModelPricingStatus,
+    ModelTokenUsageEvidence,
+    ModelUsageCollectionStatus,
+    ModelUsageEvidence,
+    ModelUsageEvidenceConfidence,
+    ModelUsageEvidenceSource,
+    ModelUsageObservation,
     RuntimeObservation,
     SelectedSkill,
     SelectedSkillResource,
@@ -147,6 +155,54 @@ def test_run_invocation_passes_global_verbose_diagnostics_to_augmenter() -> None
 
     assert exit_code == 0
     assert augmenter.calls[0][4] is True
+
+
+def test_run_invocation_appends_requested_usage_and_price_evidence() -> None:
+    runtime = FakeRuntime(
+        result=LocalAgentRunResult(
+            status=LocalAgentRunStatus.SUCCESS,
+            output_text="pong",
+            usage_evidence=(
+                ModelUsageEvidence(
+                    provider="codex",
+                    status=ModelUsageCollectionStatus.COLLECTED,
+                    source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+                    confidence=ModelUsageEvidenceConfidence.EXTRACTED,
+                    model="gpt-5.3-codex-spark",
+                    tokens=ModelTokenUsageEvidence(input_tokens=1, output_tokens=1, total_tokens=2),
+                ),
+            ),
+            cost_evidence=(
+                ModelCostEvidence(
+                    pricing_status=ModelPricingStatus.UNKNOWN,
+                    source=ModelUsageEvidenceSource.SOURCE_CODE_OBSERVATION,
+                    confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+                    observations=(ModelUsageObservation(message="pricing is unknown"),),
+                ),
+            ),
+        ),
+    )
+    stdout = StringIO()
+
+    exit_code = run_cli_command(
+        CliInvocation(
+            command=CliRunCommand(prompt="Reply with pong"),
+            global_options=CliGlobalOptions(print_usage=True, print_prices=True),
+        ),
+        dependencies=CliCommandDependencies(runtime=runtime),
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert exit_code == 0
+    assert stdout.getvalue() == (
+        "pong\n"
+        "Usage evidence:\n"
+        "- provider=codex status=collected source=response_payload confidence=extracted "
+        "model=gpt-5.3-codex-spark input_tokens=1 output_tokens=1 total_tokens=2\n"
+        "Pricing evidence:\n"
+        "- status=unknown source=source_code_observation confidence=unknown observation='pricing is unknown'\n"
+    )
 
 
 def test_run_command_skips_augmentation_when_no_context_is_selected() -> None:

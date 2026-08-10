@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, TextIO
 
 from fabrica.adapters.inbound.cli.output import (
+    write_model_evidence_report,
     write_run_result,
     write_script_execution_result,
     write_script_policy_result,
@@ -19,9 +20,6 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     AgentRuntimeCliDependencies,
     AgentRuntimeCliStreams,
     AgentRuntimeCliWriters,
-    LocalAgentRuntime,
-    ScriptExecutor,
-    ScriptPolicyEvaluator,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.runner import run_agent_runtime_cli_command
 
@@ -29,13 +27,33 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from fabrica.adapters.inbound.cli.contributions import CliExecutionContext
+    from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliCommandOptions
     from fabrica.features.agent_runtime.application.dtos import (
         LocalAgentRunCommand,
+        ModelCostEvidence,
+        ModelUsageEvidence,
         SelectedSkill,
         SelectedSkillResource,
         SkillScriptApprovalBinding,
         SkillScriptApprovalDecision,
     )
+    from fabrica.features.agent_runtime.application.ports import (
+        LocalAgentRuntime,
+        SkillScriptPolicyEvaluator,
+        SkillScriptRunner,
+    )
+
+
+class ModelEvidenceResult(Protocol):
+    """Result shape that can expose model evidence to the product CLI."""
+
+    @property
+    def usage_evidence(self) -> tuple[ModelUsageEvidence, ...]:
+        """Return usage evidence emitted by the command."""
+
+    @property
+    def cost_evidence(self) -> tuple[ModelCostEvidence, ...]:
+        """Return cost evidence emitted by the command."""
 
 
 def run_agent_runtime_contribution_command(command: object, context: CliExecutionContext) -> int:
@@ -50,9 +68,25 @@ def run_agent_runtime_contribution_command(command: object, context: CliExecutio
         streams=AgentRuntimeCliStreams(stdout=context.stdout, stderr=context.stderr),
         writers=AgentRuntimeCliWriters(
             run_result=write_run_result,
+            evidence=_write_requested_model_evidence,
             script_policy_result=write_script_policy_result,
             script_execution_result=write_script_execution_result,
         ),
+    )
+
+
+def _write_requested_model_evidence(
+    result: ModelEvidenceResult,
+    *,
+    global_options: AgentRuntimeCliCommandOptions,
+    stdout: TextIO,
+) -> None:
+    write_model_evidence_report(
+        usage_evidence=result.usage_evidence,
+        cost_evidence=result.cost_evidence,
+        stdout=stdout,
+        include_usage=global_options.print_usage,
+        include_prices=global_options.print_prices,
     )
 
 
@@ -105,7 +139,7 @@ def _create_default_script_policy_evaluator(
     command: CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand,
     *,
     context: CliExecutionContext,
-) -> ScriptPolicyEvaluator | None:
+) -> SkillScriptPolicyEvaluator | None:
     if not isinstance(command, CliScriptPolicyCommand):
         return None
 
@@ -126,7 +160,7 @@ def _create_default_script_executor(
     command: CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand,
     *,
     context: CliExecutionContext,
-) -> ScriptExecutor | None:
+) -> SkillScriptRunner | None:
     if not isinstance(command, CliScriptExecuteCommand):
         return None
 

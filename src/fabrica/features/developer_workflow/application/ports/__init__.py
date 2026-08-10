@@ -22,6 +22,10 @@ from fabrica.features.developer_workflow.application.ports.git import (
     PreCommitRunError,
     PreCommitRunner,
 )
+from fabrica.features.developer_workflow.application.ports.inbound import (
+    CommitMessageWorkflowRunner,
+    ConfirmedCommitWorkflowRunner,
+)
 
 __all__ = [
     "AsyncCommitMessageSynthesizer",
@@ -30,6 +34,8 @@ __all__ = [
     "CommitMessageAnalysisError",
     "CommitMessageSynthesisError",
     "CommitMessageSynthesizer",
+    "CommitMessageWorkflowRunner",
+    "ConfirmedCommitWorkflowRunner",
     "GitCommitContextLoader",
     "GitCommitCreator",
     "GitCommitError",

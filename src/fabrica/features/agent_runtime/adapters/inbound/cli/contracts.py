@@ -13,18 +13,14 @@ if TYPE_CHECKING:
         LocalAgentRunResult,
         SelectedSkill,
         SelectedSkillResource,
-        SkillScriptExecutionCommand,
         SkillScriptExecutionResult,
-        SkillScriptPolicyEvaluationCommand,
         SkillScriptPolicyEvaluationResult,
     )
-
-
-class LocalAgentRuntime(Protocol):
-    """Protocol for the runtime use case consumed by the CLI adapter."""
-
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run one local agent command."""
+    from fabrica.features.agent_runtime.application.ports import (
+        LocalAgentRuntime,
+        SkillScriptPolicyEvaluator,
+        SkillScriptRunner,
+    )
 
 
 class CommandAugmenter(Protocol):
@@ -42,22 +38,16 @@ class CommandAugmenter(Protocol):
         """Return a command augmented with explicitly selected context."""
 
 
-class ScriptPolicyEvaluator(Protocol):
-    """Protocol for selected skill script policy evaluation consumed by the CLI adapter."""
-
-    def evaluate(self, command: SkillScriptPolicyEvaluationCommand) -> SkillScriptPolicyEvaluationResult:
-        """Evaluate selected script policy without executing the script."""
-
-
-class ScriptExecutor(Protocol):
-    """Protocol for selected skill script execution consumed by the CLI adapter."""
-
-    def execute(self, command: SkillScriptExecutionCommand) -> SkillScriptExecutionResult:
-        """Execute one selected skill script through policy-gated application boundaries."""
-
-
 class AgentRuntimeCliCommandOptions(Protocol):
     """Shared product CLI options consumed by agent-runtime command adapters."""
+
+    @property
+    def print_usage(self) -> bool:
+        """Return whether model usage evidence should be printed."""
+
+    @property
+    def print_prices(self) -> bool:
+        """Return whether model pricing evidence should be printed."""
 
     @property
     def verbose_diagnostics(self) -> bool:
@@ -69,6 +59,19 @@ class RunResultWriter(Protocol):
 
     def __call__(self, result: LocalAgentRunResult, *, stdout: TextIO, stderr: TextIO) -> int:
         """Write a local runtime result and return a process exit code."""
+
+
+class EvidenceWriter(Protocol):
+    """Writer for requested model evidence after command output."""
+
+    def __call__(
+        self,
+        result: LocalAgentRunResult,
+        *,
+        global_options: AgentRuntimeCliCommandOptions,
+        stdout: TextIO,
+    ) -> None:
+        """Write model evidence selected by global CLI options."""
 
 
 class ScriptPolicyResultWriter(Protocol):
@@ -91,8 +94,8 @@ class AgentRuntimeCliDependencies:
 
     runtime: LocalAgentRuntime | None = None
     command_augmenter: CommandAugmenter | None = None
-    script_policy_evaluator: ScriptPolicyEvaluator | None = None
-    script_executor: ScriptExecutor | None = None
+    script_policy_evaluator: SkillScriptPolicyEvaluator | None = None
+    script_executor: SkillScriptRunner | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +103,7 @@ class AgentRuntimeCliWriters:
     """Injected output writers for agent-runtime CLI commands."""
 
     run_result: RunResultWriter
+    evidence: EvidenceWriter
     script_policy_result: ScriptPolicyResultWriter
     script_execution_result: ScriptExecutionResultWriter
 

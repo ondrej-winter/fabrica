@@ -1,6 +1,11 @@
 """Application-owned ports for local agent runtime use cases."""
 
 from fabrica.features.agent_runtime.application.ports.agent_model import AgentModel, AgentModelError
+from fabrica.features.agent_runtime.application.ports.inbound import (
+    LocalAgentRuntime,
+    SkillScriptPolicyEvaluator,
+    SkillScriptRunner,
+)
 from fabrica.features.agent_runtime.application.ports.registered_tool import RegisteredTool, RegisteredToolHandler
 from fabrica.features.agent_runtime.application.ports.skill_context import (
     SkillContextLoader,
@@ -27,6 +32,7 @@ from fabrica.features.agent_runtime.application.ports.tool_execution import Tool
 __all__ = [
     "AgentModel",
     "AgentModelError",
+    "LocalAgentRuntime",
     "RegisteredTool",
     "RegisteredToolHandler",
     "SkillContextLoadError",
@@ -37,6 +43,8 @@ __all__ = [
     "SkillScriptExecutor",
     "SkillScriptMetadataLoadError",
     "SkillScriptMetadataLoader",
+    "SkillScriptPolicyEvaluator",
+    "SkillScriptRunner",
     "SkillToolPreparationError",
     "SkillToolPreparer",
     "ToolAwareAgentModel",

@@ -12,8 +12,10 @@ if TYPE_CHECKING:
     from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
         CommandAugmenter,
         LocalAgentRuntime,
-        ScriptExecutor,
-        ScriptPolicyEvaluator,
+    )
+    from fabrica.features.agent_runtime.application.ports import (
+        SkillScriptPolicyEvaluator,
+        SkillScriptRunner,
     )
     from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
         CommitMessageWorkflowRunner,
@@ -33,8 +35,8 @@ class CliCommandDependencies:
     command_augmenter: CommandAugmenter | None = None
     commit_message_workflow: CommitMessageWorkflowRunner | None = None
     confirmed_commit_workflow: ConfirmedCommitWorkflowRunner | None = None
-    script_policy_evaluator: ScriptPolicyEvaluator | None = None
-    script_executor: ScriptExecutor | None = None
+    script_policy_evaluator: SkillScriptPolicyEvaluator | None = None
+    script_executor: SkillScriptRunner | None = None
 
 
 @dataclass(frozen=True, slots=True)
