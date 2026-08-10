@@ -7,12 +7,17 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliSelectedResource,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
+    AgentRuntimeCliCommandOptions,
     AgentRuntimeCliDependencies,
     AgentRuntimeCliStreams,
+    AgentRuntimeCliWriters,
     CommandAugmenter,
     LocalAgentRuntime,
+    RunResultWriter,
+    ScriptExecutionResultWriter,
     ScriptExecutor,
     ScriptPolicyEvaluator,
+    ScriptPolicyResultWriter,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.registration import (
     register_agent_runtime_cli_commands,
@@ -22,16 +27,21 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.runner import (
 )
 
 __all__ = [
+    "AgentRuntimeCliCommandOptions",
     "AgentRuntimeCliDependencies",
     "AgentRuntimeCliStreams",
+    "AgentRuntimeCliWriters",
     "CliRunCommand",
     "CliScriptExecuteCommand",
     "CliScriptPolicyCommand",
     "CliSelectedResource",
     "CommandAugmenter",
     "LocalAgentRuntime",
+    "RunResultWriter",
+    "ScriptExecutionResultWriter",
     "ScriptExecutor",
     "ScriptPolicyEvaluator",
+    "ScriptPolicyResultWriter",
     "register_agent_runtime_cli_commands",
     "run_agent_runtime_cli_command",
 ]

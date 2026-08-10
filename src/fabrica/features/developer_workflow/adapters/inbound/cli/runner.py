@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TextIO
+from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli.output import write_run_result
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunResult,
     LocalAgentRunStatus,
@@ -14,50 +13,50 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.command_models imp
     CliCommitCommand,
     CliCommitMessageCommand,
 )
+from fabrica.features.developer_workflow.application.dtos import GenerateCommitMessageCommand
 
 if TYPE_CHECKING:
-    from fabrica.adapters.inbound.cli.options import CliGlobalOptions
-    from fabrica.bootstrap import ConfirmedCommitWorkflowResult
     from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
-        CommitMessageWorkflowRunner,
-        ConfirmedCommitWorkflowRunner,
+        DeveloperWorkflowCliCommandOptions,
         DeveloperWorkflowCliDependencies,
         DeveloperWorkflowCliStreams,
-        EvidenceWriter,
+        DeveloperWorkflowCliWriters,
     )
+    from fabrica.features.developer_workflow.application.use_cases import ConfirmedCommitWorkflowResult
 
 
 def run_developer_workflow_cli_command(
     command: CliCommitMessageCommand | CliCommitCommand,
     *,
-    global_options: CliGlobalOptions,
+    global_options: DeveloperWorkflowCliCommandOptions,
     dependencies: DeveloperWorkflowCliDependencies,
     streams: DeveloperWorkflowCliStreams,
-    evidence_writer: EvidenceWriter,
+    writers: DeveloperWorkflowCliWriters,
 ) -> int:
     """Run one developer-workflow owned CLI command."""
     if isinstance(command, CliCommitMessageCommand):
-        workflow = dependencies.commit_message_workflow or _create_default_commit_message_workflow(
-            command, global_options=global_options
+        workflow = _require_dependency(
+            dependencies.commit_message_workflow,
+            dependency_name="commit_message_workflow",
         )
-        result = workflow.run(command)
+        result = workflow.run(_generate_commit_message_command(command))
         return _write_runtime_result(
             result,
             global_options=global_options,
-            stdout=streams.stdout,
-            stderr=streams.stderr,
-            evidence_writer=evidence_writer,
+            streams=streams,
+            writers=writers,
         )
-    workflow = dependencies.confirmed_commit_workflow or _create_default_confirmed_commit_workflow(
-        command, global_options=global_options
+    workflow = _require_dependency(
+        dependencies.confirmed_commit_workflow,
+        dependency_name="confirmed_commit_workflow",
     )
-    generation_result = workflow.generate(command)
+    generation_result = workflow.generate(_generate_commit_message_command(command))
     if not generation_result.succeeded or generation_result.recommendation is None:
         return _write_confirmed_commit_result(
             generation_result,
             global_options=global_options,
             streams=streams,
-            evidence_writer=evidence_writer,
+            writers=writers,
         )
 
     if generation_result.output_text:
@@ -84,14 +83,13 @@ def run_developer_workflow_cli_command(
         return _write_runtime_result(
             interrupted_result,
             global_options=global_options,
-            stdout=streams.stdout,
-            stderr=streams.stderr,
-            evidence_writer=evidence_writer,
+            streams=streams,
+            writers=writers,
         )
 
     if answer.strip().casefold() not in {"y", "yes"}:
         streams.stdout.write("Commit cancelled; no commit created.\n")
-        evidence_writer(generation_result, global_options=global_options, stdout=streams.stdout)
+        writers.evidence(generation_result, global_options=global_options, stdout=streams.stdout)
         return 0
 
     commit_result = workflow.commit(generation_result.recommendation)
@@ -105,30 +103,29 @@ def run_developer_workflow_cli_command(
         global_options=global_options,
         streams=streams,
         output_already_written=True,
-        evidence_writer=evidence_writer,
+        writers=writers,
     )
 
 
 def _write_runtime_result(
     result: LocalAgentRunResult,
     *,
-    global_options: CliGlobalOptions,
-    stdout: TextIO,
-    stderr: TextIO,
-    evidence_writer: EvidenceWriter,
+    global_options: DeveloperWorkflowCliCommandOptions,
+    streams: DeveloperWorkflowCliStreams,
+    writers: DeveloperWorkflowCliWriters,
 ) -> int:
-    exit_code = write_run_result(result, stdout=stdout, stderr=stderr)
+    exit_code = writers.runtime_result(result, stdout=streams.stdout, stderr=streams.stderr)
     if global_options.print_usage or global_options.print_prices:
-        evidence_writer(result, global_options=global_options, stdout=stdout)
+        writers.evidence(result, global_options=global_options, stdout=streams.stdout)
     return exit_code
 
 
 def _write_confirmed_commit_result(
     result: ConfirmedCommitWorkflowResult,
     *,
-    global_options: CliGlobalOptions,
+    global_options: DeveloperWorkflowCliCommandOptions,
     streams: DeveloperWorkflowCliStreams,
-    evidence_writer: EvidenceWriter,
+    writers: DeveloperWorkflowCliWriters,
     output_already_written: bool = False,
 ) -> int:
     runtime_result = LocalAgentRunResult(
@@ -141,47 +138,19 @@ def _write_confirmed_commit_result(
     return _write_runtime_result(
         runtime_result,
         global_options=global_options,
-        stdout=streams.stdout,
-        stderr=streams.stderr,
-        evidence_writer=evidence_writer,
+        streams=streams,
+        writers=writers,
     )
 
 
-def _create_default_commit_message_workflow(
-    command: CliCommitMessageCommand,
-    *,
-    global_options: CliGlobalOptions,
-) -> CommitMessageWorkflowRunner:
-    from fabrica.bootstrap import (  # noqa: PLC0415
-        CommitMessageWorkflowOptions,
-        create_codex_commit_message_workflow,
-    )
-
-    return create_codex_commit_message_workflow(
-        CommitMessageWorkflowOptions(
-            codex_model=command.model,
-            codex_reasoning_effort=command.reasoning_effort,
-            skill_roots=command.skill_roots,
-            verbose_diagnostics=global_options.verbose_diagnostics,
-        ),
-    )
+def _require_dependency(dependency: object | None, *, dependency_name: str):
+    if dependency is None:
+        msg = f"developer-workflow CLI dependency is not configured: {dependency_name}"
+        raise RuntimeError(msg)
+    return dependency
 
 
-def _create_default_confirmed_commit_workflow(
-    command: CliCommitCommand,
-    *,
-    global_options: CliGlobalOptions,
-) -> ConfirmedCommitWorkflowRunner:
-    from fabrica.bootstrap import (  # noqa: PLC0415
-        CommitMessageWorkflowOptions,
-        create_codex_confirmed_commit_workflow,
-    )
-
-    return create_codex_confirmed_commit_workflow(
-        CommitMessageWorkflowOptions(
-            codex_model=command.model,
-            codex_reasoning_effort=command.reasoning_effort,
-            skill_roots=command.skill_roots,
-            verbose_diagnostics=global_options.verbose_diagnostics,
-        ),
-    )
+def _generate_commit_message_command(
+    command: CliCommitMessageCommand | CliCommitCommand,
+) -> GenerateCommitMessageCommand:
+    return GenerateCommitMessageCommand(skill_id=command.skill_id)

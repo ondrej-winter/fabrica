@@ -7,9 +7,12 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.command_models imp
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
     CommitMessageWorkflowRunner,
     ConfirmedCommitWorkflowRunner,
+    DeveloperWorkflowCliCommandOptions,
     DeveloperWorkflowCliDependencies,
     DeveloperWorkflowCliStreams,
+    DeveloperWorkflowCliWriters,
     EvidenceWriter,
+    RuntimeResultWriter,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.registration import (
     register_developer_workflow_cli_commands,
@@ -23,9 +26,12 @@ __all__ = [
     "CliCommitMessageCommand",
     "CommitMessageWorkflowRunner",
     "ConfirmedCommitWorkflowRunner",
+    "DeveloperWorkflowCliCommandOptions",
     "DeveloperWorkflowCliDependencies",
     "DeveloperWorkflowCliStreams",
+    "DeveloperWorkflowCliWriters",
     "EvidenceWriter",
+    "RuntimeResultWriter",
     "register_developer_workflow_cli_commands",
     "run_developer_workflow_cli_command",
 ]

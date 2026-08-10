@@ -13,6 +13,16 @@ DEFAULT_MAX_COMMIT_MESSAGE_EVIDENCE_CHARS = 50_000
 
 
 @dataclass(frozen=True, slots=True)
+class GenerateCommitMessageCommand:
+    """Application command for selected-skill commit-message generation."""
+
+    skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "skill_id", _validate_required_text(self.skill_id, field_name="skill_id"))
+
+
+@dataclass(frozen=True, slots=True)
 class AnalyzeStagedFileForCommitMessageCommand:
     """Command to analyze one staged file diff for commit-message evidence."""
 

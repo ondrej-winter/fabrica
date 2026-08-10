@@ -103,7 +103,9 @@ from fabrica.features.developer_workflow.adapters.outbound.pre_commit_registered
     create_pre_commit_registered_tools,
 )
 from fabrica.features.developer_workflow.application.dtos import (
+    DEFAULT_COMMIT_MESSAGE_SKILL_ID,
     CommitMessageRecommendation,
+    GenerateCommitMessageCommand,
     GitContextDiffBounds,
     GitStagedDiffBounds,
     SynthesizeCommitMessageCommand,
@@ -115,7 +117,6 @@ from fabrica.features.developer_workflow.application.ports import (
     GitStagedChangesLoadError,
 )
 from fabrica.features.developer_workflow.application.use_cases import (
-    DEFAULT_COMMIT_MESSAGE_SKILL_ID,
     CommitMessageEvidenceRecorder,
     CommitMessageGenerator,
     ConfirmedCommitWorkflow,
@@ -331,20 +332,26 @@ class CommitMessageWorkflow:
     evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
 
     def run(
-        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
+        self,
+        command: GenerateCommitMessageCommand | None = None,
+        *,
+        skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID,
     ) -> LocalAgentRunResult:
         """Generate a recommendation and map it to the local runtime result contract."""
         return asyncio.run(self.run_async(command, skill_id=skill_id))
 
     async def run_async(
-        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
+        self,
+        command: GenerateCommitMessageCommand | None = None,
+        *,
+        skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID,
     ) -> LocalAgentRunResult:
         """Generate a recommendation asynchronously and map it to the runtime result contract."""
-        selected_skill_id = getattr(command, "skill_id", skill_id)
+        active_command = command or GenerateCommitMessageCommand(skill_id=skill_id)
         if self.evidence_recorder is not None:
             self.evidence_recorder.reset()
         try:
-            result = await self.generator.generate_async(skill_id=selected_skill_id)
+            result = await self.generator.generate_async(skill_id=active_command.skill_id)
         except GitStagedChangesLoadError as err:
             return LocalAgentRunResult(
                 status=LocalAgentRunStatus.CONFIGURATION_ERROR,

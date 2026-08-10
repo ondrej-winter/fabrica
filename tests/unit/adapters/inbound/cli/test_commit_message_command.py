@@ -24,6 +24,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageObservation,
     RuntimeObservation,
 )
+from fabrica.features.developer_workflow.application.dtos import GenerateCommitMessageCommand
 
 EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2
 
@@ -31,9 +32,9 @@ EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2
 @dataclass
 class FakeCommitMessageWorkflow:
     result: LocalAgentRunResult
-    calls: list[CliCommitMessageCommand] = field(default_factory=list)
+    calls: list[GenerateCommitMessageCommand] = field(default_factory=list)
 
-    def run(self, command: CliCommitMessageCommand) -> LocalAgentRunResult:
+    def run(self, command: GenerateCommitMessageCommand) -> LocalAgentRunResult:
         self.calls.append(command)
         return self.result
 
@@ -61,7 +62,7 @@ def test_commit_message_command_uses_injected_workflow_and_writes_success_output
     assert exit_code == 0
     assert stdout.getvalue() == "Commit message:\nfeat: add x\n"
     assert stderr.getvalue() == ""
-    assert workflow.calls == [command]
+    assert workflow.calls == [GenerateCommitMessageCommand(skill_id="team-style")]
 
 
 def test_commit_message_invocation_appends_requested_usage_and_price_evidence() -> None:

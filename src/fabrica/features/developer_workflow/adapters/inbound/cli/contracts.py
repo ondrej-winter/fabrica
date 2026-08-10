@@ -6,27 +6,48 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, TextIO
 
 if TYPE_CHECKING:
-    from fabrica.adapters.inbound.cli.options import CliGlobalOptions
-    from fabrica.bootstrap import ConfirmedCommitWorkflowResult
     from fabrica.features.agent_runtime.application.dtos import LocalAgentRunResult
-    from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
-        CliCommitCommand,
-        CliCommitMessageCommand,
+    from fabrica.features.developer_workflow.application.dtos import (
+        CommitMessageRecommendation,
+        GenerateCommitMessageCommand,
     )
-    from fabrica.features.developer_workflow.application.dtos import CommitMessageRecommendation
+    from fabrica.features.developer_workflow.application.use_cases import ConfirmedCommitWorkflowResult
+
+
+class DeveloperWorkflowCliCommandOptions(Protocol):
+    """Shared product CLI options consumed by developer-workflow command adapters."""
+
+    @property
+    def print_usage(self) -> bool:
+        """Return whether model usage evidence should be printed."""
+
+    @property
+    def print_prices(self) -> bool:
+        """Return whether model pricing evidence should be printed."""
+
+    @property
+    def verbose_diagnostics(self) -> bool:
+        """Return whether additional safe diagnostics should be included."""
+
+
+class RuntimeResultWriter(Protocol):
+    """Writer for runtime-shaped developer workflow results."""
+
+    def __call__(self, result: LocalAgentRunResult, *, stdout: TextIO, stderr: TextIO) -> int:
+        """Write a runtime result and return a process exit code."""
 
 
 class CommitMessageWorkflowRunner(Protocol):
     """Protocol for commit-message workflow execution consumed by the CLI adapter."""
 
-    def run(self, command: CliCommitMessageCommand) -> LocalAgentRunResult:
+    def run(self, command: GenerateCommitMessageCommand) -> LocalAgentRunResult:
         """Run selected-skill commit-message generation."""
 
 
 class ConfirmedCommitWorkflowRunner(Protocol):
     """Protocol for interactive confirmed commit workflow execution."""
 
-    def generate(self, command: CliCommitCommand) -> ConfirmedCommitWorkflowResult:
+    def generate(self, command: GenerateCommitMessageCommand) -> ConfirmedCommitWorkflowResult:
         """Generate a commit-message recommendation without creating a commit."""
 
     def commit(self, recommendation: CommitMessageRecommendation) -> ConfirmedCommitWorkflowResult:
@@ -50,6 +71,14 @@ class DeveloperWorkflowCliStreams:
     stderr: TextIO
 
 
+@dataclass(frozen=True, slots=True)
+class DeveloperWorkflowCliWriters:
+    """Injected output writers for developer-workflow CLI commands."""
+
+    evidence: EvidenceWriter
+    runtime_result: RuntimeResultWriter
+
+
 class EvidenceWriter(Protocol):
     """Protocol for writing requested model evidence after command output."""
 
@@ -57,7 +86,7 @@ class EvidenceWriter(Protocol):
         self,
         result: LocalAgentRunResult | ConfirmedCommitWorkflowResult,
         *,
-        global_options: CliGlobalOptions,
+        global_options: DeveloperWorkflowCliCommandOptions,
         stdout: TextIO,
     ) -> None:
         """Write model evidence selected by global CLI options."""

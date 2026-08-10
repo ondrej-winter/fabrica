@@ -56,6 +56,35 @@ class ScriptExecutor(Protocol):
         """Execute one selected skill script through policy-gated application boundaries."""
 
 
+class AgentRuntimeCliCommandOptions(Protocol):
+    """Shared product CLI options consumed by agent-runtime command adapters."""
+
+    @property
+    def verbose_diagnostics(self) -> bool:
+        """Return whether additional safe diagnostics should be included."""
+
+
+class RunResultWriter(Protocol):
+    """Writer for one local agent runtime result."""
+
+    def __call__(self, result: LocalAgentRunResult, *, stdout: TextIO, stderr: TextIO) -> int:
+        """Write a local runtime result and return a process exit code."""
+
+
+class ScriptPolicyResultWriter(Protocol):
+    """Writer for one selected script policy result."""
+
+    def __call__(self, result: SkillScriptPolicyEvaluationResult, *, stdout: TextIO, stderr: TextIO) -> int:
+        """Write a selected script policy result and return a process exit code."""
+
+
+class ScriptExecutionResultWriter(Protocol):
+    """Writer for one selected script execution result."""
+
+    def __call__(self, result: SkillScriptExecutionResult, *, stdout: TextIO, stderr: TextIO) -> int:
+        """Write a selected script execution result and return a process exit code."""
+
+
 @dataclass(frozen=True, slots=True)
 class AgentRuntimeCliDependencies:
     """Injected dependencies for agent-runtime CLI commands."""
@@ -64,6 +93,15 @@ class AgentRuntimeCliDependencies:
     command_augmenter: CommandAugmenter | None = None
     script_policy_evaluator: ScriptPolicyEvaluator | None = None
     script_executor: ScriptExecutor | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AgentRuntimeCliWriters:
+    """Injected output writers for agent-runtime CLI commands."""
+
+    run_result: RunResultWriter
+    script_policy_result: ScriptPolicyResultWriter
+    script_execution_result: ScriptExecutionResultWriter
 
 
 @dataclass(frozen=True, slots=True)

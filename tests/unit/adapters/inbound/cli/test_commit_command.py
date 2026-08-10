@@ -20,7 +20,11 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageEvidenceSource,
     RuntimeObservation,
 )
-from fabrica.features.developer_workflow.application.dtos import CommitMessageRecommendation, GitCommitResult
+from fabrica.features.developer_workflow.application.dtos import (
+    CommitMessageRecommendation,
+    GenerateCommitMessageCommand,
+    GitCommitResult,
+)
 
 EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2
 EXPECTED_INTERRUPTED_EXIT_CODE = 5
@@ -30,10 +34,10 @@ EXPECTED_INTERRUPTED_EXIT_CODE = 5
 class FakeConfirmedCommitWorkflow:
     generation_result: ConfirmedCommitWorkflowResult
     commit_result: ConfirmedCommitWorkflowResult | None = None
-    generate_calls: list[CliCommitCommand] = field(default_factory=list)
+    generate_calls: list[GenerateCommitMessageCommand] = field(default_factory=list)
     commit_calls: list[CommitMessageRecommendation] = field(default_factory=list)
 
-    def generate(self, command: CliCommitCommand) -> ConfirmedCommitWorkflowResult:
+    def generate(self, command: GenerateCommitMessageCommand) -> ConfirmedCommitWorkflowResult:
         self.generate_calls.append(command)
         return self.generation_result
 
@@ -79,7 +83,7 @@ def test_commit_command_prints_recommendation_prompts_and_commits_on_yes() -> No
         "Committed as abc1234.\n"
     )
     assert stderr.getvalue() == ""
-    assert workflow.generate_calls == [command]
+    assert workflow.generate_calls == [GenerateCommitMessageCommand(skill_id="team-style")]
     assert workflow.commit_calls == [recommendation]
 
 
