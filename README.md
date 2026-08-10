@@ -18,6 +18,7 @@ Run the local quality gate before handing off changes:
 uv run ruff format .
 uv run ruff check .
 uv run ty check src tests
+uv run lint-imports
 uv run pytest
 ```
 

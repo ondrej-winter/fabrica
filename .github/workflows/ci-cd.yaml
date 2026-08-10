@@ -49,6 +49,9 @@ jobs:
       - name: Type check
         run: uv run ty check src tests
 
+      - name: Import lint
+        run: uv run lint-imports
+
       - name: Test
         run: uv run pytest
 
