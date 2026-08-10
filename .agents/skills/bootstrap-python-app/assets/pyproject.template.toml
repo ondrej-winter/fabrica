@@ -5,16 +5,37 @@ build-backend = "hatchling.build"
 [project]
 name = "<app_name>"
 version = "0.1.0"
+description = "A Python application using hexagonal vertical-slice architecture."
+readme = "README.md"
 requires-python = ">=<python_version>"
 dependencies = []
 
+[project.urls]
+Documentation = "<repository_url>#readme"
+Repository = "<repository_url>"
+
+[project.scripts]
+"<app_name>" = "<app_name>.adapters.inbound.cli.__main__:main"
+
 [dependency-groups]
 dev = [
+    "import-linter>=2.13",
+    "pre-commit>=4.3.0",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
+    "python-semantic-release>=10.5.2",
     "ruff>=0.16.1",
     "ty>=0.0.69",
 ]
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+tag_format = "v{version}"
+commit_message = "chore(release): v{version}"
+build_command = "uv build"
+dist_path = "dist/"
+upload_to_pypi = false
+upload_to_release = false
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/<app_name>"]
@@ -40,6 +61,64 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"] # pytest-native assertions are expected in tests
+
+[tool.importlinter]
+root_package = "<app_name>"
+
+[[tool.importlinter.contracts]]
+id = "features-do-not-import-product-cli-or-bootstrap"
+name = "Feature slices must not import product CLI or bootstrap"
+type = "forbidden"
+source_modules = ["<app_name>.features"]
+forbidden_modules = [
+    "<app_name>.adapters.inbound.cli",
+    "<app_name>.bootstrap",
+]
+
+[[tool.importlinter.contracts]]
+id = "feature-slices-follow-hexagonal-layers"
+name = "Feature slices follow adapters -> application -> domain dependency direction"
+type = "layers"
+containers = ["<app_name>.features.*"]
+layers = [
+    "(adapters)",
+    "application",
+    "(domain)",
+]
+
+[[tool.importlinter.contracts]]
+id = "feature-slice-dependencies-are-acyclic"
+name = "Feature slice dependencies must remain acyclic"
+type = "acyclic_siblings"
+ancestors = ["<app_name>.features"]
+depth = 0
+
+[[tool.importlinter.contracts]]
+id = "shared-kernel-stays-pure"
+name = "Shared kernel must not import feature, adapter, or bootstrap code"
+type = "forbidden"
+source_modules = ["<app_name>.shared_kernel"]
+forbidden_modules = [
+    "<app_name>.adapters",
+    "<app_name>.bootstrap",
+    "<app_name>.features",
+]
+
+[[tool.importlinter.contracts]]
+id = "generic-cli-shell-stays-feature-agnostic"
+name = "Generic product CLI shell modules must not import features or bootstrap"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = [
+    "<app_name>.adapters.inbound.cli.__main__",
+    "<app_name>.adapters.inbound.cli.options",
+    "<app_name>.adapters.inbound.cli.parser",
+    "<app_name>.adapters.inbound.cli.runner",
+]
+forbidden_modules = [
+    "<app_name>.features",
+    "<app_name>.bootstrap",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
