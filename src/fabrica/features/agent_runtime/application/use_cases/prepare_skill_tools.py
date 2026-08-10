@@ -49,16 +49,16 @@ class PrepareSkillTools:
                     reason="skill was not explicitly selected",
                     metadata={"skill_id": declaration.skill_id},
                 )
-            elif declaration.exposes_model_tool:
-                assert declaration.tool is not None
-                if declaration.tool.name in seen_tool_names:
+            elif declaration.exposes_model_tool and declaration.tool is not None:
+                tool_name = declaration.tool.name
+                if tool_name in seen_tool_names:
                     normalized = declaration.with_status(
                         SkillToolExposureStatus.DUPLICATE,
                         reason="tool name was already registered for this preparation request",
-                        metadata={"tool_name": declaration.tool.name},
+                        metadata={"tool_name": tool_name},
                     )
                 else:
-                    seen_tool_names.add(declaration.tool.name)
+                    seen_tool_names.add(tool_name)
 
             if normalized.status is SkillToolExposureStatus.SCRIPT_DEFERRED:
                 observations.append(
