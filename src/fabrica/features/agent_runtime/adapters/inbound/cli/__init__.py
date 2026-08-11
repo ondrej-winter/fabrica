@@ -24,11 +24,6 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.registration import (
 from fabrica.features.agent_runtime.adapters.inbound.cli.runner import (
     run_agent_runtime_cli_command,
 )
-from fabrica.features.agent_runtime.application.ports import (
-    LocalAgentRuntime,
-    SkillScriptPolicyEvaluator,
-    SkillScriptRunner,
-)
 
 __all__ = [
     "AGENT_RUNTIME_CLI_COMMAND_TYPES",
@@ -42,12 +37,9 @@ __all__ = [
     "CliSelectedResource",
     "CommandAugmenter",
     "EvidenceWriter",
-    "LocalAgentRuntime",
     "RunResultWriter",
     "ScriptExecutionResultWriter",
     "ScriptPolicyResultWriter",
-    "SkillScriptPolicyEvaluator",
-    "SkillScriptRunner",
     "register_agent_runtime_cli_commands",
     "run_agent_runtime_cli_command",
 ]

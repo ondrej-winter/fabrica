@@ -13,7 +13,12 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class CliCommitMessageCommand:
-    """Parsed CLI arguments for selected-skill commit-message generation."""
+    """Parsed CLI arguments for selected-skill commit-message generation.
+
+    ``model``, ``reasoning_effort``, and ``skill_roots`` are adapter-local
+    composition options consumed by the default bootstrap contribution factory.
+    The feature runner maps ``skill_id`` into the application command.
+    """
 
     skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
     model: str | None = None
@@ -26,7 +31,12 @@ class CliCommitMessageCommand:
 
 @dataclass(frozen=True, slots=True)
 class CliCommitCommand:
-    """Parsed CLI arguments for interactive confirmed git commit creation."""
+    """Parsed CLI arguments for interactive confirmed git commit creation.
+
+    ``model``, ``reasoning_effort``, and ``skill_roots`` are adapter-local
+    composition options consumed by the default bootstrap contribution factory.
+    The feature runner maps ``skill_id`` into the application command.
+    """
 
     skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
     model: str | None = None

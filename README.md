@@ -853,3 +853,11 @@ feature slices:
   startup helpers.
 - `tests/unit/` and `tests/integration/` mirror source ownership for fast unit
   checks and explicit I/O-facing integration checks.
+
+The product CLI keeps the same boundaries. Generic shell modules under
+`src/fabrica/adapters/inbound/cli/` own global option parsing and contribution
+dispatch only; they do not import feature slices. Feature slices own their
+subcommand registration, adapter-local parsed command models, CLI runners, and
+output mapping under `features/<feature>/adapters/inbound/cli/`. Bootstrap-owned
+factories under `src/fabrica/bootstrap/cli_contributions/` assemble those feature
+CLI adapters with default concrete dependencies.

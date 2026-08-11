@@ -19,17 +19,11 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.registration impor
 from fabrica.features.developer_workflow.adapters.inbound.cli.runner import (
     run_developer_workflow_cli_command,
 )
-from fabrica.features.developer_workflow.application.ports import (
-    CommitMessageWorkflowRunner,
-    ConfirmedCommitWorkflowRunner,
-)
 
 __all__ = [
     "DEVELOPER_WORKFLOW_CLI_COMMAND_TYPES",
     "CliCommitCommand",
     "CliCommitMessageCommand",
-    "CommitMessageWorkflowRunner",
-    "ConfirmedCommitWorkflowRunner",
     "DeveloperWorkflowCliCommandOptions",
     "DeveloperWorkflowCliDependencies",
     "DeveloperWorkflowCliStreams",
