@@ -7,7 +7,10 @@ from typing import TYPE_CHECKING, TextIO
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from fabrica.features.developer_workflow.application.use_cases import ConfirmedCommitWorkflowResult
+    from fabrica.features.developer_workflow.application.dtos import (
+        CommitMessageWorkflowResult,
+        ConfirmedCommitWorkflowResult,
+    )
 
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunResult,
@@ -21,6 +24,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptPolicyEvaluationResult,
     SkillScriptPolicyStatus,
 )
+from fabrica.features.developer_workflow.application.dtos import DeveloperWorkflowStatus
 
 MAX_OUTPUT_LINE_CHARS = 4_000
 
@@ -30,6 +34,14 @@ EXIT_CODE_BY_STATUS: dict[LocalAgentRunStatus, int] = {
     LocalAgentRunStatus.MODEL_ERROR: 3,
     LocalAgentRunStatus.UNSUPPORTED_CAPABILITY: 4,
     LocalAgentRunStatus.SAFETY_DENIED: 5,
+}
+
+EXIT_CODE_BY_DEVELOPER_WORKFLOW_STATUS: dict[DeveloperWorkflowStatus, int] = {
+    DeveloperWorkflowStatus.SUCCESS: 0,
+    DeveloperWorkflowStatus.CONFIGURATION_ERROR: 2,
+    DeveloperWorkflowStatus.MODEL_ERROR: 3,
+    DeveloperWorkflowStatus.UNSUPPORTED_CAPABILITY: 4,
+    DeveloperWorkflowStatus.SAFETY_DENIED: 5,
 }
 
 EXIT_CODE_BY_SCRIPT_POLICY_STATUS: dict[SkillScriptPolicyStatus, int] = {
@@ -63,6 +75,21 @@ def write_run_result(result: LocalAgentRunResult, *, stdout: TextIO, stderr: Tex
             _write_line(stderr, f"observation: {observation.message}{suffix}")
 
     return EXIT_CODE_BY_STATUS[result.status]
+
+
+def write_developer_workflow_result(result: CommitMessageWorkflowResult, *, stdout: TextIO, stderr: TextIO) -> int:
+    """Write a developer workflow result and return the matching process exit code."""
+    if result.output_text:
+        _write_line(stdout, result.output_text)
+
+    if not result.succeeded:
+        _write_line(stderr, f"status: {result.status.value}")
+        for observation in result.observations:
+            metadata = _format_metadata(observation.metadata)
+            suffix = f" {metadata}" if metadata else ""
+            _write_line(stderr, f"observation: {observation.message}{suffix}")
+
+    return EXIT_CODE_BY_DEVELOPER_WORKFLOW_STATUS[result.status]
 
 
 def write_model_evidence_report(
@@ -140,7 +167,7 @@ def write_confirmed_commit_result(result: ConfirmedCommitWorkflowResult, *, stdo
             suffix = f" {metadata}" if metadata else ""
             _write_line(stderr, f"observation: {observation.message}{suffix}")
 
-    return EXIT_CODE_BY_STATUS[result.status]
+    return EXIT_CODE_BY_DEVELOPER_WORKFLOW_STATUS[result.status]
 
 
 def _write_line(stream: TextIO, text: str) -> None:

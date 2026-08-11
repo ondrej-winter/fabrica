@@ -6,12 +6,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, TextIO
 
 if TYPE_CHECKING:
-    from fabrica.features.agent_runtime.application.dtos import LocalAgentRunResult
+    from fabrica.features.developer_workflow.application.dtos import (
+        CommitMessageWorkflowResult,
+        ConfirmedCommitWorkflowResult,
+    )
     from fabrica.features.developer_workflow.application.ports import (
         CommitMessageWorkflowRunner,
         ConfirmedCommitWorkflowRunner,
     )
-    from fabrica.features.developer_workflow.application.use_cases import ConfirmedCommitWorkflowResult
 
 
 class DeveloperWorkflowCliCommandOptions(Protocol):
@@ -33,7 +35,7 @@ class DeveloperWorkflowCliCommandOptions(Protocol):
 class RuntimeResultWriter(Protocol):
     """Writer for runtime-shaped developer workflow results."""
 
-    def __call__(self, result: LocalAgentRunResult, *, stdout: TextIO, stderr: TextIO) -> int:
+    def __call__(self, result: CommitMessageWorkflowResult, *, stdout: TextIO, stderr: TextIO) -> int:
         """Write a runtime result and return a process exit code."""
 
 
@@ -75,7 +77,7 @@ class EvidenceWriter(Protocol):
 
     def __call__(
         self,
-        result: LocalAgentRunResult | ConfirmedCommitWorkflowResult,
+        result: CommitMessageWorkflowResult | ConfirmedCommitWorkflowResult,
         *,
         global_options: DeveloperWorkflowCliCommandOptions,
         stdout: TextIO,

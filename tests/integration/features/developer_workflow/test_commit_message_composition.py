@@ -27,6 +27,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageEvidenceSource,
 )
 from fabrica.features.developer_workflow.application.dtos import (
+    DeveloperWorkflowStatus,
     GitStagedChangesFailureCategory,
 )
 
@@ -138,7 +139,7 @@ def test_commit_message_workflow_stops_before_runtime_when_staged_discovery_fail
 
     result = workflow.run()
 
-    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.observations[0].metadata["category"] == GitStagedChangesFailureCategory.NO_STAGED_CHANGES
     assert runtime.calls == []
 

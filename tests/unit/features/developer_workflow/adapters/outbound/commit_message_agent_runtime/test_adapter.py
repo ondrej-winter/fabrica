@@ -1,22 +1,28 @@
 """Tests for commit-message agent-runtime outbound adapters."""
 
+import asyncio
 import json
 from dataclasses import dataclass, field
 
 import pytest
 
 from fabrica.features.agent_runtime.application.dtos import (
+    LocalAgentContextBlock,
     LocalAgentRunCommand,
     LocalAgentRunResult,
     LocalAgentRunStatus,
+    SelectedSkill,
 )
+from fabrica.features.agent_runtime.application.ports import SkillContextLoadError
 from fabrica.features.developer_workflow.adapters.outbound.commit_message_agent_runtime import (
     AgentRuntimeCommitMessageSynthesizer,
     AgentRuntimeStagedFileCommitMessageAnalyzer,
+    SkillContextCommitMessageSynthesizer,
 )
 from fabrica.features.developer_workflow.application.dtos import (
     AnalyzeStagedFileForCommitMessageCommand,
     CommitMessageEvidenceBundle,
+    CommitMessageRecommendation,
     GitStagedDiff,
     GitStagedFile,
     GitStagedFileStatus,
@@ -25,6 +31,7 @@ from fabrica.features.developer_workflow.application.dtos import (
 )
 from fabrica.features.developer_workflow.application.ports import (
     CommitMessageAnalysisError,
+    CommitMessageSkillContextLoadError,
     CommitMessageSynthesisError,
 )
 
@@ -40,6 +47,29 @@ class FakeRuntime:
 
     async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         return self.run(command)
+
+
+@dataclass
+class RecordingSynthesizer:
+    recommendation: CommitMessageRecommendation
+    calls: list[SynthesizeCommitMessageCommand] = field(default_factory=list)
+
+    async def synthesize_async(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
+        self.calls.append(command)
+        return self.recommendation
+
+
+@dataclass
+class FakeSkillContextLoader:
+    contexts: tuple[LocalAgentContextBlock, ...] = ()
+    error: SkillContextLoadError | None = None
+    calls: list[tuple[SelectedSkill, ...]] = field(default_factory=list)
+
+    def load(self, selections: tuple[SelectedSkill, ...]) -> tuple[LocalAgentContextBlock, ...]:
+        self.calls.append(selections)
+        if self.error is not None:
+            raise self.error
+        return self.contexts
 
 
 def test_analyzer_sends_one_file_diff_and_parses_strict_json_evidence() -> None:
@@ -164,6 +194,74 @@ def test_synthesizer_maps_runtime_failure_without_exposing_output_text() -> None
         )
 
     assert error_info.value.metadata == {"runtime_status": "model_error", "has_output_text": True}
+
+
+def test_skill_context_synthesizer_loads_selected_skill_markdown_before_synthesis() -> None:
+    recommendation = CommitMessageRecommendation(
+        summary="Adds context.",
+        rationale="The selected skill markdown is loaded before synthesis.",
+        commit_message="feat: load skill context",
+    )
+    synthesizer = RecordingSynthesizer(recommendation=recommendation)
+    loader = FakeSkillContextLoader(
+        contexts=(
+            LocalAgentContextBlock(
+                text="# Conventional Commits\nUse feat.\n",
+                metadata={"skill_id": "team-style"},
+            ),
+        )
+    )
+    bundle = CommitMessageEvidenceBundle(evidence=(_evidence(),))
+
+    result = asyncio.run(
+        SkillContextCommitMessageSynthesizer(
+            synthesizer=synthesizer,
+            skill_context_loader=loader,
+        ).synthesize_async(SynthesizeCommitMessageCommand(evidence_bundle=bundle, skill_id="team-style"))
+    )
+
+    assert result is recommendation
+    assert loader.calls == [(SelectedSkill(skill_id="team-style"),)]
+    assert synthesizer.calls == [
+        SynthesizeCommitMessageCommand(
+            evidence_bundle=bundle,
+            skill_id="team-style",
+            skill_markdown="# Conventional Commits\nUse feat.\n",
+        )
+    ]
+
+
+def test_skill_context_synthesizer_translates_agent_runtime_context_errors() -> None:
+    loader = FakeSkillContextLoader(
+        error=SkillContextLoadError(
+            "selected skill was not found",
+            skill_id="missing-skill",
+            category="skill_not_found",
+            metadata={"skill_id": "missing-skill"},
+        )
+    )
+    synthesizer = RecordingSynthesizer(
+        recommendation=CommitMessageRecommendation(
+            summary="Unused.",
+            rationale="Unused.",
+            commit_message="chore: unused",
+        )
+    )
+
+    with pytest.raises(CommitMessageSkillContextLoadError) as error_info:
+        asyncio.run(
+            SkillContextCommitMessageSynthesizer(
+                synthesizer=synthesizer,
+                skill_context_loader=loader,
+            ).synthesize_async(
+                SynthesizeCommitMessageCommand(evidence_bundle=CommitMessageEvidenceBundle(evidence=(_evidence(),)))
+            )
+        )
+
+    assert str(error_info.value) == "selected skill was not found"
+    assert error_info.value.category == "skill_not_found"
+    assert error_info.value.metadata == {"skill_id": "missing-skill"}
+    assert synthesizer.calls == []
 
 
 def _analysis_json(**overrides: str) -> str:

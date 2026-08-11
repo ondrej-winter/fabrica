@@ -2,32 +2,55 @@
 
 from dataclasses import dataclass, field
 from io import StringIO
+from typing import TextIO
 
 from fabrica.adapters.inbound.cli import (
-    CliCommandDependencies,
+    CliCommand,
+    CliCommandExecutionOptions,
     CliGlobalOptions,
     CliInvocation,
-    run_cli_command,
 )
-from fabrica.bootstrap import ConfirmedCommitWorkflowResult
+from fabrica.adapters.inbound.cli import (
+    run_cli_command as _run_cli_command,
+)
+from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.application.dtos import (
-    LocalAgentRunStatus,
     ModelTokenUsageEvidence,
     ModelUsageCollectionStatus,
     ModelUsageEvidence,
     ModelUsageEvidenceConfidence,
     ModelUsageEvidenceSource,
-    RuntimeObservation,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import CliCommitCommand
+from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import DeveloperWorkflowCliDependencies
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageRecommendation,
+    ConfirmedCommitWorkflowResult,
+    DeveloperWorkflowObservation,
+    DeveloperWorkflowStatus,
     GenerateCommitMessageCommand,
     GitCommitResult,
 )
 
 EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2
 EXPECTED_INTERRUPTED_EXIT_CODE = 5
+
+
+def run_cli_command(
+    invocation: CliCommand | CliInvocation,
+    *,
+    dependencies: DeveloperWorkflowCliDependencies | None = None,
+    stdin: TextIO | None = None,
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
+) -> int:
+    options = CliCommandExecutionOptions(
+        contributions=create_cli_contributions(developer_workflow_dependencies=dependencies),
+        stdin=stdin,
+        stdout=stdout,
+        stderr=stderr,
+    )
+    return _run_cli_command(invocation, options=options)
 
 
 @dataclass
@@ -45,7 +68,7 @@ class FakeConfirmedCommitWorkflow:
         self.commit_calls.append(recommendation)
         if self.commit_result is None:
             return ConfirmedCommitWorkflowResult(
-                status=LocalAgentRunStatus.SUCCESS,
+                status=DeveloperWorkflowStatus.SUCCESS,
                 recommendation=recommendation,
                 commit_result=GitCommitResult(short_hash="abc1234"),
                 commit_attempted=True,
@@ -68,7 +91,7 @@ def test_commit_command_prints_recommendation_prompts_and_commits_on_yes() -> No
 
     exit_code = run_cli_command(
         command,
-        dependencies=CliCommandDependencies(confirmed_commit_workflow=workflow),
+        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
         stdin=StringIO(" yes \n"),
         stdout=stdout,
         stderr=stderr,
@@ -94,7 +117,7 @@ def test_commit_command_rejects_without_invoking_commit() -> None:
 
     exit_code = run_cli_command(
         CliCommitCommand(),
-        dependencies=CliCommandDependencies(confirmed_commit_workflow=workflow),
+        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
         stdin=StringIO("maybe\n"),
         stdout=stdout,
         stderr=StringIO(),
@@ -110,7 +133,7 @@ def test_commit_command_treats_eof_as_successful_noop() -> None:
 
     exit_code = run_cli_command(
         CliCommitCommand(),
-        dependencies=CliCommandDependencies(confirmed_commit_workflow=workflow),
+        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
         stdin=StringIO(""),
         stdout=StringIO(),
         stderr=StringIO(),
@@ -126,7 +149,7 @@ def test_commit_command_interrupted_input_exits_nonzero_without_commit() -> None
 
     exit_code = run_cli_command(
         CliCommitCommand(),
-        dependencies=CliCommandDependencies(confirmed_commit_workflow=workflow),
+        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
         stdin=InterruptingInput(),
         stdout=StringIO(),
         stderr=stderr,
@@ -141,9 +164,12 @@ def test_commit_command_interrupted_input_exits_nonzero_without_commit() -> None
 def test_commit_command_generation_failure_skips_prompt_and_commit() -> None:
     workflow = FakeConfirmedCommitWorkflow(
         generation_result=ConfirmedCommitWorkflowResult(
-            status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+            status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
             observations=(
-                RuntimeObservation(message="no staged git changes", metadata={"category": "no_staged_changes"}),
+                DeveloperWorkflowObservation(
+                    message="no staged git changes",
+                    metadata={"category": "no_staged_changes"},
+                ),
             ),
         ),
     )
@@ -152,7 +178,7 @@ def test_commit_command_generation_failure_skips_prompt_and_commit() -> None:
 
     exit_code = run_cli_command(
         CliCommitCommand(),
-        dependencies=CliCommandDependencies(confirmed_commit_workflow=workflow),
+        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
         stdin=StringIO("yes\n"),
         stdout=stdout,
         stderr=stderr,
@@ -170,9 +196,9 @@ def test_commit_command_generation_failure_skips_prompt_and_commit() -> None:
 def test_commit_command_pre_commit_stop_skips_prompt_and_commit() -> None:
     workflow = FakeConfirmedCommitWorkflow(
         generation_result=ConfirmedCommitWorkflowResult(
-            status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+            status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
             observations=(
-                RuntimeObservation(
+                DeveloperWorkflowObservation(
                     message="pre-commit failed; no commit was created",
                     metadata={"category": "pre_commit_failed"},
                 ),
@@ -184,7 +210,7 @@ def test_commit_command_pre_commit_stop_skips_prompt_and_commit() -> None:
 
     exit_code = run_cli_command(
         CliCommitCommand(),
-        dependencies=CliCommandDependencies(confirmed_commit_workflow=workflow),
+        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
         stdin=StringIO("yes\n"),
         stdout=stdout,
         stderr=stderr,
@@ -210,7 +236,7 @@ def test_commit_command_appends_evidence_on_rejection() -> None:
             command=CliCommitCommand(),
             global_options=CliGlobalOptions(print_usage=True),
         ),
-        dependencies=CliCommandDependencies(confirmed_commit_workflow=workflow),
+        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
         stdin=StringIO("no\n"),
         stdout=stdout,
         stderr=StringIO(),
@@ -227,10 +253,10 @@ def test_commit_command_reports_commit_failure_without_reprinting_recommendation
     workflow = FakeConfirmedCommitWorkflow(
         generation_result=_generation_success(recommendation, usage_evidence=(_usage_evidence(),)),
         commit_result=ConfirmedCommitWorkflowResult(
-            status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+            status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
             recommendation=recommendation,
             observations=(
-                RuntimeObservation(
+                DeveloperWorkflowObservation(
                     message="git commit failed",
                     metadata={"category": "git_failed", "commit_attempted": True},
                 ),
@@ -244,7 +270,7 @@ def test_commit_command_reports_commit_failure_without_reprinting_recommendation
 
     exit_code = run_cli_command(
         CliInvocation(command=CliCommitCommand(), global_options=CliGlobalOptions(print_usage=True)),
-        dependencies=CliCommandDependencies(confirmed_commit_workflow=workflow),
+        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
         stdin=StringIO("y\n"),
         stdout=stdout,
         stderr=stderr,
@@ -272,7 +298,7 @@ def _generation_success(
     usage_evidence: tuple[ModelUsageEvidence, ...] = (),
 ) -> ConfirmedCommitWorkflowResult:
     return ConfirmedCommitWorkflowResult(
-        status=LocalAgentRunStatus.SUCCESS,
+        status=DeveloperWorkflowStatus.SUCCESS,
         recommendation=recommendation,
         output_text=(
             f"Summary:\n{recommendation.summary}\n\n"

@@ -8,9 +8,14 @@ import pytest
 from fabrica.adapters.inbound.cli import (
     CliGlobalOptions,
     CliInvocation,
-    build_parser,
-    parse_args,
 )
+from fabrica.adapters.inbound.cli import (
+    build_parser as _build_parser,
+)
+from fabrica.adapters.inbound.cli import (
+    parse_args as _parse_args,
+)
+from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliRunCommand,
     CliScriptExecuteCommand,
@@ -24,6 +29,14 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.command_models imp
 )
 
 ARGPARSE_USAGE_ERROR = 2
+
+
+def build_parser():
+    return _build_parser(create_cli_contributions())
+
+
+def parse_args(args: tuple[str, ...] | list[str]) -> CliInvocation:
+    return _parse_args(args, contributions=create_cli_contributions())
 
 
 def test_build_parser_renders_help_without_runtime_side_effects(capsys: pytest.CaptureFixture[str]) -> None:

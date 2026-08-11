@@ -3,14 +3,20 @@
 from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
+from typing import TextIO
 
 from fabrica.adapters.inbound.cli import (
-    CliCommandDependencies,
+    CliCommand,
+    CliCommandExecutionOptions,
     CliGlobalOptions,
     CliInvocation,
-    run_cli_command,
 )
+from fabrica.adapters.inbound.cli import (
+    run_cli_command as _run_cli_command,
+)
+from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import CliRunCommand, CliSelectedResource
+from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentContextBlock,
     LocalAgentRunCommand,
@@ -32,6 +38,23 @@ from fabrica.features.agent_runtime.application.dtos import (
 EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2
 EXPECTED_MODEL_ERROR_EXIT_CODE = 3
 EXPECTED_BOUNDED_OUTPUT_LINE_CHARS = 4_000
+
+
+def run_cli_command(
+    invocation: CliCommand | CliInvocation,
+    *,
+    dependencies: AgentRuntimeCliDependencies | None = None,
+    stdin: TextIO | None = None,
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
+) -> int:
+    options = CliCommandExecutionOptions(
+        contributions=create_cli_contributions(agent_runtime_dependencies=dependencies),
+        stdin=stdin,
+        stdout=stdout,
+        stderr=stderr,
+    )
+    return _run_cli_command(invocation, options=options)
 
 
 @dataclass
@@ -86,7 +109,7 @@ def test_run_command_maps_prompt_and_model_to_runtime_command() -> None:
 
     exit_code = run_cli_command(
         CliRunCommand(prompt="Reply with pong", model_hint="codex-compatible"),
-        dependencies=CliCommandDependencies(runtime=runtime),
+        dependencies=AgentRuntimeCliDependencies(runtime=runtime),
         stdout=stdout,
         stderr=stderr,
     )
@@ -110,7 +133,7 @@ def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> 
             resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
             skill_roots=(Path("synthetic-skills"),),
         ),
-        dependencies=CliCommandDependencies(runtime=runtime, command_augmenter=augmenter),
+        dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
         stdout=StringIO(),
         stderr=StringIO(),
     )
@@ -148,7 +171,7 @@ def test_run_invocation_passes_global_verbose_diagnostics_to_augmenter() -> None
             ),
             global_options=CliGlobalOptions(verbose_diagnostics=True),
         ),
-        dependencies=CliCommandDependencies(runtime=runtime, command_augmenter=augmenter),
+        dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
         stdout=StringIO(),
         stderr=StringIO(),
     )
@@ -189,7 +212,7 @@ def test_run_invocation_appends_requested_usage_and_price_evidence() -> None:
             command=CliRunCommand(prompt="Reply with pong"),
             global_options=CliGlobalOptions(print_usage=True, print_prices=True),
         ),
-        dependencies=CliCommandDependencies(runtime=runtime),
+        dependencies=AgentRuntimeCliDependencies(runtime=runtime),
         stdout=stdout,
         stderr=StringIO(),
     )
@@ -213,7 +236,7 @@ def test_run_command_skips_augmentation_when_no_context_is_selected() -> None:
 
     run_cli_command(
         CliRunCommand(prompt="Reply with pong"),
-        dependencies=CliCommandDependencies(runtime=runtime, command_augmenter=augmenter),
+        dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
         stdout=StringIO(),
         stderr=StringIO(),
     )
@@ -238,7 +261,7 @@ def test_run_command_maps_non_success_status_to_stable_exit_code_and_stderr() ->
 
     exit_code = run_cli_command(
         CliRunCommand(prompt="Reply with pong"),
-        dependencies=CliCommandDependencies(runtime=runtime),
+        dependencies=AgentRuntimeCliDependencies(runtime=runtime),
         stdout=stdout,
         stderr=stderr,
     )
@@ -267,7 +290,7 @@ def test_run_command_bounds_observation_metadata_for_safe_evidence_capture() -> 
 
     exit_code = run_cli_command(
         CliRunCommand(prompt="Reply with pong"),
-        dependencies=CliCommandDependencies(runtime=runtime),
+        dependencies=AgentRuntimeCliDependencies(runtime=runtime),
         stdout=StringIO(),
         stderr=stderr,
     )

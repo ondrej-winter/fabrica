@@ -15,6 +15,12 @@ This directory contains durable project documentation and current reference note
 
 ## Current map
 
+### Architecture decision records
+
+- `adr/README.md` indexes accepted architecture decisions.
+- `adr/0001-compose-product-cli-in-bootstrap.md` records the product CLI
+  bootstrap/contribution boundary.
+
 ### Specs
 
 - `specs/README.md` explains the concern-oriented spec taxonomy.

@@ -5,18 +5,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from fabrica.features.agent_runtime.application.dtos import LocalAgentRunResult
     from fabrica.features.developer_workflow.application.dtos import (
         CommitMessageRecommendation,
+        CommitMessageWorkflowResult,
+        ConfirmedCommitWorkflowResult,
         GenerateCommitMessageCommand,
     )
-    from fabrica.features.developer_workflow.application.use_cases import ConfirmedCommitWorkflowResult
 
 
 class CommitMessageWorkflowRunner(Protocol):
     """Inbound port for selected-skill commit-message generation."""
 
-    def run(self, command: GenerateCommitMessageCommand) -> LocalAgentRunResult:
+    def run(self, command: GenerateCommitMessageCommand) -> CommitMessageWorkflowResult:
         """Run selected-skill commit-message generation."""
 
 

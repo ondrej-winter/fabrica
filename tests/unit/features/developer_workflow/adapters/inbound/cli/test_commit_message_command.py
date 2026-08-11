@@ -3,16 +3,19 @@
 from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
+from typing import TextIO
 
 from fabrica.adapters.inbound.cli import (
-    CliCommandDependencies,
+    CliCommand,
+    CliCommandExecutionOptions,
     CliGlobalOptions,
     CliInvocation,
-    run_cli_command,
 )
+from fabrica.adapters.inbound.cli import (
+    run_cli_command as _run_cli_command,
+)
+from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.application.dtos import (
-    LocalAgentRunResult,
-    LocalAgentRunStatus,
     ModelCostEvidence,
     ModelPricingStatus,
     ModelTokenUsageEvidence,
@@ -21,27 +24,52 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageEvidenceConfidence,
     ModelUsageEvidenceSource,
     ModelUsageObservation,
-    RuntimeObservation,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import CliCommitMessageCommand
-from fabrica.features.developer_workflow.application.dtos import GenerateCommitMessageCommand
+from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import DeveloperWorkflowCliDependencies
+from fabrica.features.developer_workflow.application.dtos import (
+    CommitMessageWorkflowResult,
+    DeveloperWorkflowObservation,
+    DeveloperWorkflowStatus,
+    GenerateCommitMessageCommand,
+)
 
 EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2
 
 
+def run_cli_command(
+    invocation: CliCommand | CliInvocation,
+    *,
+    dependencies: DeveloperWorkflowCliDependencies | None = None,
+    stdin: TextIO | None = None,
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
+) -> int:
+    options = CliCommandExecutionOptions(
+        contributions=create_cli_contributions(developer_workflow_dependencies=dependencies),
+        stdin=stdin,
+        stdout=stdout,
+        stderr=stderr,
+    )
+    return _run_cli_command(invocation, options=options)
+
+
 @dataclass
 class FakeCommitMessageWorkflow:
-    result: LocalAgentRunResult
+    result: CommitMessageWorkflowResult
     calls: list[GenerateCommitMessageCommand] = field(default_factory=list)
 
-    def run(self, command: GenerateCommitMessageCommand) -> LocalAgentRunResult:
+    def run(self, command: GenerateCommitMessageCommand) -> CommitMessageWorkflowResult:
         self.calls.append(command)
         return self.result
 
 
 def test_commit_message_command_uses_injected_workflow_and_writes_success_output() -> None:
     workflow = FakeCommitMessageWorkflow(
-        result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="Commit message:\nfeat: add x"),
+        result=CommitMessageWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
+            output_text="Commit message:\nfeat: add x",
+        ),
     )
     stdout = StringIO()
     stderr = StringIO()
@@ -54,7 +82,7 @@ def test_commit_message_command_uses_injected_workflow_and_writes_success_output
 
     exit_code = run_cli_command(
         command,
-        dependencies=CliCommandDependencies(commit_message_workflow=workflow),
+        dependencies=DeveloperWorkflowCliDependencies(commit_message_workflow=workflow),
         stdout=stdout,
         stderr=stderr,
     )
@@ -67,8 +95,8 @@ def test_commit_message_command_uses_injected_workflow_and_writes_success_output
 
 def test_commit_message_invocation_appends_requested_usage_and_price_evidence() -> None:
     workflow = FakeCommitMessageWorkflow(
-        result=LocalAgentRunResult(
-            status=LocalAgentRunStatus.SUCCESS,
+        result=CommitMessageWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
             output_text="Commit message:\nfeat: add x",
             usage_evidence=(
                 ModelUsageEvidence(
@@ -97,7 +125,7 @@ def test_commit_message_invocation_appends_requested_usage_and_price_evidence() 
             command=CliCommitMessageCommand(),
             global_options=CliGlobalOptions(print_usage=True, print_prices=True),
         ),
-        dependencies=CliCommandDependencies(commit_message_workflow=workflow),
+        dependencies=DeveloperWorkflowCliDependencies(commit_message_workflow=workflow),
         stdout=stdout,
         stderr=StringIO(),
     )
@@ -115,10 +143,10 @@ def test_commit_message_invocation_appends_requested_usage_and_price_evidence() 
 
 def test_commit_message_command_reports_pre_model_configuration_failures() -> None:
     workflow = FakeCommitMessageWorkflow(
-        result=LocalAgentRunResult(
-            status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+        result=CommitMessageWorkflowResult(
+            status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
             observations=(
-                RuntimeObservation(
+                DeveloperWorkflowObservation(
                     message="no staged git changes were found", metadata={"category": "no_staged_changes"}
                 ),
             ),
@@ -128,7 +156,7 @@ def test_commit_message_command_reports_pre_model_configuration_failures() -> No
 
     exit_code = run_cli_command(
         CliCommitMessageCommand(),
-        dependencies=CliCommandDependencies(commit_message_workflow=workflow),
+        dependencies=DeveloperWorkflowCliDependencies(commit_message_workflow=workflow),
         stdout=StringIO(),
         stderr=stderr,
     )

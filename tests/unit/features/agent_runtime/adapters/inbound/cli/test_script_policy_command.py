@@ -3,12 +3,19 @@
 from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
+from typing import TextIO
 
 from fabrica.adapters.inbound.cli import (
-    CliCommandDependencies,
-    run_cli_command,
+    CliCommand,
+    CliCommandExecutionOptions,
+    CliInvocation,
 )
+from fabrica.adapters.inbound.cli import (
+    run_cli_command as _run_cli_command,
+)
+from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import CliScriptPolicyCommand
+from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
 from fabrica.features.agent_runtime.application.dtos import (
     SelectedSkillScript,
     SkillScriptApprovalBinding,
@@ -21,6 +28,23 @@ from fabrica.features.agent_runtime.application.dtos import (
 EXPECTED_METADATA_ERROR_EXIT_CODE = 2
 EXPECTED_UNSUPPORTED_EXIT_CODE = 4
 EXPECTED_POLICY_DENIED_EXIT_CODE = 5
+
+
+def run_cli_command(
+    invocation: CliCommand | CliInvocation,
+    *,
+    dependencies: AgentRuntimeCliDependencies | None = None,
+    stdin: TextIO | None = None,
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
+) -> int:
+    options = CliCommandExecutionOptions(
+        contributions=create_cli_contributions(agent_runtime_dependencies=dependencies),
+        stdin=stdin,
+        stdout=stdout,
+        stderr=stderr,
+    )
+    return _run_cli_command(invocation, options=options)
 
 
 @dataclass
@@ -51,7 +75,7 @@ def test_script_policy_command_maps_explicit_selection_to_policy_evaluator() -> 
             script_id="scripts/check.py",
             skill_roots=(Path("synthetic-skills"),),
         ),
-        dependencies=CliCommandDependencies(script_policy_evaluator=evaluator),
+        dependencies=AgentRuntimeCliDependencies(script_policy_evaluator=evaluator),
         stdout=stdout,
         stderr=stderr,
     )
@@ -76,7 +100,7 @@ def test_script_policy_command_writes_approved_status_to_stdout() -> None:
 
     exit_code = run_cli_command(
         CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
-        dependencies=CliCommandDependencies(script_policy_evaluator=evaluator),
+        dependencies=AgentRuntimeCliDependencies(script_policy_evaluator=evaluator),
         stdout=stdout,
         stderr=stderr,
     )
@@ -99,7 +123,7 @@ def test_script_policy_command_maps_non_approved_statuses_to_stable_exit_codes()
 
         exit_code = run_cli_command(
             CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
-            dependencies=CliCommandDependencies(script_policy_evaluator=evaluator),
+            dependencies=AgentRuntimeCliDependencies(script_policy_evaluator=evaluator),
             stdout=StringIO(),
             stderr=StringIO(),
         )

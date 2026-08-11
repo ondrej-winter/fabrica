@@ -136,17 +136,18 @@ def test_generate_commit_message_lists_files_before_loading_and_preserves_eviden
         staged_changes_loader=loader,
         analyzer=analyzer,
         synthesizer=synthesizer,
+        query_executor=RecordingQueryExecutor(),
     ).generate(skill_id="team-commit-style")
 
     assert events == [
         "list_files",
-        "load_file_diff:src/file.py",
-        "analyze:src/file.py",
         "load_file_diff:tests/test_file.py",
         "analyze:tests/test_file.py",
+        "load_file_diff:src/file.py",
+        "analyze:src/file.py",
         "synthesize",
     ]
-    assert [call.staged_file.path for call in analyzer.calls] == ["src/file.py", "tests/test_file.py"]
+    assert [call.staged_file.path for call in analyzer.calls] == ["tests/test_file.py", "src/file.py"]
     assert [item.staged_file.path for item in result.evidence_bundle.evidence] == ["src/file.py", "tests/test_file.py"]
     assert synthesizer.calls[0].skill_id == "team-commit-style"
     assert result.recommendation.commit_message == (
@@ -211,6 +212,7 @@ def test_generate_commit_message_fails_before_analysis_when_staged_file_bound_is
             staged_changes_loader=loader,
             analyzer=analyzer,
             synthesizer=synthesizer,
+            query_executor=RecordingQueryExecutor(),
             options=GenerateCommitMessageOptions(max_staged_files=2),
         ).generate()
 
@@ -242,6 +244,7 @@ def test_generate_commit_message_stops_before_synthesis_when_file_diff_loading_f
             staged_changes_loader=loader,
             analyzer=FakeAnalyzer(events=events),
             synthesizer=synthesizer,
+            query_executor=RecordingQueryExecutor(),
         ).generate()
 
     assert error_info.value.metadata == {"category": "git_failed", "path": "src/file.py"}
@@ -266,6 +269,7 @@ def test_generate_commit_message_stops_before_synthesis_when_analysis_fails() ->
             staged_changes_loader=loader,
             analyzer=analyzer,
             synthesizer=synthesizer,
+            query_executor=RecordingQueryExecutor(),
         ).generate()
 
     assert events == ["list_files", "load_file_diff:src/file.py", "analyze:src/file.py"]
@@ -284,6 +288,7 @@ def test_generate_commit_message_translates_invalid_evidence_bundle_before_synth
             staged_changes_loader=loader,
             analyzer=analyzer,
             synthesizer=synthesizer,
+            query_executor=RecordingQueryExecutor(),
         ).generate()
 
     assert error_info.value.metadata == {"evidence_count": 1}
@@ -302,6 +307,7 @@ def test_generate_commit_message_propagates_synthesis_failure_after_complete_evi
             staged_changes_loader=loader,
             analyzer=FakeAnalyzer(events=events),
             synthesizer=synthesizer,
+            query_executor=RecordingQueryExecutor(),
         ).generate()
 
     assert events == ["list_files", "load_file_diff:src/file.py", "analyze:src/file.py", "synthesize"]

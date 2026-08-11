@@ -1,6 +1,5 @@
 """Command-line inbound adapter for local agent runtime workflows."""
 
-from fabrica.adapters.inbound.cli.contributions import CliCommandDependencies
 from fabrica.adapters.inbound.cli.options import CliGlobalOptions
 from fabrica.adapters.inbound.cli.parser import (
     CliCommand,
@@ -9,12 +8,13 @@ from fabrica.adapters.inbound.cli.parser import (
     parse_args,
 )
 from fabrica.adapters.inbound.cli.runner import (
+    CliCommandExecutionOptions,
     run_cli_command,
 )
 
 __all__ = [
     "CliCommand",
-    "CliCommandDependencies",
+    "CliCommandExecutionOptions",
     "CliGlobalOptions",
     "CliInvocation",
     "build_parser",

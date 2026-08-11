@@ -5,16 +5,16 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from fabrica.features.agent_runtime.application.dtos import (
-    LocalAgentRunResult,
-    LocalAgentRunStatus,
-    RuntimeObservation,
-)
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
 )
-from fabrica.features.developer_workflow.application.dtos import GenerateCommitMessageCommand
+from fabrica.features.developer_workflow.application.dtos import (
+    CommitMessageWorkflowResult,
+    DeveloperWorkflowObservation,
+    DeveloperWorkflowStatus,
+    GenerateCommitMessageCommand,
+)
 
 if TYPE_CHECKING:
     from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
         DeveloperWorkflowCliStreams,
         DeveloperWorkflowCliWriters,
     )
-    from fabrica.features.developer_workflow.application.use_cases import ConfirmedCommitWorkflowResult
+    from fabrica.features.developer_workflow.application.dtos import ConfirmedCommitWorkflowResult
 
 
 def run_developer_workflow_cli_command(
@@ -70,10 +70,10 @@ def run_developer_workflow_cli_command(
     try:
         answer = streams.stdin.readline()
     except KeyboardInterrupt:
-        interrupted_result = LocalAgentRunResult(
-            status=LocalAgentRunStatus.SAFETY_DENIED,
+        interrupted_result = CommitMessageWorkflowResult(
+            status=DeveloperWorkflowStatus.SAFETY_DENIED,
             observations=(
-                RuntimeObservation(
+                DeveloperWorkflowObservation(
                     message="commit confirmation interrupted",
                     metadata={"category": "commit_confirmation_interrupted"},
                 ),
@@ -109,7 +109,7 @@ def run_developer_workflow_cli_command(
 
 
 def _write_runtime_result(
-    result: LocalAgentRunResult,
+    result: CommitMessageWorkflowResult,
     *,
     global_options: DeveloperWorkflowCliCommandOptions,
     streams: DeveloperWorkflowCliStreams,

@@ -9,18 +9,6 @@ from typing import TYPE_CHECKING, TextIO
 
 if TYPE_CHECKING:
     from fabrica.adapters.inbound.cli.options import CliGlobalOptions
-    from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
-        CommandAugmenter,
-        LocalAgentRuntime,
-    )
-    from fabrica.features.agent_runtime.application.ports import (
-        SkillScriptPolicyEvaluator,
-        SkillScriptRunner,
-    )
-    from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
-        CommitMessageWorkflowRunner,
-        ConfirmedCommitWorkflowRunner,
-    )
 
 
 type CommandRegistrar = Callable[[argparse._SubParsersAction[argparse.ArgumentParser]], None]  # noqa: SLF001
@@ -28,23 +16,10 @@ type ContributionRunner = Callable[[object, "CliExecutionContext"], int]
 
 
 @dataclass(frozen=True, slots=True)
-class CliCommandDependencies:
-    """Product CLI dependency overrides for deterministic tests and composition."""
-
-    runtime: LocalAgentRuntime | None = None
-    command_augmenter: CommandAugmenter | None = None
-    commit_message_workflow: CommitMessageWorkflowRunner | None = None
-    confirmed_commit_workflow: ConfirmedCommitWorkflowRunner | None = None
-    script_policy_evaluator: SkillScriptPolicyEvaluator | None = None
-    script_executor: SkillScriptRunner | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class CliExecutionContext:
     """Shared execution context passed from the product CLI shell to one contribution."""
 
     global_options: CliGlobalOptions
-    dependencies: CliCommandDependencies
     stdin: TextIO
     stdout: TextIO
     stderr: TextIO

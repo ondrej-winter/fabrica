@@ -6,12 +6,19 @@ from dataclasses import dataclass, field
 from hashlib import sha256
 from io import StringIO
 from pathlib import Path
+from typing import TextIO
 
 from fabrica.adapters.inbound.cli import (
-    CliCommandDependencies,
-    run_cli_command,
+    CliCommand,
+    CliCommandExecutionOptions,
+    CliInvocation,
 )
+from fabrica.adapters.inbound.cli import (
+    run_cli_command as _run_cli_command,
+)
+from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import CliScriptExecuteCommand
+from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
 from fabrica.features.agent_runtime.application.dtos import (
     SelectedSkillScript,
     SkillScriptApprovalBinding,
@@ -26,6 +33,23 @@ from fabrica.features.agent_runtime.application.dtos import (
 EXPECTED_POLICY_DENIED_EXIT_CODE = 5
 EXPECTED_EXECUTION_FAILED_EXIT_CODE = 6
 EXPECTED_TIMED_OUT_EXIT_CODE = 7
+
+
+def run_cli_command(
+    invocation: CliCommand | CliInvocation,
+    *,
+    dependencies: AgentRuntimeCliDependencies | None = None,
+    stdin: TextIO | None = None,
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
+) -> int:
+    options = CliCommandExecutionOptions(
+        contributions=create_cli_contributions(agent_runtime_dependencies=dependencies),
+        stdin=stdin,
+        stdout=stdout,
+        stderr=stderr,
+    )
+    return _run_cli_command(invocation, options=options)
 
 
 @dataclass
@@ -53,7 +77,7 @@ def test_script_execute_command_maps_explicit_selection_to_executor() -> None:
 
     exit_code = run_cli_command(
         _command(),
-        dependencies=CliCommandDependencies(script_executor=executor),
+        dependencies=AgentRuntimeCliDependencies(script_executor=executor),
         stdout=stdout,
         stderr=stderr,
     )
@@ -76,7 +100,7 @@ def test_script_execute_command_maps_failure_statuses_to_stable_exit_codes() -> 
 
         exit_code = run_cli_command(
             _command(),
-            dependencies=CliCommandDependencies(script_executor=executor),
+            dependencies=AgentRuntimeCliDependencies(script_executor=executor),
             stdout=StringIO(),
             stderr=StringIO(),
         )
@@ -104,7 +128,7 @@ def test_script_execute_command_writes_bounded_failure_details_to_stderr() -> No
 
     exit_code = run_cli_command(
         _command(),
-        dependencies=CliCommandDependencies(script_executor=executor),
+        dependencies=AgentRuntimeCliDependencies(script_executor=executor),
         stdout=stdout,
         stderr=stderr,
     )

@@ -38,6 +38,21 @@ class CommitMessageSynthesisError(Exception):
         self.metadata = dict(metadata or {})
 
 
+class CommitMessageSkillContextLoadError(Exception):
+    """Application-safe failure raised when commit-message skill context cannot load."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        category: str,
+        metadata: Mapping[str, SafeGitStagedChangesMetadataValue] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.category = category
+        self.metadata = dict(metadata or {})
+
+
 class StagedFileCommitMessageAnalyzer(Protocol):
     """Outbound port for analyzing one staged file into structured evidence."""
 
@@ -74,6 +89,7 @@ __all__ = [
     "AsyncCommitMessageSynthesizer",
     "AsyncStagedFileCommitMessageAnalyzer",
     "CommitMessageAnalysisError",
+    "CommitMessageSkillContextLoadError",
     "CommitMessageSynthesisError",
     "CommitMessageSynthesizer",
     "StagedFileCommitMessageAnalyzer",

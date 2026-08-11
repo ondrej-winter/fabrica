@@ -6,14 +6,11 @@ import subprocess
 import sys
 import tempfile
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
 from typing import TYPE_CHECKING
 
-from fabrica.features.agent_runtime.adapters.outbound.skill_script_file import (
-    DEFAULT_SKILL_ROOT,
-    SkillScriptFileMetadataLoader,
-)
 from fabrica.features.agent_runtime.application.dtos import (
     SafeRuntimeMetadataValue,
     SkillScriptApprovalBinding,
@@ -24,7 +21,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptExecutionStatus,
     SkillScriptType,
 )
-from fabrica.features.agent_runtime.application.ports import SkillScriptExecutionError
+from fabrica.features.agent_runtime.application.ports import SkillScriptExecutionError, SkillScriptMetadataLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
@@ -37,6 +34,16 @@ _BINDING_MISMATCH_MESSAGE = "approved script binding does not match current scri
 _UNSUPPORTED_SCRIPT_TYPE_MESSAGE = "selected script type is not supported for subprocess execution"
 _MISSING_INTERPRETER_MESSAGE = "selected script interpreter is unavailable"
 _SUBPROCESS_OS_ERROR_MESSAGE = "selected script subprocess execution failed"
+
+
+@dataclass(frozen=True, slots=True)
+class SkillScriptSubprocessExecutionSettings:
+    """Execution settings for the selected script subprocess adapter."""
+
+    python_interpreter: str | Path | None = None
+    shell_interpreter: str | Path = "/bin/sh"
+    working_directory: Path | None = None
+    verbose_diagnostics: bool = False
 
 
 class SkillScriptSubprocessExecutor:
@@ -52,21 +59,17 @@ class SkillScriptSubprocessExecutor:
     def __init__(
         self,
         *,
-        skill_roots: tuple[Path, ...] | None = None,
-        python_interpreter: str | Path | None = None,
-        shell_interpreter: str | Path = "/bin/sh",
-        working_directory: Path | None = None,
-        verbose_diagnostics: bool = False,
+        metadata_loader: SkillScriptMetadataLoader,
+        skill_roots: tuple[Path, ...],
+        settings: SkillScriptSubprocessExecutionSettings | None = None,
     ) -> None:
-        self._skill_roots = tuple(skill_roots or (DEFAULT_SKILL_ROOT,))
-        self._metadata_loader = SkillScriptFileMetadataLoader(
-            skill_roots=self._skill_roots,
-            verbose_diagnostics=verbose_diagnostics,
-        )
-        self._python_interpreter = str(python_interpreter or sys.executable)
-        self._shell_interpreter = str(shell_interpreter)
-        self._working_directory = working_directory
-        self._verbose_diagnostics = verbose_diagnostics
+        execution_settings = settings or SkillScriptSubprocessExecutionSettings()
+        self._skill_roots = tuple(skill_roots)
+        self._metadata_loader = metadata_loader
+        self._python_interpreter = str(execution_settings.python_interpreter or sys.executable)
+        self._shell_interpreter = str(execution_settings.shell_interpreter)
+        self._working_directory = execution_settings.working_directory
+        self._verbose_diagnostics = execution_settings.verbose_diagnostics
 
     def execute(
         self,

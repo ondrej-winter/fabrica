@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from fabrica.adapters.inbound.cli.options import CliGlobalOptions
-from fabrica.adapters.inbound.cli.registry import default_cli_contributions
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from fabrica.adapters.inbound.cli.contributions import CliContribution
 
 type CliCommand = object
 
@@ -19,7 +24,7 @@ class CliInvocation:
     global_options: CliGlobalOptions = field(default_factory=CliGlobalOptions)
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(contributions: Sequence[CliContribution]) -> argparse.ArgumentParser:
     """Build the side-effect-free CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="fabrica",
@@ -41,15 +46,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Include additional diagnostics without exposing secrets or executing scripts.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for contribution in default_cli_contributions():
+    for contribution in contributions:
         contribution.register_commands(subparsers)
 
     return parser
 
 
-def parse_args(args: tuple[str, ...] | list[str] | None = None) -> CliInvocation:
+def parse_args(
+    args: tuple[str, ...] | list[str] | None,
+    *,
+    contributions: Sequence[CliContribution],
+) -> CliInvocation:
     """Parse command-line arguments into an adapter-local invocation object."""
-    namespace = build_parser().parse_args(args)
+    namespace = build_parser(contributions).parse_args(args)
     command_factory = namespace.command_factory
     return CliInvocation(
         command=command_factory(namespace),

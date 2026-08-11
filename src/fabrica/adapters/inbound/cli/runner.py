@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import sys
-from typing import TextIO
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, TextIO
 
 from fabrica.adapters.inbound.cli.contributions import (
-    CliCommandDependencies,
     CliExecutionContext,
 )
 from fabrica.adapters.inbound.cli.options import CliGlobalOptions
@@ -14,27 +14,37 @@ from fabrica.adapters.inbound.cli.parser import (
     CliCommand,
     CliInvocation,
 )
-from fabrica.adapters.inbound.cli.registry import default_cli_contributions
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from fabrica.adapters.inbound.cli.contributions import CliContribution
+
+
+@dataclass(frozen=True, slots=True)
+class CliCommandExecutionOptions:
+    """Runtime options supplied by the product CLI shell."""
+
+    contributions: Sequence[CliContribution]
+    stdin: TextIO | None = None
+    stdout: TextIO | None = None
+    stderr: TextIO | None = None
 
 
 def run_cli_command(
     invocation: CliCommand | CliInvocation,
     *,
-    dependencies: CliCommandDependencies | None = None,
-    stdin: TextIO | None = None,
-    stdout: TextIO | None = None,
-    stderr: TextIO | None = None,
+    options: CliCommandExecutionOptions,
 ) -> int:
     """Run one parsed CLI command and return a process exit code."""
     command, global_options = _normalize_invocation(invocation)
     context = CliExecutionContext(
         global_options=global_options,
-        dependencies=dependencies or CliCommandDependencies(),
-        stdin=stdin or sys.stdin,
-        stdout=stdout or sys.stdout,
-        stderr=stderr or sys.stderr,
+        stdin=options.stdin or sys.stdin,
+        stdout=options.stdout or sys.stdout,
+        stderr=options.stderr or sys.stderr,
     )
-    for contribution in default_cli_contributions():
+    for contribution in options.contributions:
         if contribution.can_handle(command):
             return contribution.run_command(command, context)
 

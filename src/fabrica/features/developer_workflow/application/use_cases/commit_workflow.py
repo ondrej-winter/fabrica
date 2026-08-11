@@ -5,20 +5,16 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
-from fabrica.features.agent_runtime.application.dtos import (
-    LocalAgentRunStatus,
-    ModelCostEvidence,
-    ModelUsageEvidence,
-    RuntimeObservation,
-)
-from fabrica.features.agent_runtime.application.ports import SkillContextLoadError
 from fabrica.features.developer_workflow.application.dtos import (
     DEFAULT_COMMIT_MESSAGE_SKILL_ID,
     DEFAULT_MAX_COMMIT_MESSAGE_STAGED_FILES,
     AnalyzeStagedFileForCommitMessageCommand,
     CommitMessageEvidenceBundle,
     CommitMessageRecommendation,
+    ConfirmedCommitWorkflowResult,
     CreateGitCommitCommand,
+    DeveloperWorkflowObservation,
+    DeveloperWorkflowStatus,
     GenerateCommitMessageResult,
     GitCommitResult,
     PreCommitRunCommand,
@@ -33,6 +29,7 @@ from fabrica.features.developer_workflow.application.ports import (
     AsyncGitStagedChangesLoader,
     AsyncStagedFileCommitMessageAnalyzer,
     CommitMessageAnalysisError,
+    CommitMessageSkillContextLoadError,
     CommitMessageSynthesisError,
     GitCommitCreator,
     GitCommitError,
@@ -42,7 +39,7 @@ from fabrica.features.developer_workflow.application.ports import (
     PreCommitRunner,
 )
 from fabrica.features.query_execution.application.ports import AsyncQueryFanoutExecutor
-from fabrica.features.query_execution.application.use_cases import BoundedAsyncQueryFanoutExecutor
+from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence
 
 
 class _SyncStagedFileCommitMessageAnalyzer(Protocol):
@@ -110,14 +107,14 @@ class GenerateCommitMessage:
         staged_changes_loader: AsyncGitStagedChangesLoader,
         analyzer: AsyncStagedFileCommitMessageAnalyzer,
         synthesizer: AsyncCommitMessageSynthesizer,
-        query_executor: AsyncQueryFanoutExecutor | None = None,
+        query_executor: AsyncQueryFanoutExecutor,
         options: GenerateCommitMessageOptions | None = None,
     ) -> None:
         workflow_options = options or GenerateCommitMessageOptions()
         self._staged_changes_loader = staged_changes_loader
         self._analyzer = analyzer
         self._synthesizer = synthesizer
-        self._query_executor = query_executor or BoundedAsyncQueryFanoutExecutor()
+        self._query_executor = query_executor
         self._options = workflow_options
 
     def generate(self, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID) -> GenerateCommitMessageResult:
@@ -239,30 +236,6 @@ class GitCommitter(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class ConfirmedCommitWorkflowResult:
-    """Result of generating a recommendation and attempting an approved commit."""
-
-    status: LocalAgentRunStatus
-    recommendation: CommitMessageRecommendation | None = None
-    commit_result: GitCommitResult | None = None
-    output_text: str | None = None
-    observations: tuple[RuntimeObservation, ...] = ()
-    usage_evidence: tuple[ModelUsageEvidence, ...] = ()
-    cost_evidence: tuple[ModelCostEvidence, ...] = ()
-    commit_attempted: bool = False
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "observations", tuple(self.observations))
-        object.__setattr__(self, "usage_evidence", tuple(self.usage_evidence))
-        object.__setattr__(self, "cost_evidence", tuple(self.cost_evidence))
-
-    @property
-    def succeeded(self) -> bool:
-        """Return whether recommendation generation and commit creation succeeded."""
-        return self.status is LocalAgentRunStatus.SUCCESS
-
-
-@dataclass(frozen=True, slots=True)
 class ConfirmedCommitWorkflow:
     """Application workflow for an externally approved generated git commit."""
 
@@ -311,24 +284,24 @@ class ConfirmedCommitWorkflow:
             result = await self.generator.generate_async(skill_id=selected_skill_id)
         except GitStagedChangesLoadError as err:
             return self._failure_result(
-                LocalAgentRunStatus.CONFIGURATION_ERROR,
-                RuntimeObservation(
+                DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+                DeveloperWorkflowObservation(
                     message=str(err),
                     metadata={"category": err.category, **err.metadata},
                 ),
             )
-        except SkillContextLoadError as err:
+        except CommitMessageSkillContextLoadError as err:
             return self._failure_result(
-                LocalAgentRunStatus.CONFIGURATION_ERROR,
-                RuntimeObservation(
+                DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+                DeveloperWorkflowObservation(
                     message=str(err),
                     metadata={"category": err.category, **err.metadata},
                 ),
             )
         except (GenerateCommitMessageError, ValueError) as err:
             return self._failure_result(
-                LocalAgentRunStatus.CONFIGURATION_ERROR,
-                RuntimeObservation(
+                DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+                DeveloperWorkflowObservation(
                     message=str(err),
                     metadata={
                         "category": "invalid_commit_message_input",
@@ -338,8 +311,8 @@ class ConfirmedCommitWorkflow:
             )
         except (CommitMessageAnalysisError, CommitMessageSynthesisError) as err:
             return self._failure_result(
-                LocalAgentRunStatus.MODEL_ERROR,
-                RuntimeObservation(
+                DeveloperWorkflowStatus.MODEL_ERROR,
+                DeveloperWorkflowObservation(
                     message=str(err),
                     metadata={
                         "category": "commit_message_model_failure",
@@ -352,7 +325,7 @@ class ConfirmedCommitWorkflow:
         output_text = format_commit_message_recommendation(recommendation)
 
         return ConfirmedCommitWorkflowResult(
-            status=LocalAgentRunStatus.SUCCESS,
+            status=DeveloperWorkflowStatus.SUCCESS,
             recommendation=recommendation,
             output_text=output_text,
             usage_evidence=self._usage_evidence,
@@ -374,11 +347,11 @@ class ConfirmedCommitWorkflow:
             )
         except GitCommitError as err:
             return ConfirmedCommitWorkflowResult(
-                status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
                 recommendation=recommendation,
                 output_text=output_text,
                 observations=(
-                    RuntimeObservation(
+                    DeveloperWorkflowObservation(
                         message=str(err),
                         metadata={
                             "category": "git_commit_failed",
@@ -393,7 +366,7 @@ class ConfirmedCommitWorkflow:
             )
 
         return ConfirmedCommitWorkflowResult(
-            status=LocalAgentRunStatus.SUCCESS,
+            status=DeveloperWorkflowStatus.SUCCESS,
             recommendation=recommendation,
             commit_result=commit_result,
             output_text=output_text,
@@ -412,8 +385,8 @@ class ConfirmedCommitWorkflow:
 
     def _failure_result(
         self,
-        status: LocalAgentRunStatus,
-        observation: RuntimeObservation,
+        status: DeveloperWorkflowStatus,
+        observation: DeveloperWorkflowObservation,
     ) -> ConfirmedCommitWorkflowResult:
         return ConfirmedCommitWorkflowResult(
             status=status,
@@ -427,7 +400,7 @@ class ConfirmedCommitWorkflow:
             result = self.pre_commit_runner.run_pre_commit(PreCommitRunCommand())
         except PreCommitRunError as err:
             return self._pre_commit_failure_result(
-                RuntimeObservation(
+                DeveloperWorkflowObservation(
                     message=str(err),
                     metadata={"category": err.category, **err.metadata},
                 ),
@@ -436,7 +409,7 @@ class ConfirmedCommitWorkflow:
             return None
         if result.status is PreCommitRunStatus.MODIFIED_FILES:
             return self._pre_commit_failure_result(
-                RuntimeObservation(
+                DeveloperWorkflowObservation(
                     message=(
                         "pre-commit modified files; no commit was created. "
                         "review and stage changed files before retrying."
@@ -445,15 +418,15 @@ class ConfirmedCommitWorkflow:
                 ),
             )
         return self._pre_commit_failure_result(
-            RuntimeObservation(
+            DeveloperWorkflowObservation(
                 message="pre-commit failed; no commit was created.",
                 metadata={"category": "pre_commit_failed", **_pre_commit_metadata(result)},
             ),
         )
 
-    def _pre_commit_failure_result(self, observation: RuntimeObservation) -> ConfirmedCommitWorkflowResult:
+    def _pre_commit_failure_result(self, observation: DeveloperWorkflowObservation) -> ConfirmedCommitWorkflowResult:
         return ConfirmedCommitWorkflowResult(
-            status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+            status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
             observations=(observation,),
         )
 

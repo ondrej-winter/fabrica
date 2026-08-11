@@ -21,11 +21,12 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageEvidence,
     ModelUsageEvidenceConfidence,
     ModelUsageEvidenceSource,
-    RuntimeObservation,
 )
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageEvidenceBundle,
     CommitMessageRecommendation,
+    DeveloperWorkflowObservation,
+    DeveloperWorkflowStatus,
     GenerateCommitMessageResult,
     GitCommitResult,
     GitStagedChangesFailureCategory,
@@ -177,7 +178,7 @@ def test_confirmed_commit_workflow_stops_before_commit_when_staged_discovery_fai
 
     result = workflow.run()
 
-    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.commit_attempted is False
     assert result.commit_result is None
     assert result.observations[0].metadata["category"] == GitStagedChangesFailureCategory.NO_STAGED_CHANGES
@@ -198,7 +199,7 @@ def test_confirmed_commit_workflow_stops_before_runtime_when_pre_commit_fails(tm
 
     result = workflow.run(skill_id="conventional-commits")
 
-    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is None
     assert result.commit_attempted is False
     assert result.commit_result is None
@@ -221,7 +222,7 @@ def test_confirmed_commit_workflow_stops_before_runtime_when_pre_commit_modifies
 
     result = workflow.run(skill_id="conventional-commits")
 
-    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is None
     assert result.commit_attempted is False
     assert result.commit_result is None
@@ -255,7 +256,7 @@ def test_confirmed_commit_workflow_reports_git_failure_without_creating_commit(t
 
     result = workflow.run(skill_id="conventional-commits")
 
-    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.commit_attempted is True
     assert result.commit_result is None
     assert result.recommendation is not None
@@ -285,7 +286,7 @@ def test_confirmed_commit_workflow_maps_commit_error_after_preserving_recommenda
 
     result = workflow.run()
 
-    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is recommendation
     assert result.output_text == _synthesis_text(
         summary="Summary text.",
@@ -296,7 +297,7 @@ def test_confirmed_commit_workflow_maps_commit_error_after_preserving_recommenda
     assert result.commit_result is None
     assert result.usage_evidence == (usage,)
     assert result.observations == (
-        RuntimeObservation(
+        DeveloperWorkflowObservation(
             message="git commit failed",
             metadata={"category": "git_failed", "commit_attempted": True, "returncode": 1},
         ),

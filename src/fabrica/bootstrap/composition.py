@@ -37,16 +37,18 @@ from fabrica.features.agent_runtime.adapters.outbound.registered_tool import (
     SkillAssociatedRegisteredTool,
 )
 from fabrica.features.agent_runtime.adapters.outbound.skill_markdown_file import (
+    DEFAULT_SKILL_ROOT,
     SkillMarkdownFileContextLoader,
     SkillResourceFileContextLoader,
 )
 from fabrica.features.agent_runtime.adapters.outbound.skill_script_file import SkillScriptFileMetadataLoader
-from fabrica.features.agent_runtime.adapters.outbound.skill_script_subprocess import SkillScriptSubprocessExecutor
+from fabrica.features.agent_runtime.adapters.outbound.skill_script_subprocess import (
+    SkillScriptSubprocessExecutionSettings,
+    SkillScriptSubprocessExecutor,
+)
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     LocalAgentRunResult,
-    LocalAgentRunStatus,
-    RuntimeObservation,
     SelectedSkill,
     SelectedSkillResource,
     SkillContextBounds,
@@ -63,7 +65,6 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolLoopRunResult,
 )
 from fabrica.features.agent_runtime.application.ports import (
-    SkillContextLoadError,
     SkillScriptApprovalLookup,
     ToolAwareAgentModel,
 )
@@ -86,6 +87,7 @@ from fabrica.features.codex_transport.application.use_cases import CompleteWithC
 from fabrica.features.developer_workflow.adapters.outbound.commit_message_agent_runtime import (
     AgentRuntimeCommitMessageSynthesizer,
     AgentRuntimeStagedFileCommitMessageAnalyzer,
+    SkillContextCommitMessageSynthesizer,
 )
 from fabrica.features.developer_workflow.adapters.outbound.git_registered_tool import (
     create_git_context_registered_tools as create_git_context_registered_tool_adapters,
@@ -104,15 +106,16 @@ from fabrica.features.developer_workflow.adapters.outbound.pre_commit_registered
 )
 from fabrica.features.developer_workflow.application.dtos import (
     DEFAULT_COMMIT_MESSAGE_SKILL_ID,
-    CommitMessageRecommendation,
+    CommitMessageWorkflowResult,
+    DeveloperWorkflowObservation,
+    DeveloperWorkflowStatus,
     GenerateCommitMessageCommand,
     GitContextDiffBounds,
     GitStagedDiffBounds,
-    SynthesizeCommitMessageCommand,
 )
 from fabrica.features.developer_workflow.application.ports import (
-    AsyncCommitMessageSynthesizer,
     CommitMessageAnalysisError,
+    CommitMessageSkillContextLoadError,
     CommitMessageSynthesisError,
     GitStagedChangesLoadError,
 )
@@ -126,6 +129,7 @@ from fabrica.features.developer_workflow.application.use_cases import (
     GenerateCommitMessageOptions,
     format_commit_message_recommendation,
 )
+from fabrica.features.query_execution.application.use_cases import BoundedAsyncQueryFanoutExecutor
 
 DEFAULT_CODEX_AUTH_FILE = Path.home() / ".codex" / "auth.json"
 DEFAULT_COMMIT_MESSAGE_CODEX_MODEL = "gpt-5.3-codex-spark"
@@ -336,8 +340,8 @@ class CommitMessageWorkflow:
         command: GenerateCommitMessageCommand | None = None,
         *,
         skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID,
-    ) -> LocalAgentRunResult:
-        """Generate a recommendation and map it to the local runtime result contract."""
+    ) -> CommitMessageWorkflowResult:
+        """Generate a recommendation and map it to the developer workflow result contract."""
         return asyncio.run(self.run_async(command, skill_id=skill_id))
 
     async def run_async(
@@ -345,38 +349,38 @@ class CommitMessageWorkflow:
         command: GenerateCommitMessageCommand | None = None,
         *,
         skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID,
-    ) -> LocalAgentRunResult:
-        """Generate a recommendation asynchronously and map it to the runtime result contract."""
+    ) -> CommitMessageWorkflowResult:
+        """Generate a recommendation asynchronously and map it to the developer workflow result contract."""
         active_command = command or GenerateCommitMessageCommand(skill_id=skill_id)
         if self.evidence_recorder is not None:
             self.evidence_recorder.reset()
         try:
             result = await self.generator.generate_async(skill_id=active_command.skill_id)
         except GitStagedChangesLoadError as err:
-            return LocalAgentRunResult(
-                status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+            return CommitMessageWorkflowResult(
+                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
                 observations=(
-                    RuntimeObservation(
+                    DeveloperWorkflowObservation(
                         message=str(err),
                         metadata={"category": err.category, **err.metadata},
                     ),
                 ),
             )
-        except SkillContextLoadError as err:
-            return LocalAgentRunResult(
-                status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+        except CommitMessageSkillContextLoadError as err:
+            return CommitMessageWorkflowResult(
+                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
                 observations=(
-                    RuntimeObservation(
+                    DeveloperWorkflowObservation(
                         message=str(err),
                         metadata={"category": err.category, **err.metadata},
                     ),
                 ),
             )
         except (GenerateCommitMessageError, ValueError) as err:
-            return LocalAgentRunResult(
-                status=LocalAgentRunStatus.CONFIGURATION_ERROR,
+            return CommitMessageWorkflowResult(
+                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
                 observations=(
-                    RuntimeObservation(
+                    DeveloperWorkflowObservation(
                         message=str(err),
                         metadata={
                             "category": "invalid_commit_message_input",
@@ -386,10 +390,10 @@ class CommitMessageWorkflow:
                 ),
             )
         except (CommitMessageAnalysisError, CommitMessageSynthesisError) as err:
-            return LocalAgentRunResult(
-                status=LocalAgentRunStatus.MODEL_ERROR,
+            return CommitMessageWorkflowResult(
+                status=DeveloperWorkflowStatus.MODEL_ERROR,
                 observations=(
-                    RuntimeObservation(
+                    DeveloperWorkflowObservation(
                         message=str(err),
                         metadata={
                             "category": "commit_message_model_failure",
@@ -398,8 +402,8 @@ class CommitMessageWorkflow:
                     ),
                 ),
             )
-        return LocalAgentRunResult(
-            status=LocalAgentRunStatus.SUCCESS,
+        return CommitMessageWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
             output_text=format_commit_message_recommendation(result.recommendation),
             usage_evidence=self.evidence_recorder.usage_evidence if self.evidence_recorder is not None else (),
             cost_evidence=self.evidence_recorder.cost_evidence if self.evidence_recorder is not None else (),
@@ -444,29 +448,6 @@ class EvidenceRecordingCommitMessageRuntime:
     def _record(self, result: LocalAgentRunResult) -> None:
         self._usage_evidence.extend(result.usage_evidence)
         self._cost_evidence.extend(result.cost_evidence)
-
-
-@dataclass(frozen=True, slots=True)
-class SkillContextCommitMessageSynthesizer:
-    """Synthesizer decorator that loads selected skill markdown before synthesis."""
-
-    synthesizer: AsyncCommitMessageSynthesizer
-    skill_context_loader: LoadSkillContext
-
-    async def synthesize_async(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
-        """Load selected skill context and delegate final synthesis."""
-        skill_context = await asyncio.to_thread(
-            self.skill_context_loader.load,
-            (SelectedSkill(skill_id=command.skill_id),),
-        )
-        skill_markdown = skill_context[0].text if skill_context else None
-        return await self.synthesizer.synthesize_async(
-            SynthesizeCommitMessageCommand(
-                evidence_bundle=command.evidence_bundle,
-                skill_id=command.skill_id,
-                skill_markdown=skill_markdown,
-            ),
-        )
 
 
 class DenyByDefaultSkillScriptApprovalLookup:
@@ -653,6 +634,7 @@ def _create_commit_message_generator(
             synthesizer=AgentRuntimeCommitMessageSynthesizer(runtime),
             skill_context_loader=skill_context_loader,
         ),
+        query_executor=BoundedAsyncQueryFanoutExecutor(),
         options=GenerateCommitMessageOptions(max_parallel_analysis=options.max_parallel_analysis),
     )
 
@@ -732,9 +714,10 @@ def create_skill_script_executor(
     call backends.
     """
     execution_options = options or SkillScriptExecutionOptions()
+    skill_roots = execution_options.skill_roots or (DEFAULT_SKILL_ROOT,)
     policy_evaluator = create_skill_script_policy_evaluator(
         SkillScriptPolicyEvaluationOptions(
-            skill_roots=execution_options.skill_roots,
+            skill_roots=skill_roots,
             sandbox_policy=execution_options.sandbox_policy,
             max_script_bytes=execution_options.max_script_bytes,
             verbose_diagnostics=execution_options.verbose_diagnostics,
@@ -742,11 +725,18 @@ def create_skill_script_executor(
         ),
     )
     executor = SkillScriptSubprocessExecutor(
-        skill_roots=execution_options.skill_roots,
-        python_interpreter=execution_options.python_interpreter,
-        shell_interpreter=execution_options.shell_interpreter,
-        working_directory=execution_options.working_directory,
-        verbose_diagnostics=execution_options.verbose_diagnostics,
+        metadata_loader=SkillScriptFileMetadataLoader(
+            skill_roots=skill_roots,
+            max_script_bytes=execution_options.max_script_bytes or execution_options.sandbox_policy.max_script_bytes,
+            verbose_diagnostics=execution_options.verbose_diagnostics,
+        ),
+        skill_roots=skill_roots,
+        settings=SkillScriptSubprocessExecutionSettings(
+            python_interpreter=execution_options.python_interpreter,
+            shell_interpreter=execution_options.shell_interpreter,
+            working_directory=execution_options.working_directory,
+            verbose_diagnostics=execution_options.verbose_diagnostics,
+        ),
     )
     return ExecuteSkillScript(policy_evaluator=policy_evaluator, executor=executor)
 

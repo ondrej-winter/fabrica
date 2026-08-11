@@ -36,7 +36,7 @@ Documentation = "https://github.com/ondrej-winter/fabrica#readme"
 Repository = "https://github.com/ondrej-winter/fabrica"
 
 [project.scripts]
-fabrica = "fabrica.adapters.inbound.cli.__main__:main"
+fabrica = "fabrica.bootstrap.cli:main"
 
 [dependency-groups]
 dev = [
@@ -84,6 +84,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"] # pytest-native assertions are expected in tests
+
+[tool.ty.src]
+exclude = [".agents/**"]
 
 [tool.importlinter]
 root_package = "fabrica"
@@ -146,7 +149,7 @@ name = "Generic product CLI shell modules must not import features or bootstrap"
 type = "forbidden"
 allow_indirect_imports = true
 source_modules = [
-    "fabrica.adapters.inbound.cli.__main__",
+    "fabrica.adapters.inbound.cli.contributions",
     "fabrica.adapters.inbound.cli.options",
     "fabrica.adapters.inbound.cli.parser",
     "fabrica.adapters.inbound.cli.runner",
@@ -155,6 +158,37 @@ forbidden_modules = [
     "fabrica.features",
     "fabrica.bootstrap",
 ]
+
+[[tool.importlinter.contracts]]
+id = "developer-workflow-core-does-not-import-agent-runtime"
+name = "Developer workflow core must not import agent-runtime contracts"
+type = "forbidden"
+source_modules = ["fabrica.features.developer_workflow.application"]
+forbidden_modules = ["fabrica.features.agent_runtime"]
+
+[[tool.importlinter.contracts]]
+id = "developer-workflow-inbound-cli-does-not-import-agent-runtime"
+name = "Developer workflow inbound CLI must not expose agent-runtime contracts"
+type = "forbidden"
+source_modules = ["fabrica.features.developer_workflow.adapters.inbound"]
+forbidden_modules = ["fabrica.features.agent_runtime"]
+
+[[tool.importlinter.contracts]]
+id = "developer-workflow-application-uses-query-execution-port-only"
+name = "Developer workflow application may depend on query-execution ports, not implementations"
+type = "forbidden"
+source_modules = ["fabrica.features.developer_workflow.application"]
+forbidden_modules = [
+    "fabrica.features.query_execution.adapters",
+    "fabrica.features.query_execution.application.use_cases",
+]
+
+[[tool.importlinter.contracts]]
+id = "skill-script-subprocess-receives-metadata-loader-through-port"
+name = "Skill script subprocess adapter must receive metadata loading through the application port"
+type = "forbidden"
+source_modules = ["fabrica.features.agent_runtime.adapters.outbound.skill_script_subprocess"]
+forbidden_modules = ["fabrica.features.agent_runtime.adapters.outbound.skill_script_file"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

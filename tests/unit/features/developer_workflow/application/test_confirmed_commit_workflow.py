@@ -3,10 +3,10 @@
 from dataclasses import dataclass, field
 
 from fabrica.bootstrap import ConfirmedCommitWorkflow
-from fabrica.features.agent_runtime.application.dtos import LocalAgentRunStatus
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageEvidenceBundle,
     CommitMessageRecommendation,
+    DeveloperWorkflowStatus,
     GenerateCommitMessageResult,
     GitCommitResult,
     GitStagedFile,
@@ -91,7 +91,7 @@ def test_confirmed_commit_pre_commit_failure_skips_generation_and_commit() -> No
         pre_commit_runner=pre_commit,
     ).generate()
 
-    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is None
     assert result.commit_result is None
     assert result.commit_attempted is False
@@ -116,7 +116,7 @@ def test_confirmed_commit_modified_files_skips_generation_and_reports_review_req
         pre_commit_runner=pre_commit,
     ).generate()
 
-    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is None
     assert result.commit_result is None
     assert result.commit_attempted is False
@@ -144,7 +144,7 @@ def test_confirmed_commit_pre_commit_error_skips_generation_and_commit() -> None
         pre_commit_runner=pre_commit,
     ).generate()
 
-    assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is None
     assert result.commit_result is None
     assert result.commit_attempted is False

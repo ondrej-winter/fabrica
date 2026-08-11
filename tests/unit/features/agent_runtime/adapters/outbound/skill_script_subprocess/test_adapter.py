@@ -5,7 +5,9 @@ from __future__ import annotations
 from hashlib import sha256
 from pathlib import Path
 
+from fabrica.features.agent_runtime.adapters.outbound.skill_script_file import SkillScriptFileMetadataLoader
 from fabrica.features.agent_runtime.adapters.outbound.skill_script_subprocess import (
+    SkillScriptSubprocessExecutionSettings,
     SkillScriptSubprocessExecutor,
 )
 from fabrica.features.agent_runtime.application.dtos import (
@@ -26,7 +28,7 @@ def test_execute_runs_approved_python_script_and_captures_stdout(tmp_path: Path)
     selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")
     binding = _binding(selection, script, SkillScriptType.PYTHON)
 
-    result = SkillScriptSubprocessExecutor(skill_roots=(tmp_path,)).execute(
+    result = _executor(tmp_path).execute(
         SkillScriptExecutionCommand(selection=selection),
         binding,
     )
@@ -44,7 +46,7 @@ def test_execute_runs_approved_shell_script_through_explicit_interpreter(tmp_pat
     selection = SelectedSkillScript(skill_id="shell-testing", script_id="scripts/check.sh")
     binding = _binding(selection, script, SkillScriptType.SHELL)
 
-    result = SkillScriptSubprocessExecutor(skill_roots=(tmp_path,), shell_interpreter="/bin/sh").execute(
+    result = _executor(tmp_path, shell_interpreter="/bin/sh").execute(
         SkillScriptExecutionCommand(selection=selection),
         binding,
     )
@@ -65,7 +67,7 @@ def test_execute_refuses_mismatched_binding_without_running_script(tmp_path: Pat
     binding = _binding(selection, script, SkillScriptType.PYTHON, content_digest="sha256:not-current")
     working_directory = tmp_path / "work"
 
-    result = SkillScriptSubprocessExecutor(skill_roots=(tmp_path,), working_directory=working_directory).execute(
+    result = _executor(tmp_path, working_directory=working_directory).execute(
         SkillScriptExecutionCommand(selection=selection),
         binding,
     )
@@ -85,7 +87,7 @@ def test_execute_maps_non_zero_exit_to_execution_failed(tmp_path: Path) -> None:
     selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/fail.py")
     binding = _binding(selection, script, SkillScriptType.PYTHON)
 
-    result = SkillScriptSubprocessExecutor(skill_roots=(tmp_path,)).execute(
+    result = _executor(tmp_path).execute(
         SkillScriptExecutionCommand(selection=selection),
         binding,
     )
@@ -101,7 +103,7 @@ def test_execute_maps_timeout_to_timed_out(tmp_path: Path) -> None:
     selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/sleep.py")
     binding = _binding(selection, script, SkillScriptType.PYTHON)
 
-    result = SkillScriptSubprocessExecutor(skill_roots=(tmp_path,)).execute(
+    result = _executor(tmp_path).execute(
         SkillScriptExecutionCommand(
             selection=selection,
             sandbox_policy=SkillScriptSandboxPolicy(timeout_seconds=1),
@@ -119,7 +121,7 @@ def test_execute_bounds_stdout_and_records_truncation(tmp_path: Path) -> None:
     selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/output.py")
     binding = _binding(selection, script, SkillScriptType.PYTHON)
 
-    result = SkillScriptSubprocessExecutor(skill_roots=(tmp_path,)).execute(
+    result = _executor(tmp_path).execute(
         SkillScriptExecutionCommand(
             selection=selection,
             sandbox_policy=SkillScriptSandboxPolicy(max_stdout_chars=SHORT_OUTPUT_BOUND),
@@ -143,7 +145,7 @@ def test_execute_uses_empty_environment_by_default(tmp_path: Path) -> None:
     selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/env.py")
     binding = _binding(selection, script, SkillScriptType.PYTHON)
 
-    result = SkillScriptSubprocessExecutor(skill_roots=(tmp_path,)).execute(
+    result = _executor(tmp_path).execute(
         SkillScriptExecutionCommand(selection=selection),
         binding,
     )
@@ -163,7 +165,7 @@ def test_execute_uses_explicit_working_directory_for_script_writes(tmp_path: Pat
     selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/write.py")
     binding = _binding(selection, script, SkillScriptType.PYTHON)
 
-    result = SkillScriptSubprocessExecutor(skill_roots=(tmp_path,), working_directory=working_directory).execute(
+    result = _executor(tmp_path, working_directory=working_directory).execute(
         SkillScriptExecutionCommand(selection=selection),
         binding,
     )
@@ -183,7 +185,7 @@ def test_execute_uses_temporary_working_directory_by_default(tmp_path: Path) -> 
     selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/pwd.py")
     binding = _binding(selection, script, SkillScriptType.PYTHON)
 
-    result = SkillScriptSubprocessExecutor(skill_roots=(tmp_path,)).execute(
+    result = _executor(tmp_path).execute(
         SkillScriptExecutionCommand(selection=selection),
         binding,
     )
@@ -200,10 +202,7 @@ def test_execute_returns_unsupported_for_missing_shell_interpreter(tmp_path: Pat
     selection = SelectedSkillScript(skill_id="shell-testing", script_id="scripts/check.sh")
     binding = _binding(selection, script, SkillScriptType.SHELL)
 
-    result = SkillScriptSubprocessExecutor(
-        skill_roots=(tmp_path,),
-        shell_interpreter=tmp_path / "missing-sh",
-    ).execute(
+    result = _executor(tmp_path, shell_interpreter=tmp_path / "missing-sh").execute(
         SkillScriptExecutionCommand(selection=selection),
         binding,
     )
@@ -215,7 +214,7 @@ def test_execute_returns_unsupported_for_missing_shell_interpreter(tmp_path: Pat
 def test_constructing_executor_does_not_read_skill_roots_or_run_scripts(tmp_path: Path) -> None:
     missing_root = tmp_path / "missing-skills"
 
-    executor = SkillScriptSubprocessExecutor(skill_roots=(missing_root,))
+    executor = _executor(missing_root)
 
     assert executor is not None
     assert not missing_root.exists()
@@ -226,6 +225,22 @@ def _write_script(root: Path, skill_id: str, script_id: str, text: str) -> Path:
     script_file.parent.mkdir(parents=True, exist_ok=True)
     script_file.write_text(text, encoding="utf-8")
     return script_file
+
+
+def _executor(
+    skill_root: Path,
+    *,
+    shell_interpreter: str | Path = "/bin/sh",
+    working_directory: Path | None = None,
+) -> SkillScriptSubprocessExecutor:
+    return SkillScriptSubprocessExecutor(
+        metadata_loader=SkillScriptFileMetadataLoader(skill_roots=(skill_root,)),
+        skill_roots=(skill_root,),
+        settings=SkillScriptSubprocessExecutionSettings(
+            shell_interpreter=shell_interpreter,
+            working_directory=working_directory,
+        ),
+    )
 
 
 def _binding(
