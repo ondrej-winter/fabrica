@@ -6,14 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, TextIO
 
 from fabrica.adapters.inbound.cli.contributions import CliContribution
-from fabrica.adapters.inbound.cli.output import (
-    write_confirmed_commit_result,
-    write_developer_workflow_result,
-    write_model_evidence_report,
-    write_run_result,
-    write_script_execution_result,
-    write_script_policy_result,
-)
+from fabrica.adapters.inbound.cli.output import write_model_evidence_report
 from fabrica.adapters.inbound.cli.parser import parse_args
 from fabrica.adapters.inbound.cli.runner import CliCommandExecutionOptions, run_cli_command
 from fabrica.bootstrap.composition import (
@@ -42,6 +35,11 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.contribution import (
     AGENT_RUNTIME_CLI_COMMAND_TYPES,
     register_agent_runtime_cli_commands,
 )
+from fabrica.features.agent_runtime.adapters.inbound.cli.output import (
+    write_run_result,
+    write_script_execution_result,
+    write_script_policy_result,
+)
 from fabrica.features.agent_runtime.adapters.inbound.cli.runner import run_agent_runtime_cli_command
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
@@ -55,6 +53,10 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
 from fabrica.features.developer_workflow.adapters.inbound.cli.contribution import (
     DEVELOPER_WORKFLOW_CLI_COMMAND_TYPES,
     register_developer_workflow_cli_commands,
+)
+from fabrica.features.developer_workflow.adapters.inbound.cli.output import (
+    write_confirmed_commit_result,
+    write_developer_workflow_result,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.runner import run_developer_workflow_cli_command
 

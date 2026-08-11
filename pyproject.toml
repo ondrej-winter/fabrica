@@ -151,6 +151,7 @@ allow_indirect_imports = true
 source_modules = [
     "fabrica.adapters.inbound.cli.contributions",
     "fabrica.adapters.inbound.cli.options",
+    "fabrica.adapters.inbound.cli.output",
     "fabrica.adapters.inbound.cli.parser",
     "fabrica.adapters.inbound.cli.runner",
 ]
