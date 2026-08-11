@@ -14,7 +14,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/add-hexagonal-feature",
       "skill_file": "skills/python-software-development/add-hexagonal-feature/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -29,7 +29,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/add-observability",
       "skill_file": "skills/agnostic-software-development/add-observability/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -44,7 +44,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/api-and-interface-design",
       "skill_file": "skills/agnostic-software-development/api-and-interface-design/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -59,7 +59,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/author-agent-skill",
       "skill_file": "skills/agnostic-software-development/author-agent-skill/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -74,7 +74,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/bootstrap-python-app",
       "skill_file": "skills/python-software-development/bootstrap-python-app/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -89,7 +89,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/browser-runtime-verification",
       "skill_file": "skills/agnostic-software-development/browser-runtime-verification/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -104,7 +104,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/ci-cd-and-automation",
       "skill_file": "skills/agnostic-software-development/ci-cd-and-automation/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -119,7 +119,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/code-review-and-quality",
       "skill_file": "skills/agnostic-software-development/code-review-and-quality/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -134,7 +134,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/code-simplification",
       "skill_file": "skills/agnostic-software-development/code-simplification/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -149,7 +149,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/context-engineering",
       "skill_file": "skills/agnostic-software-development/context-engineering/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -164,7 +164,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/conventional-commits",
       "skill_file": "skills/agnostic-software-development/conventional-commits/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -179,7 +179,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/debugging-and-error-recovery",
       "skill_file": "skills/agnostic-software-development/debugging-and-error-recovery/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -194,7 +194,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/deprecation-and-migration",
       "skill_file": "skills/agnostic-software-development/deprecation-and-migration/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -209,7 +209,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/documentation-and-adrs",
       "skill_file": "skills/agnostic-software-development/documentation-and-adrs/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -224,7 +224,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/doubt-driven-development",
       "skill_file": "skills/agnostic-software-development/doubt-driven-development/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -239,7 +239,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/format-python-code",
       "skill_file": "skills/python-software-development/format-python-code/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -254,7 +254,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/frontend-ui-engineering",
       "skill_file": "skills/agnostic-software-development/frontend-ui-engineering/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -269,7 +269,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/git-workflow-and-versioning",
       "skill_file": "skills/agnostic-software-development/git-workflow-and-versioning/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -284,7 +284,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/hexagonal-vertical-slices",
       "skill_file": "skills/agnostic-software-development/hexagonal-vertical-slices/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -299,7 +299,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/idea-refine",
       "skill_file": "skills/agnostic-software-development/idea-refine/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -314,7 +314,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/incremental-implementation",
       "skill_file": "skills/agnostic-software-development/incremental-implementation/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -329,7 +329,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/interview-me",
       "skill_file": "skills/agnostic-software-development/interview-me/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -344,7 +344,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/lint-python-code",
       "skill_file": "skills/python-software-development/lint-python-code/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -359,7 +359,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/performance-optimization",
       "skill_file": "skills/agnostic-software-development/performance-optimization/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -374,7 +374,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/planning-and-task-breakdown",
       "skill_file": "skills/agnostic-software-development/planning-and-task-breakdown/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -389,7 +389,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/python-add-adapter",
       "skill_file": "skills/python-software-development/python-add-adapter/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -404,7 +404,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/python-add-env-settings-adapter",
       "skill_file": "skills/python-software-development/python-add-env-settings-adapter/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -419,7 +419,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/python-add-port",
       "skill_file": "skills/python-software-development/python-add-port/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -434,7 +434,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/review-implementation-plan",
       "skill_file": "skills/agnostic-software-development/review-implementation-plan/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -449,7 +449,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/run-local-quality-gate",
       "skill_file": "skills/agnostic-software-development/run-local-quality-gate/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -464,7 +464,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/run-python-quality-gate",
       "skill_file": "skills/python-software-development/run-python-quality-gate/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -479,7 +479,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/run-python-tests",
       "skill_file": "skills/python-software-development/run-python-tests/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -494,7 +494,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/security-and-hardening",
       "skill_file": "skills/agnostic-software-development/security-and-hardening/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -509,7 +509,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/shipping-and-launch",
       "skill_file": "skills/agnostic-software-development/shipping-and-launch/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -524,7 +524,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/source-driven-development",
       "skill_file": "skills/agnostic-software-development/source-driven-development/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -539,7 +539,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/spec-driven-development",
       "skill_file": "skills/agnostic-software-development/spec-driven-development/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -554,7 +554,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/split-python-module",
       "skill_file": "skills/python-software-development/split-python-module/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -569,7 +569,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/test-driven-development",
       "skill_file": "skills/agnostic-software-development/test-driven-development/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -584,7 +584,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/update-project-docs",
       "skill_file": "skills/agnostic-software-development/update-project-docs/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -599,7 +599,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/using-agnostic-software-development-skills",
       "skill_file": "skills/agnostic-software-development/using-agnostic-software-development-skills/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -614,7 +614,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/using-python-software-development-skills",
       "skill_file": "skills/python-software-development/using-python-software-development-skills/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -629,7 +629,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/agnostic-software-development/write-adr",
       "skill_file": "skills/agnostic-software-development/write-adr/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -644,7 +644,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/write-pytest-tests",
       "skill_file": "skills/python-software-development/write-pytest-tests/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     },
     {
@@ -659,7 +659,7 @@
       "index_schema_version": 1,
       "skill_path": "skills/python-software-development/write-python-docstrings",
       "skill_file": "skills/python-software-development/write-python-docstrings/SKILL.md",
-      "locked_at": "2026-07-30T18:47:43.782384Z",
+      "locked_at": "2026-08-11T20:36:50.768379Z",
       "target_ref": "agents"
     }
   ]
