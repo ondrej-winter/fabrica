@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from fabrica.adapters.inbound.cli import CliCommandExecutionOptions, build_parser, run_cli_command
+from fabrica.adapters.inbound.cli import parse_args as parse_cli_args
 from fabrica.adapters.inbound.cli.contributions import CliContribution
 from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
@@ -52,6 +53,48 @@ def test_runner_dispatches_only_supplied_contributions() -> None:
 
     with pytest.raises(RuntimeError, match="no CLI contribution registered"):
         run_cli_command(command, options=CliCommandExecutionOptions(contributions=()))
+
+
+def test_parser_rejects_contribution_without_command_factory() -> None:
+    parser = build_parser((_malformed_contribution_without_command_factory(),))
+    namespace = parser.parse_args(["malformed"])
+
+    assert not hasattr(namespace, "command_factory")
+
+
+def test_parse_args_reports_missing_command_factory() -> None:
+    with pytest.raises(TypeError, match="did not configure a command factory"):
+        parse_cli_args(["malformed"], contributions=(_malformed_contribution_without_command_factory(),))
+
+
+def test_contribution_validation_rejects_duplicate_command_ownership() -> None:
+    duplicate = CliContribution(
+        name="duplicate_synthetic",
+        command_types=(_SyntheticCommand,),
+        register_commands=_ignore_registration,
+        run_command=_synthetic_run_command,
+    )
+
+    with pytest.raises(ValueError, match="duplicate CLI command type ownership"):
+        build_parser((_synthetic_contribution(), duplicate))
+
+    with pytest.raises(ValueError, match="duplicate CLI command type ownership"):
+        run_cli_command(
+            _SyntheticCommand(name="synthetic"),
+            options=CliCommandExecutionOptions(contributions=(_synthetic_contribution(), duplicate)),
+        )
+
+
+def test_contribution_validation_rejects_duplicate_names() -> None:
+    duplicate_name = CliContribution(
+        name="synthetic",
+        command_types=(_OtherSyntheticCommand,),
+        register_commands=_ignore_registration,
+        run_command=_synthetic_run_command,
+    )
+
+    with pytest.raises(ValueError, match="duplicate CLI contribution name"):
+        build_parser((_synthetic_contribution(), duplicate_name))
 
 
 def test_bootstrap_cli_contributions_declare_feature_owned_command_sets() -> None:
@@ -106,6 +149,11 @@ class _SyntheticCommand:
     name: str
 
 
+@dataclass(frozen=True, slots=True)
+class _OtherSyntheticCommand:
+    name: str
+
+
 def _synthetic_contribution() -> CliContribution:
     def register(subparsers: CliSubparsers) -> None:
         parser = subparsers.add_parser("synthetic")
@@ -117,6 +165,31 @@ def _synthetic_contribution() -> CliContribution:
 
     return CliContribution(
         name="synthetic",
+        command_types=(_SyntheticCommand,),
+        register_commands=register,
+        run_command=run,
+    )
+
+
+def _ignore_registration(subparsers: CliSubparsers) -> None:
+    _ = subparsers
+
+
+def _synthetic_run_command(command: object, context: object) -> int:
+    _ = command, context
+    return SYNTHETIC_EXIT_CODE
+
+
+def _malformed_contribution_without_command_factory() -> CliContribution:
+    def register(subparsers: CliSubparsers) -> None:
+        subparsers.add_parser("malformed")
+
+    def run(command: object, context: object) -> int:
+        _ = command, context
+        return SYNTHETIC_EXIT_CODE
+
+    return CliContribution(
+        name="malformed",
         command_types=(_SyntheticCommand,),
         register_commands=register,
         run_command=run,

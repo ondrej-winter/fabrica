@@ -101,11 +101,17 @@ def _agent_runtime_dependencies_for_command(
     overrides: AgentRuntimeCliDependencies | None,
 ) -> AgentRuntimeCliDependencies:
     dependencies = overrides or AgentRuntimeCliDependencies()
+    if isinstance(command, CliRunCommand):
+        return AgentRuntimeCliDependencies(
+            runtime=dependencies.runtime or _create_default_runtime(),
+            command_augmenter=dependencies.command_augmenter or _default_augment_command,
+        )
+    if isinstance(command, CliScriptPolicyCommand):
+        return AgentRuntimeCliDependencies(
+            script_policy_evaluator=dependencies.script_policy_evaluator
+            or _create_default_script_policy_evaluator(command, context=context),
+        )
     return AgentRuntimeCliDependencies(
-        runtime=dependencies.runtime or _create_default_runtime(),
-        command_augmenter=dependencies.command_augmenter or _default_augment_command,
-        script_policy_evaluator=dependencies.script_policy_evaluator
-        or _create_default_script_policy_evaluator(command, context=context),
         script_executor=dependencies.script_executor or _create_default_script_executor(command, context=context),
     )
 

@@ -5,6 +5,9 @@ from io import StringIO
 from pathlib import Path
 from typing import TextIO
 
+import pytest
+
+import fabrica.bootstrap.cli_contributions.agent_runtime as agent_runtime_cli_contribution
 from fabrica.adapters.inbound.cli import (
     CliCommand,
     CliCommandExecutionOptions,
@@ -156,6 +159,32 @@ def test_script_policy_command_default_composition_denies_synthetic_script_witho
     assert "status: denied\n" in stderr.getvalue()
     assert "approval_not_approved" in stderr.getvalue()
     assert "not executed by policy inspection" not in stderr.getvalue()
+
+
+def test_script_policy_default_composition_does_not_create_codex_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_runtime_is_created() -> object:
+        msg = "script-policy must not create the Codex runtime"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(agent_runtime_cli_contribution, "create_codex_runtime", fail_if_runtime_is_created)
+    script_file = tmp_path / "python-testing" / "scripts" / "check.py"
+    script_file.parent.mkdir(parents=True)
+    script_file.write_text("print('not executed by policy inspection')\n", encoding="utf-8")
+
+    exit_code = run_cli_command(
+        CliScriptPolicyCommand(
+            skill_id="python-testing",
+            script_id="scripts/check.py",
+            skill_root_options=CliSkillRootOptions(skill_roots=(tmp_path,)),
+        ),
+        stdout=StringIO(),
+        stderr=StringIO(),
+    )
+
+    assert exit_code == EXPECTED_POLICY_DENIED_EXIT_CODE
 
 
 def _selection() -> SelectedSkillScript:

@@ -6,10 +6,11 @@ import argparse
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from fabrica.adapters.inbound.cli.contributions import validate_cli_contributions
 from fabrica.adapters.inbound.cli.options import CliGlobalOptions
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     from fabrica.adapters.inbound.cli.contributions import CliContribution
 
@@ -26,6 +27,7 @@ class CliInvocation:
 
 def build_parser(contributions: Sequence[CliContribution]) -> argparse.ArgumentParser:
     """Build the side-effect-free CLI argument parser."""
+    validate_cli_contributions(contributions)
     parser = argparse.ArgumentParser(
         prog="fabrica",
         description="Run local subscription-backed agent runtime experiments.",
@@ -59,7 +61,7 @@ def parse_args(
 ) -> CliInvocation:
     """Parse command-line arguments into an adapter-local invocation object."""
     namespace = build_parser(contributions).parse_args(args)
-    command_factory = namespace.command_factory
+    command_factory = _command_factory_from_namespace(namespace)
     return CliInvocation(
         command=command_factory(namespace),
         global_options=CliGlobalOptions(
@@ -68,3 +70,11 @@ def parse_args(
             verbose_diagnostics=namespace.verbose_diagnostics,
         ),
     )
+
+
+def _command_factory_from_namespace(namespace: argparse.Namespace) -> Callable[[argparse.Namespace], CliCommand]:
+    command_factory = getattr(namespace, "command_factory", None)
+    if not callable(command_factory):
+        msg = "CLI contribution did not configure a command factory for the selected command"
+        raise TypeError(msg)
+    return command_factory

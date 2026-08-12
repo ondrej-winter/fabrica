@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, TextIO
 
 from fabrica.adapters.inbound.cli.contributions import (
     CliExecutionContext,
+    validate_cli_contributions,
 )
 from fabrica.adapters.inbound.cli.options import CliGlobalOptions
 from fabrica.adapters.inbound.cli.parser import (
@@ -37,6 +38,7 @@ def run_cli_command(
     options: CliCommandExecutionOptions,
 ) -> int:
     """Run one parsed CLI command and return a process exit code."""
+    validate_cli_contributions(options.contributions)
     command, global_options = _normalize_invocation(invocation)
     context = CliExecutionContext(
         global_options=global_options,
