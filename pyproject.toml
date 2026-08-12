@@ -149,6 +149,7 @@ name = "Generic product CLI shell modules must not import features or bootstrap"
 type = "forbidden"
 allow_indirect_imports = true
 source_modules = [
+    "fabrica.adapters.inbound.cli",
     "fabrica.adapters.inbound.cli.contributions",
     "fabrica.adapters.inbound.cli.options",
     "fabrica.adapters.inbound.cli.output",

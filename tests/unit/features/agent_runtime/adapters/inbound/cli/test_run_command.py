@@ -5,22 +5,21 @@ from io import StringIO
 from pathlib import Path
 from typing import TextIO
 
-from fabrica.adapters.inbound.cli import (
-    CliCommand,
-    CliCommandExecutionOptions,
-    CliGlobalOptions,
-    CliInvocation,
-)
-from fabrica.adapters.inbound.cli import (
-    run_cli_command as _run_cli_command,
-)
-from fabrica.bootstrap.cli import create_cli_contributions
+from fabrica.adapters.inbound.cli import CliGlobalOptions, CliInvocation
+from fabrica.adapters.inbound.cli.output import write_model_evidence_report
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
     CliSelectedResource,
 )
-from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
+from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
+    AgentRuntimeCliDependencies,
+    AgentRuntimeCliOptions,
+    AgentRuntimeCliStreams,
+    AgentRuntimeCliWriters,
+)
+from fabrica.features.agent_runtime.adapters.inbound.cli.output import write_run_result
+from fabrica.features.agent_runtime.adapters.inbound.cli.runner import run_agent_runtime_cli_command
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentContextBlock,
     LocalAgentRunCommand,
@@ -44,21 +43,74 @@ EXPECTED_MODEL_ERROR_EXIT_CODE = 3
 EXPECTED_BOUNDED_OUTPUT_LINE_CHARS = 4_000
 
 
-def run_cli_command(
-    invocation: CliCommand | CliInvocation,
+def run_feature_cli_command(
+    invocation: CliRunCommand | CliInvocation,
     *,
     dependencies: AgentRuntimeCliDependencies | None = None,
-    stdin: TextIO | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    options = CliCommandExecutionOptions(
-        contributions=create_cli_contributions(agent_runtime_dependencies=dependencies),
-        stdin=stdin,
-        stdout=stdout,
-        stderr=stderr,
+    command, global_options, composition_options = _normalize_invocation(invocation)
+    return run_agent_runtime_cli_command(
+        command,
+        options=AgentRuntimeCliOptions(
+            print_usage=global_options.print_usage,
+            print_prices=global_options.print_prices,
+            verbose_diagnostics=global_options.verbose_diagnostics,
+            skill_roots=composition_options.skill_roots,
+        ),
+        dependencies=dependencies or AgentRuntimeCliDependencies(),
+        streams=AgentRuntimeCliStreams(stdout=stdout or StringIO(), stderr=stderr or StringIO()),
+        writers=AgentRuntimeCliWriters(
+            run_result=write_run_result,
+            evidence=_write_evidence,
+            script_policy_result=_unexpected_script_policy_result_writer,
+            script_execution_result=_unexpected_script_execution_result_writer,
+        ),
     )
-    return _run_cli_command(invocation, options=options)
+
+
+def _normalize_invocation(
+    invocation: CliRunCommand | CliInvocation,
+) -> tuple[CliRunCommand, CliGlobalOptions, AgentRuntimeCliCompositionOptions]:
+    if isinstance(invocation, CliInvocation):
+        if not isinstance(invocation.command, CliRunCommand):
+            msg = "run-command tests only support CliRunCommand invocations"
+            raise TypeError(msg)
+        composition_options = invocation.composition_options or AgentRuntimeCliCompositionOptions()
+        if not isinstance(composition_options, AgentRuntimeCliCompositionOptions):
+            msg = "run-command tests require agent-runtime composition options"
+            raise TypeError(msg)
+        return invocation.command, invocation.global_options, composition_options
+    return invocation, CliGlobalOptions(), AgentRuntimeCliCompositionOptions()
+
+
+def _write_evidence(
+    result: LocalAgentRunResult,
+    *,
+    include_usage: bool,
+    include_prices: bool,
+    stdout: TextIO,
+) -> None:
+    write_model_evidence_report(
+        usage_evidence=result.usage_evidence,
+        cost_evidence=result.cost_evidence,
+        stdout=stdout,
+        include_usage=include_usage,
+        include_prices=include_prices,
+    )
+
+
+def _unexpected_script_policy_result_writer(*args: object, **kwargs: object) -> int:
+    _ = args, kwargs
+    msg = "run-command tests must not execute script-policy writer"
+    raise AssertionError(msg)
+
+
+def _unexpected_script_execution_result_writer(*args: object, **kwargs: object) -> int:
+    _ = args, kwargs
+    msg = "run-command tests must not execute script-execution writer"
+    raise AssertionError(msg)
 
 
 @dataclass
@@ -111,7 +163,7 @@ def test_run_command_maps_prompt_and_model_to_runtime_command() -> None:
     stdout = StringIO()
     stderr = StringIO()
 
-    exit_code = run_cli_command(
+    exit_code = run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong", model_hint="codex-compatible"),
         dependencies=AgentRuntimeCliDependencies(runtime=runtime),
         stdout=stdout,
@@ -130,7 +182,7 @@ def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> 
     )
     augmenter = RecordingAugmenter()
 
-    exit_code = run_cli_command(
+    exit_code = run_feature_cli_command(
         CliRunCommand(
             prompt="Use selected context",
             skill_ids=("python-testing",),
@@ -165,7 +217,7 @@ def test_run_invocation_passes_global_verbose_diagnostics_to_augmenter() -> None
     )
     augmenter = RecordingAugmenter()
 
-    exit_code = run_cli_command(
+    exit_code = run_feature_cli_command(
         CliInvocation(
             command=CliRunCommand(
                 prompt="Use selected context",
@@ -189,7 +241,7 @@ def test_run_invocation_passes_composition_skill_roots_to_augmenter() -> None:
     )
     augmenter = RecordingAugmenter()
 
-    exit_code = run_cli_command(
+    exit_code = run_feature_cli_command(
         CliInvocation(
             command=CliRunCommand(prompt="Use selected context", skill_ids=("python-testing",)),
             composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("synthetic-skills"),)),
@@ -230,7 +282,7 @@ def test_run_invocation_appends_requested_usage_and_price_evidence() -> None:
     )
     stdout = StringIO()
 
-    exit_code = run_cli_command(
+    exit_code = run_feature_cli_command(
         CliInvocation(
             command=CliRunCommand(prompt="Reply with pong"),
             global_options=CliGlobalOptions(print_usage=True, print_prices=True),
@@ -257,7 +309,7 @@ def test_run_command_skips_augmentation_when_no_context_is_selected() -> None:
     )
     augmenter = RecordingAugmenter()
 
-    run_cli_command(
+    run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong"),
         dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
         stdout=StringIO(),
@@ -282,7 +334,7 @@ def test_run_command_maps_non_success_status_to_stable_exit_code_and_stderr() ->
     stdout = StringIO()
     stderr = StringIO()
 
-    exit_code = run_cli_command(
+    exit_code = run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong"),
         dependencies=AgentRuntimeCliDependencies(runtime=runtime),
         stdout=stdout,
@@ -311,7 +363,7 @@ def test_run_command_bounds_observation_metadata_for_safe_evidence_capture() -> 
     )
     stderr = StringIO()
 
-    exit_code = run_cli_command(
+    exit_code = run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong"),
         dependencies=AgentRuntimeCliDependencies(runtime=runtime),
         stdout=StringIO(),
