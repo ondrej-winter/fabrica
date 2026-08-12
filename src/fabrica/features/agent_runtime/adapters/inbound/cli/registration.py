@@ -4,17 +4,27 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Protocol
 
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliRunCommand,
+    CliScriptApprovalOptions,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
     CliSelectedResource,
+    CliSkillRootOptions,
 )
 from fabrica.features.agent_runtime.application.dtos import SkillScriptType
 
 
-def register_agent_runtime_cli_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+class CliSubparsers(Protocol):
+    """Subparser behavior needed by agent-runtime CLI registration."""
+
+    def add_parser(self, name: str, **kwargs: object) -> argparse.ArgumentParser:
+        """Add one named subcommand parser to the product CLI."""
+
+
+def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
     """Register agent-runtime owned commands on the product CLI parser."""
     run_parser = subparsers.add_parser(
         "run",
@@ -121,7 +131,7 @@ def _run_command_from_namespace(namespace: argparse.Namespace) -> CliRunCommand:
         model_hint=namespace.model_hint,
         skill_ids=tuple(namespace.skill_ids),
         resources=tuple(namespace.resources),
-        skill_roots=tuple(namespace.skill_roots),
+        skill_root_options=_skill_root_options_from_namespace(namespace),
     )
 
 
@@ -129,7 +139,7 @@ def _script_policy_command_from_namespace(namespace: argparse.Namespace) -> CliS
     return CliScriptPolicyCommand(
         skill_id=namespace.skill_id,
         script_id=namespace.script_id,
-        skill_roots=tuple(namespace.skill_roots),
+        skill_root_options=_skill_root_options_from_namespace(namespace),
     )
 
 
@@ -137,9 +147,15 @@ def _script_execute_command_from_namespace(namespace: argparse.Namespace) -> Cli
     return CliScriptExecuteCommand(
         skill_id=namespace.skill_id,
         script_id=namespace.script_id,
-        approval_script_type=SkillScriptType(namespace.approve_script_type),
-        approval_suffix=namespace.approve_suffix,
-        approval_byte_size=namespace.approve_byte_size,
-        approval_content_digest=namespace.approve_content_digest,
-        skill_roots=tuple(namespace.skill_roots),
+        approval_options=CliScriptApprovalOptions(
+            script_type=SkillScriptType(namespace.approve_script_type),
+            suffix=namespace.approve_suffix,
+            byte_size=namespace.approve_byte_size,
+            content_digest=namespace.approve_content_digest,
+        ),
+        skill_root_options=_skill_root_options_from_namespace(namespace),
     )
+
+
+def _skill_root_options_from_namespace(namespace: argparse.Namespace) -> CliSkillRootOptions:
+    return CliSkillRootOptions(skill_roots=tuple(namespace.skill_roots))

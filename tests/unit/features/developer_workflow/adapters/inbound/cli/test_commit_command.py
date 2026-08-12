@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from io import StringIO
 from typing import TextIO
 
+import pytest
+
 from fabrica.adapters.inbound.cli import (
     CliCommand,
     CliCommandExecutionOptions,
@@ -21,7 +23,10 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageEvidenceConfidence,
     ModelUsageEvidenceSource,
 )
-from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import CliCommitCommand
+from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
+    CliCommitCommand,
+    CliDeveloperWorkflowCompositionOptions,
+)
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import DeveloperWorkflowCliDependencies
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageRecommendation,
@@ -82,17 +87,21 @@ class InterruptingInput(StringIO):
         raise KeyboardInterrupt
 
 
-def test_commit_command_prints_recommendation_prompts_and_commits_on_yes() -> None:
+@pytest.mark.parametrize("confirmation", ["y\n", " yes \n"])
+def test_commit_command_prints_recommendation_prompts_and_commits_on_approval(confirmation: str) -> None:
     recommendation = _recommendation()
     workflow = FakeConfirmedCommitWorkflow(generation_result=_generation_success(recommendation))
     stdout = StringIO()
     stderr = StringIO()
-    command = CliCommitCommand(skill_id="team-style", model="gpt-5.6-sol", reasoning_effort="medium")
+    command = CliCommitCommand(
+        skill_id="team-style",
+        composition_options=CliDeveloperWorkflowCompositionOptions(model="gpt-5.6-sol", reasoning_effort="medium"),
+    )
 
     exit_code = run_cli_command(
         command,
         dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
-        stdin=StringIO(" yes \n"),
+        stdin=StringIO(confirmation),
         stdout=stdout,
         stderr=stderr,
     )
@@ -110,7 +119,7 @@ def test_commit_command_prints_recommendation_prompts_and_commits_on_yes() -> No
     assert workflow.commit_calls == [recommendation]
 
 
-def test_commit_command_rejects_without_invoking_commit() -> None:
+def test_commit_command_rejects_no_without_invoking_commit() -> None:
     recommendation = _recommendation()
     workflow = FakeConfirmedCommitWorkflow(generation_result=_generation_success(recommendation))
     stdout = StringIO()
@@ -118,7 +127,7 @@ def test_commit_command_rejects_without_invoking_commit() -> None:
     exit_code = run_cli_command(
         CliCommitCommand(),
         dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
-        stdin=StringIO("maybe\n"),
+        stdin=StringIO("n\n"),
         stdout=stdout,
         stderr=StringIO(),
     )

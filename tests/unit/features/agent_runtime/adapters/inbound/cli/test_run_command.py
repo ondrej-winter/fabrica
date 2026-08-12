@@ -15,7 +15,11 @@ from fabrica.adapters.inbound.cli import (
     run_cli_command as _run_cli_command,
 )
 from fabrica.bootstrap.cli import create_cli_contributions
-from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import CliRunCommand, CliSelectedResource
+from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
+    CliRunCommand,
+    CliSelectedResource,
+    CliSkillRootOptions,
+)
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentContextBlock,
@@ -131,7 +135,7 @@ def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> 
             prompt="Use selected context",
             skill_ids=("python-testing",),
             resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
-            skill_roots=(Path("synthetic-skills"),),
+            skill_root_options=CliSkillRootOptions(skill_roots=(Path("synthetic-skills"),)),
         ),
         dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
         stdout=StringIO(),
@@ -167,7 +171,7 @@ def test_run_invocation_passes_global_verbose_diagnostics_to_augmenter() -> None
             command=CliRunCommand(
                 prompt="Use selected context",
                 skill_ids=("python-testing",),
-                skill_roots=(Path("synthetic-skills"),),
+                skill_root_options=CliSkillRootOptions(skill_roots=(Path("synthetic-skills"),)),
             ),
             global_options=CliGlobalOptions(verbose_diagnostics=True),
         ),

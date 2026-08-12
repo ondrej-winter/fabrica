@@ -14,7 +14,10 @@ from fabrica.adapters.inbound.cli import (
     run_cli_command as _run_cli_command,
 )
 from fabrica.bootstrap.cli import create_cli_contributions
-from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import CliScriptPolicyCommand
+from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
+    CliScriptPolicyCommand,
+    CliSkillRootOptions,
+)
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
 from fabrica.features.agent_runtime.application.dtos import (
     SelectedSkillScript,
@@ -73,7 +76,7 @@ def test_script_policy_command_maps_explicit_selection_to_policy_evaluator() -> 
         CliScriptPolicyCommand(
             skill_id="python-testing",
             script_id="scripts/check.py",
-            skill_roots=(Path("synthetic-skills"),),
+            skill_root_options=CliSkillRootOptions(skill_roots=(Path("synthetic-skills"),)),
         ),
         dependencies=AgentRuntimeCliDependencies(script_policy_evaluator=evaluator),
         stdout=stdout,
@@ -142,7 +145,7 @@ def test_script_policy_command_default_composition_denies_synthetic_script_witho
         CliScriptPolicyCommand(
             skill_id="python-testing",
             script_id="scripts/check.py",
-            skill_roots=(tmp_path,),
+            skill_root_options=CliSkillRootOptions(skill_roots=(tmp_path,)),
         ),
         stdout=stdout,
         stderr=stderr,

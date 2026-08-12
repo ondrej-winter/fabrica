@@ -17,7 +17,11 @@ from fabrica.adapters.inbound.cli import (
     run_cli_command as _run_cli_command,
 )
 from fabrica.bootstrap.cli import create_cli_contributions
-from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import CliScriptExecuteCommand
+from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
+    CliScriptApprovalOptions,
+    CliScriptExecuteCommand,
+    CliSkillRootOptions,
+)
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
 from fabrica.features.agent_runtime.application.dtos import (
     SelectedSkillScript,
@@ -212,11 +216,13 @@ def _command(
     return CliScriptExecuteCommand(
         skill_id="python-testing",
         script_id=script_id,
-        approval_script_type=SkillScriptType.PYTHON,
-        approval_suffix=".py",
-        approval_byte_size=approval_byte_size,
-        approval_content_digest=approval_content_digest,
-        skill_roots=skill_roots,
+        approval_options=CliScriptApprovalOptions(
+            script_type=SkillScriptType.PYTHON,
+            suffix=".py",
+            byte_size=approval_byte_size,
+            content_digest=approval_content_digest,
+        ),
+        skill_root_options=CliSkillRootOptions(skill_roots=skill_roots),
     )
 
 

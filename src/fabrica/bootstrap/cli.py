@@ -20,14 +20,11 @@ if TYPE_CHECKING:
         AgentRuntimeCliCommandOptions,
         AgentRuntimeCliDependencies,
     )
-    from fabrica.features.agent_runtime.application.dtos import (
-        ModelCostEvidence,
-        ModelUsageEvidence,
-    )
     from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
         DeveloperWorkflowCliCommandOptions,
         DeveloperWorkflowCliDependencies,
     )
+    from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence
 
 
 class ModelEvidenceResult(Protocol):

@@ -18,14 +18,17 @@ from fabrica.adapters.inbound.cli import (
 from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliRunCommand,
+    CliScriptApprovalOptions,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
     CliSelectedResource,
+    CliSkillRootOptions,
 )
 from fabrica.features.agent_runtime.application.dtos import SkillScriptType
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
+    CliDeveloperWorkflowCompositionOptions,
 )
 
 ARGPARSE_USAGE_ERROR = 2
@@ -85,7 +88,7 @@ def test_parse_run_command_supports_prompt_model_and_explicit_context() -> None:
             model_hint="codex-compatible",
             skill_ids=("python-testing", "code-review"),
             resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
-            skill_roots=(Path("./skills"),),
+            skill_root_options=CliSkillRootOptions(skill_roots=(Path("./skills"),)),
         ),
         global_options=CliGlobalOptions(print_usage=True, print_prices=True, verbose_diagnostics=True),
     )
@@ -121,9 +124,11 @@ def test_parse_commit_message_command_supports_skill_root_and_diagnostics_overri
     assert command == CliInvocation(
         command=CliCommitMessageCommand(
             skill_id="team-style",
-            model="gpt-5.6-sol",
-            reasoning_effort="medium",
-            skill_roots=(Path("./skills"),),
+            composition_options=CliDeveloperWorkflowCompositionOptions(
+                model="gpt-5.6-sol",
+                reasoning_effort="medium",
+                skill_roots=(Path("./skills"),),
+            ),
         ),
         global_options=CliGlobalOptions(verbose_diagnostics=True),
     )
@@ -194,9 +199,11 @@ def test_parse_commit_command_supports_commit_message_generation_options() -> No
     assert command == CliInvocation(
         command=CliCommitCommand(
             skill_id="team-style",
-            model="gpt-5.6-sol",
-            reasoning_effort="medium",
-            skill_roots=(Path("./skills"),),
+            composition_options=CliDeveloperWorkflowCompositionOptions(
+                model="gpt-5.6-sol",
+                reasoning_effort="medium",
+                skill_roots=(Path("./skills"),),
+            ),
         ),
         global_options=CliGlobalOptions(verbose_diagnostics=True),
     )
@@ -234,7 +241,7 @@ def test_parse_script_policy_command_supports_explicit_selected_script() -> None
         command=CliScriptPolicyCommand(
             skill_id="python-testing",
             script_id="scripts/check.py",
-            skill_roots=(Path("./skills"),),
+            skill_root_options=CliSkillRootOptions(skill_roots=(Path("./skills"),)),
         ),
         global_options=CliGlobalOptions(verbose_diagnostics=True),
     )
@@ -266,11 +273,13 @@ def test_parse_script_execute_command_requires_metadata_bound_approval() -> None
         command=CliScriptExecuteCommand(
             skill_id="python-testing",
             script_id="scripts/check.py",
-            approval_script_type=SkillScriptType.PYTHON,
-            approval_suffix=".py",
-            approval_byte_size=128,
-            approval_content_digest="sha256:abc123",
-            skill_roots=(Path("./skills"),),
+            approval_options=CliScriptApprovalOptions(
+                script_type=SkillScriptType.PYTHON,
+                suffix=".py",
+                byte_size=128,
+                content_digest="sha256:abc123",
+            ),
+            skill_root_options=CliSkillRootOptions(skill_roots=(Path("./skills"),)),
         ),
         global_options=CliGlobalOptions(verbose_diagnostics=True),
     )

@@ -20,6 +20,26 @@ class CliSelectedResource:
 
 
 @dataclass(frozen=True, slots=True)
+class CliSkillRootOptions:
+    """Adapter-local skill-root options consumed by bootstrap CLI composition."""
+
+    skill_roots: tuple[Path, ...] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "skill_roots", tuple(self.skill_roots))
+
+
+@dataclass(frozen=True, slots=True)
+class CliScriptApprovalOptions:
+    """Adapter-local metadata-bound approval options for CLI script execution."""
+
+    script_type: SkillScriptType
+    suffix: str
+    byte_size: int
+    content_digest: str
+
+
+@dataclass(frozen=True, slots=True)
 class CliRunCommand:
     """Parsed CLI arguments for one local runtime prompt run."""
 
@@ -27,12 +47,11 @@ class CliRunCommand:
     model_hint: str | None = None
     skill_ids: tuple[str, ...] = field(default_factory=tuple)
     resources: tuple[CliSelectedResource, ...] = field(default_factory=tuple)
-    skill_roots: tuple[Path, ...] = field(default_factory=tuple)
+    skill_root_options: CliSkillRootOptions = field(default_factory=CliSkillRootOptions)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "skill_ids", tuple(self.skill_ids))
         object.__setattr__(self, "resources", tuple(self.resources))
-        object.__setattr__(self, "skill_roots", tuple(self.skill_roots))
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,10 +60,7 @@ class CliScriptPolicyCommand:
 
     skill_id: str
     script_id: str
-    skill_roots: tuple[Path, ...] = field(default_factory=tuple)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "skill_roots", tuple(self.skill_roots))
+    skill_root_options: CliSkillRootOptions = field(default_factory=CliSkillRootOptions)
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,11 +69,5 @@ class CliScriptExecuteCommand:
 
     skill_id: str
     script_id: str
-    approval_script_type: SkillScriptType
-    approval_suffix: str
-    approval_byte_size: int
-    approval_content_digest: str
-    skill_roots: tuple[Path, ...] = field(default_factory=tuple)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "skill_roots", tuple(self.skill_roots))
+    approval_options: CliScriptApprovalOptions
+    skill_root_options: CliSkillRootOptions = field(default_factory=CliSkillRootOptions)

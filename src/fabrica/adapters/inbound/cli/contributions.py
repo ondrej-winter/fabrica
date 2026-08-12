@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
-import argparse
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TextIO
+from typing import TYPE_CHECKING, Protocol, TextIO
 
 if TYPE_CHECKING:
+    import argparse
+
     from fabrica.adapters.inbound.cli.options import CliGlobalOptions
 
 
-type CommandRegistrar = Callable[[argparse._SubParsersAction[argparse.ArgumentParser]], None]  # noqa: SLF001
+class CliSubparsers(Protocol):
+    """Public behavior needed to register feature-owned CLI commands."""
+
+    def add_parser(self, name: str, **kwargs: object) -> argparse.ArgumentParser:
+        """Add one named subcommand parser to the product CLI."""
+
+
+type CommandRegistrar = Callable[[CliSubparsers], None]
 type ContributionRunner = Callable[[object, "CliExecutionContext"], int]
 
 

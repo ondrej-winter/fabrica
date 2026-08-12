@@ -111,7 +111,7 @@ def _augment_command(
         runtime_command,
         skill_selections,
         resource_selections,
-        skill_roots=command.skill_roots,
+        skill_roots=command.skill_root_options.skill_roots,
         verbose_diagnostics=global_options.verbose_diagnostics,
     )
 

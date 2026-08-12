@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
+    CliDeveloperWorkflowCompositionOptions,
 )
 from fabrica.features.developer_workflow.application.dtos import DEFAULT_COMMIT_MESSAGE_SKILL_ID
 
@@ -15,7 +16,14 @@ if TYPE_CHECKING:
     import argparse
 
 
-def register_developer_workflow_cli_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+class CliSubparsers(Protocol):
+    """Subparser behavior needed by developer-workflow CLI registration."""
+
+    def add_parser(self, name: str, **kwargs: object) -> argparse.ArgumentParser:
+        """Add one named subcommand parser to the product CLI."""
+
+
+def register_developer_workflow_cli_commands(subparsers: CliSubparsers) -> None:
     """Register developer-workflow owned commands on the product CLI parser."""
     commit_message_parser = subparsers.add_parser(
         "commit-message",
@@ -72,15 +80,21 @@ def _add_commit_message_generation_flags(parser: argparse.ArgumentParser) -> Non
 def _commit_message_command_from_namespace(namespace: argparse.Namespace) -> CliCommitMessageCommand:
     return CliCommitMessageCommand(
         skill_id=namespace.skill_id,
-        model=namespace.model,
-        reasoning_effort=namespace.reasoning_effort,
-        skill_roots=tuple(namespace.skill_roots),
+        composition_options=_developer_workflow_composition_options_from_namespace(namespace),
     )
 
 
 def _commit_command_from_namespace(namespace: argparse.Namespace) -> CliCommitCommand:
     return CliCommitCommand(
         skill_id=namespace.skill_id,
+        composition_options=_developer_workflow_composition_options_from_namespace(namespace),
+    )
+
+
+def _developer_workflow_composition_options_from_namespace(
+    namespace: argparse.Namespace,
+) -> CliDeveloperWorkflowCompositionOptions:
+    return CliDeveloperWorkflowCompositionOptions(
         model=namespace.model,
         reasoning_effort=namespace.reasoning_effort,
         skill_roots=tuple(namespace.skill_roots),

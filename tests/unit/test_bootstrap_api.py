@@ -1,5 +1,7 @@
 """Bootstrap public interface contract tests."""
 
+from pathlib import Path
+
 from fabrica import bootstrap
 
 DEFAULT_STAGED_GIT_TOOL_TIMEOUT_SECONDS = 10.0
@@ -72,3 +74,14 @@ def test_bootstrap_option_defaults_preserve_safe_composition_contract() -> None:
     assert staged_git_tools.working_directory is None
     assert staged_git_tools.timeout_seconds == DEFAULT_STAGED_GIT_TOOL_TIMEOUT_SECONDS
     assert model_skill_runtime.skill_tools == ()
+
+
+def test_product_cli_model_evidence_contract_uses_shared_kernel_owner() -> None:
+    """Keep feature-neutral CLI evidence protocols pointed at the shared kernel."""
+    bootstrap_cli_source = Path("src/fabrica/bootstrap/cli.py").read_text(encoding="utf-8")
+
+    assert "from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence" in bootstrap_cli_source
+    assert (
+        "from fabrica.features.agent_runtime.application.dtos import (\n        ModelCostEvidence"
+        not in bootstrap_cli_source
+    )

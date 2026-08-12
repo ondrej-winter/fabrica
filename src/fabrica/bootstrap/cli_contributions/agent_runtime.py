@@ -143,7 +143,7 @@ def _create_default_script_policy_evaluator(
 
     return create_skill_script_policy_evaluator(
         SkillScriptPolicyEvaluationOptions(
-            skill_roots=command.skill_roots,
+            skill_roots=command.skill_root_options.skill_roots,
             verbose_diagnostics=context.global_options.verbose_diagnostics,
         ),
     )
@@ -159,7 +159,7 @@ def _create_default_script_executor(
 
     return create_skill_script_executor(
         SkillScriptExecutionOptions(
-            skill_roots=command.skill_roots,
+            skill_roots=command.skill_root_options.skill_roots,
             verbose_diagnostics=context.global_options.verbose_diagnostics,
             approval_lookup=_MetadataBoundCliApprovalLookup(command),
         ),
@@ -182,10 +182,10 @@ class _MetadataBoundCliApprovalLookup:
         expected = SkillScriptApprovalBinding(
             skill_id=self.command.skill_id,
             script_id=self.command.script_id,
-            script_type=self.command.approval_script_type,
-            suffix=self.command.approval_suffix,
-            byte_size=self.command.approval_byte_size,
-            content_digest=self.command.approval_content_digest,
+            script_type=self.command.approval_options.script_type,
+            suffix=self.command.approval_options.suffix,
+            byte_size=self.command.approval_options.byte_size,
+            content_digest=self.command.approval_options.content_digest,
         )
         if binding == expected:
             return SkillScriptApprovalDecision(status=SkillScriptApprovalStatus.APPROVED, binding=binding)

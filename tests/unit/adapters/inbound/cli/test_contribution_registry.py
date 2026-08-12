@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import argparse
 from argparse import Namespace
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -13,6 +13,7 @@ from fabrica.adapters.inbound.cli.contributions import CliContribution
 from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliRunCommand,
+    CliScriptApprovalOptions,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
 )
@@ -21,6 +22,9 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.command_models imp
     CliCommitCommand,
     CliCommitMessageCommand,
 )
+
+if TYPE_CHECKING:
+    from fabrica.adapters.inbound.cli.contributions import CliSubparsers
 
 ARGPARSE_USAGE_ERROR = 2
 SYNTHETIC_EXIT_CODE = 42
@@ -88,10 +92,12 @@ def _script_execute_command() -> CliScriptExecuteCommand:
     return CliScriptExecuteCommand(
         skill_id="python-testing",
         script_id="scripts/check.py",
-        approval_script_type=SkillScriptType.PYTHON,
-        approval_suffix=".py",
-        approval_byte_size=128,
-        approval_content_digest="sha256:abc123",
+        approval_options=CliScriptApprovalOptions(
+            script_type=SkillScriptType.PYTHON,
+            suffix=".py",
+            byte_size=128,
+            content_digest="sha256:abc123",
+        ),
     )
 
 
@@ -101,7 +107,7 @@ class _SyntheticCommand:
 
 
 def _synthetic_contribution() -> CliContribution:
-    def register(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    def register(subparsers: CliSubparsers) -> None:
         parser = subparsers.add_parser("synthetic")
         parser.set_defaults(command_factory=_synthetic_command_factory)
 

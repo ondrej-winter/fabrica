@@ -2,9 +2,11 @@
 
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliRunCommand,
+    CliScriptApprovalOptions,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
     CliSelectedResource,
+    CliSkillRootOptions,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     AgentRuntimeCliCommandOptions,
@@ -32,9 +34,11 @@ __all__ = [
     "AgentRuntimeCliStreams",
     "AgentRuntimeCliWriters",
     "CliRunCommand",
+    "CliScriptApprovalOptions",
     "CliScriptExecuteCommand",
     "CliScriptPolicyCommand",
     "CliSelectedResource",
+    "CliSkillRootOptions",
     "CommandAugmenter",
     "EvidenceWriter",
     "RunResultWriter",

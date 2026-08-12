@@ -33,25 +33,12 @@ from fabrica.features.developer_workflow.application.ports import (
     CommitMessageSynthesisError,
     GitCommitCreator,
     GitCommitError,
-    GitStagedChangesLoader,
     GitStagedChangesLoadError,
     PreCommitRunError,
     PreCommitRunner,
 )
 from fabrica.features.query_execution.application.ports import AsyncQueryFanoutExecutor
 from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence
-
-
-class _SyncStagedFileCommitMessageAnalyzer(Protocol):
-    def analyze(self, command: AnalyzeStagedFileForCommitMessageCommand) -> StagedFileCommitEvidence:
-        """Analyze one staged file diff for factual commit-message evidence."""
-        ...
-
-
-class _SyncCommitMessageSynthesizer(Protocol):
-    def synthesize(self, command: SynthesizeCommitMessageCommand):
-        """Synthesize a final Conventional Commit recommendation."""
-        ...
 
 
 class CreateGitCommit:
@@ -177,50 +164,6 @@ class GenerateCommitMessage:
         return GenerateCommitMessageResult(recommendation=recommendation, evidence_bundle=evidence_bundle)
 
 
-class SyncGitStagedChangesLoaderAdapter:
-    """Async staged-git loader adapter for legacy sync staged-git loaders."""
-
-    def __init__(self, loader: GitStagedChangesLoader) -> None:
-        self._loader = loader
-
-    async def list_files_async(self):
-        """List currently staged files without blocking the event loop."""
-        return await asyncio.to_thread(self._loader.list_files)
-
-    async def load_file_diff_async(self, path: str):
-        """Load one staged file diff without blocking the event loop."""
-        try:
-            return await asyncio.to_thread(self._loader.load_file_diff, path)
-        except GitStagedChangesLoadError as err:
-            raise GitStagedChangesLoadError(
-                str(err),
-                category=err.category,
-                metadata={**err.metadata, "path": path},
-            ) from err
-
-
-class SyncStagedFileCommitMessageAnalyzerAdapter:
-    """Async analyzer adapter for legacy sync commit-message analyzers."""
-
-    def __init__(self, analyzer: _SyncStagedFileCommitMessageAnalyzer) -> None:
-        self._analyzer = analyzer
-
-    async def analyze_async(self, command: AnalyzeStagedFileForCommitMessageCommand) -> StagedFileCommitEvidence:
-        """Analyze one staged file without blocking the event loop."""
-        return await asyncio.to_thread(self._analyzer.analyze, command)
-
-
-class SyncCommitMessageSynthesizerAdapter:
-    """Async synthesizer adapter for legacy sync commit-message synthesizers."""
-
-    def __init__(self, synthesizer: _SyncCommitMessageSynthesizer) -> None:
-        self._synthesizer = synthesizer
-
-    async def synthesize_async(self, command: SynthesizeCommitMessageCommand):
-        """Synthesize a commit-message recommendation without blocking the event loop."""
-        return await asyncio.to_thread(self._synthesizer.synthesize, command)
-
-
 class CommitMessageGenerator(Protocol):
     """Generator protocol consumed by composed commit workflows."""
 
@@ -237,7 +180,7 @@ class GitCommitter(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class ConfirmedCommitWorkflow:
-    """Application workflow for an externally approved generated git commit."""
+    """Application workflow for a generated git commit approved outside the core."""
 
     generator: CommitMessageGenerator
     committer: GitCommitter
@@ -247,7 +190,7 @@ class ConfirmedCommitWorkflow:
     def run(
         self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
     ) -> ConfirmedCommitWorkflowResult:
-        """Generate a recommendation and create the approved git commit."""
+        """Generate a recommendation and create a commit for pre-approved callers."""
         return asyncio.run(self.run_async(command, skill_id=skill_id))
 
     def generate(
@@ -259,7 +202,7 @@ class ConfirmedCommitWorkflow:
     async def run_async(
         self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
     ) -> ConfirmedCommitWorkflowResult:
-        """Generate a recommendation asynchronously and create the approved git commit."""
+        """Generate a recommendation asynchronously and commit for pre-approved callers."""
         generation_result = await self.generate_async(command, skill_id=skill_id)
         if not generation_result.succeeded or generation_result.recommendation is None:
             return generation_result
@@ -340,7 +283,7 @@ class ConfirmedCommitWorkflow:
         usage_evidence: tuple[ModelUsageEvidence, ...] | None = None,
         cost_evidence: tuple[ModelCostEvidence, ...] | None = None,
     ) -> ConfirmedCommitWorkflowResult:
-        """Create a git commit from an externally approved recommendation."""
+        """Create a git commit from a recommendation approved by the caller."""
         try:
             commit_result = self.committer.create(
                 CreateGitCommitCommand(message=recommendation.commit_message),

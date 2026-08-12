@@ -25,7 +25,10 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageEvidenceSource,
     ModelUsageObservation,
 )
-from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import CliCommitMessageCommand
+from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
+    CliCommitMessageCommand,
+    CliDeveloperWorkflowCompositionOptions,
+)
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import DeveloperWorkflowCliDependencies
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageWorkflowResult,
@@ -75,9 +78,11 @@ def test_commit_message_command_uses_injected_workflow_and_writes_success_output
     stderr = StringIO()
     command = CliCommitMessageCommand(
         skill_id="team-style",
-        model="gpt-5.6-sol",
-        reasoning_effort="medium",
-        skill_roots=(Path("skills"),),
+        composition_options=CliDeveloperWorkflowCompositionOptions(
+            model="gpt-5.6-sol",
+            reasoning_effort="medium",
+            skill_roots=(Path("skills"),),
+        ),
     )
 
     exit_code = run_cli_command(

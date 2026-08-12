@@ -45,9 +45,8 @@ def create_developer_workflow_cli_contribution(
 ) -> CliContribution:
     """Create the developer-workflow CLI contribution with bootstrap-owned defaults.
 
-    The parsed ``model``, ``reasoning_effort``, and ``skill_roots`` fields are
-    composition options for these default Codex-backed workflow factories. The
-    feature runner maps only the use-case input fields into application commands.
+    The feature runner maps only use-case input into application commands. Default
+    Codex-backed workflow factories consume explicit adapter-local composition options.
     """
     return CliContribution(
         name="developer_workflow",
@@ -107,12 +106,13 @@ def _create_default_commit_message_workflow(
 ) -> CommitMessageWorkflowRunner | None:
     if not isinstance(command, CliCommitMessageCommand):
         return None
+    options = command.composition_options
 
     return create_codex_commit_message_workflow(
         CommitMessageWorkflowOptions(
-            codex_model=command.model,
-            codex_reasoning_effort=command.reasoning_effort,
-            skill_roots=command.skill_roots,
+            codex_model=options.model,
+            codex_reasoning_effort=options.reasoning_effort,
+            skill_roots=options.skill_roots,
             verbose_diagnostics=context.global_options.verbose_diagnostics,
         ),
     )
@@ -125,12 +125,13 @@ def _create_default_confirmed_commit_workflow(
 ) -> ConfirmedCommitWorkflowRunner | None:
     if not isinstance(command, CliCommitCommand):
         return None
+    options = command.composition_options
 
     return create_codex_confirmed_commit_workflow(
         CommitMessageWorkflowOptions(
-            codex_model=command.model,
-            codex_reasoning_effort=command.reasoning_effort,
-            skill_roots=command.skill_roots,
+            codex_model=options.model,
+            codex_reasoning_effort=options.reasoning_effort,
+            skill_roots=options.skill_roots,
             verbose_diagnostics=context.global_options.verbose_diagnostics,
         ),
     )
