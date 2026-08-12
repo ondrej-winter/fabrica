@@ -28,9 +28,6 @@ class CliCommitMessageCommand:
     """Parsed CLI use-case input for selected-skill commit-message generation."""
 
     skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
-    composition_options: CliDeveloperWorkflowCompositionOptions = field(
-        default_factory=CliDeveloperWorkflowCompositionOptions,
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +35,3 @@ class CliCommitCommand:
     """Parsed CLI use-case input for interactive confirmed git commit creation."""
 
     skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
-    composition_options: CliDeveloperWorkflowCompositionOptions = field(
-        default_factory=CliDeveloperWorkflowCompositionOptions,
-    )

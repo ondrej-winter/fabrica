@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 EXPECTED_POLICY_DENIED_EXIT_CODE = 5
 
 
-def test_module_entrypoint_help_is_offline_and_lists_explicit_script_execution_command() -> None:
+def test_root_module_entrypoint_help_is_offline_and_lists_explicit_script_execution_command() -> None:
     result = _run_module_entrypoint("--help")
 
     _assert_help_result(result)
@@ -25,7 +25,7 @@ def test_console_script_help_is_offline_and_lists_explicit_script_execution_comm
     _assert_help_result(result)
 
 
-def test_module_entrypoint_dispatches_script_policy_through_bootstrap_without_execution(tmp_path: Path) -> None:
+def test_root_module_entrypoint_dispatches_script_policy_through_bootstrap_without_execution(tmp_path: Path) -> None:
     _write_script(tmp_path, "python-testing", "scripts/check.py", "print('not executed by process smoke')\n")
 
     result = _run_module_entrypoint(
@@ -59,7 +59,7 @@ def test_console_script_dispatches_script_policy_through_bootstrap_without_execu
 
 def _run_module_entrypoint(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603
-        [sys.executable, "-m", "fabrica.adapters.inbound.cli", *args],
+        [sys.executable, "-m", "fabrica", *args],
         check=False,
         capture_output=True,
         text=True,

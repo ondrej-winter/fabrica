@@ -80,6 +80,7 @@ class AgentRuntimeCliOptions:
     print_usage: bool = False
     print_prices: bool = False
     verbose_diagnostics: bool = False
+    skill_roots: tuple[Path, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

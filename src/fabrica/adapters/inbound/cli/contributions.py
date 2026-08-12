@@ -28,6 +28,7 @@ class CliExecutionContext:
     """Shared execution context passed from the product CLI shell to one contribution."""
 
     global_options: CliGlobalOptions
+    composition_options: object | None
     stdin: TextIO
     stdout: TextIO
     stderr: TextIO

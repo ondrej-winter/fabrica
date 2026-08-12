@@ -23,6 +23,7 @@ class CliInvocation:
 
     command: CliCommand
     global_options: CliGlobalOptions = field(default_factory=CliGlobalOptions)
+    composition_options: object | None = None
 
 
 def build_parser(contributions: Sequence[CliContribution]) -> argparse.ArgumentParser:
@@ -69,6 +70,7 @@ def parse_args(
             print_prices=namespace.print_prices,
             verbose_diagnostics=namespace.verbose_diagnostics,
         ),
+        composition_options=_composition_options_from_namespace(namespace),
     )
 
 
@@ -78,3 +80,13 @@ def _command_factory_from_namespace(namespace: argparse.Namespace) -> Callable[[
         msg = "CLI contribution did not configure a command factory for the selected command"
         raise TypeError(msg)
     return command_factory
+
+
+def _composition_options_from_namespace(namespace: argparse.Namespace) -> object | None:
+    composition_options_factory = getattr(namespace, "composition_options_factory", None)
+    if composition_options_factory is None:
+        return None
+    if not callable(composition_options_factory):
+        msg = "CLI contribution configured a non-callable composition options factory"
+        raise TypeError(msg)
+    return composition_options_factory(namespace)

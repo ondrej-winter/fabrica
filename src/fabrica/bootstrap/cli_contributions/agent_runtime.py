@@ -15,6 +15,7 @@ from fabrica.bootstrap.composition import (
     create_skill_script_policy_evaluator,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
+    AgentRuntimeCliCompositionOptions,
     CliRunCommand,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
@@ -84,6 +85,7 @@ def _run_agent_runtime_contribution(
                 print_usage=context.global_options.print_usage,
                 print_prices=context.global_options.print_prices,
                 verbose_diagnostics=context.global_options.verbose_diagnostics,
+                skill_roots=_agent_runtime_composition_options_from_context(context).skill_roots,
             ),
             dependencies=_agent_runtime_dependencies_for_command(command, context=context, overrides=overrides),
             streams=AgentRuntimeCliStreams(stdout=context.stdout, stderr=context.stderr),
@@ -105,6 +107,7 @@ def _agent_runtime_dependencies_for_command(
     overrides: AgentRuntimeCliDependencies | None,
 ) -> AgentRuntimeCliDependencies:
     dependencies = overrides or AgentRuntimeCliDependencies()
+    composition_options = _agent_runtime_composition_options_from_context(context)
     if isinstance(command, CliRunCommand):
         return AgentRuntimeCliDependencies(
             runtime=dependencies.runtime or _create_default_runtime(),
@@ -113,11 +116,26 @@ def _agent_runtime_dependencies_for_command(
     if isinstance(command, CliScriptPolicyCommand):
         return AgentRuntimeCliDependencies(
             script_policy_evaluator=dependencies.script_policy_evaluator
-            or _create_default_script_policy_evaluator(command, context=context),
+            or _create_default_script_policy_evaluator(
+                command, context=context, composition_options=composition_options
+            ),
         )
     return AgentRuntimeCliDependencies(
-        script_executor=dependencies.script_executor or _create_default_script_executor(command, context=context),
+        script_executor=dependencies.script_executor
+        or _create_default_script_executor(command, context=context, composition_options=composition_options),
     )
+
+
+def _agent_runtime_composition_options_from_context(context: CliExecutionContext) -> AgentRuntimeCliCompositionOptions:
+    if context.composition_options is None:
+        return AgentRuntimeCliCompositionOptions()
+    if not isinstance(context.composition_options, AgentRuntimeCliCompositionOptions):
+        msg = (
+            "agent-runtime CLI contribution received incompatible composition options: "
+            f"{type(context.composition_options).__name__}"
+        )
+        raise TypeError(msg)
+    return context.composition_options
 
 
 def _default_augment_command(
@@ -147,13 +165,14 @@ def _create_default_script_policy_evaluator(
     command: CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand,
     *,
     context: CliExecutionContext,
+    composition_options: AgentRuntimeCliCompositionOptions,
 ) -> SkillScriptPolicyEvaluator | None:
     if not isinstance(command, CliScriptPolicyCommand):
         return None
 
     return create_skill_script_policy_evaluator(
         SkillScriptPolicyEvaluationOptions(
-            skill_roots=command.skill_root_options.skill_roots,
+            skill_roots=composition_options.skill_roots,
             verbose_diagnostics=context.global_options.verbose_diagnostics,
         ),
     )
@@ -163,13 +182,14 @@ def _create_default_script_executor(
     command: CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand,
     *,
     context: CliExecutionContext,
+    composition_options: AgentRuntimeCliCompositionOptions,
 ) -> SkillScriptRunner | None:
     if not isinstance(command, CliScriptExecuteCommand):
         return None
 
     return create_skill_script_executor(
         SkillScriptExecutionOptions(
-            skill_roots=command.skill_root_options.skill_roots,
+            skill_roots=composition_options.skill_roots,
             verbose_diagnostics=context.global_options.verbose_diagnostics,
             approval_lookup=MetadataBoundApprovalLookup(_approval_binding_from_command(command)),
         ),

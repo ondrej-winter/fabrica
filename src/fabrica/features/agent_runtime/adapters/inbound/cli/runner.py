@@ -19,6 +19,8 @@ from fabrica.features.agent_runtime.application.dtos import (
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
         AgentRuntimeCliDependencies,
         AgentRuntimeCliOptions,
@@ -58,6 +60,7 @@ def run_agent_runtime_cli_command(
             runtime_command,
             command,
             verbose_diagnostics=options.verbose_diagnostics,
+            skill_roots=options.skill_roots,
             command_augmenter=dependencies.command_augmenter,
         )
     active_runtime = _require_dependency(dependencies.runtime, dependency_name="runtime")
@@ -104,6 +107,7 @@ def _augment_command(
     command: CliRunCommand,
     *,
     verbose_diagnostics: bool,
+    skill_roots: tuple[Path, ...],
     command_augmenter: CommandAugmenter | None,
 ) -> LocalAgentRunCommand:
     skill_selections = tuple(SelectedSkill(skill_id=skill_id) for skill_id in command.skill_ids)
@@ -116,7 +120,7 @@ def _augment_command(
         runtime_command,
         skill_selections,
         resource_selections,
-        skill_roots=command.skill_root_options.skill_roots,
+        skill_roots=skill_roots,
         verbose_diagnostics=verbose_diagnostics,
     )
 

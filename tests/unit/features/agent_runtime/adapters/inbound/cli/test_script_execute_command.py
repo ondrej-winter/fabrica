@@ -18,9 +18,9 @@ from fabrica.adapters.inbound.cli import (
 )
 from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
+    AgentRuntimeCliCompositionOptions,
     CliScriptApprovalOptions,
     CliScriptExecuteCommand,
-    CliSkillRootOptions,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
 from fabrica.features.agent_runtime.application.dtos import (
@@ -152,10 +152,12 @@ def test_script_execute_default_composition_executes_only_matching_approved_synt
     stderr = StringIO()
 
     exit_code = run_cli_command(
-        _command(
-            skill_roots=(tmp_path,),
-            approval_byte_size=binding.byte_size,
-            approval_content_digest=binding.content_digest,
+        CliInvocation(
+            command=_command(
+                approval_byte_size=binding.byte_size,
+                approval_content_digest=binding.content_digest,
+            ),
+            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(tmp_path,)),
         ),
         stdout=stdout,
         stderr=stderr,
@@ -184,11 +186,13 @@ def test_script_execute_default_composition_denies_mismatched_approval_without_e
     stderr = StringIO()
 
     exit_code = run_cli_command(
-        _command(
-            script_id="scripts/write.py",
-            skill_roots=(tmp_path,),
-            approval_byte_size=binding.byte_size,
-            approval_content_digest="sha256:not-current",
+        CliInvocation(
+            command=_command(
+                script_id="scripts/write.py",
+                approval_byte_size=binding.byte_size,
+                approval_content_digest="sha256:not-current",
+            ),
+            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(tmp_path,)),
         ),
         stdout=stdout,
         stderr=stderr,
@@ -209,7 +213,6 @@ def _selection() -> SelectedSkillScript:
 def _command(
     *,
     script_id: str = "scripts/check.py",
-    skill_roots: tuple[Path, ...] = (),
     approval_byte_size: int = 128,
     approval_content_digest: str = "sha256:abc123",
 ) -> CliScriptExecuteCommand:
@@ -222,7 +225,6 @@ def _command(
             byte_size=approval_byte_size,
             content_digest=approval_content_digest,
         ),
-        skill_root_options=CliSkillRootOptions(skill_roots=skill_roots),
     )
 
 

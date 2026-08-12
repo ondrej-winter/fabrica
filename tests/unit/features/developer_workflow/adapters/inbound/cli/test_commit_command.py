@@ -25,7 +25,6 @@ from fabrica.features.agent_runtime.application.dtos import (
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
-    CliDeveloperWorkflowCompositionOptions,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import DeveloperWorkflowCliDependencies
 from fabrica.features.developer_workflow.application.dtos import (
@@ -93,10 +92,7 @@ def test_commit_command_prints_recommendation_prompts_and_commits_on_approval(co
     workflow = FakeConfirmedCommitWorkflow(generation_result=_generation_success(recommendation))
     stdout = StringIO()
     stderr = StringIO()
-    command = CliCommitCommand(
-        skill_id="team-style",
-        composition_options=CliDeveloperWorkflowCompositionOptions(model="gpt-5.6-sol", reasoning_effort="medium"),
-    )
+    command = CliCommitCommand(skill_id="team-style")
 
     exit_code = run_cli_command(
         command,

@@ -20,8 +20,8 @@ class CliSelectedResource:
 
 
 @dataclass(frozen=True, slots=True)
-class CliSkillRootOptions:
-    """Adapter-local skill-root options consumed by bootstrap CLI composition."""
+class AgentRuntimeCliCompositionOptions:
+    """Adapter-local options consumed by bootstrap agent-runtime composition."""
 
     skill_roots: tuple[Path, ...] = field(default_factory=tuple)
 
@@ -47,7 +47,6 @@ class CliRunCommand:
     model_hint: str | None = None
     skill_ids: tuple[str, ...] = field(default_factory=tuple)
     resources: tuple[CliSelectedResource, ...] = field(default_factory=tuple)
-    skill_root_options: CliSkillRootOptions = field(default_factory=CliSkillRootOptions)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "skill_ids", tuple(self.skill_ids))
@@ -60,7 +59,6 @@ class CliScriptPolicyCommand:
 
     skill_id: str
     script_id: str
-    skill_root_options: CliSkillRootOptions = field(default_factory=CliSkillRootOptions)
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,4 +68,3 @@ class CliScriptExecuteCommand:
     skill_id: str
     script_id: str
     approval_options: CliScriptApprovalOptions
-    skill_root_options: CliSkillRootOptions = field(default_factory=CliSkillRootOptions)

@@ -36,7 +36,7 @@ Documentation = "https://github.com/ondrej-winter/fabrica#readme"
 Repository = "https://github.com/ondrej-winter/fabrica"
 
 [project.scripts]
-fabrica = "fabrica.adapters.inbound.cli.__main__:main"
+fabrica = "fabrica.bootstrap.cli:main"
 
 [dependency-groups]
 dev = [

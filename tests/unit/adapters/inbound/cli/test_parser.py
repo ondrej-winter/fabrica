@@ -17,12 +17,12 @@ from fabrica.adapters.inbound.cli import (
 )
 from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
+    AgentRuntimeCliCompositionOptions,
     CliRunCommand,
     CliScriptApprovalOptions,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
     CliSelectedResource,
-    CliSkillRootOptions,
 )
 from fabrica.features.agent_runtime.application.dtos import SkillScriptType
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
@@ -88,22 +88,28 @@ def test_parse_run_command_supports_prompt_model_and_explicit_context() -> None:
             model_hint="codex-compatible",
             skill_ids=("python-testing", "code-review"),
             resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
-            skill_root_options=CliSkillRootOptions(skill_roots=(Path("./skills"),)),
         ),
         global_options=CliGlobalOptions(print_usage=True, print_prices=True, verbose_diagnostics=True),
+        composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("./skills"),)),
     )
 
 
 def test_parse_run_command_uses_empty_explicit_context_defaults() -> None:
     command = parse_args(["run", "--prompt", "Reply with pong"])
 
-    assert command == CliInvocation(command=CliRunCommand(prompt="Reply with pong"))
+    assert command == CliInvocation(
+        command=CliRunCommand(prompt="Reply with pong"),
+        composition_options=AgentRuntimeCliCompositionOptions(),
+    )
 
 
 def test_parse_commit_message_command_defaults_to_conventional_commits_skill() -> None:
     command = parse_args(["commit-message"])
 
-    assert command == CliInvocation(command=CliCommitMessageCommand(skill_id="conventional-commits"))
+    assert command == CliInvocation(
+        command=CliCommitMessageCommand(skill_id="conventional-commits"),
+        composition_options=CliDeveloperWorkflowCompositionOptions(),
+    )
 
 
 def test_parse_commit_message_command_supports_skill_root_and_diagnostics_overrides() -> None:
@@ -124,13 +130,13 @@ def test_parse_commit_message_command_supports_skill_root_and_diagnostics_overri
     assert command == CliInvocation(
         command=CliCommitMessageCommand(
             skill_id="team-style",
-            composition_options=CliDeveloperWorkflowCompositionOptions(
-                model="gpt-5.6-sol",
-                reasoning_effort="medium",
-                skill_roots=(Path("./skills"),),
-            ),
         ),
         global_options=CliGlobalOptions(verbose_diagnostics=True),
+        composition_options=CliDeveloperWorkflowCompositionOptions(
+            model="gpt-5.6-sol",
+            reasoning_effort="medium",
+            skill_roots=(Path("./skills"),),
+        ),
     )
 
 
@@ -152,6 +158,7 @@ def test_parse_commit_message_command_supports_usage_and_price_reporting() -> No
     assert command == CliInvocation(
         command=CliCommitMessageCommand(skill_id="conventional-commits"),
         global_options=CliGlobalOptions(print_usage=True, print_prices=True),
+        composition_options=CliDeveloperWorkflowCompositionOptions(),
     )
 
 
@@ -165,7 +172,10 @@ def test_parse_commit_message_command_rejects_unknown_reasoning_effort() -> None
 def test_parse_commit_command_defaults_to_conventional_commits_skill() -> None:
     command = parse_args(["commit"])
 
-    assert command == CliInvocation(command=CliCommitCommand(skill_id="conventional-commits"))
+    assert command == CliInvocation(
+        command=CliCommitCommand(skill_id="conventional-commits"),
+        composition_options=CliDeveloperWorkflowCompositionOptions(),
+    )
 
 
 def test_commit_command_help_documents_mutating_pre_commit_gate(capsys: pytest.CaptureFixture[str]) -> None:
@@ -199,13 +209,13 @@ def test_parse_commit_command_supports_commit_message_generation_options() -> No
     assert command == CliInvocation(
         command=CliCommitCommand(
             skill_id="team-style",
-            composition_options=CliDeveloperWorkflowCompositionOptions(
-                model="gpt-5.6-sol",
-                reasoning_effort="medium",
-                skill_roots=(Path("./skills"),),
-            ),
         ),
         global_options=CliGlobalOptions(verbose_diagnostics=True),
+        composition_options=CliDeveloperWorkflowCompositionOptions(
+            model="gpt-5.6-sol",
+            reasoning_effort="medium",
+            skill_roots=(Path("./skills"),),
+        ),
     )
 
 
@@ -241,9 +251,9 @@ def test_parse_script_policy_command_supports_explicit_selected_script() -> None
         command=CliScriptPolicyCommand(
             skill_id="python-testing",
             script_id="scripts/check.py",
-            skill_root_options=CliSkillRootOptions(skill_roots=(Path("./skills"),)),
         ),
         global_options=CliGlobalOptions(verbose_diagnostics=True),
+        composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("./skills"),)),
     )
 
 
@@ -279,9 +289,9 @@ def test_parse_script_execute_command_requires_metadata_bound_approval() -> None
                 byte_size=128,
                 content_digest="sha256:abc123",
             ),
-            skill_root_options=CliSkillRootOptions(skill_roots=(Path("./skills"),)),
         ),
         global_options=CliGlobalOptions(verbose_diagnostics=True),
+        composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("./skills"),)),
     )
 
 

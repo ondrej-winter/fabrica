@@ -33,6 +33,9 @@ def register_developer_workflow_cli_commands(subparsers: CliSubparsers) -> None:
     _add_commit_message_generation_flags(commit_message_parser)
     _add_common_skill_root_flags(commit_message_parser)
     commit_message_parser.set_defaults(command_factory=_commit_message_command_from_namespace)
+    commit_message_parser.set_defaults(
+        composition_options_factory=_developer_workflow_composition_options_from_namespace
+    )
 
     commit_parser = subparsers.add_parser(
         "commit",
@@ -45,6 +48,7 @@ def register_developer_workflow_cli_commands(subparsers: CliSubparsers) -> None:
     _add_commit_message_generation_flags(commit_parser)
     _add_common_skill_root_flags(commit_parser)
     commit_parser.set_defaults(command_factory=_commit_command_from_namespace)
+    commit_parser.set_defaults(composition_options_factory=_developer_workflow_composition_options_from_namespace)
 
 
 def _add_common_skill_root_flags(parser: argparse.ArgumentParser) -> None:
@@ -78,17 +82,11 @@ def _add_commit_message_generation_flags(parser: argparse.ArgumentParser) -> Non
 
 
 def _commit_message_command_from_namespace(namespace: argparse.Namespace) -> CliCommitMessageCommand:
-    return CliCommitMessageCommand(
-        skill_id=namespace.skill_id,
-        composition_options=_developer_workflow_composition_options_from_namespace(namespace),
-    )
+    return CliCommitMessageCommand(skill_id=namespace.skill_id)
 
 
 def _commit_command_from_namespace(namespace: argparse.Namespace) -> CliCommitCommand:
-    return CliCommitCommand(
-        skill_id=namespace.skill_id,
-        composition_options=_developer_workflow_composition_options_from_namespace(namespace),
-    )
+    return CliCommitCommand(skill_id=namespace.skill_id)
 
 
 def _developer_workflow_composition_options_from_namespace(

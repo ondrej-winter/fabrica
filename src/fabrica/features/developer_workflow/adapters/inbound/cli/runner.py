@@ -36,17 +36,51 @@ def run_developer_workflow_cli_command(
 ) -> int:
     """Run one developer-workflow owned CLI command."""
     if isinstance(command, CliCommitMessageCommand):
-        workflow = _require_dependency(
-            dependencies.commit_message_workflow,
-            dependency_name="commit_message_workflow",
-        )
-        result = workflow.run(_generate_commit_message_command(command))
-        return _write_runtime_result(
-            result,
+        return _run_commit_message_preview(
+            command,
             options=options,
+            dependencies=dependencies,
             streams=streams,
             writers=writers,
         )
+    return _run_confirmed_commit(
+        command,
+        options=options,
+        dependencies=dependencies,
+        streams=streams,
+        writers=writers,
+    )
+
+
+def _run_commit_message_preview(
+    command: CliCommitMessageCommand,
+    *,
+    options: DeveloperWorkflowCliOptions,
+    dependencies: DeveloperWorkflowCliDependencies,
+    streams: DeveloperWorkflowCliStreams,
+    writers: DeveloperWorkflowCliWriters,
+) -> int:
+    workflow = _require_dependency(
+        dependencies.commit_message_workflow,
+        dependency_name="commit_message_workflow",
+    )
+    result = workflow.run(_generate_commit_message_command(command))
+    return _write_runtime_result(
+        result,
+        options=options,
+        streams=streams,
+        writers=writers,
+    )
+
+
+def _run_confirmed_commit(
+    command: CliCommitCommand,
+    *,
+    options: DeveloperWorkflowCliOptions,
+    dependencies: DeveloperWorkflowCliDependencies,
+    streams: DeveloperWorkflowCliStreams,
+    writers: DeveloperWorkflowCliWriters,
+) -> int:
     workflow = _require_dependency(
         dependencies.confirmed_commit_workflow,
         dependency_name="confirmed_commit_workflow",
@@ -60,43 +94,21 @@ def run_developer_workflow_cli_command(
             writers=writers,
         )
 
-    if generation_result.output_text:
-        streams.stdout.write(generation_result.output_text)
-        if not generation_result.output_text.endswith("\n"):
-            streams.stdout.write("\n")
-    streams.stdout.write("Commit with this message? [y/N] ")
-    streams.stdout.flush()
-
-    try:
-        answer = streams.stdin.readline()
-    except KeyboardInterrupt:
-        interrupted_result = CommitMessageWorkflowResult(
-            status=DeveloperWorkflowStatus.SAFETY_DENIED,
-            observations=(
-                DeveloperWorkflowObservation(
-                    message="commit confirmation interrupted",
-                    metadata={"category": "commit_confirmation_interrupted"},
-                ),
-            ),
-            usage_evidence=generation_result.usage_evidence,
-            cost_evidence=generation_result.cost_evidence,
-        )
-        return _write_runtime_result(
-            interrupted_result,
+    confirmation = _prompt_for_commit_confirmation(generation_result, streams=streams)
+    if confirmation is None:
+        return _write_interrupted_confirmation_result(
+            generation_result,
             options=options,
             streams=streams,
             writers=writers,
         )
-
-    if answer.strip().casefold() not in {"y", "yes"}:
-        streams.stdout.write("Commit cancelled; no commit created.\n")
-        writers.evidence(
+    if not confirmation:
+        return _write_cancelled_confirmation_result(
             generation_result,
-            include_usage=options.print_usage,
-            include_prices=options.print_prices,
-            stdout=streams.stdout,
+            options=options,
+            streams=streams,
+            writers=writers,
         )
-        return 0
 
     commit_result = workflow.commit(generation_result.recommendation)
     if commit_result.succeeded and commit_result.commit_result is not None:
@@ -111,6 +123,68 @@ def run_developer_workflow_cli_command(
         output_already_written=True,
         writers=writers,
     )
+
+
+def _prompt_for_commit_confirmation(
+    generation_result: ConfirmedCommitWorkflowResult,
+    *,
+    streams: DeveloperWorkflowCliStreams,
+) -> bool | None:
+    if generation_result.output_text:
+        streams.stdout.write(generation_result.output_text)
+        if not generation_result.output_text.endswith("\n"):
+            streams.stdout.write("\n")
+    streams.stdout.write("Commit with this message? [y/N] ")
+    streams.stdout.flush()
+
+    try:
+        answer = streams.stdin.readline()
+    except KeyboardInterrupt:
+        return None
+    return answer.strip().casefold() in {"y", "yes"}
+
+
+def _write_interrupted_confirmation_result(
+    generation_result: ConfirmedCommitWorkflowResult,
+    *,
+    options: DeveloperWorkflowCliOptions,
+    streams: DeveloperWorkflowCliStreams,
+    writers: DeveloperWorkflowCliWriters,
+) -> int:
+    interrupted_result = CommitMessageWorkflowResult(
+        status=DeveloperWorkflowStatus.SAFETY_DENIED,
+        observations=(
+            DeveloperWorkflowObservation(
+                message="commit confirmation interrupted",
+                metadata={"category": "commit_confirmation_interrupted"},
+            ),
+        ),
+        usage_evidence=generation_result.usage_evidence,
+        cost_evidence=generation_result.cost_evidence,
+    )
+    return _write_runtime_result(
+        interrupted_result,
+        options=options,
+        streams=streams,
+        writers=writers,
+    )
+
+
+def _write_cancelled_confirmation_result(
+    generation_result: ConfirmedCommitWorkflowResult,
+    *,
+    options: DeveloperWorkflowCliOptions,
+    streams: DeveloperWorkflowCliStreams,
+    writers: DeveloperWorkflowCliWriters,
+) -> int:
+    streams.stdout.write("Commit cancelled; no commit created.\n")
+    writers.evidence(
+        generation_result,
+        include_usage=options.print_usage,
+        include_prices=options.print_prices,
+        stdout=streams.stdout,
+    )
+    return 0
 
 
 def _write_runtime_result(

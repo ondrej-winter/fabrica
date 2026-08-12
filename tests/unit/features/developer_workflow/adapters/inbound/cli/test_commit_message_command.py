@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from io import StringIO
-from pathlib import Path
 from typing import TextIO
 
 from fabrica.adapters.inbound.cli import (
@@ -27,7 +26,6 @@ from fabrica.features.agent_runtime.application.dtos import (
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitMessageCommand,
-    CliDeveloperWorkflowCompositionOptions,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import DeveloperWorkflowCliDependencies
 from fabrica.features.developer_workflow.application.dtos import (
@@ -76,14 +74,7 @@ def test_commit_message_command_uses_injected_workflow_and_writes_success_output
     )
     stdout = StringIO()
     stderr = StringIO()
-    command = CliCommitMessageCommand(
-        skill_id="team-style",
-        composition_options=CliDeveloperWorkflowCompositionOptions(
-            model="gpt-5.6-sol",
-            reasoning_effort="medium",
-            skill_roots=(Path("skills"),),
-        ),
-    )
+    command = CliCommitMessageCommand(skill_id="team-style")
 
     exit_code = run_cli_command(
         command,

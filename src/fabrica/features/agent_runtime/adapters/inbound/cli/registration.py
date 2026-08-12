@@ -7,12 +7,12 @@ from pathlib import Path
 from typing import Protocol
 
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
+    AgentRuntimeCliCompositionOptions,
     CliRunCommand,
     CliScriptApprovalOptions,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
     CliSelectedResource,
-    CliSkillRootOptions,
 )
 from fabrica.features.agent_runtime.application.dtos import SkillScriptType
 
@@ -51,6 +51,7 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
     )
     _add_common_skill_root_flags(run_parser)
     run_parser.set_defaults(command_factory=_run_command_from_namespace)
+    run_parser.set_defaults(composition_options_factory=_agent_runtime_composition_options_from_namespace)
 
     policy_parser = subparsers.add_parser(
         "script-policy",
@@ -61,6 +62,7 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
     policy_parser.add_argument("--script-id", required=True, help="Relative selected script ID within the skill.")
     _add_common_skill_root_flags(policy_parser)
     policy_parser.set_defaults(command_factory=_script_policy_command_from_namespace)
+    policy_parser.set_defaults(composition_options_factory=_agent_runtime_composition_options_from_namespace)
 
     execute_parser = subparsers.add_parser(
         "script-execute",
@@ -96,6 +98,7 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
     )
     _add_common_skill_root_flags(execute_parser)
     execute_parser.set_defaults(command_factory=_script_execute_command_from_namespace)
+    execute_parser.set_defaults(composition_options_factory=_agent_runtime_composition_options_from_namespace)
 
 
 def _add_common_skill_root_flags(parser: argparse.ArgumentParser) -> None:
@@ -131,7 +134,6 @@ def _run_command_from_namespace(namespace: argparse.Namespace) -> CliRunCommand:
         model_hint=namespace.model_hint,
         skill_ids=tuple(namespace.skill_ids),
         resources=tuple(namespace.resources),
-        skill_root_options=_skill_root_options_from_namespace(namespace),
     )
 
 
@@ -139,7 +141,6 @@ def _script_policy_command_from_namespace(namespace: argparse.Namespace) -> CliS
     return CliScriptPolicyCommand(
         skill_id=namespace.skill_id,
         script_id=namespace.script_id,
-        skill_root_options=_skill_root_options_from_namespace(namespace),
     )
 
 
@@ -153,9 +154,10 @@ def _script_execute_command_from_namespace(namespace: argparse.Namespace) -> Cli
             byte_size=namespace.approve_byte_size,
             content_digest=namespace.approve_content_digest,
         ),
-        skill_root_options=_skill_root_options_from_namespace(namespace),
     )
 
 
-def _skill_root_options_from_namespace(namespace: argparse.Namespace) -> CliSkillRootOptions:
-    return CliSkillRootOptions(skill_roots=tuple(namespace.skill_roots))
+def _agent_runtime_composition_options_from_namespace(
+    namespace: argparse.Namespace,
+) -> AgentRuntimeCliCompositionOptions:
+    return AgentRuntimeCliCompositionOptions(skill_roots=tuple(namespace.skill_roots))

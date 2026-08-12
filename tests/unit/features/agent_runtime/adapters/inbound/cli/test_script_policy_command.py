@@ -18,8 +18,8 @@ from fabrica.adapters.inbound.cli import (
 )
 from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
+    AgentRuntimeCliCompositionOptions,
     CliScriptPolicyCommand,
-    CliSkillRootOptions,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
 from fabrica.features.agent_runtime.application.dtos import (
@@ -79,7 +79,6 @@ def test_script_policy_command_maps_explicit_selection_to_policy_evaluator() -> 
         CliScriptPolicyCommand(
             skill_id="python-testing",
             script_id="scripts/check.py",
-            skill_root_options=CliSkillRootOptions(skill_roots=(Path("synthetic-skills"),)),
         ),
         dependencies=AgentRuntimeCliDependencies(script_policy_evaluator=evaluator),
         stdout=stdout,
@@ -145,11 +144,11 @@ def test_script_policy_command_default_composition_denies_synthetic_script_witho
     stderr = StringIO()
 
     exit_code = run_cli_command(
-        CliScriptPolicyCommand(
-            skill_id="python-testing",
-            script_id="scripts/check.py",
-            skill_root_options=CliSkillRootOptions(skill_roots=(tmp_path,)),
+        CliInvocation(
+            command=CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
+            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(tmp_path,)),
         ),
+        stdin=None,
         stdout=stdout,
         stderr=stderr,
     )
@@ -175,16 +174,36 @@ def test_script_policy_default_composition_does_not_create_codex_runtime(
     script_file.write_text("print('not executed by policy inspection')\n", encoding="utf-8")
 
     exit_code = run_cli_command(
-        CliScriptPolicyCommand(
-            skill_id="python-testing",
-            script_id="scripts/check.py",
-            skill_root_options=CliSkillRootOptions(skill_roots=(tmp_path,)),
+        CliInvocation(
+            command=CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
+            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(tmp_path,)),
         ),
         stdout=StringIO(),
         stderr=StringIO(),
     )
 
     assert exit_code == EXPECTED_POLICY_DENIED_EXIT_CODE
+
+
+def test_script_policy_invocation_passes_composition_skill_roots_to_default_composition(tmp_path: Path) -> None:
+    script_file = tmp_path / "python-testing" / "scripts" / "check.py"
+    script_file.parent.mkdir(parents=True)
+    script_file.write_text("print('not executed by policy inspection')\n", encoding="utf-8")
+    stdout = StringIO()
+    stderr = StringIO()
+
+    exit_code = run_cli_command(
+        CliInvocation(
+            command=CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
+            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(tmp_path,)),
+        ),
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == EXPECTED_POLICY_DENIED_EXIT_CODE
+    assert stdout.getvalue() == ""
+    assert "status: denied\n" in stderr.getvalue()
 
 
 def _selection() -> SelectedSkillScript:

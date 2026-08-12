@@ -16,9 +16,9 @@ from fabrica.adapters.inbound.cli import (
 )
 from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
+    AgentRuntimeCliCompositionOptions,
     CliRunCommand,
     CliSelectedResource,
-    CliSkillRootOptions,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
 from fabrica.features.agent_runtime.application.dtos import (
@@ -135,7 +135,6 @@ def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> 
             prompt="Use selected context",
             skill_ids=("python-testing",),
             resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
-            skill_root_options=CliSkillRootOptions(skill_roots=(Path("synthetic-skills"),)),
         ),
         dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
         stdout=StringIO(),
@@ -148,7 +147,7 @@ def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> 
             LocalAgentRunCommand(prompt="Use selected context"),
             (SelectedSkill(skill_id="python-testing"),),
             (SelectedSkillResource(skill_id="python-testing", resource_id="references/example.md"),),
-            (Path("synthetic-skills"),),
+            (),
             False,
         ),
     ]
@@ -171,9 +170,9 @@ def test_run_invocation_passes_global_verbose_diagnostics_to_augmenter() -> None
             command=CliRunCommand(
                 prompt="Use selected context",
                 skill_ids=("python-testing",),
-                skill_root_options=CliSkillRootOptions(skill_roots=(Path("synthetic-skills"),)),
             ),
             global_options=CliGlobalOptions(verbose_diagnostics=True),
+            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("synthetic-skills"),)),
         ),
         dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
         stdout=StringIO(),
@@ -182,6 +181,26 @@ def test_run_invocation_passes_global_verbose_diagnostics_to_augmenter() -> None
 
     assert exit_code == 0
     assert augmenter.calls[0][4] is True
+
+
+def test_run_invocation_passes_composition_skill_roots_to_augmenter() -> None:
+    runtime = FakeRuntime(
+        result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="context-ok"),
+    )
+    augmenter = RecordingAugmenter()
+
+    exit_code = run_cli_command(
+        CliInvocation(
+            command=CliRunCommand(prompt="Use selected context", skill_ids=("python-testing",)),
+            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("synthetic-skills"),)),
+        ),
+        dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
+        stdout=StringIO(),
+        stderr=StringIO(),
+    )
+
+    assert exit_code == 0
+    assert augmenter.calls[0][3] == (Path("synthetic-skills"),)
 
 
 def test_run_invocation_appends_requested_usage_and_price_evidence() -> None:

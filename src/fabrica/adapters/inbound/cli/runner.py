@@ -39,9 +39,10 @@ def run_cli_command(
 ) -> int:
     """Run one parsed CLI command and return a process exit code."""
     validate_cli_contributions(options.contributions)
-    command, global_options = _normalize_invocation(invocation)
+    command, global_options, composition_options = _normalize_invocation(invocation)
     context = CliExecutionContext(
         global_options=global_options,
+        composition_options=composition_options,
         stdin=options.stdin or sys.stdin,
         stdout=options.stdout or sys.stdout,
         stderr=options.stderr or sys.stderr,
@@ -54,7 +55,7 @@ def run_cli_command(
     raise RuntimeError(msg)
 
 
-def _normalize_invocation(invocation: CliCommand | CliInvocation) -> tuple[CliCommand, CliGlobalOptions]:
+def _normalize_invocation(invocation: CliCommand | CliInvocation) -> tuple[CliCommand, CliGlobalOptions, object | None]:
     if isinstance(invocation, CliInvocation):
-        return invocation.command, invocation.global_options
-    return invocation, CliGlobalOptions()
+        return invocation.command, invocation.global_options, invocation.composition_options
+    return invocation, CliGlobalOptions(), None
