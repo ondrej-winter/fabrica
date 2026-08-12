@@ -16,6 +16,7 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.command_models imp
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
     DeveloperWorkflowCliDependencies,
+    DeveloperWorkflowCliOptions,
     DeveloperWorkflowCliStreams,
     DeveloperWorkflowCliWriters,
 )
@@ -67,7 +68,10 @@ def _run_developer_workflow_contribution(
             raise TypeError(msg)
         return run_developer_workflow_cli_command(
             command,
-            global_options=context.global_options,
+            options=DeveloperWorkflowCliOptions(
+                print_usage=context.global_options.print_usage,
+                print_prices=context.global_options.print_prices,
+            ),
             dependencies=_developer_workflow_dependencies_for_command(command, context=context, overrides=overrides),
             streams=DeveloperWorkflowCliStreams(
                 stdin=context.stdin,

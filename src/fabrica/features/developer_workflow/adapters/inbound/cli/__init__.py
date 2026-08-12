@@ -6,8 +6,8 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.command_models imp
     CliDeveloperWorkflowCompositionOptions,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
-    DeveloperWorkflowCliCommandOptions,
     DeveloperWorkflowCliDependencies,
+    DeveloperWorkflowCliOptions,
     DeveloperWorkflowCliStreams,
     DeveloperWorkflowCliWriters,
     EvidenceWriter,
@@ -26,8 +26,8 @@ __all__ = [
     "CliCommitCommand",
     "CliCommitMessageCommand",
     "CliDeveloperWorkflowCompositionOptions",
-    "DeveloperWorkflowCliCommandOptions",
     "DeveloperWorkflowCliDependencies",
+    "DeveloperWorkflowCliOptions",
     "DeveloperWorkflowCliStreams",
     "DeveloperWorkflowCliWriters",
     "EvidenceWriter",

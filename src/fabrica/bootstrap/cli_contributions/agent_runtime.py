@@ -21,6 +21,7 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     AgentRuntimeCliDependencies,
+    AgentRuntimeCliOptions,
     AgentRuntimeCliStreams,
     AgentRuntimeCliWriters,
 )
@@ -79,7 +80,11 @@ def _run_agent_runtime_contribution(
             raise TypeError(msg)
         return run_agent_runtime_cli_command(
             command,
-            global_options=context.global_options,
+            options=AgentRuntimeCliOptions(
+                print_usage=context.global_options.print_usage,
+                print_prices=context.global_options.print_prices,
+                verbose_diagnostics=context.global_options.verbose_diagnostics,
+            ),
             dependencies=_agent_runtime_dependencies_for_command(command, context=context, overrides=overrides),
             streams=AgentRuntimeCliStreams(stdout=context.stdout, stderr=context.stderr),
             writers=AgentRuntimeCliWriters(

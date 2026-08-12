@@ -16,22 +16,6 @@ if TYPE_CHECKING:
     )
 
 
-class DeveloperWorkflowCliCommandOptions(Protocol):
-    """Shared product CLI options consumed by developer-workflow command adapters."""
-
-    @property
-    def print_usage(self) -> bool:
-        """Return whether model usage evidence should be printed."""
-
-    @property
-    def print_prices(self) -> bool:
-        """Return whether model pricing evidence should be printed."""
-
-    @property
-    def verbose_diagnostics(self) -> bool:
-        """Return whether additional safe diagnostics should be included."""
-
-
 class RuntimeResultWriter(Protocol):
     """Writer for runtime-shaped developer workflow results."""
 
@@ -44,6 +28,14 @@ class ConfirmedCommitResultWriter(Protocol):
 
     def __call__(self, result: ConfirmedCommitWorkflowResult, *, stdout: TextIO, stderr: TextIO) -> int:
         """Write a confirmed commit workflow result and return a process exit code."""
+
+
+@dataclass(frozen=True, slots=True)
+class DeveloperWorkflowCliOptions:
+    """Product CLI option values consumed by developer-workflow commands."""
+
+    print_usage: bool = False
+    print_prices: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,7 +71,8 @@ class EvidenceWriter(Protocol):
         self,
         result: CommitMessageWorkflowResult | ConfirmedCommitWorkflowResult,
         *,
-        global_options: DeveloperWorkflowCliCommandOptions,
+        include_usage: bool,
+        include_prices: bool,
         stdout: TextIO,
     ) -> None:
         """Write model evidence selected by global CLI options."""

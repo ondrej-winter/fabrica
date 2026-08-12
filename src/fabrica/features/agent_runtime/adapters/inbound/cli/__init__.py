@@ -9,8 +9,8 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliSkillRootOptions,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
-    AgentRuntimeCliCommandOptions,
     AgentRuntimeCliDependencies,
+    AgentRuntimeCliOptions,
     AgentRuntimeCliStreams,
     AgentRuntimeCliWriters,
     CommandAugmenter,
@@ -29,8 +29,8 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.runner import (
 
 __all__ = [
     "AGENT_RUNTIME_CLI_COMMAND_TYPES",
-    "AgentRuntimeCliCommandOptions",
     "AgentRuntimeCliDependencies",
+    "AgentRuntimeCliOptions",
     "AgentRuntimeCliStreams",
     "AgentRuntimeCliWriters",
     "CliRunCommand",

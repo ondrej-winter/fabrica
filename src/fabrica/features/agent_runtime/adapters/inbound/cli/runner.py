@@ -20,8 +20,8 @@ from fabrica.features.agent_runtime.application.dtos import (
 
 if TYPE_CHECKING:
     from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
-        AgentRuntimeCliCommandOptions,
         AgentRuntimeCliDependencies,
+        AgentRuntimeCliOptions,
         AgentRuntimeCliStreams,
         AgentRuntimeCliWriters,
         CommandAugmenter,
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 def run_agent_runtime_cli_command(
     command: CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand,
     *,
-    global_options: AgentRuntimeCliCommandOptions,
+    options: AgentRuntimeCliOptions,
     dependencies: AgentRuntimeCliDependencies,
     streams: AgentRuntimeCliStreams,
     writers: AgentRuntimeCliWriters,
@@ -57,14 +57,19 @@ def run_agent_runtime_cli_command(
         runtime_command = _augment_command(
             runtime_command,
             command,
-            global_options=global_options,
+            verbose_diagnostics=options.verbose_diagnostics,
             command_augmenter=dependencies.command_augmenter,
         )
     active_runtime = _require_dependency(dependencies.runtime, dependency_name="runtime")
     result = active_runtime.run(runtime_command)
     exit_code = writers.run_result(result, stdout=streams.stdout, stderr=streams.stderr)
-    if global_options.print_usage or global_options.print_prices:
-        writers.evidence(result, global_options=global_options, stdout=streams.stdout)
+    if options.print_usage or options.print_prices:
+        writers.evidence(
+            result,
+            include_usage=options.print_usage,
+            include_prices=options.print_prices,
+            stdout=streams.stdout,
+        )
     return exit_code
 
 
@@ -98,7 +103,7 @@ def _augment_command(
     runtime_command: LocalAgentRunCommand,
     command: CliRunCommand,
     *,
-    global_options: AgentRuntimeCliCommandOptions,
+    verbose_diagnostics: bool,
     command_augmenter: CommandAugmenter | None,
 ) -> LocalAgentRunCommand:
     skill_selections = tuple(SelectedSkill(skill_id=skill_id) for skill_id in command.skill_ids)
@@ -112,7 +117,7 @@ def _augment_command(
         skill_selections,
         resource_selections,
         skill_roots=command.skill_root_options.skill_roots,
-        verbose_diagnostics=global_options.verbose_diagnostics,
+        verbose_diagnostics=verbose_diagnostics,
     )
 
 

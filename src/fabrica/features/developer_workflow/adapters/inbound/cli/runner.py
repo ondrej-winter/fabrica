@@ -18,8 +18,8 @@ from fabrica.features.developer_workflow.application.dtos import (
 
 if TYPE_CHECKING:
     from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
-        DeveloperWorkflowCliCommandOptions,
         DeveloperWorkflowCliDependencies,
+        DeveloperWorkflowCliOptions,
         DeveloperWorkflowCliStreams,
         DeveloperWorkflowCliWriters,
     )
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 def run_developer_workflow_cli_command(
     command: CliCommitMessageCommand | CliCommitCommand,
     *,
-    global_options: DeveloperWorkflowCliCommandOptions,
+    options: DeveloperWorkflowCliOptions,
     dependencies: DeveloperWorkflowCliDependencies,
     streams: DeveloperWorkflowCliStreams,
     writers: DeveloperWorkflowCliWriters,
@@ -43,7 +43,7 @@ def run_developer_workflow_cli_command(
         result = workflow.run(_generate_commit_message_command(command))
         return _write_runtime_result(
             result,
-            global_options=global_options,
+            options=options,
             streams=streams,
             writers=writers,
         )
@@ -55,7 +55,7 @@ def run_developer_workflow_cli_command(
     if not generation_result.succeeded or generation_result.recommendation is None:
         return _write_confirmed_commit_result(
             generation_result,
-            global_options=global_options,
+            options=options,
             streams=streams,
             writers=writers,
         )
@@ -83,14 +83,19 @@ def run_developer_workflow_cli_command(
         )
         return _write_runtime_result(
             interrupted_result,
-            global_options=global_options,
+            options=options,
             streams=streams,
             writers=writers,
         )
 
     if answer.strip().casefold() not in {"y", "yes"}:
         streams.stdout.write("Commit cancelled; no commit created.\n")
-        writers.evidence(generation_result, global_options=global_options, stdout=streams.stdout)
+        writers.evidence(
+            generation_result,
+            include_usage=options.print_usage,
+            include_prices=options.print_prices,
+            stdout=streams.stdout,
+        )
         return 0
 
     commit_result = workflow.commit(generation_result.recommendation)
@@ -101,7 +106,7 @@ def run_developer_workflow_cli_command(
             streams.stdout.write("Committed.\n")
     return _write_confirmed_commit_result(
         commit_result,
-        global_options=global_options,
+        options=options,
         streams=streams,
         output_already_written=True,
         writers=writers,
@@ -111,20 +116,25 @@ def run_developer_workflow_cli_command(
 def _write_runtime_result(
     result: CommitMessageWorkflowResult,
     *,
-    global_options: DeveloperWorkflowCliCommandOptions,
+    options: DeveloperWorkflowCliOptions,
     streams: DeveloperWorkflowCliStreams,
     writers: DeveloperWorkflowCliWriters,
 ) -> int:
     exit_code = writers.runtime_result(result, stdout=streams.stdout, stderr=streams.stderr)
-    if global_options.print_usage or global_options.print_prices:
-        writers.evidence(result, global_options=global_options, stdout=streams.stdout)
+    if options.print_usage or options.print_prices:
+        writers.evidence(
+            result,
+            include_usage=options.print_usage,
+            include_prices=options.print_prices,
+            stdout=streams.stdout,
+        )
     return exit_code
 
 
 def _write_confirmed_commit_result(
     result: ConfirmedCommitWorkflowResult,
     *,
-    global_options: DeveloperWorkflowCliCommandOptions,
+    options: DeveloperWorkflowCliOptions,
     streams: DeveloperWorkflowCliStreams,
     writers: DeveloperWorkflowCliWriters,
     output_already_written: bool = False,
@@ -132,8 +142,13 @@ def _write_confirmed_commit_result(
     if output_already_written:
         result = replace(result, output_text=None)
     exit_code = writers.confirmed_commit_result(result, stdout=streams.stdout, stderr=streams.stderr)
-    if global_options.print_usage or global_options.print_prices:
-        writers.evidence(result, global_options=global_options, stdout=streams.stdout)
+    if options.print_usage or options.print_prices:
+        writers.evidence(
+            result,
+            include_usage=options.print_usage,
+            include_prices=options.print_prices,
+            stdout=streams.stdout,
+        )
     return exit_code
 
 

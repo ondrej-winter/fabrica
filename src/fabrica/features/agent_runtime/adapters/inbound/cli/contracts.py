@@ -38,22 +38,6 @@ class CommandAugmenter(Protocol):
         """Return a command augmented with explicitly selected context."""
 
 
-class AgentRuntimeCliCommandOptions(Protocol):
-    """Shared product CLI options consumed by agent-runtime command adapters."""
-
-    @property
-    def print_usage(self) -> bool:
-        """Return whether model usage evidence should be printed."""
-
-    @property
-    def print_prices(self) -> bool:
-        """Return whether model pricing evidence should be printed."""
-
-    @property
-    def verbose_diagnostics(self) -> bool:
-        """Return whether additional safe diagnostics should be included."""
-
-
 class RunResultWriter(Protocol):
     """Writer for one local agent runtime result."""
 
@@ -68,7 +52,8 @@ class EvidenceWriter(Protocol):
         self,
         result: LocalAgentRunResult,
         *,
-        global_options: AgentRuntimeCliCommandOptions,
+        include_usage: bool,
+        include_prices: bool,
         stdout: TextIO,
     ) -> None:
         """Write model evidence selected by global CLI options."""
@@ -86,6 +71,15 @@ class ScriptExecutionResultWriter(Protocol):
 
     def __call__(self, result: SkillScriptExecutionResult, *, stdout: TextIO, stderr: TextIO) -> int:
         """Write a selected script execution result and return a process exit code."""
+
+
+@dataclass(frozen=True, slots=True)
+class AgentRuntimeCliOptions:
+    """Product CLI option values consumed by agent-runtime commands."""
+
+    print_usage: bool = False
+    print_prices: bool = False
+    verbose_diagnostics: bool = False
 
 
 @dataclass(frozen=True, slots=True)

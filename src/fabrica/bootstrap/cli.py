@@ -16,14 +16,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from fabrica.adapters.inbound.cli.contributions import CliContribution
-    from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
-        AgentRuntimeCliCommandOptions,
-        AgentRuntimeCliDependencies,
-    )
-    from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
-        DeveloperWorkflowCliCommandOptions,
-        DeveloperWorkflowCliDependencies,
-    )
+    from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
+    from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import DeveloperWorkflowCliDependencies
     from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence
 
 
@@ -67,13 +61,14 @@ def create_cli_contributions(
 def _write_requested_agent_runtime_model_evidence(
     result: ModelEvidenceResult,
     *,
-    global_options: AgentRuntimeCliCommandOptions,
+    include_usage: bool,
+    include_prices: bool,
     stdout: TextIO,
 ) -> None:
     _write_requested_model_evidence(
         result,
-        print_usage=global_options.print_usage,
-        print_prices=global_options.print_prices,
+        print_usage=include_usage,
+        print_prices=include_prices,
         stdout=stdout,
     )
 
@@ -81,13 +76,14 @@ def _write_requested_agent_runtime_model_evidence(
 def _write_requested_developer_workflow_model_evidence(
     result: ModelEvidenceResult,
     *,
-    global_options: DeveloperWorkflowCliCommandOptions,
+    include_usage: bool,
+    include_prices: bool,
     stdout: TextIO,
 ) -> None:
     _write_requested_model_evidence(
         result,
-        print_usage=global_options.print_usage,
-        print_prices=global_options.print_prices,
+        print_usage=include_usage,
+        print_prices=include_prices,
         stdout=stdout,
     )
 
