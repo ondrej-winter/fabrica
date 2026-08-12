@@ -1,5 +1,6 @@
 """Agent-runtime CLI command adapters."""
 
+from fabrica.features.agent_runtime.adapters.inbound.cli.approval import MetadataBoundCliApprovalLookup
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliRunCommand,
     CliScriptApprovalOptions,
@@ -41,6 +42,7 @@ __all__ = [
     "CliSkillRootOptions",
     "CommandAugmenter",
     "EvidenceWriter",
+    "MetadataBoundCliApprovalLookup",
     "RunResultWriter",
     "ScriptExecutionResultWriter",
     "ScriptPolicyResultWriter",

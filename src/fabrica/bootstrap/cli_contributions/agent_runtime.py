@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from fabrica.adapters.inbound.cli.contributions import CliContribution
@@ -15,6 +14,7 @@ from fabrica.bootstrap.composition import (
     create_skill_script_executor,
     create_skill_script_policy_evaluator,
 )
+from fabrica.features.agent_runtime.adapters.inbound.cli.approval import MetadataBoundCliApprovalLookup
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliRunCommand,
     CliScriptExecuteCommand,
@@ -45,8 +45,6 @@ if TYPE_CHECKING:
         LocalAgentRunCommand,
         SelectedSkill,
         SelectedSkillResource,
-        SkillScriptApprovalBinding,
-        SkillScriptApprovalDecision,
     )
     from fabrica.features.agent_runtime.application.ports import (
         LocalAgentRuntime,
@@ -167,36 +165,6 @@ def _create_default_script_executor(
         SkillScriptExecutionOptions(
             skill_roots=command.skill_root_options.skill_roots,
             verbose_diagnostics=context.global_options.verbose_diagnostics,
-            approval_lookup=_MetadataBoundCliApprovalLookup(command),
+            approval_lookup=MetadataBoundCliApprovalLookup(command),
         ),
     )
-
-
-@dataclass(frozen=True, slots=True)
-class _MetadataBoundCliApprovalLookup:
-    """CLI approval lookup that approves only an exact supplied metadata binding."""
-
-    command: CliScriptExecuteCommand
-
-    def get_approval(self, binding: SkillScriptApprovalBinding) -> SkillScriptApprovalDecision:
-        from fabrica.features.agent_runtime.application.dtos import (  # noqa: PLC0415
-            SkillScriptApprovalBinding,
-            SkillScriptApprovalDecision,
-            SkillScriptApprovalStatus,
-        )
-
-        expected = SkillScriptApprovalBinding(
-            skill_id=self.command.skill_id,
-            script_id=self.command.script_id,
-            script_type=self.command.approval_options.script_type,
-            suffix=self.command.approval_options.suffix,
-            byte_size=self.command.approval_options.byte_size,
-            content_digest=self.command.approval_options.content_digest,
-        )
-        if binding == expected:
-            return SkillScriptApprovalDecision(status=SkillScriptApprovalStatus.APPROVED, binding=binding)
-        return SkillScriptApprovalDecision(
-            status=SkillScriptApprovalStatus.DENIED,
-            binding=binding,
-            reason="CLI approval metadata did not match selected script metadata",
-        )
