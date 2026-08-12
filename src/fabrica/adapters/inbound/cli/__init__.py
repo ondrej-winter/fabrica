@@ -1,4 +1,4 @@
-"""Command-line inbound adapter for local agent runtime workflows."""
+"""Feature-neutral command-line shell for Fabrica workflows."""
 
 from fabrica.adapters.inbound.cli.options import CliGlobalOptions
 from fabrica.adapters.inbound.cli.parser import (

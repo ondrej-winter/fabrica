@@ -14,7 +14,6 @@ from fabrica.bootstrap.composition import (
     create_skill_script_executor,
     create_skill_script_policy_evaluator,
 )
-from fabrica.features.agent_runtime.adapters.inbound.cli.approval import MetadataBoundCliApprovalLookup
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliRunCommand,
     CliScriptExecuteCommand,
@@ -35,6 +34,8 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.output import (
     write_script_policy_result,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.runner import run_agent_runtime_cli_command
+from fabrica.features.agent_runtime.adapters.outbound.script_approval import MetadataBoundApprovalLookup
+from fabrica.features.agent_runtime.application.dtos import SkillScriptApprovalBinding
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -165,6 +166,17 @@ def _create_default_script_executor(
         SkillScriptExecutionOptions(
             skill_roots=command.skill_root_options.skill_roots,
             verbose_diagnostics=context.global_options.verbose_diagnostics,
-            approval_lookup=MetadataBoundCliApprovalLookup(command),
+            approval_lookup=MetadataBoundApprovalLookup(_approval_binding_from_command(command)),
         ),
+    )
+
+
+def _approval_binding_from_command(command: CliScriptExecuteCommand) -> SkillScriptApprovalBinding:
+    return SkillScriptApprovalBinding(
+        skill_id=command.skill_id,
+        script_id=command.script_id,
+        script_type=command.approval_options.script_type,
+        suffix=command.approval_options.suffix,
+        byte_size=command.approval_options.byte_size,
+        content_digest=command.approval_options.content_digest,
     )
