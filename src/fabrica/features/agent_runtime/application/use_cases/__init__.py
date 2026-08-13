@@ -10,6 +10,9 @@ from fabrica.features.agent_runtime.application.use_cases.load_skill_resource_co
 )
 from fabrica.features.agent_runtime.application.use_cases.prepare_skill_tools import PrepareSkillTools
 from fabrica.features.agent_runtime.application.use_cases.run_local_agent import RunLocalAgent
+from fabrica.features.agent_runtime.application.use_cases.run_local_agent_with_selected_context import (
+    RunLocalAgentWithSelectedContext,
+)
 from fabrica.features.agent_runtime.application.use_cases.run_tool_loop import RunToolLoop
 
 __all__ = [
@@ -19,5 +22,6 @@ __all__ = [
     "LoadSkillResourceContext",
     "PrepareSkillTools",
     "RunLocalAgent",
+    "RunLocalAgentWithSelectedContext",
     "RunToolLoop",
 ]

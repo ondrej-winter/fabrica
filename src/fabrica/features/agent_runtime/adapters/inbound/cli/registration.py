@@ -14,7 +14,14 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliScriptPolicyCommand,
     CliSelectedResource,
 )
-from fabrica.features.agent_runtime.application.dtos import SkillScriptType
+from fabrica.features.agent_runtime.application.dtos import (
+    LocalAgentRunCommand,
+    SelectedSkill,
+    SelectedSkillResource,
+    SelectedSkillScript,
+    SkillScriptApprovalBinding,
+    SkillScriptType,
+)
 
 
 class CliSubparsers(Protocol):
@@ -31,12 +38,18 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
         help="run one local runtime prompt",
         description="Run one local runtime prompt with explicitly selected context only.",
     )
-    run_parser.add_argument("--prompt", required=True, help="Prompt text for the local runtime run.")
+    run_parser.add_argument(
+        "--prompt",
+        required=True,
+        type=_parse_prompt,
+        help="Prompt text for the local runtime run.",
+    )
     run_parser.add_argument("--model", dest="model_hint", help="Optional model hint passed to the runtime.")
     run_parser.add_argument(
         "--skill",
         dest="skill_ids",
         action="append",
+        type=_parse_skill_id,
         default=[],
         help="Explicit selected Agent Skill ID. May be repeated.",
     )
@@ -58,8 +71,18 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
         help="inspect selected skill script policy without executing it",
         description="Evaluate policy for one explicitly selected Agent Skill script without executing it.",
     )
-    policy_parser.add_argument("--skill-id", required=True, help="Explicit selected Agent Skill ID.")
-    policy_parser.add_argument("--script-id", required=True, help="Relative selected script ID within the skill.")
+    policy_parser.add_argument(
+        "--skill-id",
+        required=True,
+        type=_parse_skill_id,
+        help="Explicit selected Agent Skill ID.",
+    )
+    policy_parser.add_argument(
+        "--script-id",
+        required=True,
+        type=_parse_script_id,
+        help="Relative selected script ID within the skill.",
+    )
     _add_common_skill_root_flags(policy_parser)
     policy_parser.set_defaults(command_factory=_script_policy_command_from_namespace)
     policy_parser.set_defaults(composition_options_factory=_agent_runtime_composition_options_from_namespace)
@@ -72,8 +95,18 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
             "non-interactive approval metadata matches the inspected script. This is not production sandboxing."
         ),
     )
-    execute_parser.add_argument("--skill-id", required=True, help="Explicit selected Agent Skill ID.")
-    execute_parser.add_argument("--script-id", required=True, help="Relative selected script ID within the skill.")
+    execute_parser.add_argument(
+        "--skill-id",
+        required=True,
+        type=_parse_skill_id,
+        help="Explicit selected Agent Skill ID.",
+    )
+    execute_parser.add_argument(
+        "--script-id",
+        required=True,
+        type=_parse_script_id,
+        help="Relative selected script ID within the skill.",
+    )
     execute_parser.add_argument(
         "--approve-script-type",
         required=True,
@@ -83,6 +116,7 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
     execute_parser.add_argument(
         "--approve-suffix",
         required=True,
+        type=_parse_approved_suffix,
         help="Approved script suffix bound to the selected script metadata, such as .py or .sh.",
     )
     execute_parser.add_argument(
@@ -94,6 +128,7 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
     execute_parser.add_argument(
         "--approve-content-digest",
         required=True,
+        type=_parse_content_digest,
         help="Approved content digest bound to the selected script metadata, such as sha256:....",
     )
     _add_common_skill_root_flags(execute_parser)
@@ -117,15 +152,86 @@ def _parse_resource_selection(value: str) -> CliSelectedResource:
     if not separator or not skill_id or not resource_id:
         msg = "resource must use SKILL_ID:RESOURCE_ID"
         raise argparse.ArgumentTypeError(msg)
+    try:
+        SelectedSkillResource(skill_id=skill_id, resource_id=resource_id)
+    except ValueError as err:
+        raise _argument_type_error(err) from err
     return CliSelectedResource(skill_id=skill_id, resource_id=resource_id)
 
 
+def _parse_prompt(value: str) -> str:
+    try:
+        LocalAgentRunCommand(prompt=value)
+    except ValueError as err:
+        raise _argument_type_error(err) from err
+    return value
+
+
+def _parse_skill_id(value: str) -> str:
+    try:
+        SelectedSkill(skill_id=value)
+    except ValueError as err:
+        raise _argument_type_error(err) from err
+    if value.startswith("/") or "//" in value:
+        msg = "skill_id must be a relative identifier"
+        raise argparse.ArgumentTypeError(msg)
+    if any(part in {"", ".", ".."} for part in value.split("/")):
+        msg = "skill_id must not contain traversal segments"
+        raise argparse.ArgumentTypeError(msg)
+    return value
+
+
+def _parse_script_id(value: str) -> str:
+    try:
+        SelectedSkillScript(skill_id="selected-skill", script_id=value)
+    except ValueError as err:
+        raise _argument_type_error(err) from err
+    return value
+
+
+def _parse_approved_suffix(value: str) -> str:
+    try:
+        SkillScriptApprovalBinding(
+            skill_id="selected-skill",
+            script_id="scripts/selected.py",
+            script_type=SkillScriptType.PYTHON,
+            suffix=value,
+            byte_size=1,
+            content_digest="sha256:synthetic",
+        )
+    except ValueError as err:
+        raise _argument_type_error(err) from err
+    return value
+
+
+def _parse_content_digest(value: str) -> str:
+    try:
+        SkillScriptApprovalBinding(
+            skill_id="selected-skill",
+            script_id="scripts/selected.py",
+            script_type=SkillScriptType.PYTHON,
+            suffix=".py",
+            byte_size=1,
+            content_digest=value,
+        )
+    except ValueError as err:
+        raise _argument_type_error(err) from err
+    return value
+
+
 def _parse_positive_int(value: str) -> int:
-    parsed = int(value)
+    try:
+        parsed = int(value)
+    except ValueError as err:
+        raise _argument_type_error(err) from err
     if parsed < 1:
         msg = "value must be at least 1"
         raise argparse.ArgumentTypeError(msg)
     return parsed
+
+
+def _argument_type_error(error: ValueError) -> argparse.ArgumentTypeError:
+    return argparse.ArgumentTypeError(str(error))
 
 
 def _run_command_from_namespace(namespace: argparse.Namespace) -> CliRunCommand:

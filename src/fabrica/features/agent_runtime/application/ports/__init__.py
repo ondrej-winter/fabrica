@@ -3,6 +3,7 @@
 from fabrica.features.agent_runtime.application.ports.agent_model import AgentModel, AgentModelError
 from fabrica.features.agent_runtime.application.ports.inbound import (
     LocalAgentRuntime,
+    SelectedContextLocalAgentRuntime,
     SkillScriptPolicyEvaluator,
     SkillScriptRunner,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "LocalAgentRuntime",
     "RegisteredTool",
     "RegisteredToolHandler",
+    "SelectedContextLocalAgentRuntime",
     "SkillContextLoadError",
     "SkillContextLoader",
     "SkillResourceContextLoader",

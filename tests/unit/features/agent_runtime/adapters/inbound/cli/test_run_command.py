@@ -21,7 +21,6 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
 from fabrica.features.agent_runtime.adapters.inbound.cli.output import write_run_result
 from fabrica.features.agent_runtime.adapters.inbound.cli.runner import run_agent_runtime_cli_command
 from fabrica.features.agent_runtime.application.dtos import (
-    LocalAgentContextBlock,
     LocalAgentRunCommand,
     LocalAgentRunResult,
     LocalAgentRunStatus,
@@ -126,34 +125,29 @@ class FakeRuntime:
 
 
 @dataclass
-class RecordingAugmenter:
-    """Test double for selected skill/resource context augmentation."""
+class FakeSelectedContextRuntime:
+    """Test double for the selected-context local runtime use case."""
 
     calls: list[
         tuple[
             LocalAgentRunCommand,
             tuple[SelectedSkill, ...],
             tuple[SelectedSkillResource, ...],
-            tuple[Path, ...],
-            bool,
         ]
     ] = field(default_factory=list)
+    result: LocalAgentRunResult = field(
+        default_factory=lambda: LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="context-ok"),
+    )
 
-    def __call__(
+    def run(
         self,
         command: LocalAgentRunCommand,
-        skill_selections: tuple[SelectedSkill, ...],
-        resource_selections: tuple[SelectedSkillResource, ...],
         *,
-        skill_roots: tuple[Path, ...],
-        verbose_diagnostics: bool,
-    ) -> LocalAgentRunCommand:
-        self.calls.append((command, skill_selections, resource_selections, skill_roots, verbose_diagnostics))
-        return LocalAgentRunCommand(
-            prompt=command.prompt,
-            model_hint=command.model_hint,
-            context=(LocalAgentContextBlock(text="synthetic skill context", label="python-testing"),),
-        )
+        skill_selections: tuple[SelectedSkill, ...] = (),
+        resource_selections: tuple[SelectedSkillResource, ...] = (),
+    ) -> LocalAgentRunResult:
+        self.calls.append((command, skill_selections, resource_selections))
+        return self.result
 
 
 def test_run_command_maps_prompt_and_model_to_runtime_command() -> None:
@@ -177,10 +171,8 @@ def test_run_command_maps_prompt_and_model_to_runtime_command() -> None:
 
 
 def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> None:
-    runtime = FakeRuntime(
-        result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="context-ok"),
-    )
-    augmenter = RecordingAugmenter()
+    runtime = FakeRuntime(result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="unused"))
+    selected_context_runtime = FakeSelectedContextRuntime()
 
     exit_code = run_feature_cli_command(
         CliRunCommand(
@@ -188,71 +180,46 @@ def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> 
             skill_ids=("python-testing",),
             resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
         ),
-        dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
+        dependencies=AgentRuntimeCliDependencies(
+            runtime=runtime,
+            selected_context_runtime=selected_context_runtime,
+        ),
         stdout=StringIO(),
         stderr=StringIO(),
     )
 
     assert exit_code == 0
-    assert augmenter.calls == [
+    assert selected_context_runtime.calls == [
         (
             LocalAgentRunCommand(prompt="Use selected context"),
             (SelectedSkill(skill_id="python-testing"),),
             (SelectedSkillResource(skill_id="python-testing", resource_id="references/example.md"),),
-            (),
-            False,
         ),
     ]
-    assert runtime.calls == [
-        LocalAgentRunCommand(
-            prompt="Use selected context",
-            context=(LocalAgentContextBlock(text="synthetic skill context", label="python-testing"),),
-        ),
-    ]
+    assert runtime.calls == []
 
 
-def test_run_invocation_passes_global_verbose_diagnostics_to_augmenter() -> None:
-    runtime = FakeRuntime(
-        result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="context-ok"),
-    )
-    augmenter = RecordingAugmenter()
-
-    exit_code = run_feature_cli_command(
-        CliInvocation(
-            command=CliRunCommand(
-                prompt="Use selected context",
-                skill_ids=("python-testing",),
-            ),
-            global_options=CliGlobalOptions(verbose_diagnostics=True),
-            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("synthetic-skills"),)),
-        ),
-        dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
-        stdout=StringIO(),
-        stderr=StringIO(),
-    )
-
-    assert exit_code == 0
-    assert augmenter.calls[0][4] is True
-
-
-def test_run_invocation_passes_composition_skill_roots_to_augmenter() -> None:
-    runtime = FakeRuntime(
-        result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="context-ok"),
-    )
-    augmenter = RecordingAugmenter()
+def test_run_invocation_uses_selected_context_runtime_with_selected_skill() -> None:
+    selected_context_runtime = FakeSelectedContextRuntime()
 
     exit_code = run_feature_cli_command(
         CliInvocation(
             command=CliRunCommand(prompt="Use selected context", skill_ids=("python-testing",)),
             composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("synthetic-skills"),)),
         ),
-        dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
+        dependencies=AgentRuntimeCliDependencies(selected_context_runtime=selected_context_runtime),
         stdout=StringIO(),
         stderr=StringIO(),
     )
 
     assert exit_code == 0
-    assert augmenter.calls[0][3] == (Path("synthetic-skills"),)
+    assert selected_context_runtime.calls == [
+        (
+            LocalAgentRunCommand(prompt="Use selected context"),
+            (SelectedSkill(skill_id="python-testing"),),
+            (),
+        ),
+    ]
 
 
 def test_run_invocation_appends_requested_usage_and_price_evidence() -> None:
@@ -307,16 +274,19 @@ def test_run_command_skips_augmentation_when_no_context_is_selected() -> None:
     runtime = FakeRuntime(
         result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="pong"),
     )
-    augmenter = RecordingAugmenter()
+    selected_context_runtime = FakeSelectedContextRuntime()
 
     run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong"),
-        dependencies=AgentRuntimeCliDependencies(runtime=runtime, command_augmenter=augmenter),
+        dependencies=AgentRuntimeCliDependencies(
+            runtime=runtime,
+            selected_context_runtime=selected_context_runtime,
+        ),
         stdout=StringIO(),
         stderr=StringIO(),
     )
 
-    assert augmenter.calls == []
+    assert selected_context_runtime.calls == []
 
 
 def test_run_command_maps_non_success_status_to_stable_exit_code_and_stderr() -> None:

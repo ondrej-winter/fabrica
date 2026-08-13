@@ -19,14 +19,11 @@ from fabrica.features.agent_runtime.application.dtos import (
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
         AgentRuntimeCliDependencies,
         AgentRuntimeCliOptions,
         AgentRuntimeCliStreams,
         AgentRuntimeCliWriters,
-        CommandAugmenter,
     )
     from fabrica.features.agent_runtime.application.ports import SkillScriptPolicyEvaluator, SkillScriptRunner
 
@@ -56,15 +53,18 @@ def run_agent_runtime_cli_command(
         )
     runtime_command = LocalAgentRunCommand(prompt=command.prompt, model_hint=command.model_hint)
     if command.skill_ids or command.resources:
-        runtime_command = _augment_command(
-            runtime_command,
-            command,
-            verbose_diagnostics=options.verbose_diagnostics,
-            skill_roots=options.skill_roots,
-            command_augmenter=dependencies.command_augmenter,
+        runtime = _require_dependency(
+            dependencies.selected_context_runtime,
+            dependency_name="selected_context_runtime",
         )
-    active_runtime = _require_dependency(dependencies.runtime, dependency_name="runtime")
-    result = active_runtime.run(runtime_command)
+        result = runtime.run(
+            runtime_command,
+            skill_selections=_skill_selections_from_command(command),
+            resource_selections=_resource_selections_from_command(command),
+        )
+    else:
+        runtime = _require_dependency(dependencies.runtime, dependency_name="runtime")
+        result = runtime.run(runtime_command)
     exit_code = writers.run_result(result, stdout=streams.stdout, stderr=streams.stderr)
     if options.print_usage or options.print_prices:
         writers.evidence(
@@ -102,26 +102,14 @@ def _run_script_execute_command(
     return writers.script_execution_result(result, stdout=streams.stdout, stderr=streams.stderr)
 
 
-def _augment_command(
-    runtime_command: LocalAgentRunCommand,
-    command: CliRunCommand,
-    *,
-    verbose_diagnostics: bool,
-    skill_roots: tuple[Path, ...],
-    command_augmenter: CommandAugmenter | None,
-) -> LocalAgentRunCommand:
-    skill_selections = tuple(SelectedSkill(skill_id=skill_id) for skill_id in command.skill_ids)
-    resource_selections = tuple(
+def _skill_selections_from_command(command: CliRunCommand) -> tuple[SelectedSkill, ...]:
+    return tuple(SelectedSkill(skill_id=skill_id) for skill_id in command.skill_ids)
+
+
+def _resource_selections_from_command(command: CliRunCommand) -> tuple[SelectedSkillResource, ...]:
+    return tuple(
         SelectedSkillResource(skill_id=resource.skill_id, resource_id=resource.resource_id)
         for resource in command.resources
-    )
-    augmenter = _require_dependency(command_augmenter, dependency_name="command_augmenter")
-    return augmenter(
-        runtime_command,
-        skill_selections,
-        resource_selections,
-        skill_roots=skill_roots,
-        verbose_diagnostics=verbose_diagnostics,
     )
 
 

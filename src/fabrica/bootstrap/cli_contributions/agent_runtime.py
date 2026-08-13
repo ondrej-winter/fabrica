@@ -10,7 +10,7 @@ from fabrica.bootstrap.composition import (
     SkillScriptExecutionOptions,
     SkillScriptPolicyEvaluationOptions,
     create_codex_runtime,
-    create_skill_context_augmented_local_agent_command,
+    create_selected_context_local_agent_runtime,
     create_skill_script_executor,
     create_skill_script_policy_evaluator,
 )
@@ -40,17 +40,11 @@ from fabrica.features.agent_runtime.adapters.outbound.script_approval import Met
 from fabrica.features.agent_runtime.application.dtos import SkillScriptApprovalBinding
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from fabrica.adapters.inbound.cli.contributions import CliExecutionContext
     from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import EvidenceWriter
-    from fabrica.features.agent_runtime.application.dtos import (
-        LocalAgentRunCommand,
-        SelectedSkill,
-        SelectedSkillResource,
-    )
     from fabrica.features.agent_runtime.application.ports import (
         LocalAgentRuntime,
+        SelectedContextLocalAgentRuntime,
         SkillScriptPolicyEvaluator,
         SkillScriptRunner,
     )
@@ -109,9 +103,15 @@ def _agent_runtime_dependencies_for_command(
     dependencies = overrides or AgentRuntimeCliDependencies()
     composition_options = _agent_runtime_composition_options_from_context(context)
     if isinstance(command, CliRunCommand):
+        runtime = dependencies.runtime or _create_default_runtime()
         return AgentRuntimeCliDependencies(
-            runtime=dependencies.runtime or _create_default_runtime(),
-            command_augmenter=dependencies.command_augmenter or _default_augment_command,
+            runtime=runtime,
+            selected_context_runtime=dependencies.selected_context_runtime
+            or _create_default_selected_context_runtime(
+                runtime,
+                composition_options=composition_options,
+                verbose_diagnostics=context.global_options.verbose_diagnostics,
+            ),
         )
     if isinstance(command, CliScriptPolicyCommand):
         return AgentRuntimeCliDependencies(
@@ -138,20 +138,16 @@ def _agent_runtime_composition_options_from_context(context: CliExecutionContext
     return context.composition_options
 
 
-def _default_augment_command(
-    command: LocalAgentRunCommand,
-    skill_selections: tuple[SelectedSkill, ...],
-    resource_selections: tuple[SelectedSkillResource, ...],
+def _create_default_selected_context_runtime(
+    runtime: LocalAgentRuntime,
     *,
-    skill_roots: tuple[Path, ...],
+    composition_options: AgentRuntimeCliCompositionOptions,
     verbose_diagnostics: bool,
-) -> LocalAgentRunCommand:
-    return create_skill_context_augmented_local_agent_command(
-        command,
-        SkillContextAugmentationOptions(
-            skill_selections=skill_selections,
-            resource_selections=resource_selections,
-            skill_roots=skill_roots,
+) -> SelectedContextLocalAgentRuntime:
+    return create_selected_context_local_agent_runtime(
+        runtime=runtime,
+        options=SkillContextAugmentationOptions(
+            skill_roots=composition_options.skill_roots,
             verbose_diagnostics=verbose_diagnostics,
         ),
     )

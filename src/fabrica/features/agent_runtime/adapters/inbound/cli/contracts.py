@@ -9,33 +9,16 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from fabrica.features.agent_runtime.application.dtos import (
-        LocalAgentRunCommand,
         LocalAgentRunResult,
-        SelectedSkill,
-        SelectedSkillResource,
         SkillScriptExecutionResult,
         SkillScriptPolicyEvaluationResult,
     )
     from fabrica.features.agent_runtime.application.ports import (
         LocalAgentRuntime,
+        SelectedContextLocalAgentRuntime,
         SkillScriptPolicyEvaluator,
         SkillScriptRunner,
     )
-
-
-class CommandAugmenter(Protocol):
-    """Protocol for selected skill/resource command augmentation."""
-
-    def __call__(
-        self,
-        command: LocalAgentRunCommand,
-        skill_selections: tuple[SelectedSkill, ...],
-        resource_selections: tuple[SelectedSkillResource, ...],
-        *,
-        skill_roots: tuple[Path, ...],
-        verbose_diagnostics: bool,
-    ) -> LocalAgentRunCommand:
-        """Return a command augmented with explicitly selected context."""
 
 
 class RunResultWriter(Protocol):
@@ -88,7 +71,7 @@ class AgentRuntimeCliDependencies:
     """Injected dependencies for agent-runtime CLI commands."""
 
     runtime: LocalAgentRuntime | None = None
-    command_augmenter: CommandAugmenter | None = None
+    selected_context_runtime: SelectedContextLocalAgentRuntime | None = None
     script_policy_evaluator: SkillScriptPolicyEvaluator | None = None
     script_executor: SkillScriptRunner | None = None
 

@@ -14,7 +14,12 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillContextBounds,
     SkillResourceContextBounds,
 )
-from fabrica.features.agent_runtime.application.use_cases import LoadSkillContext, LoadSkillResourceContext
+from fabrica.features.agent_runtime.application.ports import LocalAgentRuntime
+from fabrica.features.agent_runtime.application.use_cases import (
+    LoadSkillContext,
+    LoadSkillResourceContext,
+    RunLocalAgentWithSelectedContext,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,3 +138,24 @@ def create_skill_context_augmented_local_agent_command(
             verbose_diagnostics=options.verbose_diagnostics,
         )
     return augmented
+
+
+def create_selected_context_local_agent_runtime(
+    *,
+    runtime: LocalAgentRuntime,
+    options: SkillContextAugmentationOptions,
+) -> RunLocalAgentWithSelectedContext:
+    """Create the application use case for selected-context local agent runs."""
+    return RunLocalAgentWithSelectedContext(
+        runtime=runtime,
+        skill_context_loader=create_skill_context_loader(
+            skill_roots=options.skill_roots,
+            bounds=options.skill_bounds,
+            verbose_diagnostics=options.verbose_diagnostics,
+        ),
+        skill_resource_context_loader=create_skill_resource_context_loader(
+            skill_roots=options.skill_roots,
+            bounds=options.resource_bounds,
+            verbose_diagnostics=options.verbose_diagnostics,
+        ),
+    )

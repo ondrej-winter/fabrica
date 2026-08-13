@@ -233,6 +233,87 @@ def test_parse_run_command_rejects_malformed_resource_selection() -> None:
     assert exc_info.value.code == ARGPARSE_USAGE_ERROR
 
 
+@pytest.mark.parametrize(
+    ("args", "expected_message"),
+    [
+        (("run", "--prompt", ""), "prompt must not be empty"),
+        (("run", "--prompt", "pong", "--skill", "../unsafe"), "skill_id must not contain traversal segments"),
+        (
+            ("run", "--prompt", "pong", "--resource", "python-testing:../unsafe"),
+            "resource_id must not contain traversal segments",
+        ),
+        (
+            ("script-policy", "--skill-id", "python-testing", "--script-id", "../unsafe.py"),
+            "script_id must not contain traversal segments",
+        ),
+        (
+            (
+                "script-execute",
+                "--skill-id",
+                "python-testing",
+                "--script-id",
+                "scripts/check.py",
+                "--approve-script-type",
+                "python",
+                "--approve-suffix",
+                ".rb",
+                "--approve-byte-size",
+                "128",
+                "--approve-content-digest",
+                "sha256:abc123",
+            ),
+            "script suffix is not supported",
+        ),
+        (
+            (
+                "script-execute",
+                "--skill-id",
+                "python-testing",
+                "--script-id",
+                "scripts/check.py",
+                "--approve-script-type",
+                "python",
+                "--approve-suffix",
+                ".py",
+                "--approve-byte-size",
+                "128",
+                "--approve-content-digest",
+                "sha256:bad digest",
+            ),
+            "content_digest contains unsupported characters",
+        ),
+        (
+            (
+                "script-execute",
+                "--skill-id",
+                "python-testing",
+                "--script-id",
+                "scripts/check.py",
+                "--approve-script-type",
+                "python",
+                "--approve-suffix",
+                ".py",
+                "--approve-byte-size",
+                "not-an-int",
+                "--approve-content-digest",
+                "sha256:abc123",
+            ),
+            "invalid literal for int",
+        ),
+    ],
+)
+def test_parse_agent_runtime_commands_reject_invalid_boundary_values(
+    args: tuple[str, ...],
+    expected_message: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        parse_args(args)
+
+    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
+    assert expected_message in capsys.readouterr().err
+
+
 def test_parse_script_policy_command_supports_explicit_selected_script() -> None:
     command = parse_args(
         [
