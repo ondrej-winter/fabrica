@@ -7,6 +7,7 @@ from fabrica.features.developer_workflow.application.dtos import (
 from fabrica.features.developer_workflow.application.use_cases.commit_workflow import (
     CommitMessageEvidenceRecorder,
     CommitMessageGenerator,
+    CommitMessageWorkflow,
     ConfirmedCommitWorkflow,
     CreateGitCommit,
     GenerateCommitMessage,
@@ -19,6 +20,7 @@ __all__ = [
     "DEFAULT_COMMIT_MESSAGE_SKILL_ID",
     "CommitMessageEvidenceRecorder",
     "CommitMessageGenerator",
+    "CommitMessageWorkflow",
     "ConfirmedCommitWorkflow",
     "ConfirmedCommitWorkflowResult",
     "CreateGitCommit",

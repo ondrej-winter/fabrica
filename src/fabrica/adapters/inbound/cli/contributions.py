@@ -66,4 +66,27 @@ def validate_cli_contributions(contributions: Sequence[CliContribution]) -> None
                     f"{owners_by_command_type[command_type]} and {contribution.name}"
                 )
                 raise ValueError(msg)
+            overlapping_owner = _overlapping_command_owner(
+                command_type,
+                owners_by_command_type=owners_by_command_type,
+            )
+            if overlapping_owner is not None:
+                owned_type, owner = overlapping_owner
+                msg = (
+                    "overlapping CLI command type ownership registered: "
+                    f"{command_type.__name__} owned by {contribution.name} overlaps with "
+                    f"{owned_type.__name__} owned by {owner}"
+                )
+                raise ValueError(msg)
             owners_by_command_type[command_type] = contribution.name
+
+
+def _overlapping_command_owner(
+    command_type: type[object],
+    *,
+    owners_by_command_type: dict[type[object], str],
+) -> tuple[type[object], str] | None:
+    for owned_type, owner in owners_by_command_type.items():
+        if issubclass(command_type, owned_type) or issubclass(owned_type, command_type):
+            return owned_type, owner
+    return None

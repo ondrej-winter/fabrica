@@ -2,13 +2,15 @@
 
 from dataclasses import dataclass, field
 
-from fabrica.bootstrap import ConfirmedCommitWorkflow
+import pytest
+
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageEvidenceBundle,
     CommitMessageRecommendation,
     DeveloperWorkflowStatus,
     GenerateCommitMessageResult,
     GitCommitResult,
+    GitStagedChangesFailureCategory,
     GitStagedFile,
     GitStagedFileStatus,
     PreCommitFailureCategory,
@@ -17,7 +19,17 @@ from fabrica.features.developer_workflow.application.dtos import (
     PreCommitRunStatus,
     StagedFileCommitEvidence,
 )
-from fabrica.features.developer_workflow.application.ports import PreCommitRunError
+from fabrica.features.developer_workflow.application.ports import (
+    CommitMessageAnalysisError,
+    CommitMessageSkillContextLoadError,
+    CommitMessageSynthesisError,
+    GitStagedChangesLoadError,
+    PreCommitRunError,
+)
+from fabrica.features.developer_workflow.application.use_cases import (
+    ConfirmedCommitWorkflow,
+    GenerateCommitMessageError,
+)
 
 
 @dataclass
@@ -40,12 +52,14 @@ class FakePreCommitRunner:
 class FakeGenerator:
     """Fake recommendation generator recording selected skill IDs."""
 
-    result: GenerateCommitMessageResult
+    result: GenerateCommitMessageResult | Exception
     skill_ids: list[str] = field(default_factory=list)
 
     async def generate_async(self, *, skill_id: str) -> GenerateCommitMessageResult:
         """Record the selected skill and return a deterministic recommendation."""
         self.skill_ids.append(skill_id)
+        if isinstance(self.result, Exception):
+            raise self.result
         return self.result
 
 
@@ -154,6 +168,61 @@ def test_confirmed_commit_pre_commit_error_skips_generation_and_commit() -> None
     }
     assert pre_commit.commands == [PreCommitRunCommand()]
     assert generator.skill_ids == []
+    assert committer.calls == []
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_status", "expected_category"),
+    [
+        (
+            GitStagedChangesLoadError("git failed", category=GitStagedChangesFailureCategory.GIT_FAILED),
+            DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+            GitStagedChangesFailureCategory.GIT_FAILED,
+        ),
+        (
+            CommitMessageSkillContextLoadError("skill missing", category="skill_not_found"),
+            DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+            "skill_not_found",
+        ),
+        (
+            GenerateCommitMessageError("bad input", metadata={"evidence_count": 0}),
+            DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+            "invalid_commit_message_input",
+        ),
+        (
+            CommitMessageAnalysisError("analysis failed", metadata={"phase": "analysis"}),
+            DeveloperWorkflowStatus.MODEL_ERROR,
+            "commit_message_model_failure",
+        ),
+        (
+            CommitMessageSynthesisError("synthesis failed", metadata={"phase": "synthesis"}),
+            DeveloperWorkflowStatus.MODEL_ERROR,
+            "commit_message_model_failure",
+        ),
+    ],
+)
+def test_confirmed_commit_generation_errors_skip_commit(
+    error: Exception,
+    expected_status: DeveloperWorkflowStatus,
+    expected_category: object,
+) -> None:
+    pre_commit = FakePreCommitRunner(PreCommitRunResult(status=PreCommitRunStatus.PASSED))
+    generator = FakeGenerator(error)
+    committer = FakeCommitter()
+
+    result = ConfirmedCommitWorkflow(
+        generator=generator,
+        committer=committer,
+        pre_commit_runner=pre_commit,
+    ).generate(skill_id="team-style")
+
+    assert result.status is expected_status
+    assert result.recommendation is None
+    assert result.commit_result is None
+    assert result.commit_attempted is False
+    assert result.observations[0].message == str(error)
+    assert result.observations[0].metadata["category"] == expected_category
+    assert generator.skill_ids == ["team-style"]
     assert committer.calls == []
 
 

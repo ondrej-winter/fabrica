@@ -144,6 +144,14 @@ ignore_imports = [
 unmatched_ignore_imports_alerting = "none"
 
 [[tool.importlinter.contracts]]
+id = "feature-inbound-adapters-do-not-import-outbound-adapters"
+name = "Feature inbound adapters must not import outbound adapters"
+type = "forbidden"
+source_modules = ["fabrica.features.*.adapters.inbound"]
+forbidden_modules = ["fabrica.features.*.adapters.outbound"]
+unmatched_ignore_imports_alerting = "none"
+
+[[tool.importlinter.contracts]]
 id = "generic-cli-shell-stays-feature-agnostic"
 name = "Generic product CLI shell modules must not import features or bootstrap"
 type = "forbidden"

@@ -7,7 +7,6 @@ from pathlib import Path
 
 from fabrica.bootstrap import (
     CommitMessageWorkflowOptions,
-    ConfirmedCommitWorkflow,
     create_confirmed_commit_workflow,
 )
 from fabrica.features.agent_runtime.application.dtos import (
@@ -38,6 +37,7 @@ from fabrica.features.developer_workflow.application.dtos import (
     StagedFileCommitEvidence,
 )
 from fabrica.features.developer_workflow.application.ports import GitCommitError
+from fabrica.features.developer_workflow.application.use_cases import ConfirmedCommitWorkflow
 
 
 @dataclass

@@ -5,11 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from fabrica.adapters.inbound.cli.contributions import CliContribution
-from fabrica.bootstrap.composition import (
-    CommitMessageWorkflowOptions,
-    create_codex_commit_message_workflow,
-    create_codex_confirmed_commit_workflow,
-)
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -128,6 +123,11 @@ def _create_default_commit_message_workflow(
     if not isinstance(command, CliCommitMessageCommand):
         return None
 
+    from fabrica.bootstrap.composition.developer_workflow import (  # noqa: PLC0415
+        CommitMessageWorkflowOptions,
+        create_codex_commit_message_workflow,
+    )
+
     return create_codex_commit_message_workflow(
         CommitMessageWorkflowOptions(
             codex_model=composition_options.model,
@@ -146,6 +146,11 @@ def _create_default_confirmed_commit_workflow(
 ) -> ConfirmedCommitWorkflowRunner | None:
     if not isinstance(command, CliCommitCommand):
         return None
+
+    from fabrica.bootstrap.composition.developer_workflow import (  # noqa: PLC0415
+        CommitMessageWorkflowOptions,
+        create_codex_confirmed_commit_workflow,
+    )
 
     return create_codex_confirmed_commit_workflow(
         CommitMessageWorkflowOptions(

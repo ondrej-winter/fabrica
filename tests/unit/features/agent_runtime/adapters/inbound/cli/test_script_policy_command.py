@@ -214,7 +214,7 @@ def test_script_policy_default_composition_does_not_create_codex_runtime(
         msg = "script-policy must not create the Codex runtime"
         raise AssertionError(msg)
 
-    monkeypatch.setattr(agent_runtime_cli_contribution, "create_codex_runtime", fail_if_runtime_is_created)
+    monkeypatch.setattr(agent_runtime_cli_contribution, "_create_default_runtime", fail_if_runtime_is_created)
     script_file = tmp_path / "python-testing" / "scripts" / "check.py"
     script_file.parent.mkdir(parents=True)
     script_file.write_text("print('not executed by policy inspection')\n", encoding="utf-8")

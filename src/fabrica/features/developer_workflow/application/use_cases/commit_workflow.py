@@ -11,10 +11,12 @@ from fabrica.features.developer_workflow.application.dtos import (
     AnalyzeStagedFileForCommitMessageCommand,
     CommitMessageEvidenceBundle,
     CommitMessageRecommendation,
+    CommitMessageWorkflowResult,
     ConfirmedCommitWorkflowResult,
     CreateGitCommitCommand,
     DeveloperWorkflowObservation,
     DeveloperWorkflowStatus,
+    GenerateCommitMessageCommand,
     GenerateCommitMessageResult,
     GitCommitResult,
     PreCommitRunCommand,
@@ -176,6 +178,96 @@ class GitCommitter(Protocol):
 
     def create(self, command: CreateGitCommitCommand) -> GitCommitResult:
         """Create a git commit from an approved command."""
+
+
+@dataclass(frozen=True, slots=True)
+class CommitMessageWorkflow:
+    """Application workflow for selected-skill commit-message generation."""
+
+    generator: CommitMessageGenerator
+    evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
+
+    def run(
+        self,
+        command: GenerateCommitMessageCommand | None = None,
+        *,
+        skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID,
+    ) -> CommitMessageWorkflowResult:
+        """Generate a recommendation from a synchronous caller."""
+        return asyncio.run(self.run_async(command, skill_id=skill_id))
+
+    async def run_async(
+        self,
+        command: GenerateCommitMessageCommand | None = None,
+        *,
+        skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID,
+    ) -> CommitMessageWorkflowResult:
+        """Generate a recommendation and map failures to the workflow result contract."""
+        active_command = command or GenerateCommitMessageCommand(skill_id=skill_id)
+        if self.evidence_recorder is not None:
+            self.evidence_recorder.reset()
+        try:
+            result = await self.generator.generate_async(skill_id=active_command.skill_id)
+        except GitStagedChangesLoadError as err:
+            return CommitMessageWorkflowResult(
+                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+                observations=(
+                    DeveloperWorkflowObservation(
+                        message=str(err),
+                        metadata={"category": err.category, **err.metadata},
+                    ),
+                ),
+            )
+        except CommitMessageSkillContextLoadError as err:
+            return CommitMessageWorkflowResult(
+                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+                observations=(
+                    DeveloperWorkflowObservation(
+                        message=str(err),
+                        metadata={"category": err.category, **err.metadata},
+                    ),
+                ),
+            )
+        except (GenerateCommitMessageError, ValueError) as err:
+            return CommitMessageWorkflowResult(
+                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+                observations=(
+                    DeveloperWorkflowObservation(
+                        message=str(err),
+                        metadata={
+                            "category": "invalid_commit_message_input",
+                            **getattr(err, "metadata", {}),
+                        },
+                    ),
+                ),
+            )
+        except (CommitMessageAnalysisError, CommitMessageSynthesisError) as err:
+            return CommitMessageWorkflowResult(
+                status=DeveloperWorkflowStatus.MODEL_ERROR,
+                observations=(
+                    DeveloperWorkflowObservation(
+                        message=str(err),
+                        metadata={
+                            "category": "commit_message_model_failure",
+                            **err.metadata,
+                        },
+                    ),
+                ),
+            )
+        return CommitMessageWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
+            output_text=format_commit_message_recommendation(result.recommendation),
+            usage_evidence=self._usage_evidence,
+            cost_evidence=self._cost_evidence,
+        )
+
+    @property
+    def _usage_evidence(self) -> tuple[ModelUsageEvidence, ...]:
+        return self.evidence_recorder.usage_evidence if self.evidence_recorder is not None else ()
+
+    @property
+    def _cost_evidence(self) -> tuple[ModelCostEvidence, ...]:
+        return self.evidence_recorder.cost_evidence if self.evidence_recorder is not None else ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
     CliDeveloperWorkflowCompositionOptions,
 )
-from fabrica.features.developer_workflow.application.dtos import DEFAULT_COMMIT_MESSAGE_SKILL_ID
-
-if TYPE_CHECKING:
-    import argparse
+from fabrica.features.developer_workflow.application.dtos import (
+    DEFAULT_COMMIT_MESSAGE_SKILL_ID,
+    GenerateCommitMessageCommand,
+)
 
 
 class CliSubparsers(Protocol):
@@ -66,6 +67,7 @@ def _add_commit_message_generation_flags(parser: argparse.ArgumentParser) -> Non
     parser.add_argument(
         "--skill",
         dest="skill_id",
+        type=_parse_skill_id,
         default=DEFAULT_COMMIT_MESSAGE_SKILL_ID,
         help="Selected commit-message Agent Skill ID. Defaults to conventional-commits.",
     )
@@ -79,6 +81,13 @@ def _add_commit_message_generation_flags(parser: argparse.ArgumentParser) -> Non
         choices=("low", "medium", "high", "xhigh", "max", "ultra"),
         help="Optional Codex reasoning effort override for commit-message generation.",
     )
+
+
+def _parse_skill_id(value: str) -> str:
+    try:
+        return GenerateCommitMessageCommand(skill_id=value).skill_id
+    except ValueError as err:
+        raise argparse.ArgumentTypeError(str(err)) from err
 
 
 def _commit_message_command_from_namespace(namespace: argparse.Namespace) -> CliCommitMessageCommand:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from argparse import Namespace
 from dataclasses import dataclass
+from io import StringIO
 from typing import TYPE_CHECKING
 
 import pytest
@@ -22,6 +23,15 @@ from fabrica.features.agent_runtime.application.dtos import SkillScriptType
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
+)
+from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import DeveloperWorkflowCliDependencies
+from fabrica.features.developer_workflow.application.dtos import (
+    CommitMessageRecommendation,
+    CommitMessageWorkflowResult,
+    ConfirmedCommitWorkflowResult,
+    DeveloperWorkflowStatus,
+    GenerateCommitMessageCommand,
+    GitCommitResult,
 )
 
 if TYPE_CHECKING:
@@ -85,6 +95,31 @@ def test_contribution_validation_rejects_duplicate_command_ownership() -> None:
         )
 
 
+def test_contribution_validation_rejects_overlapping_command_ownership() -> None:
+    """Keep isinstance-based dispatch from depending on contribution order."""
+    base_owner = CliContribution(
+        name="base_synthetic",
+        command_types=(_SyntheticBaseCommand,),
+        register_commands=_ignore_registration,
+        run_command=_synthetic_run_command,
+    )
+    child_owner = CliContribution(
+        name="child_synthetic",
+        command_types=(_SyntheticChildCommand,),
+        register_commands=_ignore_registration,
+        run_command=_synthetic_run_command,
+    )
+
+    with pytest.raises(ValueError, match="overlapping CLI command type ownership"):
+        build_parser((base_owner, child_owner))
+
+    with pytest.raises(ValueError, match="overlapping CLI command type ownership"):
+        run_cli_command(
+            _SyntheticChildCommand(name="synthetic"),
+            options=CliCommandExecutionOptions(contributions=(base_owner, child_owner)),
+        )
+
+
 def test_contribution_validation_rejects_duplicate_names() -> None:
     duplicate_name = CliContribution(
         name="synthetic",
@@ -131,6 +166,81 @@ def test_bootstrap_cli_contributions_route_only_owned_commands() -> None:
     assert not developer_workflow.can_handle(CliRunCommand(prompt="pong"))
 
 
+def test_product_shell_dispatches_commit_message_through_developer_workflow_contribution() -> None:
+    """Exercise generic parsing and dispatch with injected developer-workflow dependencies."""
+    workflow = _FakeCommitMessageWorkflow(
+        CommitMessageWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
+            output_text="Commit message:\nfeat: add product shell coverage",
+        ),
+    )
+    stdout = StringIO()
+    stderr = StringIO()
+    invocation = parse_cli_args(
+        ["commit-message", "--skill", "team-style"],
+        contributions=create_cli_contributions(
+            developer_workflow_dependencies=DeveloperWorkflowCliDependencies(commit_message_workflow=workflow),
+        ),
+    )
+
+    exit_code = run_cli_command(
+        invocation,
+        options=CliCommandExecutionOptions(
+            contributions=create_cli_contributions(
+                developer_workflow_dependencies=DeveloperWorkflowCliDependencies(commit_message_workflow=workflow),
+            ),
+            stdout=stdout,
+            stderr=stderr,
+        ),
+    )
+
+    assert exit_code == 0
+    assert stdout.getvalue() == "Commit message:\nfeat: add product shell coverage\n"
+    assert stderr.getvalue() == ""
+    assert workflow.calls == [GenerateCommitMessageCommand(skill_id="team-style")]
+
+
+def test_product_shell_dispatches_confirmed_commit_through_developer_workflow_contribution() -> None:
+    """Exercise confirmed commit command through the generic product shell."""
+    recommendation = CommitMessageRecommendation(
+        summary="Adds product shell coverage.",
+        rationale="The generic CLI wires the developer-workflow contribution.",
+        commit_message="test(cli): cover developer workflow shell dispatch",
+    )
+    workflow = _FakeConfirmedCommitWorkflow(
+        generation_result=ConfirmedCommitWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
+            recommendation=recommendation,
+            output_text=(
+                "Summary:\nAdds product shell coverage.\n\n"
+                "Rationale:\nThe generic CLI wires the developer-workflow contribution.\n\n"
+                "Commit message:\ntest(cli): cover developer workflow shell dispatch"
+            ),
+        ),
+    )
+    stdout = StringIO()
+    stderr = StringIO()
+    dependencies = DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow)
+    contributions = create_cli_contributions(developer_workflow_dependencies=dependencies)
+    invocation = parse_cli_args(["commit", "--skill", "team-style"], contributions=contributions)
+
+    exit_code = run_cli_command(
+        invocation,
+        options=CliCommandExecutionOptions(
+            contributions=contributions,
+            stdin=StringIO("yes\n"),
+            stdout=stdout,
+            stderr=stderr,
+        ),
+    )
+
+    assert exit_code == 0
+    assert "Commit with this message? [y/N] Committed as abc1234.\n" in stdout.getvalue()
+    assert stderr.getvalue() == ""
+    assert workflow.generate_calls == [GenerateCommitMessageCommand(skill_id="team-style")]
+    assert workflow.commit_calls == [recommendation]
+
+
 def _script_execute_command() -> CliScriptExecuteCommand:
     return CliScriptExecuteCommand(
         skill_id="python-testing",
@@ -152,6 +262,59 @@ class _SyntheticCommand:
 @dataclass(frozen=True, slots=True)
 class _OtherSyntheticCommand:
     name: str
+
+
+@dataclass(frozen=True, slots=True)
+class _SyntheticBaseCommand:
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
+class _SyntheticChildCommand(_SyntheticBaseCommand):
+    pass
+
+
+@dataclass
+class _FakeCommitMessageWorkflow:
+    result: CommitMessageWorkflowResult
+    calls: list[GenerateCommitMessageCommand] | None = None
+
+    def __post_init__(self) -> None:
+        if self.calls is None:
+            self.calls = []
+
+    def run(self, command: GenerateCommitMessageCommand) -> CommitMessageWorkflowResult:
+        assert self.calls is not None
+        self.calls.append(command)
+        return self.result
+
+
+@dataclass
+class _FakeConfirmedCommitWorkflow:
+    generation_result: ConfirmedCommitWorkflowResult
+    generate_calls: list[GenerateCommitMessageCommand] | None = None
+    commit_calls: list[CommitMessageRecommendation] | None = None
+
+    def __post_init__(self) -> None:
+        if self.generate_calls is None:
+            self.generate_calls = []
+        if self.commit_calls is None:
+            self.commit_calls = []
+
+    def generate(self, command: GenerateCommitMessageCommand) -> ConfirmedCommitWorkflowResult:
+        assert self.generate_calls is not None
+        self.generate_calls.append(command)
+        return self.generation_result
+
+    def commit(self, recommendation: CommitMessageRecommendation) -> ConfirmedCommitWorkflowResult:
+        assert self.commit_calls is not None
+        self.commit_calls.append(recommendation)
+        return ConfirmedCommitWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
+            recommendation=recommendation,
+            commit_result=GitCommitResult(short_hash="abc1234"),
+            commit_attempted=True,
+        )
 
 
 def _synthetic_contribution() -> CliContribution:

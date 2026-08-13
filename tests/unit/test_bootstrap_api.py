@@ -1,5 +1,6 @@
 """Bootstrap public interface contract tests."""
 
+import sys
 from pathlib import Path
 
 from fabrica import bootstrap
@@ -12,10 +13,7 @@ EXPECTED_BOOTSTRAP_EXPORTS = [
     "DEFAULT_CODEX_AUTH_FILE",
     "DEFAULT_COMMIT_MESSAGE_CODEX_MODEL",
     "DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT",
-    "CommitMessageWorkflow",
     "CommitMessageWorkflowOptions",
-    "ConfirmedCommitWorkflow",
-    "ConfirmedCommitWorkflowResult",
     "DenyByDefaultSkillScriptApprovalLookup",
     "ModelDrivenSkillRuntime",
     "ModelDrivenSkillRuntimeOptions",
@@ -51,11 +49,27 @@ EXPECTED_BOOTSTRAP_EXPORTS = [
 def test_bootstrap_exports_only_curated_composition_surface() -> None:
     """Document the stable consumer-facing bootstrap names."""
     assert bootstrap.__all__ == EXPECTED_BOOTSTRAP_EXPORTS
-    assert all(hasattr(bootstrap, name) for name in bootstrap.__all__)
+    assert all(getattr(bootstrap, name) is not None for name in bootstrap.__all__)
+    assert "CommitMessageWorkflow" not in bootstrap.__all__
+    assert "ConfirmedCommitWorkflow" not in bootstrap.__all__
+    assert "ConfirmedCommitWorkflowResult" not in bootstrap.__all__
     assert "ReadOnlyGitContextToolOptions" not in bootstrap.__all__
     assert "create_read_only_git_context_registered_tools" not in bootstrap.__all__
     assert not hasattr(bootstrap, "ReadOnlyGitContextToolOptions")
     assert not hasattr(bootstrap, "create_read_only_git_context_registered_tools")
+
+
+def test_bootstrap_package_import_does_not_eagerly_load_composition_modules() -> None:
+    """Keep CLI startup resilient by avoiding package-level composition imports."""
+    for module_name in tuple(sys.modules):
+        if module_name.startswith("fabrica.bootstrap"):
+            del sys.modules[module_name]
+
+    bootstrap_package = __import__("fabrica.bootstrap", fromlist=["__all__"])
+
+    assert bootstrap_package.__all__ == EXPECTED_BOOTSTRAP_EXPORTS
+    assert "fabrica.bootstrap.composition" not in sys.modules
+    assert "fabrica.bootstrap.composition.codex_runtime" not in sys.modules
 
 
 def test_bootstrap_option_defaults_preserve_safe_composition_contract() -> None:

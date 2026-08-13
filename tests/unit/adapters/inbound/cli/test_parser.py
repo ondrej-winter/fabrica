@@ -169,6 +169,25 @@ def test_parse_commit_message_command_rejects_unknown_reasoning_effort() -> None
     assert exc_info.value.code == ARGPARSE_USAGE_ERROR
 
 
+@pytest.mark.parametrize(
+    ("args", "expected_message"),
+    [
+        (("commit-message", "--skill", ""), "skill_id must not be empty"),
+        (("commit", "--skill", "   "), "skill_id must not be empty"),
+    ],
+)
+def test_parse_developer_workflow_commands_reject_invalid_boundary_values(
+    args: tuple[str, ...],
+    expected_message: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        parse_args(args)
+
+    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
+    assert expected_message in capsys.readouterr().err
+
+
 def test_parse_commit_command_defaults_to_conventional_commits_skill() -> None:
     command = parse_args(["commit"])
 

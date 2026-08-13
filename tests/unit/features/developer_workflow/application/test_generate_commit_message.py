@@ -7,7 +7,12 @@ import pytest
 
 from fabrica.features.developer_workflow.application.dtos import (
     AnalyzeStagedFileForCommitMessageCommand,
+    CommitMessageEvidenceBundle,
     CommitMessageRecommendation,
+    CommitMessageWorkflowResult,
+    DeveloperWorkflowStatus,
+    GenerateCommitMessageCommand,
+    GenerateCommitMessageResult,
     GitStagedChangesFailureCategory,
     GitStagedDiff,
     GitStagedFile,
@@ -18,14 +23,17 @@ from fabrica.features.developer_workflow.application.dtos import (
 )
 from fabrica.features.developer_workflow.application.ports import (
     CommitMessageAnalysisError,
+    CommitMessageSkillContextLoadError,
     CommitMessageSynthesisError,
     GitStagedChangesLoadError,
 )
 from fabrica.features.developer_workflow.application.use_cases import (
+    CommitMessageWorkflow,
     GenerateCommitMessage,
     GenerateCommitMessageError,
     GenerateCommitMessageOptions,
 )
+from fabrica.shared_kernel.model_usage import ModelUsageEvidence
 
 
 @dataclass
@@ -117,6 +125,31 @@ class RecordingQueryExecutor:
         return tuple(indexed_results[index] for index in range(len(operations)))
 
 
+@dataclass
+class FakeCommitMessageGenerator:
+    result: GenerateCommitMessageResult | Exception
+    skill_ids: list[str] = field(default_factory=list)
+
+    async def generate_async(self, *, skill_id: str) -> GenerateCommitMessageResult:
+        self.skill_ids.append(skill_id)
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+@dataclass
+class FakeEvidenceRecorder:
+    usage_evidence: tuple[ModelUsageEvidence, ...] = ()
+    reset_count: int = 0
+
+    @property
+    def cost_evidence(self) -> tuple[()]:
+        return ()
+
+    def reset(self) -> None:
+        self.reset_count += 1
+
+
 def test_generate_commit_message_lists_files_before_loading_and_preserves_evidence_order() -> None:
     events: list[str] = []
     first = GitStagedFile(path="src/file.py", status=GitStagedFileStatus.MODIFIED)
@@ -153,6 +186,69 @@ def test_generate_commit_message_lists_files_before_loading_and_preserves_eviden
     assert result.recommendation.commit_message == (
         "feat(developer-workflow): generate commit messages from per-file evidence"
     )
+
+
+def test_commit_message_workflow_maps_success_and_resets_evidence() -> None:
+    recommendation = CommitMessageRecommendation(
+        summary="Adds CLI architecture cleanup.",
+        rationale="The workflow owns result mapping in the application layer.",
+        commit_message="refactor(cli): clean up architecture",
+    )
+    generator = FakeCommitMessageGenerator(_result_for(recommendation))
+    recorder = FakeEvidenceRecorder()
+
+    result = CommitMessageWorkflow(generator=generator, evidence_recorder=recorder).run(
+        GenerateCommitMessageCommand(skill_id="team-style"),
+    )
+
+    assert result == CommitMessageWorkflowResult(
+        status=DeveloperWorkflowStatus.SUCCESS,
+        output_text=(
+            "Summary:\nAdds CLI architecture cleanup.\n\n"
+            "Rationale:\nThe workflow owns result mapping in the application layer.\n\n"
+            "Commit message:\nrefactor(cli): clean up architecture"
+        ),
+    )
+    assert generator.skill_ids == ["team-style"]
+    assert recorder.reset_count == 1
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_status", "expected_category"),
+    [
+        (
+            GitStagedChangesLoadError("no staged changes", category=GitStagedChangesFailureCategory.NO_STAGED_CHANGES),
+            DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+            GitStagedChangesFailureCategory.NO_STAGED_CHANGES,
+        ),
+        (
+            CommitMessageSkillContextLoadError("skill missing", category="skill_not_found"),
+            DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+            "skill_not_found",
+        ),
+        (
+            GenerateCommitMessageError("bad input", metadata={"evidence_count": 0}),
+            DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+            "invalid_commit_message_input",
+        ),
+        (
+            CommitMessageSynthesisError("model failed", metadata={"phase": "synthesis"}),
+            DeveloperWorkflowStatus.MODEL_ERROR,
+            "commit_message_model_failure",
+        ),
+    ],
+)
+def test_commit_message_workflow_maps_application_errors_to_results(
+    error: Exception,
+    expected_status: DeveloperWorkflowStatus,
+    expected_category: object,
+) -> None:
+    result = CommitMessageWorkflow(generator=FakeCommitMessageGenerator(error)).run(skill_id="team-style")
+
+    assert result.status is expected_status
+    assert result.output_text is None
+    assert result.observations[0].message == str(error)
+    assert result.observations[0].metadata["category"] == expected_category
 
 
 def test_generate_commit_message_uses_default_bounded_parallel_analysis_and_ordered_results() -> None:
@@ -319,6 +415,17 @@ def _loader_for(staged_file: GitStagedFile, *, events: list[str]) -> FakeStagedC
         staged_files=GitStagedFileList(files=(staged_file,)),
         diffs={staged_file.path: GitStagedDiff(text=f"diff --git a/{staged_file.path} b/{staged_file.path}\n")},
         events=events,
+    )
+
+
+def _result_for(recommendation: CommitMessageRecommendation):
+    evidence = _evidence(
+        GitStagedFile(path="src/file.py", status=GitStagedFileStatus.MODIFIED),
+        summary="Adds CLI architecture cleanup.",
+    )
+    return GenerateCommitMessageResult(
+        recommendation=recommendation,
+        evidence_bundle=CommitMessageEvidenceBundle(evidence=(evidence,)),
     )
 
 

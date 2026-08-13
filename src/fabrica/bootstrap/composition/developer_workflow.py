@@ -1,6 +1,5 @@
 """Composition helpers for developer workflow and git-related tools."""
 
-import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -37,29 +36,15 @@ from fabrica.features.developer_workflow.adapters.outbound.pre_commit_registered
     create_pre_commit_registered_tools,
 )
 from fabrica.features.developer_workflow.application.dtos import (
-    DEFAULT_COMMIT_MESSAGE_SKILL_ID,
-    CommitMessageWorkflowResult,
-    DeveloperWorkflowObservation,
-    DeveloperWorkflowStatus,
-    GenerateCommitMessageCommand,
     GitContextDiffBounds,
     GitStagedDiffBounds,
 )
-from fabrica.features.developer_workflow.application.ports import (
-    CommitMessageAnalysisError,
-    CommitMessageSkillContextLoadError,
-    CommitMessageSynthesisError,
-    GitStagedChangesLoadError,
-)
 from fabrica.features.developer_workflow.application.use_cases import (
-    CommitMessageEvidenceRecorder,
-    CommitMessageGenerator,
+    CommitMessageWorkflow,
     ConfirmedCommitWorkflow,
     CreateGitCommit,
     GenerateCommitMessage,
-    GenerateCommitMessageError,
     GenerateCommitMessageOptions,
-    format_commit_message_recommendation,
 )
 from fabrica.features.query_execution.application.use_cases import BoundedAsyncQueryFanoutExecutor
 
@@ -143,88 +128,6 @@ class CommitMessageRuntime(Protocol):
 
     async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         """Run one prepared local agent command asynchronously."""
-
-
-@dataclass(frozen=True, slots=True)
-class CommitMessageWorkflow:
-    """Composed workflow that runs evidence-first commit-message generation."""
-
-    generator: CommitMessageGenerator
-    evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
-
-    def run(
-        self,
-        command: GenerateCommitMessageCommand | None = None,
-        *,
-        skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID,
-    ) -> CommitMessageWorkflowResult:
-        """Generate a recommendation and map it to the developer workflow result contract."""
-        return asyncio.run(self.run_async(command, skill_id=skill_id))
-
-    async def run_async(
-        self,
-        command: GenerateCommitMessageCommand | None = None,
-        *,
-        skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID,
-    ) -> CommitMessageWorkflowResult:
-        """Generate a recommendation asynchronously and map it to the developer workflow result contract."""
-        active_command = command or GenerateCommitMessageCommand(skill_id=skill_id)
-        if self.evidence_recorder is not None:
-            self.evidence_recorder.reset()
-        try:
-            result = await self.generator.generate_async(skill_id=active_command.skill_id)
-        except GitStagedChangesLoadError as err:
-            return CommitMessageWorkflowResult(
-                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
-                observations=(
-                    DeveloperWorkflowObservation(
-                        message=str(err),
-                        metadata={"category": err.category, **err.metadata},
-                    ),
-                ),
-            )
-        except CommitMessageSkillContextLoadError as err:
-            return CommitMessageWorkflowResult(
-                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
-                observations=(
-                    DeveloperWorkflowObservation(
-                        message=str(err),
-                        metadata={"category": err.category, **err.metadata},
-                    ),
-                ),
-            )
-        except (GenerateCommitMessageError, ValueError) as err:
-            return CommitMessageWorkflowResult(
-                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
-                observations=(
-                    DeveloperWorkflowObservation(
-                        message=str(err),
-                        metadata={
-                            "category": "invalid_commit_message_input",
-                            **getattr(err, "metadata", {}),
-                        },
-                    ),
-                ),
-            )
-        except (CommitMessageAnalysisError, CommitMessageSynthesisError) as err:
-            return CommitMessageWorkflowResult(
-                status=DeveloperWorkflowStatus.MODEL_ERROR,
-                observations=(
-                    DeveloperWorkflowObservation(
-                        message=str(err),
-                        metadata={
-                            "category": "commit_message_model_failure",
-                            **err.metadata,
-                        },
-                    ),
-                ),
-            )
-        return CommitMessageWorkflowResult(
-            status=DeveloperWorkflowStatus.SUCCESS,
-            output_text=format_commit_message_recommendation(result.recommendation),
-            usage_evidence=self.evidence_recorder.usage_evidence if self.evidence_recorder is not None else (),
-            cost_evidence=self.evidence_recorder.cost_evidence if self.evidence_recorder is not None else (),
-        )
 
 
 class EvidenceRecordingCommitMessageRuntime:
