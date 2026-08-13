@@ -44,7 +44,7 @@ def write_model_evidence_report(
 
 def write_line(stream: TextIO, text: str) -> None:
     """Write one bounded text line to a CLI stream."""
-    bounded = _bound_text(text)
+    bounded = bound_text(text)
     stream.write(bounded)
     if not bounded.endswith("\n"):
         stream.write("\n")
@@ -54,7 +54,14 @@ def format_metadata(metadata: Mapping[str, object]) -> str:
     """Format safe observation metadata as sorted key-value fields."""
     if not metadata:
         return ""
-    return " ".join(f"{key}={_bound_text(str(value))}" for key, value in sorted(metadata.items()))
+    return " ".join(f"{key}={bound_text(str(value))}" for key, value in sorted(metadata.items()))
+
+
+def bound_text(text: str) -> str:
+    """Return text bounded to one safe CLI output line."""
+    if len(text) <= MAX_OUTPUT_LINE_CHARS:
+        return text
+    return f"{text[:MAX_OUTPUT_LINE_CHARS]}...<truncated>"
 
 
 def _format_usage_evidence(evidence: ModelUsageEvidence) -> str:
@@ -98,10 +105,4 @@ def _present_fields(value: object, names: tuple[str, ...]) -> list[str]:
 
 
 def _format_observation_messages(observations: tuple[ModelUsageObservation, ...]) -> list[str]:
-    return [f"observation={_bound_text(observation.message)!r}" for observation in observations]
-
-
-def _bound_text(text: str) -> str:
-    if len(text) <= MAX_OUTPUT_LINE_CHARS:
-        return text
-    return f"{text[:MAX_OUTPUT_LINE_CHARS]}...<truncated>"
+    return [f"observation={bound_text(observation.message)!r}" for observation in observations]

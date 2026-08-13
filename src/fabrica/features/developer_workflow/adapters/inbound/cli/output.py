@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TextIO
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
 from fabrica.features.developer_workflow.application.dtos import (
+    CommitMessageRecommendation,
     CommitMessageWorkflowResult,
     ConfirmedCommitWorkflowResult,
     DeveloperWorkflowStatus,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 EXIT_CODE_BY_DEVELOPER_WORKFLOW_STATUS: dict[DeveloperWorkflowStatus, int] = {
     DeveloperWorkflowStatus.SUCCESS: 0,
@@ -21,13 +22,15 @@ EXIT_CODE_BY_DEVELOPER_WORKFLOW_STATUS: dict[DeveloperWorkflowStatus, int] = {
     DeveloperWorkflowStatus.SAFETY_DENIED: 5,
 }
 
+
 MAX_OUTPUT_LINE_CHARS = 4_000
 
 
 def write_developer_workflow_result(result: CommitMessageWorkflowResult, *, stdout: TextIO, stderr: TextIO) -> int:
     """Write a developer workflow result and return the matching process exit code."""
-    if result.output_text:
-        _write_line(stdout, result.output_text)
+    output_text = result.output_text or _format_optional_recommendation(result.recommendation)
+    if output_text:
+        _write_line(stdout, output_text)
 
     if not result.succeeded:
         _write_line(stderr, f"status: {result.status.value}")
@@ -41,8 +44,9 @@ def write_developer_workflow_result(result: CommitMessageWorkflowResult, *, stdo
 
 def write_confirmed_commit_result(result: ConfirmedCommitWorkflowResult, *, stdout: TextIO, stderr: TextIO) -> int:
     """Write a confirmed commit workflow result and return the matching process exit code."""
-    if result.output_text:
-        _write_line(stdout, result.output_text)
+    output_text = result.output_text or _format_optional_recommendation(result.recommendation)
+    if output_text:
+        _write_line(stdout, output_text)
 
     if not result.succeeded:
         _write_line(stderr, f"status: {result.status.value}")
@@ -52,6 +56,21 @@ def write_confirmed_commit_result(result: ConfirmedCommitWorkflowResult, *, stdo
             _write_line(stderr, f"observation: {observation.message}{suffix}")
 
     return EXIT_CODE_BY_DEVELOPER_WORKFLOW_STATUS[result.status]
+
+
+def format_commit_message_recommendation(recommendation: CommitMessageRecommendation) -> str:
+    """Format a recommendation with the stable terminal output labels."""
+    return (
+        f"Summary:\n{recommendation.summary}\n\n"
+        f"Rationale:\n{recommendation.rationale}\n\n"
+        f"Commit message:\n{recommendation.commit_message}"
+    )
+
+
+def _format_optional_recommendation(recommendation: CommitMessageRecommendation | None) -> str | None:
+    if recommendation is None:
+        return None
+    return format_commit_message_recommendation(recommendation)
 
 
 def _write_line(stream: TextIO, text: str) -> None:
@@ -74,6 +93,7 @@ def _bound_text(text: str) -> str:
 
 
 __all__ = [
+    "format_commit_message_recommendation",
     "write_confirmed_commit_result",
     "write_developer_workflow_result",
 ]

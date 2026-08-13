@@ -2,11 +2,14 @@
 
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 from fabrica import bootstrap
+from fabrica.bootstrap import cli as bootstrap_cli
 
 DEFAULT_STAGED_GIT_TOOL_TIMEOUT_SECONDS = 10.0
 DEFAULT_PRE_COMMIT_TOOL_TIMEOUT_SECONDS = 120.0
+EXPECTED_CLI_CONFIGURATION_ERROR_EXIT_CODE = 2
 
 
 EXPECTED_BOOTSTRAP_EXPORTS = [
@@ -99,3 +102,23 @@ def test_product_cli_model_evidence_contract_uses_shared_kernel_owner() -> None:
         "from fabrica.features.agent_runtime.application.dtos import (\n        ModelCostEvidence"
         not in bootstrap_cli_source
     )
+
+
+def test_product_cli_translates_bootstrap_wiring_errors_to_stable_stderr(
+    monkeypatch,
+    capsys,
+) -> None:
+    """Keep unexpected composition failures from leaking tracebacks by default."""
+
+    def fail_contribution_creation() -> NoReturn:
+        msg = "synthetic CLI wiring failure"
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(bootstrap_cli, "create_cli_contributions", fail_contribution_creation)
+
+    exit_code = bootstrap_cli.main(())
+
+    assert exit_code == EXPECTED_CLI_CONFIGURATION_ERROR_EXIT_CODE
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == "error: synthetic CLI wiring failure\n"

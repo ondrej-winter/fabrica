@@ -13,7 +13,6 @@ from fabrica.features.developer_workflow.application.use_cases.commit_workflow i
     GenerateCommitMessage,
     GenerateCommitMessageError,
     GenerateCommitMessageOptions,
-    format_commit_message_recommendation,
 )
 
 __all__ = [
@@ -27,5 +26,4 @@ __all__ = [
     "GenerateCommitMessage",
     "GenerateCommitMessageError",
     "GenerateCommitMessageOptions",
-    "format_commit_message_recommendation",
 ]

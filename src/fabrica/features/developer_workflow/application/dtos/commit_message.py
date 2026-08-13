@@ -170,6 +170,7 @@ class CommitMessageWorkflowResult:
     """Application result for selected-skill commit-message generation."""
 
     status: DeveloperWorkflowStatus
+    recommendation: CommitMessageRecommendation | None = None
     output_text: str | None = None
     observations: tuple[DeveloperWorkflowObservation, ...] = field(default_factory=tuple)
     usage_evidence: tuple[ModelUsageEvidence, ...] = field(default_factory=tuple)

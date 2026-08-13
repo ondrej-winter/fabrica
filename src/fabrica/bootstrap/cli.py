@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING, Protocol, TextIO
 
-from fabrica.adapters.inbound.cli.output import write_model_evidence_report
+from fabrica.adapters.inbound.cli.output import write_line, write_model_evidence_report
 from fabrica.adapters.inbound.cli.parser import parse_args
 from fabrica.adapters.inbound.cli.runner import CliCommandExecutionOptions, run_cli_command
 from fabrica.bootstrap.cli_contributions import (
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
     from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliDependencies
     from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import DeveloperWorkflowCliDependencies
     from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence
+
+CLI_CONFIGURATION_ERROR_EXIT_CODE = 2
 
 
 class ModelEvidenceResult(Protocol):
@@ -35,9 +38,13 @@ class ModelEvidenceResult(Protocol):
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the Fabrica CLI through bootstrap-owned default composition."""
-    contributions = create_cli_contributions()
-    invocation = parse_args(tuple(argv) if argv is not None else None, contributions=contributions)
-    return run_cli_command(invocation, options=CliCommandExecutionOptions(contributions=contributions))
+    try:
+        contributions = create_cli_contributions()
+        invocation = parse_args(tuple(argv) if argv is not None else None, contributions=contributions)
+        return run_cli_command(invocation, options=CliCommandExecutionOptions(contributions=contributions))
+    except (RuntimeError, TypeError, ValueError) as err:
+        write_line(sys.stderr, f"error: {err}")
+        return CLI_CONFIGURATION_ERROR_EXIT_CODE
 
 
 def create_cli_contributions(

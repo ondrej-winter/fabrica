@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TextIO
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunResult,
     LocalAgentRunStatus,
@@ -15,6 +12,9 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptPolicyEvaluationResult,
     SkillScriptPolicyStatus,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 EXIT_CODE_BY_STATUS: dict[LocalAgentRunStatus, int] = {
     LocalAgentRunStatus.SUCCESS: 0,
@@ -40,6 +40,7 @@ EXIT_CODE_BY_SCRIPT_EXECUTION_STATUS: dict[SkillScriptExecutionStatus, int] = {
     SkillScriptExecutionStatus.EXECUTION_FAILED: 6,
     SkillScriptExecutionStatus.TIMED_OUT: 7,
 }
+
 
 MAX_OUTPUT_LINE_CHARS = 4_000
 

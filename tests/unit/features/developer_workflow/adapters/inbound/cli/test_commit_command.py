@@ -345,11 +345,6 @@ def _generation_success(
     return ConfirmedCommitWorkflowResult(
         status=DeveloperWorkflowStatus.SUCCESS,
         recommendation=recommendation,
-        output_text=(
-            f"Summary:\n{recommendation.summary}\n\n"
-            f"Rationale:\n{recommendation.rationale}\n\n"
-            f"Commit message:\n{recommendation.commit_message}"
-        ),
         usage_evidence=usage_evidence,
     )
 

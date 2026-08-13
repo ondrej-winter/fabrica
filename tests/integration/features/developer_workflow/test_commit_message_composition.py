@@ -27,6 +27,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ModelUsageEvidenceSource,
 )
 from fabrica.features.developer_workflow.application.dtos import (
+    CommitMessageRecommendation,
     DeveloperWorkflowStatus,
     GitStagedChangesFailureCategory,
 )
@@ -64,7 +65,12 @@ def test_commit_message_workflow_runs_per_file_analysis_then_final_synthesis(tmp
     result = workflow.run(skill_id="conventional-commits")
 
     assert result.succeeded
-    assert result.output_text == _synthesis_text()
+    assert result.recommendation == CommitMessageRecommendation(
+        summary="Adds an example file.",
+        rationale="The structured evidence shows one staged maintenance change.",
+        commit_message="chore: add example file",
+    )
+    assert result.output_text is None
     assert [block.metadata["source"] for call in runtime.calls for block in call.context] == [
         "git_staged_file_diff",
         "commit_message_evidence",

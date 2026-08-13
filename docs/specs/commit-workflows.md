@@ -317,7 +317,7 @@ slice.
   `src/fabrica/features/developer_workflow/adapters/outbound/commit_message_agent_runtime/`.
 - Git and pre-commit subprocess adapters:
   `src/fabrica/features/developer_workflow/adapters/outbound/git_subprocess/`.
-- Composition wiring: `src/fabrica/bootstrap/composition.py`.
+- Composition wiring: `src/fabrica/bootstrap/composition/`.
 - Unit tests:
   `tests/unit/adapters/inbound/cli/` and
   `tests/unit/features/developer_workflow/`.

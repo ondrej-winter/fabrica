@@ -30,6 +30,7 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
 from fabrica.features.developer_workflow.adapters.inbound.cli.output import write_developer_workflow_result
 from fabrica.features.developer_workflow.adapters.inbound.cli.runner import run_developer_workflow_cli_command
 from fabrica.features.developer_workflow.application.dtos import (
+    CommitMessageRecommendation,
     CommitMessageWorkflowResult,
     ConfirmedCommitWorkflowResult,
     DeveloperWorkflowObservation,
@@ -113,10 +114,15 @@ class FakeCommitMessageWorkflow:
 
 
 def test_commit_message_command_uses_injected_workflow_and_writes_success_output() -> None:
+    recommendation = CommitMessageRecommendation(
+        summary="Adds x.",
+        rationale="The staged evidence supports x.",
+        commit_message="feat: add x",
+    )
     workflow = FakeCommitMessageWorkflow(
         result=CommitMessageWorkflowResult(
             status=DeveloperWorkflowStatus.SUCCESS,
-            output_text="Commit message:\nfeat: add x",
+            recommendation=recommendation,
         ),
     )
     stdout = StringIO()
@@ -131,16 +137,24 @@ def test_commit_message_command_uses_injected_workflow_and_writes_success_output
     )
 
     assert exit_code == 0
-    assert stdout.getvalue() == "Commit message:\nfeat: add x\n"
+    assert (
+        stdout.getvalue()
+        == "Summary:\nAdds x.\n\nRationale:\nThe staged evidence supports x.\n\nCommit message:\nfeat: add x\n"
+    )
     assert stderr.getvalue() == ""
     assert workflow.calls == [GenerateCommitMessageCommand(skill_id="team-style")]
 
 
 def test_commit_message_invocation_appends_requested_usage_and_price_evidence() -> None:
+    recommendation = CommitMessageRecommendation(
+        summary="Adds x.",
+        rationale="The staged evidence supports x.",
+        commit_message="feat: add x",
+    )
     workflow = FakeCommitMessageWorkflow(
         result=CommitMessageWorkflowResult(
             status=DeveloperWorkflowStatus.SUCCESS,
-            output_text="Commit message:\nfeat: add x",
+            recommendation=recommendation,
             usage_evidence=(
                 ModelUsageEvidence(
                     provider="codex",
@@ -175,6 +189,8 @@ def test_commit_message_invocation_appends_requested_usage_and_price_evidence() 
 
     assert exit_code == 0
     assert stdout.getvalue() == (
+        "Summary:\nAdds x.\n\n"
+        "Rationale:\nThe staged evidence supports x.\n\n"
         "Commit message:\nfeat: add x\n"
         "Usage evidence:\n"
         "- provider=codex status=collected source=response_payload confidence=extracted "

@@ -121,7 +121,7 @@ def test_confirmed_commit_workflow_creates_commit_from_parsed_recommendation_mes
     )
     assert result.commit_result is not None
     assert result.commit_result.short_hash
-    assert result.output_text == _synthesis_text(commit_message=commit_message)
+    assert result.output_text is None
     assert _git_commit_count(git_repository) == 1
     assert _git_log_message(git_repository) == commit_message
 
@@ -288,11 +288,7 @@ def test_confirmed_commit_workflow_maps_commit_error_after_preserving_recommenda
 
     assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is recommendation
-    assert result.output_text == _synthesis_text(
-        summary="Summary text.",
-        rationale="Rationale text.",
-        commit_message="feat: add confirmed commit flow",
-    )
+    assert result.output_text is None
     assert result.commit_attempted is True
     assert result.commit_result is None
     assert result.usage_evidence == (usage,)

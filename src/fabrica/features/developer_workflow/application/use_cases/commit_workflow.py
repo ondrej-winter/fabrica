@@ -256,7 +256,7 @@ class CommitMessageWorkflow:
             )
         return CommitMessageWorkflowResult(
             status=DeveloperWorkflowStatus.SUCCESS,
-            output_text=format_commit_message_recommendation(result.recommendation),
+            recommendation=result.recommendation,
             usage_evidence=self._usage_evidence,
             cost_evidence=self._cost_evidence,
         )
@@ -357,12 +357,9 @@ class ConfirmedCommitWorkflow:
             )
 
         recommendation = result.recommendation
-        output_text = format_commit_message_recommendation(recommendation)
-
         return ConfirmedCommitWorkflowResult(
             status=DeveloperWorkflowStatus.SUCCESS,
             recommendation=recommendation,
-            output_text=output_text,
             usage_evidence=self._usage_evidence,
             cost_evidence=self._cost_evidence,
         )
@@ -486,12 +483,3 @@ class CommitMessageEvidenceRecorder(Protocol):
 
     def reset(self) -> None:
         """Clear evidence from previous workflow runs."""
-
-
-def format_commit_message_recommendation(recommendation: CommitMessageRecommendation) -> str:
-    """Format a recommendation with the stable terminal output labels."""
-    return (
-        f"Summary:\n{recommendation.summary}\n\n"
-        f"Rationale:\n{recommendation.rationale}\n\n"
-        f"Commit message:\n{recommendation.commit_message}"
-    )

@@ -9,6 +9,7 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.command_models imp
     CliCommitCommand,
     CliCommitMessageCommand,
 )
+from fabrica.features.developer_workflow.adapters.inbound.cli.output import format_commit_message_recommendation
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageWorkflowResult,
     DeveloperWorkflowObservation,
@@ -130,9 +131,12 @@ def _prompt_for_commit_confirmation(
     *,
     streams: DeveloperWorkflowCliStreams,
 ) -> bool | None:
-    if generation_result.output_text:
-        streams.stdout.write(generation_result.output_text)
-        if not generation_result.output_text.endswith("\n"):
+    output_text = generation_result.output_text
+    if output_text is None and generation_result.recommendation is not None:
+        output_text = format_commit_message_recommendation(generation_result.recommendation)
+    if output_text:
+        streams.stdout.write(output_text)
+        if not output_text.endswith("\n"):
             streams.stdout.write("\n")
     streams.stdout.write("Commit with this message? [y/N] ")
     streams.stdout.flush()
@@ -214,7 +218,7 @@ def _write_confirmed_commit_result(
     output_already_written: bool = False,
 ) -> int:
     if output_already_written:
-        result = replace(result, output_text=None)
+        result = replace(result, recommendation=None, output_text=None)
     exit_code = writers.confirmed_commit_result(result, stdout=streams.stdout, stderr=streams.stderr)
     if options.print_usage or options.print_prices:
         writers.evidence(

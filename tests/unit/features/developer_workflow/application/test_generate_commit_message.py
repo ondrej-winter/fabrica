@@ -203,11 +203,7 @@ def test_commit_message_workflow_maps_success_and_resets_evidence() -> None:
 
     assert result == CommitMessageWorkflowResult(
         status=DeveloperWorkflowStatus.SUCCESS,
-        output_text=(
-            "Summary:\nAdds CLI architecture cleanup.\n\n"
-            "Rationale:\nThe workflow owns result mapping in the application layer.\n\n"
-            "Commit message:\nrefactor(cli): clean up architecture"
-        ),
+        recommendation=recommendation,
     )
     assert generator.skill_ids == ["team-style"]
     assert recorder.reset_count == 1

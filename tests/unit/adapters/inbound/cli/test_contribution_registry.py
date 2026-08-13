@@ -171,7 +171,11 @@ def test_product_shell_dispatches_commit_message_through_developer_workflow_cont
     workflow = _FakeCommitMessageWorkflow(
         CommitMessageWorkflowResult(
             status=DeveloperWorkflowStatus.SUCCESS,
-            output_text="Commit message:\nfeat: add product shell coverage",
+            recommendation=CommitMessageRecommendation(
+                summary="Adds product shell coverage.",
+                rationale="The generic CLI wires the developer-workflow contribution.",
+                commit_message="feat: add product shell coverage",
+            ),
         ),
     )
     stdout = StringIO()
@@ -195,7 +199,11 @@ def test_product_shell_dispatches_commit_message_through_developer_workflow_cont
     )
 
     assert exit_code == 0
-    assert stdout.getvalue() == "Commit message:\nfeat: add product shell coverage\n"
+    assert stdout.getvalue() == (
+        "Summary:\nAdds product shell coverage.\n\n"
+        "Rationale:\nThe generic CLI wires the developer-workflow contribution.\n\n"
+        "Commit message:\nfeat: add product shell coverage\n"
+    )
     assert stderr.getvalue() == ""
     assert workflow.calls == [GenerateCommitMessageCommand(skill_id="team-style")]
 
@@ -211,11 +219,6 @@ def test_product_shell_dispatches_confirmed_commit_through_developer_workflow_co
         generation_result=ConfirmedCommitWorkflowResult(
             status=DeveloperWorkflowStatus.SUCCESS,
             recommendation=recommendation,
-            output_text=(
-                "Summary:\nAdds product shell coverage.\n\n"
-                "Rationale:\nThe generic CLI wires the developer-workflow contribution.\n\n"
-                "Commit message:\ntest(cli): cover developer workflow shell dispatch"
-            ),
         ),
     )
     stdout = StringIO()
