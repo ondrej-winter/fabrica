@@ -861,3 +861,7 @@ subcommand registration, adapter-local parsed command models, CLI runners, and
 output mapping under `features/<feature>/adapters/inbound/cli/`. Bootstrap-owned
 factories under `src/fabrica/bootstrap/cli_contributions/` assemble those feature
 CLI adapters with default concrete dependencies.
+
+See
+[`docs/adr/0001-product-cli-contribution-architecture.md`](docs/adr/0001-product-cli-contribution-architecture.md)
+for the accepted CLI contribution architecture decision.

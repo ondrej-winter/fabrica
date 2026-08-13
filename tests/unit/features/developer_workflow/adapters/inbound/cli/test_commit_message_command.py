@@ -8,16 +8,6 @@ import pytest
 
 from fabrica.adapters.inbound.cli import CliGlobalOptions, CliInvocation
 from fabrica.adapters.inbound.cli.output import write_model_evidence_report
-from fabrica.features.agent_runtime.application.dtos import (
-    ModelCostEvidence,
-    ModelPricingStatus,
-    ModelTokenUsageEvidence,
-    ModelUsageCollectionStatus,
-    ModelUsageEvidence,
-    ModelUsageEvidenceConfidence,
-    ModelUsageEvidenceSource,
-    ModelUsageObservation,
-)
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitMessageCommand,
 )
@@ -36,6 +26,16 @@ from fabrica.features.developer_workflow.application.dtos import (
     DeveloperWorkflowObservation,
     DeveloperWorkflowStatus,
     GenerateCommitMessageCommand,
+)
+from fabrica.shared_kernel.model_usage import (
+    ModelCostEvidence,
+    ModelPricingStatus,
+    ModelTokenUsageEvidence,
+    ModelUsageCollectionStatus,
+    ModelUsageEvidence,
+    ModelUsageEvidenceConfidence,
+    ModelUsageEvidenceSource,
+    ModelUsageObservation,
 )
 
 EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2

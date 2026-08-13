@@ -271,6 +271,14 @@ def _command(
             byte_size=approval_byte_size,
             content_digest=approval_content_digest,
         ),
+        approval_binding=SkillScriptApprovalBinding(
+            skill_id="python-testing",
+            script_id=script_id,
+            script_type=SkillScriptType.PYTHON,
+            suffix=".py",
+            byte_size=approval_byte_size,
+            content_digest=approval_content_digest,
+        ),
     )
 
 

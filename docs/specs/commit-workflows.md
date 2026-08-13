@@ -304,9 +304,9 @@ slice.
   `src/fabrica/adapters/inbound/cli/parser.py` and
   `src/fabrica/features/developer_workflow/adapters/inbound/cli/`.
 - CLI runner, prompt handling, and terminal output:
-  `src/fabrica/adapters/inbound/cli/runner.py`,
-  `src/fabrica/adapters/inbound/cli/output.py`, and developer-workflow CLI
-  adapter contracts.
+  `src/fabrica/features/developer_workflow/adapters/inbound/cli/runner.py`,
+  `src/fabrica/features/developer_workflow/adapters/inbound/cli/output.py`, and
+  developer-workflow CLI adapter contracts.
 - Developer-workflow application DTOs:
   `src/fabrica/features/developer_workflow/application/dtos/`.
 - Developer-workflow application ports:

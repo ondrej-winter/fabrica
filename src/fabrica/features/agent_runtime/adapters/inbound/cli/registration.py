@@ -251,15 +251,24 @@ def _script_policy_command_from_namespace(namespace: argparse.Namespace) -> CliS
 
 
 def _script_execute_command_from_namespace(namespace: argparse.Namespace) -> CliScriptExecuteCommand:
+    approval_binding = SkillScriptApprovalBinding(
+        skill_id=namespace.skill_id,
+        script_id=namespace.script_id,
+        script_type=SkillScriptType(namespace.approve_script_type),
+        suffix=namespace.approve_suffix,
+        byte_size=namespace.approve_byte_size,
+        content_digest=namespace.approve_content_digest,
+    )
     return CliScriptExecuteCommand(
         skill_id=namespace.skill_id,
         script_id=namespace.script_id,
         approval_options=CliScriptApprovalOptions(
-            script_type=SkillScriptType(namespace.approve_script_type),
-            suffix=namespace.approve_suffix,
-            byte_size=namespace.approve_byte_size,
-            content_digest=namespace.approve_content_digest,
+            script_type=approval_binding.script_type,
+            suffix=approval_binding.suffix,
+            byte_size=approval_binding.byte_size,
+            content_digest=approval_binding.content_digest,
         ),
+        approval_binding=approval_binding,
     )
 
 

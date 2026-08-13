@@ -18,6 +18,9 @@ This directory contains durable project documentation and current reference note
 ### Architecture decision records
 
 - `adr/README.md` indexes accepted architecture decisions.
+- `adr/0001-product-cli-contribution-architecture.md` records the product CLI
+  contribution model, command ownership rules, and bootstrap composition
+  boundary.
 
 ### Specs
 

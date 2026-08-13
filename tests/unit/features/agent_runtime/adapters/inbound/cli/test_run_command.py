@@ -5,8 +5,12 @@ from io import StringIO
 from pathlib import Path
 from typing import TextIO
 
-from fabrica.adapters.inbound.cli import CliGlobalOptions, CliInvocation
+import pytest
+
+import fabrica.bootstrap.cli_contributions.agent_runtime as agent_runtime_cli_contribution
+from fabrica.adapters.inbound.cli import CliCommandExecutionOptions, CliGlobalOptions, CliInvocation, run_cli_command
 from fabrica.adapters.inbound.cli.output import write_model_evidence_report
+from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
@@ -49,14 +53,12 @@ def run_feature_cli_command(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    command, global_options, composition_options = _normalize_invocation(invocation)
+    command, global_options, _composition_options = _normalize_invocation(invocation)
     return run_agent_runtime_cli_command(
         command,
         options=AgentRuntimeCliOptions(
             print_usage=global_options.print_usage,
             print_prices=global_options.print_prices,
-            verbose_diagnostics=global_options.verbose_diagnostics,
-            skill_roots=composition_options.skill_roots,
         ),
         dependencies=dependencies or AgentRuntimeCliDependencies(),
         streams=AgentRuntimeCliStreams(stdout=stdout or StringIO(), stderr=stderr or StringIO()),
@@ -287,6 +289,65 @@ def test_run_command_skips_augmentation_when_no_context_is_selected() -> None:
     )
 
     assert selected_context_runtime.calls == []
+
+
+def test_product_run_with_injected_selected_context_runtime_does_not_create_default_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_created() -> object:
+        msg = "selected-context run must not create an unused default runtime"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(agent_runtime_cli_contribution, "_create_default_runtime", fail_if_created)
+    selected_context_runtime = FakeSelectedContextRuntime()
+
+    exit_code = run_cli_command(
+        CliInvocation(command=CliRunCommand(prompt="Use selected context", skill_ids=("python-testing",))),
+        options=CliCommandExecutionOptions(
+            contributions=create_cli_contributions(
+                agent_runtime_dependencies=AgentRuntimeCliDependencies(
+                    selected_context_runtime=selected_context_runtime,
+                ),
+            ),
+            stdout=StringIO(),
+            stderr=StringIO(),
+        ),
+    )
+
+    assert exit_code == 0
+    assert selected_context_runtime.calls == [
+        (
+            LocalAgentRunCommand(prompt="Use selected context"),
+            (SelectedSkill(skill_id="python-testing"),),
+            (),
+        ),
+    ]
+
+
+def test_product_run_without_selected_context_does_not_create_selected_context_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_created(*args: object, **kwargs: object) -> object:
+        _ = args, kwargs
+        msg = "plain run must not create an unused selected-context runtime"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(agent_runtime_cli_contribution, "_create_default_selected_context_runtime", fail_if_created)
+    runtime = FakeRuntime(result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="pong"))
+
+    exit_code = run_cli_command(
+        CliInvocation(command=CliRunCommand(prompt="Reply with pong")),
+        options=CliCommandExecutionOptions(
+            contributions=create_cli_contributions(
+                agent_runtime_dependencies=AgentRuntimeCliDependencies(runtime=runtime),
+            ),
+            stdout=StringIO(),
+            stderr=StringIO(),
+        ),
+    )
+
+    assert exit_code == 0
+    assert runtime.calls == [LocalAgentRunCommand(prompt="Reply with pong")]
 
 
 def test_run_command_maps_non_success_status_to_stable_exit_code_and_stderr() -> None:

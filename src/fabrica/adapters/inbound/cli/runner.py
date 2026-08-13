@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, TextIO
 
 from fabrica.adapters.inbound.cli.contributions import (
+    CliDispatchError,
     CliExecutionContext,
     validate_cli_contributions,
 )
@@ -52,7 +53,7 @@ def run_cli_command(
             return contribution.run_command(command, context)
 
     msg = f"no CLI contribution registered for command: {type(command).__name__}"
-    raise RuntimeError(msg)
+    raise CliDispatchError(msg)
 
 
 def _normalize_invocation(invocation: CliCommand | CliInvocation) -> tuple[CliCommand, CliGlobalOptions, object | None]:

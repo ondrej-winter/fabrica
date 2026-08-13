@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli.contributions import CliContribution
+from fabrica.adapters.inbound.cli.contributions import CliConfigurationError, CliContribution, CliDispatchError
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -47,6 +47,7 @@ def create_developer_workflow_cli_contribution(
     """
     return CliContribution(
         name="developer_workflow",
+        command_names=("commit-message", "commit"),
         command_types=DEVELOPER_WORKFLOW_CLI_COMMAND_TYPES,
         register_commands=register_developer_workflow_cli_commands,
         run_command=_run_developer_workflow_contribution(dependencies, evidence_writer=evidence_writer),
@@ -61,7 +62,7 @@ def _run_developer_workflow_contribution(
     def run(command: object, context: CliExecutionContext) -> int:
         if not isinstance(command, CliCommitMessageCommand | CliCommitCommand):
             msg = f"developer-workflow CLI contribution cannot handle command: {type(command).__name__}"
-            raise TypeError(msg)
+            raise CliDispatchError(msg)
         return run_developer_workflow_cli_command(
             command,
             options=DeveloperWorkflowCliOptions(
@@ -110,7 +111,7 @@ def _developer_workflow_composition_options_from_context(
             "developer-workflow CLI contribution received incompatible composition options: "
             f"{type(context.composition_options).__name__}"
         )
-        raise TypeError(msg)
+        raise CliConfigurationError(msg)
     return context.composition_options
 
 

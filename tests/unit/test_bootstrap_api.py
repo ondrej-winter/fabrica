@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import NoReturn
 
 from fabrica import bootstrap
+from fabrica.adapters.inbound.cli import CliConfigurationError
 from fabrica.bootstrap import cli as bootstrap_cli
 
 DEFAULT_STAGED_GIT_TOOL_TIMEOUT_SECONDS = 10.0
@@ -108,11 +109,11 @@ def test_product_cli_translates_bootstrap_wiring_errors_to_stable_stderr(
     monkeypatch,
     capsys,
 ) -> None:
-    """Keep unexpected composition failures from leaking tracebacks by default."""
+    """Keep expected composition failures from leaking tracebacks by default."""
 
     def fail_contribution_creation() -> NoReturn:
         msg = "synthetic CLI wiring failure"
-        raise RuntimeError(msg)
+        raise CliConfigurationError(msg)
 
     monkeypatch.setattr(bootstrap_cli, "create_cli_contributions", fail_contribution_creation)
 

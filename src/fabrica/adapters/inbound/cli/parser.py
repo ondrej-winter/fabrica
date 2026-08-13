@@ -6,7 +6,7 @@ import argparse
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli.contributions import validate_cli_contributions
+from fabrica.adapters.inbound.cli.contributions import CliConfigurationError, validate_cli_contributions
 from fabrica.adapters.inbound.cli.options import CliGlobalOptions
 
 if TYPE_CHECKING:
@@ -50,7 +50,11 @@ def build_parser(contributions: Sequence[CliContribution]) -> argparse.ArgumentP
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     for contribution in contributions:
-        contribution.register_commands(subparsers)
+        try:
+            contribution.register_commands(subparsers)
+        except argparse.ArgumentError as err:
+            msg = f"CLI contribution {contribution.name!r} registered invalid subcommands: {err}"
+            raise CliConfigurationError(msg) from err
 
     return parser
 
@@ -78,7 +82,7 @@ def _command_factory_from_namespace(namespace: argparse.Namespace) -> Callable[[
     command_factory = getattr(namespace, "command_factory", None)
     if not callable(command_factory):
         msg = "CLI contribution did not configure a command factory for the selected command"
-        raise TypeError(msg)
+        raise CliConfigurationError(msg)
     return command_factory
 
 
@@ -88,5 +92,5 @@ def _composition_options_from_namespace(namespace: argparse.Namespace) -> object
         return None
     if not callable(composition_options_factory):
         msg = "CLI contribution configured a non-callable composition options factory"
-        raise TypeError(msg)
+        raise CliConfigurationError(msg)
     return composition_options_factory(namespace)

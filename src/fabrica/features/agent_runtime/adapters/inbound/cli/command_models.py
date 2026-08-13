@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from fabrica.features.agent_runtime.application.dtos import SkillScriptType
+    from fabrica.features.agent_runtime.application.dtos import SkillScriptApprovalBinding, SkillScriptType
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,3 +68,4 @@ class CliScriptExecuteCommand:
     skill_id: str
     script_id: str
     approval_options: CliScriptApprovalOptions
+    approval_binding: SkillScriptApprovalBinding

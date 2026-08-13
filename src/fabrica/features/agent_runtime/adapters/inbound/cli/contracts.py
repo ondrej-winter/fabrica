@@ -6,8 +6,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, TextIO
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from fabrica.features.agent_runtime.application.dtos import (
         LocalAgentRunResult,
         SkillScriptExecutionResult,
@@ -62,8 +60,6 @@ class AgentRuntimeCliOptions:
 
     print_usage: bool = False
     print_prices: bool = False
-    verbose_diagnostics: bool = False
-    skill_roots: tuple[Path, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -11,7 +11,8 @@ import pytest
 
 from fabrica.adapters.inbound.cli import CliCommandExecutionOptions, build_parser, run_cli_command
 from fabrica.adapters.inbound.cli import parse_args as parse_cli_args
-from fabrica.adapters.inbound.cli.contributions import CliContribution
+from fabrica.adapters.inbound.cli.contributions import CliConfigurationError, CliContribution, CliDispatchError
+from fabrica.bootstrap import cli as bootstrap_cli
 from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliRunCommand,
@@ -19,7 +20,7 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
 )
-from fabrica.features.agent_runtime.application.dtos import SkillScriptType
+from fabrica.features.agent_runtime.application.dtos import SkillScriptApprovalBinding, SkillScriptType
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
     from fabrica.adapters.inbound.cli.contributions import CliSubparsers
 
 ARGPARSE_USAGE_ERROR = 2
+CLI_CONFIGURATION_ERROR_EXIT_CODE = 2
 SYNTHETIC_EXIT_CODE = 42
 
 
@@ -61,7 +63,7 @@ def test_runner_dispatches_only_supplied_contributions() -> None:
 
     assert exit_code == SYNTHETIC_EXIT_CODE
 
-    with pytest.raises(RuntimeError, match="no CLI contribution registered"):
+    with pytest.raises(CliDispatchError, match="no CLI contribution registered"):
         run_cli_command(command, options=CliCommandExecutionOptions(contributions=()))
 
 
@@ -73,22 +75,23 @@ def test_parser_rejects_contribution_without_command_factory() -> None:
 
 
 def test_parse_args_reports_missing_command_factory() -> None:
-    with pytest.raises(TypeError, match="did not configure a command factory"):
+    with pytest.raises(CliConfigurationError, match="did not configure a command factory"):
         parse_cli_args(["malformed"], contributions=(_malformed_contribution_without_command_factory(),))
 
 
 def test_contribution_validation_rejects_duplicate_command_ownership() -> None:
     duplicate = CliContribution(
         name="duplicate_synthetic",
+        command_names=("duplicate-synthetic",),
         command_types=(_SyntheticCommand,),
         register_commands=_ignore_registration,
         run_command=_synthetic_run_command,
     )
 
-    with pytest.raises(ValueError, match="duplicate CLI command type ownership"):
+    with pytest.raises(CliConfigurationError, match="duplicate CLI command type ownership"):
         build_parser((_synthetic_contribution(), duplicate))
 
-    with pytest.raises(ValueError, match="duplicate CLI command type ownership"):
+    with pytest.raises(CliConfigurationError, match="duplicate CLI command type ownership"):
         run_cli_command(
             _SyntheticCommand(name="synthetic"),
             options=CliCommandExecutionOptions(contributions=(_synthetic_contribution(), duplicate)),
@@ -99,21 +102,23 @@ def test_contribution_validation_rejects_overlapping_command_ownership() -> None
     """Keep isinstance-based dispatch from depending on contribution order."""
     base_owner = CliContribution(
         name="base_synthetic",
+        command_names=("base-synthetic",),
         command_types=(_SyntheticBaseCommand,),
         register_commands=_ignore_registration,
         run_command=_synthetic_run_command,
     )
     child_owner = CliContribution(
         name="child_synthetic",
+        command_names=("child-synthetic",),
         command_types=(_SyntheticChildCommand,),
         register_commands=_ignore_registration,
         run_command=_synthetic_run_command,
     )
 
-    with pytest.raises(ValueError, match="overlapping CLI command type ownership"):
+    with pytest.raises(CliConfigurationError, match="overlapping CLI command type ownership"):
         build_parser((base_owner, child_owner))
 
-    with pytest.raises(ValueError, match="overlapping CLI command type ownership"):
+    with pytest.raises(CliConfigurationError, match="overlapping CLI command type ownership"):
         run_cli_command(
             _SyntheticChildCommand(name="synthetic"),
             options=CliCommandExecutionOptions(contributions=(base_owner, child_owner)),
@@ -123,13 +128,52 @@ def test_contribution_validation_rejects_overlapping_command_ownership() -> None
 def test_contribution_validation_rejects_duplicate_names() -> None:
     duplicate_name = CliContribution(
         name="synthetic",
+        command_names=("other-synthetic",),
         command_types=(_OtherSyntheticCommand,),
         register_commands=_ignore_registration,
         run_command=_synthetic_run_command,
     )
 
-    with pytest.raises(ValueError, match="duplicate CLI contribution name"):
+    with pytest.raises(CliConfigurationError, match="duplicate CLI contribution name"):
         build_parser((_synthetic_contribution(), duplicate_name))
+
+
+def test_contribution_validation_rejects_duplicate_subcommand_names() -> None:
+    duplicate_command_name = CliContribution(
+        name="other_synthetic",
+        command_names=("synthetic",),
+        command_types=(_OtherSyntheticCommand,),
+        register_commands=_ignore_registration,
+        run_command=_synthetic_run_command,
+    )
+
+    with pytest.raises(CliConfigurationError, match="duplicate CLI subcommand name"):
+        build_parser((_synthetic_contribution(), duplicate_command_name))
+
+
+def test_product_cli_translates_duplicate_subcommand_registration_to_stable_error(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    duplicate_command_name = CliContribution(
+        name="other_synthetic",
+        command_names=("synthetic",),
+        command_types=(_OtherSyntheticCommand,),
+        register_commands=_ignore_registration,
+        run_command=_synthetic_run_command,
+    )
+    monkeypatch.setattr(
+        bootstrap_cli,
+        "create_cli_contributions",
+        lambda: (_synthetic_contribution(), duplicate_command_name),
+    )
+
+    exit_code = bootstrap_cli.main(())
+
+    assert exit_code == CLI_CONFIGURATION_ERROR_EXIT_CODE
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "error: duplicate CLI subcommand name registered: synthetic" in captured.err
 
 
 def test_bootstrap_cli_contributions_declare_feature_owned_command_sets() -> None:
@@ -140,6 +184,8 @@ def test_bootstrap_cli_contributions_declare_feature_owned_command_sets() -> Non
         "agent_runtime",
         "developer_workflow",
     )
+    assert contributions[0].command_names == ("run", "script-policy", "script-execute")
+    assert contributions[1].command_names == ("commit-message", "commit")
     assert contributions[0].command_types == (
         CliRunCommand,
         CliScriptPolicyCommand,
@@ -254,6 +300,14 @@ def _script_execute_command() -> CliScriptExecuteCommand:
             byte_size=128,
             content_digest="sha256:abc123",
         ),
+        approval_binding=SkillScriptApprovalBinding(
+            skill_id="python-testing",
+            script_id="scripts/check.py",
+            script_type=SkillScriptType.PYTHON,
+            suffix=".py",
+            byte_size=128,
+            content_digest="sha256:abc123",
+        ),
     )
 
 
@@ -331,6 +385,7 @@ def _synthetic_contribution() -> CliContribution:
 
     return CliContribution(
         name="synthetic",
+        command_names=("synthetic",),
         command_types=(_SyntheticCommand,),
         register_commands=register,
         run_command=run,
@@ -356,6 +411,7 @@ def _malformed_contribution_without_command_factory() -> CliContribution:
 
     return CliContribution(
         name="malformed",
+        command_names=("malformed",),
         command_types=(_SyntheticCommand,),
         register_commands=register,
         run_command=run,

@@ -24,7 +24,7 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliScriptPolicyCommand,
     CliSelectedResource,
 )
-from fabrica.features.agent_runtime.application.dtos import SkillScriptType
+from fabrica.features.agent_runtime.application.dtos import SkillScriptApprovalBinding, SkillScriptType
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -384,6 +384,14 @@ def test_parse_script_execute_command_requires_metadata_bound_approval() -> None
             skill_id="python-testing",
             script_id="scripts/check.py",
             approval_options=CliScriptApprovalOptions(
+                script_type=SkillScriptType.PYTHON,
+                suffix=".py",
+                byte_size=128,
+                content_digest="sha256:abc123",
+            ),
+            approval_binding=SkillScriptApprovalBinding(
+                skill_id="python-testing",
+                script_id="scripts/check.py",
                 script_type=SkillScriptType.PYTHON,
                 suffix=".py",
                 byte_size=128,

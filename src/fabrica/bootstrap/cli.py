@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Protocol, TextIO
 
+from fabrica.adapters.inbound.cli.contributions import CliError
 from fabrica.adapters.inbound.cli.output import write_line, write_model_evidence_report
 from fabrica.adapters.inbound.cli.parser import parse_args
 from fabrica.adapters.inbound.cli.runner import CliCommandExecutionOptions, run_cli_command
@@ -42,7 +43,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         contributions = create_cli_contributions()
         invocation = parse_args(tuple(argv) if argv is not None else None, contributions=contributions)
         return run_cli_command(invocation, options=CliCommandExecutionOptions(contributions=contributions))
-    except (RuntimeError, TypeError, ValueError) as err:
+    except CliError as err:
         write_line(sys.stderr, f"error: {err}")
         return CLI_CONFIGURATION_ERROR_EXIT_CODE
 
