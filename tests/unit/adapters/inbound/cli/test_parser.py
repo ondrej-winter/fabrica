@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import sys
 from dataclasses import FrozenInstanceError, dataclass
 from io import StringIO
@@ -15,15 +14,14 @@ from fabrica.adapters.inbound.cli import (
     CliConfigurationError,
     CliExecutionContext,
     CliGlobalOptions,
+    CliSubparsers,
     bind_cli_handler,
-    cli_global_options_from_namespace,
-    cli_handler_from_namespace,
 )
 from fabrica.adapters.inbound.cli import (
     build_parser as _build_parser,
 )
 from fabrica.adapters.inbound.cli import (
-    parse_args as _parse_args,
+    parse_cli_invocation as _parse_cli_invocation,
 )
 from fabrica.bootstrap.cli import create_cli_command_registrars
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
@@ -99,14 +97,8 @@ def build_parser():
 
 def parse_args(args: tuple[str, ...] | list[str]) -> ParsedInvocation:
     handlers = RecordingHandlers()
-    namespace = _parse_args(args, command_registrars=_recording_command_registrars(handlers))
-    context = CliExecutionContext(
-        global_options=cli_global_options_from_namespace(namespace),
-        stdin=StringIO(),
-        stdout=StringIO(),
-        stderr=StringIO(),
-    )
-    exit_code = cli_handler_from_namespace(namespace)(namespace, context)
+    invocation = _parse_cli_invocation(args, command_registrars=_recording_command_registrars(handlers))
+    exit_code = invocation.execute(stdin=StringIO(), stdout=StringIO(), stderr=StringIO())
 
     assert exit_code == 0
     assert handlers.invocation is not None
@@ -129,14 +121,18 @@ def _recording_command_registrars(handlers: RecordingHandlers) -> tuple[CliComma
     )
 
 
-def test_bind_cli_handler_round_trips_handler_through_parsed_namespace() -> None:
-    parser = _build_parser(
-        (lambda subparsers: bind_cli_handler(subparsers.add_parser("synthetic"), _synthetic_handler),)
+def test_parse_cli_invocation_round_trips_bound_handler() -> None:
+    invocation = _parse_cli_invocation(
+        ("synthetic",),
+        command_registrars=(_register_synthetic_command,),
     )
 
-    namespace = parser.parse_args(["synthetic"])
+    assert invocation.handler is _synthetic_handler
+    assert invocation.global_options == CliGlobalOptions()
 
-    assert cli_handler_from_namespace(namespace) is _synthetic_handler
+
+def _register_synthetic_command(subparsers: CliSubparsers) -> None:
+    bind_cli_handler(subparsers.add_parser("synthetic"), _synthetic_handler)
 
 
 def _synthetic_handler(namespace: object, context: CliExecutionContext) -> int:
@@ -144,9 +140,13 @@ def _synthetic_handler(namespace: object, context: CliExecutionContext) -> int:
     return 0
 
 
-def test_cli_handler_from_namespace_rejects_unbound_namespace() -> None:
+def test_parse_cli_invocation_rejects_unbound_command_registration() -> None:
     with pytest.raises(CliConfigurationError, match="did not configure a handler"):
-        cli_handler_from_namespace(argparse.Namespace())
+        _parse_cli_invocation(("synthetic",), command_registrars=(_register_unbound_synthetic_command,))
+
+
+def _register_unbound_synthetic_command(subparsers: CliSubparsers) -> None:
+    subparsers.add_parser("synthetic")
 
 
 def test_build_parser_renders_help_without_runtime_side_effects(capsys: pytest.CaptureFixture[str]) -> None:

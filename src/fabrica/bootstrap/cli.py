@@ -6,12 +6,9 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, TextIO
 
-from fabrica.adapters.inbound.cli.contracts import CliError, CliExecutionContext, cli_handler_from_namespace
+from fabrica.adapters.inbound.cli.contracts import CliError, CliExecutionContext
 from fabrica.adapters.inbound.cli.output import write_line, write_model_evidence_report
-from fabrica.adapters.inbound.cli.parser import (
-    cli_global_options_from_namespace,
-    parse_args,
-)
+from fabrica.adapters.inbound.cli.parser import parse_cli_invocation
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     AgentRuntimeCliOptions,
     AgentRuntimeCliStreams,
@@ -110,20 +107,17 @@ def run_cli(
     stderr: TextIO | None = None,
 ) -> int:
     """Run the Fabrica CLI with optional dependency and stream overrides."""
+    resolved_stdin = stdin if stdin is not None else sys.stdin
+    resolved_stdout = stdout if stdout is not None else sys.stdout
+    resolved_stderr = stderr if stderr is not None else sys.stderr
     try:
-        namespace = parse_args(
-            tuple(argv) if argv is not None else None,
+        invocation = parse_cli_invocation(
+            argv,
             command_registrars=create_cli_command_registrars(overrides=overrides),
         )
-        context = CliExecutionContext(
-            global_options=cli_global_options_from_namespace(namespace),
-            stdin=stdin or sys.stdin,
-            stdout=stdout or sys.stdout,
-            stderr=stderr or sys.stderr,
-        )
-        return cli_handler_from_namespace(namespace)(namespace, context)
+        return invocation.execute(stdin=resolved_stdin, stdout=resolved_stdout, stderr=resolved_stderr)
     except CliError as err:
-        write_line(stderr or sys.stderr, f"error: {err}")
+        write_line(resolved_stderr, f"error: {err}")
         return CLI_CONFIGURATION_ERROR_EXIT_CODE
 
 

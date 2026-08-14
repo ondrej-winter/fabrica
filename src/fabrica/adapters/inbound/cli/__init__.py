@@ -8,14 +8,13 @@ from fabrica.adapters.inbound.cli.contracts import (
     CliExecutionContext,
     CliGlobalOptions,
     CliHandlerBindingTarget,
+    CliInvocation,
     CliSubparsers,
     bind_cli_handler,
-    cli_handler_from_namespace,
 )
 from fabrica.adapters.inbound.cli.parser import (
     build_parser,
-    cli_global_options_from_namespace,
-    parse_args,
+    parse_cli_invocation,
 )
 
 __all__ = [
@@ -26,10 +25,9 @@ __all__ = [
     "CliExecutionContext",
     "CliGlobalOptions",
     "CliHandlerBindingTarget",
+    "CliInvocation",
     "CliSubparsers",
     "bind_cli_handler",
     "build_parser",
-    "cli_global_options_from_namespace",
-    "cli_handler_from_namespace",
-    "parse_args",
+    "parse_cli_invocation",
 ]

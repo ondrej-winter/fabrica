@@ -42,6 +42,27 @@ class CliExecutionContext:
 type CliCommandHandler = Callable[[argparse.Namespace, CliExecutionContext], int]
 
 
+@dataclass(frozen=True, slots=True)
+class CliInvocation:
+    """Parsed CLI invocation ready to execute through a bound command handler."""
+
+    namespace: argparse.Namespace
+    global_options: CliGlobalOptions
+    handler: CliCommandHandler
+
+    def execute(self, *, stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
+        """Run the selected CLI command with explicit process streams."""
+        return self.handler(
+            self.namespace,
+            CliExecutionContext(
+                global_options=self.global_options,
+                stdin=stdin,
+                stdout=stdout,
+                stderr=stderr,
+            ),
+        )
+
+
 class CliHandlerBindingTarget(Protocol):
     """Parser behavior needed to bind a command handler during CLI registration."""
 
@@ -82,6 +103,7 @@ __all__ = [
     "CliExecutionContext",
     "CliGlobalOptions",
     "CliHandlerBindingTarget",
+    "CliInvocation",
     "CliSubparsers",
     "bind_cli_handler",
     "cli_handler_from_namespace",
