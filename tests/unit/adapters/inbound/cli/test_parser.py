@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from fabrica.adapters.inbound import cli
 from fabrica.adapters.inbound.cli import (
     CliCommandHandler,
     CliCommandRegistration,
@@ -18,10 +19,10 @@ from fabrica.adapters.inbound.cli import (
     CliExecutionContext,
     CliGlobalOptions,
 )
-from fabrica.adapters.inbound.cli import (
+from fabrica.adapters.inbound.cli.parser import (
     build_parser as _build_parser,
 )
-from fabrica.adapters.inbound.cli import (
+from fabrica.adapters.inbound.cli.parser import (
     parse_cli_invocation as _parse_cli_invocation,
 )
 from fabrica.bootstrap.cli import create_cli_command_registrars
@@ -45,9 +46,30 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.registration impor
 )
 
 if TYPE_CHECKING:
+    import argparse
+
     from fabrica.adapters.inbound.cli.contracts import CliCommandRegistrar
 
 ARGPARSE_USAGE_ERROR = 2
+EXPECTED_CLI_PACKAGE_EXPORTS = [
+    "CliArgumentConfigurer",
+    "CliCommandDecoder",
+    "CliCommandHandler",
+    "CliCommandRegistrar",
+    "CliCommandRegistration",
+    "CliCommandRegistry",
+    "CliConfigurationError",
+    "CliError",
+    "CliExecutionContext",
+    "CliGlobalOptions",
+    "CliInvocation",
+]
+
+
+def test_cli_package_exports_only_registration_contracts() -> None:
+    assert cli.__all__ == EXPECTED_CLI_PACKAGE_EXPORTS
+    assert not hasattr(cli, "build_parser")
+    assert not hasattr(cli, "parse_cli_invocation")
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,8 +165,10 @@ def _synthetic_command_registrar(handlers: RecordingHandlers) -> CliCommandRegis
         commands.register_command(
             CliCommandRegistration(
                 name="synthetic",
-                handler=_synthetic_handler(handlers),
                 summary="synthetic command",
+                configure_parser=_configure_noop_synthetic_parser,
+                decode=_decode_synthetic_command,
+                handler=_synthetic_handler(handlers),
             ),
         )
 
@@ -155,22 +179,32 @@ def _register_synthetic_command(commands: CliCommandRegistry) -> None:
     commands.register_command(
         CliCommandRegistration(
             name="synthetic",
-            handler=_noop_synthetic_handler,
             summary="synthetic command",
+            configure_parser=_configure_noop_synthetic_parser,
+            decode=_decode_synthetic_command,
+            handler=_noop_synthetic_handler,
         ),
     )
 
 
-def _noop_synthetic_handler(namespace: object, context: CliExecutionContext) -> int:
-    _ = (namespace, context)
+def _configure_noop_synthetic_parser(parser: argparse.ArgumentParser) -> None:
+    _ = parser
+
+
+def _decode_synthetic_command(namespace: argparse.Namespace) -> str:
+    _ = namespace
+    return "synthetic"
+
+
+def _noop_synthetic_handler(command: str, context: CliExecutionContext) -> int:
+    _ = (command, context)
     return 0
 
 
-def _synthetic_handler(handlers: RecordingHandlers) -> CliCommandHandler:
-    def run(namespace: object, context: CliExecutionContext) -> int:
-        _ = (namespace,)
+def _synthetic_handler(handlers: RecordingHandlers) -> CliCommandHandler[str]:
+    def run(command: str, context: CliExecutionContext) -> int:
         handlers.invocation = ParsedInvocation(
-            command="synthetic",
+            command=command,
             global_options=context.global_options,
             composition_options=None,
         )
@@ -188,15 +222,19 @@ def _register_duplicate_synthetic_commands(commands: CliCommandRegistry) -> None
     commands.register_command(
         CliCommandRegistration(
             name="synthetic",
-            handler=_noop_synthetic_handler,
             summary="synthetic command",
+            configure_parser=_configure_noop_synthetic_parser,
+            decode=_decode_synthetic_command,
+            handler=_noop_synthetic_handler,
         ),
     )
     commands.register_command(
         CliCommandRegistration(
             name="synthetic",
-            handler=_noop_synthetic_handler,
             summary="synthetic command",
+            configure_parser=_configure_noop_synthetic_parser,
+            decode=_decode_synthetic_command,
+            handler=_noop_synthetic_handler,
         ),
     )
 
@@ -328,15 +366,33 @@ def test_parse_command_accepts_global_options_after_subcommand() -> None:
     ("registration", "expected_message"),
     [
         (
-            CliCommandRegistration(name="", handler=_noop_synthetic_handler, summary="synthetic command"),
+            CliCommandRegistration(
+                name="",
+                summary="synthetic command",
+                configure_parser=_configure_noop_synthetic_parser,
+                decode=_decode_synthetic_command,
+                handler=_noop_synthetic_handler,
+            ),
             "name must be a non-empty trimmed value",
         ),
         (
-            CliCommandRegistration(name=" synthetic", handler=_noop_synthetic_handler, summary="synthetic command"),
+            CliCommandRegistration(
+                name=" synthetic",
+                summary="synthetic command",
+                configure_parser=_configure_noop_synthetic_parser,
+                decode=_decode_synthetic_command,
+                handler=_noop_synthetic_handler,
+            ),
             "name must be a non-empty trimmed value",
         ),
         (
-            CliCommandRegistration(name="synthetic", handler=_noop_synthetic_handler, summary=""),
+            CliCommandRegistration(
+                name="synthetic",
+                summary="",
+                configure_parser=_configure_noop_synthetic_parser,
+                decode=_decode_synthetic_command,
+                handler=_noop_synthetic_handler,
+            ),
             "summary must be a non-empty trimmed value",
         ),
     ],

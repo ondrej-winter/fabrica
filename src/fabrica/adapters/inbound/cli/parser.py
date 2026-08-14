@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from fabrica.adapters.inbound.cli.contracts import (
+    CliCommandDecoder,
     CliCommandHandler,
     CliCommandRegistration,
     CliConfigurationError,
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
     from fabrica.adapters.inbound.cli.contracts import CliCommandRegistrar
 
 _CLI_HANDLER_NAMESPACE_ATTRIBUTE = "cli_handler"
+_CLI_DECODER_NAMESPACE_ATTRIBUTE = "cli_decoder"
 
 
 class _ArgparseCliCommandRegistry:
@@ -30,11 +32,11 @@ class _ArgparseCliCommandRegistry:
     def __init__(self, subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
         self._subparsers = subparsers
 
-    def register_command(
+    def register_command[TCommand](
         self,
-        registration: CliCommandRegistration,
-    ) -> argparse.ArgumentParser:
-        """Add one named subcommand parser and bind its execution handler."""
+        registration: CliCommandRegistration[TCommand],
+    ) -> None:
+        """Add one named subcommand parser with typed decoding and execution."""
         _validate_command_registration(registration)
         parser = self._subparsers.add_parser(
             registration.name,
@@ -42,8 +44,13 @@ class _ArgparseCliCommandRegistry:
             description=registration.description,
         )
         _add_global_options(parser, default=argparse.SUPPRESS)
-        parser.set_defaults(**{_CLI_HANDLER_NAMESPACE_ATTRIBUTE: registration.handler})
-        return parser
+        registration.configure_parser(parser)
+        parser.set_defaults(
+            **{
+                _CLI_DECODER_NAMESPACE_ATTRIBUTE: registration.decode,
+                _CLI_HANDLER_NAMESPACE_ATTRIBUTE: registration.handler,
+            },
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,12 +59,13 @@ class _ArgparseCliInvocation:
 
     namespace: argparse.Namespace
     global_options: CliGlobalOptions
-    handler: CliCommandHandler
+    decode: CliCommandDecoder[object]
+    handler: CliCommandHandler[object]
 
     def execute(self, *, stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
         """Run the selected CLI command with explicit process streams."""
         return self.handler(
-            self.namespace,
+            self.decode(self.namespace),
             CliExecutionContext(
                 global_options=self.global_options,
                 stdin=stdin,
@@ -117,6 +125,7 @@ def parse_cli_invocation(
     return _ArgparseCliInvocation(
         namespace=namespace,
         global_options=cli_global_options_from_namespace(namespace),
+        decode=_cli_decoder_from_namespace(namespace),
         handler=_cli_handler_from_namespace(namespace),
     )
 
@@ -130,7 +139,15 @@ def cli_global_options_from_namespace(namespace: argparse.Namespace) -> CliGloba
     )
 
 
-def _cli_handler_from_namespace(namespace: argparse.Namespace) -> CliCommandHandler:
+def _cli_decoder_from_namespace(namespace: argparse.Namespace) -> CliCommandDecoder[object]:
+    decoder = getattr(namespace, _CLI_DECODER_NAMESPACE_ATTRIBUTE, None)
+    if not callable(decoder):
+        msg = "CLI command registration did not configure a decoder for the selected command"
+        raise CliConfigurationError(msg)
+    return decoder
+
+
+def _cli_handler_from_namespace(namespace: argparse.Namespace) -> CliCommandHandler[object]:
     handler = getattr(namespace, _CLI_HANDLER_NAMESPACE_ATTRIBUTE, None)
     if not callable(handler):
         msg = "CLI command registration did not configure a handler for the selected command"
@@ -147,4 +164,10 @@ def _validate_command_registration(registration: CliCommandRegistration) -> None
         raise CliConfigurationError(msg)
     if not callable(registration.handler):
         msg = "CLI command registration handler must be callable"
+        raise CliConfigurationError(msg)
+    if not callable(registration.configure_parser):
+        msg = "CLI command registration parser configurer must be callable"
+        raise CliConfigurationError(msg)
+    if not callable(registration.decode):
+        msg = "CLI command registration decoder must be callable"
         raise CliConfigurationError(msg)

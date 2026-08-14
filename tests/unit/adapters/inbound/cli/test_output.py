@@ -8,8 +8,10 @@ from io import StringIO
 from fabrica.adapters.inbound.cli.output import write_model_evidence_report
 from fabrica.adapters.inbound.cli.text import (
     MAX_OUTPUT_LINE_CHARS,
+    TRUNCATED_TEXT_MARKER,
     bound_text,
     format_metadata,
+    write_line,
     write_text,
 )
 from fabrica.shared_kernel.model_usage import (
@@ -28,13 +30,30 @@ from fabrica.shared_kernel.model_usage import (
 def test_bound_text_truncates_long_cli_lines() -> None:
     bounded = bound_text("x" * (MAX_OUTPUT_LINE_CHARS + 1))
 
-    assert bounded == f"{'x' * MAX_OUTPUT_LINE_CHARS}...<truncated>"
+    assert len(bounded) == MAX_OUTPUT_LINE_CHARS
+    assert bounded == f"{'x' * (MAX_OUTPUT_LINE_CHARS - len(TRUNCATED_TEXT_MARKER))}{TRUNCATED_TEXT_MARKER}"
+
+
+def test_bound_text_escapes_line_breaks() -> None:
+    assert bound_text("hello\r\nworld") == r"hello\r\nworld"
+
+
+def test_write_line_always_writes_one_logical_line() -> None:
+    stdout = StringIO()
+
+    write_line(stdout, "hello\nworld")
+
+    assert stdout.getvalue() == r"hello\nworld" "\n"
 
 
 def test_format_metadata_sorts_and_bounds_values() -> None:
     metadata = {"z": "last", "a": "x" * (MAX_OUTPUT_LINE_CHARS + 1)}
 
-    assert format_metadata(metadata) == f"a={'x' * MAX_OUTPUT_LINE_CHARS}...<truncated> z=last"
+    formatted = format_metadata(metadata)
+
+    assert len(formatted) == MAX_OUTPUT_LINE_CHARS
+    assert formatted.startswith("a=")
+    assert formatted.endswith(TRUNCATED_TEXT_MARKER)
 
 
 def test_write_text_terminates_output_when_missing_newline() -> None:

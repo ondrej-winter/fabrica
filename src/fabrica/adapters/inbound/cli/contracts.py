@@ -2,32 +2,34 @@
 
 from __future__ import annotations
 
+import argparse
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    import argparse
     from typing import TextIO
 
 
 class CliCommandRegistry(Protocol):
     """Public behavior needed to register feature-owned CLI commands."""
 
-    def register_command(
+    def register_command[TCommand](
         self,
-        registration: CliCommandRegistration,
-    ) -> argparse.ArgumentParser:
-        """Add one named subcommand parser and bind its execution handler."""
+        registration: CliCommandRegistration[TCommand],
+    ) -> None:
+        """Add one named subcommand parser with typed decoding and execution."""
 
 
 @dataclass(frozen=True, slots=True)
-class CliCommandRegistration:
+class CliCommandRegistration[TCommand]:
     """Feature-owned command registration for the product CLI shell."""
 
     name: str
-    handler: CliCommandHandler
     summary: str
+    configure_parser: CliArgumentConfigurer
+    decode: CliCommandDecoder[TCommand]
+    handler: CliCommandHandler[TCommand]
     description: str | None = None
 
 
@@ -50,7 +52,9 @@ class CliExecutionContext:
     stderr: TextIO
 
 
-type CliCommandHandler = Callable[[argparse.Namespace, CliExecutionContext], int]
+type CliArgumentConfigurer = Callable[[argparse.ArgumentParser], None]
+type CliCommandDecoder[TCommand] = Callable[[argparse.Namespace], TCommand]
+type CliCommandHandler[TCommand] = Callable[[TCommand, CliExecutionContext], int]
 
 
 class CliInvocation(Protocol):
@@ -72,6 +76,8 @@ class CliConfigurationError(CliError):
 
 
 __all__ = [
+    "CliArgumentConfigurer",
+    "CliCommandDecoder",
     "CliCommandHandler",
     "CliCommandRegistrar",
     "CliCommandRegistration",

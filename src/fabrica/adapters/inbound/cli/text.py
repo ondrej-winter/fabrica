@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 MAX_OUTPUT_LINE_CHARS = 4_000
+TRUNCATED_TEXT_MARKER = "...<truncated>"
 
 
 def write_line(stream: TextIO, text: str) -> None:
@@ -29,18 +30,21 @@ def format_metadata(metadata: Mapping[str, object]) -> str:
     """Format safe observation metadata as sorted key-value fields."""
     if not metadata:
         return ""
-    return " ".join(f"{key}={bound_text(str(value))}" for key, value in sorted(metadata.items()))
+    return bound_text(" ".join(f"{key}={value!s}" for key, value in sorted(metadata.items())))
 
 
 def bound_text(text: str) -> str:
     """Return text bounded to one safe CLI output line."""
-    if len(text) <= MAX_OUTPUT_LINE_CHARS:
-        return text
-    return f"{text[:MAX_OUTPUT_LINE_CHARS]}...<truncated>"
+    single_line_text = text.replace("\r", r"\r").replace("\n", r"\n")
+    if len(single_line_text) <= MAX_OUTPUT_LINE_CHARS:
+        return single_line_text
+    content_length = MAX_OUTPUT_LINE_CHARS - len(TRUNCATED_TEXT_MARKER)
+    return f"{single_line_text[:content_length]}{TRUNCATED_TEXT_MARKER}"
 
 
 __all__ = [
     "MAX_OUTPUT_LINE_CHARS",
+    "TRUNCATED_TEXT_MARKER",
     "bound_text",
     "format_metadata",
     "write_line",

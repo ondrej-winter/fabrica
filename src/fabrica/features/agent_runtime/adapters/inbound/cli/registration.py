@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -38,6 +39,12 @@ type AgentRuntimeCliHandler[TCommand] = Callable[
 ]
 
 
+@dataclass(frozen=True, slots=True)
+class _ParsedAgentRuntimeCliCommand[TCommand]:
+    command: TCommand
+    composition_options: AgentRuntimeCliCompositionOptions
+
+
 def register_agent_runtime_cli_commands(
     commands: CliCommandRegistry,
     *,
@@ -46,21 +53,51 @@ def register_agent_runtime_cli_commands(
     script_execute_command: AgentRuntimeCliHandler[CliScriptExecuteCommand],
 ) -> None:
     """Register agent-runtime owned commands on the product CLI parser."""
-    run_parser = commands.register_command(
+    commands.register_command(
         CliCommandRegistration(
             name=RUN_COMMAND_NAME,
-            handler=_handler_for_run_command(run_command),
             summary="run one local runtime prompt",
+            configure_parser=_configure_run_parser,
+            decode=_parsed_run_command_from_namespace,
+            handler=_handler_for_run_command(run_command),
             description="Run one local runtime prompt with explicitly selected context only.",
         ),
     )
-    run_parser.add_argument(
+
+    commands.register_command(
+        CliCommandRegistration(
+            name=SCRIPT_POLICY_COMMAND_NAME,
+            summary="inspect selected skill script policy without executing it",
+            configure_parser=_configure_script_policy_parser,
+            decode=_parsed_script_policy_command_from_namespace,
+            handler=_handler_for_script_policy_command(script_policy_command),
+            description="Evaluate policy for one explicitly selected Agent Skill script without executing it.",
+        ),
+    )
+
+    commands.register_command(
+        CliCommandRegistration(
+            name=SCRIPT_EXECUTE_COMMAND_NAME,
+            summary="execute one explicitly selected skill script with metadata-bound approval",
+            configure_parser=_configure_script_execute_parser,
+            decode=_parsed_script_execute_command_from_namespace,
+            handler=_handler_for_script_execute_command(script_execute_command),
+            description=(
+                "Execute one explicitly selected Agent Skill script only when the supplied "
+                "non-interactive approval metadata matches the inspected script. This is not production sandboxing."
+            ),
+        ),
+    )
+
+
+def _configure_run_parser(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "--prompt",
         required=True,
         type=_parse_prompt,
         help="Prompt text for the local runtime run.",
     )
-    run_parser.add_argument(
+    parser.add_argument(
         "--skill",
         dest="skill_ids",
         action="append",
@@ -68,7 +105,7 @@ def register_agent_runtime_cli_commands(
         default=[],
         help="Explicit selected Agent Skill ID. May be repeated.",
     )
-    run_parser.add_argument(
+    parser.add_argument(
         "--resource",
         dest="resources",
         action="append",
@@ -77,78 +114,63 @@ def register_agent_runtime_cli_commands(
         metavar="SKILL_ID:RESOURCE_ID",
         help="Explicit selected Agent Skill resource. May be repeated.",
     )
-    _add_common_skill_root_flags(run_parser)
+    _add_common_skill_root_flags(parser)
 
-    policy_parser = commands.register_command(
-        CliCommandRegistration(
-            name=SCRIPT_POLICY_COMMAND_NAME,
-            handler=_handler_for_script_policy_command(script_policy_command),
-            summary="inspect selected skill script policy without executing it",
-            description="Evaluate policy for one explicitly selected Agent Skill script without executing it.",
-        ),
-    )
-    policy_parser.add_argument(
+
+def _configure_script_policy_parser(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "--skill-id",
         required=True,
         type=_parse_skill_id,
         help="Explicit selected Agent Skill ID.",
     )
-    policy_parser.add_argument(
+    parser.add_argument(
         "--script-id",
         required=True,
         type=_parse_script_id,
         help="Relative selected script ID within the skill.",
     )
-    _add_common_skill_root_flags(policy_parser)
+    _add_common_skill_root_flags(parser)
 
-    execute_parser = commands.register_command(
-        CliCommandRegistration(
-            name=SCRIPT_EXECUTE_COMMAND_NAME,
-            handler=_handler_for_script_execute_command(script_execute_command),
-            summary="execute one explicitly selected skill script with metadata-bound approval",
-            description=(
-                "Execute one explicitly selected Agent Skill script only when the supplied "
-                "non-interactive approval metadata matches the inspected script. This is not production sandboxing."
-            ),
-        ),
-    )
-    execute_parser.add_argument(
+
+def _configure_script_execute_parser(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "--skill-id",
         required=True,
         type=_parse_skill_id,
         help="Explicit selected Agent Skill ID.",
     )
-    execute_parser.add_argument(
+    parser.add_argument(
         "--script-id",
         required=True,
         type=_parse_script_id,
         help="Relative selected script ID within the skill.",
     )
-    execute_parser.add_argument(
+    parser.add_argument(
         "--approve-script-type",
         required=True,
         choices=tuple(script_type.value for script_type in SkillScriptType),
         help="Approved script type bound to the selected script metadata.",
     )
-    execute_parser.add_argument(
+    parser.add_argument(
         "--approve-suffix",
         required=True,
         type=_parse_approved_suffix,
         help="Approved script suffix bound to the selected script metadata, such as .py or .sh.",
     )
-    execute_parser.add_argument(
+    parser.add_argument(
         "--approve-byte-size",
         required=True,
         type=_parse_positive_int,
         help="Approved script byte size bound to the selected script metadata.",
     )
-    execute_parser.add_argument(
+    parser.add_argument(
         "--approve-content-digest",
         required=True,
         type=_parse_content_digest,
         help="Approved content digest bound to the selected script metadata, such as sha256:....",
     )
-    _add_common_skill_root_flags(execute_parser)
+    _add_common_skill_root_flags(parser)
 
 
 def _add_common_skill_root_flags(parser: argparse.ArgumentParser) -> None:
@@ -286,13 +308,38 @@ def _script_execute_command_from_namespace(namespace: argparse.Namespace) -> Cli
     )
 
 
+def _parsed_run_command_from_namespace(namespace: argparse.Namespace) -> _ParsedAgentRuntimeCliCommand[CliRunCommand]:
+    return _ParsedAgentRuntimeCliCommand(
+        command=_run_command_from_namespace(namespace),
+        composition_options=_agent_runtime_composition_options_from_namespace(namespace),
+    )
+
+
+def _parsed_script_policy_command_from_namespace(
+    namespace: argparse.Namespace,
+) -> _ParsedAgentRuntimeCliCommand[CliScriptPolicyCommand]:
+    return _ParsedAgentRuntimeCliCommand(
+        command=_script_policy_command_from_namespace(namespace),
+        composition_options=_agent_runtime_composition_options_from_namespace(namespace),
+    )
+
+
+def _parsed_script_execute_command_from_namespace(
+    namespace: argparse.Namespace,
+) -> _ParsedAgentRuntimeCliCommand[CliScriptExecuteCommand]:
+    return _ParsedAgentRuntimeCliCommand(
+        command=_script_execute_command_from_namespace(namespace),
+        composition_options=_agent_runtime_composition_options_from_namespace(namespace),
+    )
+
+
 def _handler_for_run_command(
     handler: AgentRuntimeCliHandler[CliRunCommand],
-) -> Callable[[argparse.Namespace, CliExecutionContext], int]:
-    def run(namespace: argparse.Namespace, context: CliExecutionContext) -> int:
+) -> Callable[[_ParsedAgentRuntimeCliCommand[CliRunCommand], CliExecutionContext], int]:
+    def run(parsed: _ParsedAgentRuntimeCliCommand[CliRunCommand], context: CliExecutionContext) -> int:
         return handler(
-            _run_command_from_namespace(namespace),
-            _agent_runtime_composition_options_from_namespace(namespace),
+            parsed.command,
+            parsed.composition_options,
             context,
         )
 
@@ -301,11 +348,11 @@ def _handler_for_run_command(
 
 def _handler_for_script_policy_command(
     handler: AgentRuntimeCliHandler[CliScriptPolicyCommand],
-) -> Callable[[argparse.Namespace, CliExecutionContext], int]:
-    def run(namespace: argparse.Namespace, context: CliExecutionContext) -> int:
+) -> Callable[[_ParsedAgentRuntimeCliCommand[CliScriptPolicyCommand], CliExecutionContext], int]:
+    def run(parsed: _ParsedAgentRuntimeCliCommand[CliScriptPolicyCommand], context: CliExecutionContext) -> int:
         return handler(
-            _script_policy_command_from_namespace(namespace),
-            _agent_runtime_composition_options_from_namespace(namespace),
+            parsed.command,
+            parsed.composition_options,
             context,
         )
 
@@ -314,11 +361,11 @@ def _handler_for_script_policy_command(
 
 def _handler_for_script_execute_command(
     handler: AgentRuntimeCliHandler[CliScriptExecuteCommand],
-) -> Callable[[argparse.Namespace, CliExecutionContext], int]:
-    def run(namespace: argparse.Namespace, context: CliExecutionContext) -> int:
+) -> Callable[[_ParsedAgentRuntimeCliCommand[CliScriptExecuteCommand], CliExecutionContext], int]:
+    def run(parsed: _ParsedAgentRuntimeCliCommand[CliScriptExecuteCommand], context: CliExecutionContext) -> int:
         return handler(
-            _script_execute_command_from_namespace(namespace),
-            _agent_runtime_composition_options_from_namespace(namespace),
+            parsed.command,
+            parsed.composition_options,
             context,
         )
 
