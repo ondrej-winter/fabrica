@@ -69,8 +69,6 @@ def test_parse_run_command_supports_prompt_model_and_explicit_context() -> None:
             "run",
             "--prompt",
             "Reply with pong",
-            "--model",
-            "codex-compatible",
             "--skill",
             "python-testing",
             "--skill",
@@ -85,7 +83,6 @@ def test_parse_run_command_supports_prompt_model_and_explicit_context() -> None:
     assert command == CliInvocation(
         command=CliRunCommand(
             prompt="Reply with pong",
-            model_hint="codex-compatible",
             skill_ids=("python-testing", "code-review"),
             resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
         ),
@@ -101,6 +98,13 @@ def test_parse_run_command_uses_empty_explicit_context_defaults() -> None:
         command=CliRunCommand(prompt="Reply with pong"),
         composition_options=AgentRuntimeCliCompositionOptions(),
     )
+
+
+def test_parse_run_command_rejects_unsupported_model_override() -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        parse_args(["run", "--prompt", "Reply with pong", "--model", "codex-compatible"])
+
+    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
 
 
 def test_parse_commit_message_command_defaults_to_conventional_commits_skill() -> None:

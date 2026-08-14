@@ -48,7 +48,7 @@ MAX_OUTPUT_LINE_CHARS = 4_000
 def write_run_result(result: LocalAgentRunResult, *, stdout: TextIO, stderr: TextIO) -> int:
     """Write a local runtime result and return the matching process exit code."""
     if result.output_text:
-        _write_line(stdout, result.output_text)
+        _write_text(stdout, result.output_text)
 
     if not result.succeeded:
         _write_line(stderr, f"status: {result.status.value}")
@@ -64,6 +64,11 @@ def write_script_policy_result(result: SkillScriptPolicyEvaluationResult, *, std
     """Write a selected script policy result and return the matching exit code."""
     stream = stdout if result.approved else stderr
     _write_line(stream, f"status: {result.status.value}")
+    if result.approved and result.binding is not None:
+        _write_line(stream, f"approve-script-type: {result.binding.script_type.value}")
+        _write_line(stream, f"approve-suffix: {result.binding.suffix}")
+        _write_line(stream, f"approve-byte-size: {result.binding.byte_size}")
+        _write_line(stream, f"approve-content-digest: {result.binding.content_digest}")
 
     for observation in result.observations:
         metadata = _format_metadata(observation.metadata)
@@ -76,9 +81,9 @@ def write_script_policy_result(result: SkillScriptPolicyEvaluationResult, *, std
 def write_script_execution_result(result: SkillScriptExecutionResult, *, stdout: TextIO, stderr: TextIO) -> int:
     """Write a selected script execution result and return the matching exit code."""
     if result.stdout.text:
-        _write_line(stdout, result.stdout.text)
+        _write_text(stdout, result.stdout.text)
     if result.stderr.text:
-        _write_line(stderr, result.stderr.text)
+        _write_text(stderr, result.stderr.text)
 
     stream = stdout if result.succeeded else stderr
     _write_line(stream, f"status: {result.status.value}")
@@ -101,6 +106,12 @@ def _write_line(stream: TextIO, text: str) -> None:
     bounded = _bound_text(text)
     stream.write(bounded)
     if not bounded.endswith("\n"):
+        stream.write("\n")
+
+
+def _write_text(stream: TextIO, text: str) -> None:
+    stream.write(text)
+    if not text.endswith("\n"):
         stream.write("\n")
 
 

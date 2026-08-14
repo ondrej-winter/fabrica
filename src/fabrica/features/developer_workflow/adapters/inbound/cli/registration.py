@@ -16,6 +16,10 @@ from fabrica.features.developer_workflow.application.dtos import (
     GenerateCommitMessageCommand,
 )
 
+COMMIT_MESSAGE_COMMAND_NAME = "commit-message"
+COMMIT_COMMAND_NAME = "commit"
+DEVELOPER_WORKFLOW_CLI_COMMAND_NAMES = (COMMIT_MESSAGE_COMMAND_NAME, COMMIT_COMMAND_NAME)
+
 
 class CliSubparsers(Protocol):
     """Subparser behavior needed by developer-workflow CLI registration."""
@@ -27,7 +31,7 @@ class CliSubparsers(Protocol):
 def register_developer_workflow_cli_commands(subparsers: CliSubparsers) -> None:
     """Register developer-workflow owned commands on the product CLI parser."""
     commit_message_parser = subparsers.add_parser(
-        "commit-message",
+        COMMIT_MESSAGE_COMMAND_NAME,
         help="preview a read-only commit message for staged git changes",
         description="Read staged git diff context and propose a commit message without creating a commit.",
     )
@@ -39,7 +43,7 @@ def register_developer_workflow_cli_commands(subparsers: CliSubparsers) -> None:
     )
 
     commit_parser = subparsers.add_parser(
-        "commit",
+        COMMIT_COMMAND_NAME,
         help="run pre-commit, then create a git commit from a generated message after confirmation",
         description=(
             "Run the staged pre-commit quality gate before message generation, "

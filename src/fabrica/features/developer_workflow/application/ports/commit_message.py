@@ -6,6 +6,7 @@ from typing import Protocol
 from fabrica.features.developer_workflow.application.dtos import (
     AnalyzeStagedFileForCommitMessageCommand,
     CommitMessageRecommendation,
+    DeveloperWorkflowStatus,
     SafeGitStagedChangesMetadataValue,
     StagedFileCommitEvidence,
     SynthesizeCommitMessageCommand,
@@ -19,9 +20,11 @@ class CommitMessageAnalysisError(Exception):
         self,
         message: str,
         *,
+        status: DeveloperWorkflowStatus = DeveloperWorkflowStatus.MODEL_ERROR,
         metadata: Mapping[str, SafeGitStagedChangesMetadataValue] | None = None,
     ) -> None:
         super().__init__(message)
+        self.status = status
         self.metadata = dict(metadata or {})
 
 
@@ -32,9 +35,11 @@ class CommitMessageSynthesisError(Exception):
         self,
         message: str,
         *,
+        status: DeveloperWorkflowStatus = DeveloperWorkflowStatus.MODEL_ERROR,
         metadata: Mapping[str, SafeGitStagedChangesMetadataValue] | None = None,
     ) -> None:
         super().__init__(message)
+        self.status = status
         self.metadata = dict(metadata or {})
 
 

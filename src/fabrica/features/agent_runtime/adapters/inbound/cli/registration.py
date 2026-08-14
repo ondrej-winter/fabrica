@@ -23,6 +23,11 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptType,
 )
 
+RUN_COMMAND_NAME = "run"
+SCRIPT_POLICY_COMMAND_NAME = "script-policy"
+SCRIPT_EXECUTE_COMMAND_NAME = "script-execute"
+AGENT_RUNTIME_CLI_COMMAND_NAMES = (RUN_COMMAND_NAME, SCRIPT_POLICY_COMMAND_NAME, SCRIPT_EXECUTE_COMMAND_NAME)
+
 
 class CliSubparsers(Protocol):
     """Subparser behavior needed by agent-runtime CLI registration."""
@@ -34,7 +39,7 @@ class CliSubparsers(Protocol):
 def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
     """Register agent-runtime owned commands on the product CLI parser."""
     run_parser = subparsers.add_parser(
-        "run",
+        RUN_COMMAND_NAME,
         help="run one local runtime prompt",
         description="Run one local runtime prompt with explicitly selected context only.",
     )
@@ -44,7 +49,6 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
         type=_parse_prompt,
         help="Prompt text for the local runtime run.",
     )
-    run_parser.add_argument("--model", dest="model_hint", help="Optional model hint passed to the runtime.")
     run_parser.add_argument(
         "--skill",
         dest="skill_ids",
@@ -67,7 +71,7 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
     run_parser.set_defaults(composition_options_factory=_agent_runtime_composition_options_from_namespace)
 
     policy_parser = subparsers.add_parser(
-        "script-policy",
+        SCRIPT_POLICY_COMMAND_NAME,
         help="inspect selected skill script policy without executing it",
         description="Evaluate policy for one explicitly selected Agent Skill script without executing it.",
     )
@@ -88,7 +92,7 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
     policy_parser.set_defaults(composition_options_factory=_agent_runtime_composition_options_from_namespace)
 
     execute_parser = subparsers.add_parser(
-        "script-execute",
+        SCRIPT_EXECUTE_COMMAND_NAME,
         help="execute one explicitly selected skill script with metadata-bound approval",
         description=(
             "Execute one explicitly selected Agent Skill script only when the supplied "
@@ -237,7 +241,6 @@ def _argument_type_error(error: ValueError) -> argparse.ArgumentTypeError:
 def _run_command_from_namespace(namespace: argparse.Namespace) -> CliRunCommand:
     return CliRunCommand(
         prompt=namespace.prompt,
-        model_hint=namespace.model_hint,
         skill_ids=tuple(namespace.skill_ids),
         resources=tuple(namespace.resources),
     )

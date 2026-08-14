@@ -30,7 +30,7 @@ def write_developer_workflow_result(result: CommitMessageWorkflowResult, *, stdo
     """Write a developer workflow result and return the matching process exit code."""
     output_text = result.output_text or _format_optional_recommendation(result.recommendation)
     if output_text:
-        _write_line(stdout, output_text)
+        _write_text(stdout, output_text)
 
     if not result.succeeded:
         _write_line(stderr, f"status: {result.status.value}")
@@ -46,7 +46,7 @@ def write_confirmed_commit_result(result: ConfirmedCommitWorkflowResult, *, stdo
     """Write a confirmed commit workflow result and return the matching process exit code."""
     output_text = result.output_text or _format_optional_recommendation(result.recommendation)
     if output_text:
-        _write_line(stdout, output_text)
+        _write_text(stdout, output_text)
 
     if not result.succeeded:
         _write_line(stderr, f"status: {result.status.value}")
@@ -77,6 +77,12 @@ def _write_line(stream: TextIO, text: str) -> None:
     bounded = _bound_text(text)
     stream.write(bounded)
     if not bounded.endswith("\n"):
+        stream.write("\n")
+
+
+def _write_text(stream: TextIO, text: str) -> None:
+    stream.write(text)
+    if not text.endswith("\n"):
         stream.write("\n")
 
 

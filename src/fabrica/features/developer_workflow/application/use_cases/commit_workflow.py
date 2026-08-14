@@ -243,12 +243,12 @@ class CommitMessageWorkflow:
             )
         except (CommitMessageAnalysisError, CommitMessageSynthesisError) as err:
             return CommitMessageWorkflowResult(
-                status=DeveloperWorkflowStatus.MODEL_ERROR,
+                status=err.status,
                 observations=(
                     DeveloperWorkflowObservation(
                         message=str(err),
                         metadata={
-                            "category": "commit_message_model_failure",
+                            "category": _commit_message_runtime_failure_category(err.status),
                             **err.metadata,
                         },
                     ),
@@ -346,11 +346,11 @@ class ConfirmedCommitWorkflow:
             )
         except (CommitMessageAnalysisError, CommitMessageSynthesisError) as err:
             return self._failure_result(
-                DeveloperWorkflowStatus.MODEL_ERROR,
+                err.status,
                 DeveloperWorkflowObservation(
                     message=str(err),
                     metadata={
-                        "category": "commit_message_model_failure",
+                        "category": _commit_message_runtime_failure_category(err.status),
                         **err.metadata,
                     },
                 ),
@@ -461,6 +461,12 @@ class ConfirmedCommitWorkflow:
             status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
             observations=(observation,),
         )
+
+
+def _commit_message_runtime_failure_category(status: DeveloperWorkflowStatus) -> str:
+    if status is DeveloperWorkflowStatus.CONFIGURATION_ERROR:
+        return "commit_message_configuration_failure"
+    return "commit_message_model_failure"
 
 
 def _pre_commit_metadata(result: PreCommitRunResult) -> dict[str, str | int | float | bool | None]:

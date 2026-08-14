@@ -157,7 +157,13 @@ def test_script_policy_command_writes_approved_status_to_stdout() -> None:
     )
 
     assert exit_code == 0
-    assert stdout.getvalue() == "status: approved\n"
+    assert stdout.getvalue() == (
+        "status: approved\n"
+        "approve-script-type: python\n"
+        "approve-suffix: .py\n"
+        "approve-byte-size: 128\n"
+        "approve-content-digest: sha256:abc123\n"
+    )
     assert stderr.getvalue() == ""
 
 

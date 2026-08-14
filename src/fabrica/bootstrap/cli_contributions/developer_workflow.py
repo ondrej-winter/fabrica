@@ -17,6 +17,7 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
     DeveloperWorkflowCliWriters,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.contribution import (
+    DEVELOPER_WORKFLOW_CLI_COMMAND_NAMES,
     DEVELOPER_WORKFLOW_CLI_COMMAND_TYPES,
     register_developer_workflow_cli_commands,
 )
@@ -24,7 +25,10 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.output import (
     write_confirmed_commit_result,
     write_developer_workflow_result,
 )
-from fabrica.features.developer_workflow.adapters.inbound.cli.runner import run_developer_workflow_cli_command
+from fabrica.features.developer_workflow.adapters.inbound.cli.runner import (
+    DeveloperWorkflowCliDependencyError,
+    run_developer_workflow_cli_command,
+)
 
 if TYPE_CHECKING:
     from fabrica.adapters.inbound.cli.contributions import CliExecutionContext
@@ -47,7 +51,7 @@ def create_developer_workflow_cli_contribution(
     """
     return CliContribution(
         name="developer_workflow",
-        command_names=("commit-message", "commit"),
+        command_names=DEVELOPER_WORKFLOW_CLI_COMMAND_NAMES,
         command_types=DEVELOPER_WORKFLOW_CLI_COMMAND_TYPES,
         register_commands=register_developer_workflow_cli_commands,
         run_command=_run_developer_workflow_contribution(dependencies, evidence_writer=evidence_writer),
@@ -63,24 +67,29 @@ def _run_developer_workflow_contribution(
         if not isinstance(command, CliCommitMessageCommand | CliCommitCommand):
             msg = f"developer-workflow CLI contribution cannot handle command: {type(command).__name__}"
             raise CliDispatchError(msg)
-        return run_developer_workflow_cli_command(
-            command,
-            options=DeveloperWorkflowCliOptions(
-                print_usage=context.global_options.print_usage,
-                print_prices=context.global_options.print_prices,
-            ),
-            dependencies=_developer_workflow_dependencies_for_command(command, context=context, overrides=overrides),
-            streams=DeveloperWorkflowCliStreams(
-                stdin=context.stdin,
-                stdout=context.stdout,
-                stderr=context.stderr,
-            ),
-            writers=DeveloperWorkflowCliWriters(
-                evidence=evidence_writer,
-                runtime_result=write_developer_workflow_result,
-                confirmed_commit_result=write_confirmed_commit_result,
-            ),
-        )
+        try:
+            return run_developer_workflow_cli_command(
+                command,
+                options=DeveloperWorkflowCliOptions(
+                    print_usage=context.global_options.print_usage,
+                    print_prices=context.global_options.print_prices,
+                ),
+                dependencies=_developer_workflow_dependencies_for_command(
+                    command, context=context, overrides=overrides
+                ),
+                streams=DeveloperWorkflowCliStreams(
+                    stdin=context.stdin,
+                    stdout=context.stdout,
+                    stderr=context.stderr,
+                ),
+                writers=DeveloperWorkflowCliWriters(
+                    evidence=evidence_writer,
+                    runtime_result=write_developer_workflow_result,
+                    confirmed_commit_result=write_confirmed_commit_result,
+                ),
+            )
+        except DeveloperWorkflowCliDependencyError as err:
+            raise CliConfigurationError(str(err)) from err
 
     return run
 

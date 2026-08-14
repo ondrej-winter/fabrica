@@ -3,6 +3,7 @@
 from fabrica.features.agent_runtime.application.dtos import LocalAgentRunResult
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageRecommendation,
+    DeveloperWorkflowStatus,
     SynthesizeCommitMessageCommand,
 )
 from fabrica.features.developer_workflow.application.ports import CommitMessageSynthesisError
@@ -36,6 +37,14 @@ def _parse_synthesis_runtime_result(runtime_result: LocalAgentRunResult) -> Comm
         msg = "commit-message synthesis runtime failed"
         raise CommitMessageSynthesisError(
             msg,
+            status=_developer_workflow_status_from_runtime(runtime_result.status),
             metadata=safe_runtime_metadata(runtime_result.status.value, runtime_result.output_text),
         )
     return parse_synthesis_output(runtime_result.output_text)
+
+
+def _developer_workflow_status_from_runtime(status: object) -> DeveloperWorkflowStatus:
+    runtime_status = getattr(status, "value", status)
+    if runtime_status == "configuration_error":
+        return DeveloperWorkflowStatus.CONFIGURATION_ERROR
+    return DeveloperWorkflowStatus.MODEL_ERROR

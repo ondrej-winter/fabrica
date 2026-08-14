@@ -28,6 +28,10 @@ if TYPE_CHECKING:
     from fabrica.features.agent_runtime.application.ports import SkillScriptPolicyEvaluator, SkillScriptRunner
 
 
+class AgentRuntimeCliDependencyError(RuntimeError):
+    """Raised when the agent-runtime CLI adapter is missing a required dependency."""
+
+
 def run_agent_runtime_cli_command(
     command: CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand,
     *,
@@ -116,5 +120,5 @@ def _resource_selections_from_command(command: CliRunCommand) -> tuple[SelectedS
 def _require_dependency(dependency: object | None, *, dependency_name: str):
     if dependency is None:
         msg = f"agent-runtime CLI dependency is not configured: {dependency_name}"
-        raise RuntimeError(msg)
+        raise AgentRuntimeCliDependencyError(msg)
     return dependency

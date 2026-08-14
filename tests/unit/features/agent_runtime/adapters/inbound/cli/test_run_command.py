@@ -172,6 +172,24 @@ def test_run_command_maps_prompt_and_model_to_runtime_command() -> None:
     assert runtime.calls == [LocalAgentRunCommand(prompt="Reply with pong", model_hint="codex-compatible")]
 
 
+def test_run_command_writes_success_output_without_cli_line_truncation() -> None:
+    long_output = "x" * (EXPECTED_BOUNDED_OUTPUT_LINE_CHARS + 10)
+    runtime = FakeRuntime(
+        result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text=long_output),
+    )
+    stdout = StringIO()
+
+    exit_code = run_feature_cli_command(
+        CliRunCommand(prompt="Reply with pong"),
+        dependencies=AgentRuntimeCliDependencies(runtime=runtime),
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert exit_code == 0
+    assert stdout.getvalue() == f"{long_output}\n"
+
+
 def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> None:
     runtime = FakeRuntime(result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="unused"))
     selected_context_runtime = FakeSelectedContextRuntime()

@@ -245,6 +245,17 @@ uv run fabrica script-policy \
   --skill-root .agents/skills
 ```
 
+When policy approves the selected script, the command prints the exact approval
+metadata needed for a later execution request:
+
+```text
+status: approved
+approve-script-type: python
+approve-suffix: .py
+approve-byte-size: 128
+approve-content-digest: sha256:abc123
+```
+
 Selected scripts can also be executed through the CLI only when the caller
 supplies explicit, non-interactive approval metadata bound to the inspected
 script:
@@ -861,7 +872,3 @@ subcommand registration, adapter-local parsed command models, CLI runners, and
 output mapping under `features/<feature>/adapters/inbound/cli/`. Bootstrap-owned
 factories under `src/fabrica/bootstrap/cli_contributions/` assemble those feature
 CLI adapters with default concrete dependencies.
-
-See
-[`docs/adr/0001-product-cli-contribution-architecture.md`](docs/adr/0001-product-cli-contribution-architecture.md)
-for the accepted CLI contribution architecture decision.

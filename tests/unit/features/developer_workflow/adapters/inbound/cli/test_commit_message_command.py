@@ -145,6 +145,33 @@ def test_commit_message_command_uses_injected_workflow_and_writes_success_output
     assert workflow.calls == [GenerateCommitMessageCommand(skill_id="team-style")]
 
 
+def test_commit_message_command_writes_success_output_without_cli_line_truncation() -> None:
+    long_summary = "x" * 4_010
+    recommendation = CommitMessageRecommendation(
+        summary=long_summary,
+        rationale="The staged evidence supports x.",
+        commit_message="feat: add x",
+    )
+    workflow = FakeCommitMessageWorkflow(
+        result=CommitMessageWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
+            recommendation=recommendation,
+        ),
+    )
+    stdout = StringIO()
+
+    exit_code = run_feature_cli_command(
+        CliCommitMessageCommand(),
+        dependencies=DeveloperWorkflowCliDependencies(commit_message_workflow=workflow),
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert exit_code == 0
+    assert long_summary in stdout.getvalue()
+    assert "...<truncated>" not in stdout.getvalue()
+
+
 def test_commit_message_invocation_appends_requested_usage_and_price_evidence() -> None:
     recommendation = CommitMessageRecommendation(
         summary="Adds x.",

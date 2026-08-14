@@ -27,6 +27,10 @@ if TYPE_CHECKING:
     from fabrica.features.developer_workflow.application.dtos import ConfirmedCommitWorkflowResult
 
 
+class DeveloperWorkflowCliDependencyError(RuntimeError):
+    """Raised when the developer-workflow CLI adapter is missing a required dependency."""
+
+
 def run_developer_workflow_cli_command(
     command: CliCommitMessageCommand | CliCommitCommand,
     *,
@@ -233,7 +237,7 @@ def _write_confirmed_commit_result(
 def _require_dependency(dependency: object | None, *, dependency_name: str):
     if dependency is None:
         msg = f"developer-workflow CLI dependency is not configured: {dependency_name}"
-        raise RuntimeError(msg)
+        raise DeveloperWorkflowCliDependencyError(msg)
     return dependency
 
 

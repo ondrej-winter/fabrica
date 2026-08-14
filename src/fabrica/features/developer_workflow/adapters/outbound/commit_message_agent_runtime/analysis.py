@@ -3,6 +3,7 @@
 from fabrica.features.agent_runtime.application.dtos import LocalAgentRunResult
 from fabrica.features.developer_workflow.application.dtos import (
     AnalyzeStagedFileForCommitMessageCommand,
+    DeveloperWorkflowStatus,
     StagedFileCommitEvidence,
 )
 from fabrica.features.developer_workflow.application.ports import CommitMessageAnalysisError
@@ -39,9 +40,17 @@ def _parse_analysis_runtime_result(
         msg = "commit-message analysis runtime failed"
         raise CommitMessageAnalysisError(
             msg,
+            status=_developer_workflow_status_from_runtime(runtime_result.status),
             metadata={
                 "path": command.staged_file.path,
                 **safe_runtime_metadata(runtime_result.status.value, runtime_result.output_text),
             },
         )
     return parse_analysis_output(runtime_result.output_text, command)
+
+
+def _developer_workflow_status_from_runtime(status: object) -> DeveloperWorkflowStatus:
+    runtime_status = getattr(status, "value", status)
+    if runtime_status == "configuration_error":
+        return DeveloperWorkflowStatus.CONFIGURATION_ERROR
+    return DeveloperWorkflowStatus.MODEL_ERROR

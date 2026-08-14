@@ -18,6 +18,7 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     AgentRuntimeCliWriters,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.contribution import (
+    AGENT_RUNTIME_CLI_COMMAND_NAMES,
     AGENT_RUNTIME_CLI_COMMAND_TYPES,
     register_agent_runtime_cli_commands,
 )
@@ -26,7 +27,10 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.output import (
     write_script_execution_result,
     write_script_policy_result,
 )
-from fabrica.features.agent_runtime.adapters.inbound.cli.runner import run_agent_runtime_cli_command
+from fabrica.features.agent_runtime.adapters.inbound.cli.runner import (
+    AgentRuntimeCliDependencyError,
+    run_agent_runtime_cli_command,
+)
 
 if TYPE_CHECKING:
     from fabrica.adapters.inbound.cli.contributions import CliExecutionContext
@@ -47,7 +51,7 @@ def create_agent_runtime_cli_contribution(
     """Create the agent-runtime CLI contribution with bootstrap-owned defaults."""
     return CliContribution(
         name="agent_runtime",
-        command_names=("run", "script-policy", "script-execute"),
+        command_names=AGENT_RUNTIME_CLI_COMMAND_NAMES,
         command_types=AGENT_RUNTIME_CLI_COMMAND_TYPES,
         register_commands=register_agent_runtime_cli_commands,
         run_command=_run_agent_runtime_contribution(dependencies, evidence_writer=evidence_writer),
@@ -63,21 +67,24 @@ def _run_agent_runtime_contribution(
         if not isinstance(command, CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand):
             msg = f"agent-runtime CLI contribution cannot handle command: {type(command).__name__}"
             raise CliDispatchError(msg)
-        return run_agent_runtime_cli_command(
-            command,
-            options=AgentRuntimeCliOptions(
-                print_usage=context.global_options.print_usage,
-                print_prices=context.global_options.print_prices,
-            ),
-            dependencies=_agent_runtime_dependencies_for_command(command, context=context, overrides=overrides),
-            streams=AgentRuntimeCliStreams(stdout=context.stdout, stderr=context.stderr),
-            writers=AgentRuntimeCliWriters(
-                run_result=write_run_result,
-                evidence=evidence_writer,
-                script_policy_result=write_script_policy_result,
-                script_execution_result=write_script_execution_result,
-            ),
-        )
+        try:
+            return run_agent_runtime_cli_command(
+                command,
+                options=AgentRuntimeCliOptions(
+                    print_usage=context.global_options.print_usage,
+                    print_prices=context.global_options.print_prices,
+                ),
+                dependencies=_agent_runtime_dependencies_for_command(command, context=context, overrides=overrides),
+                streams=AgentRuntimeCliStreams(stdout=context.stdout, stderr=context.stderr),
+                writers=AgentRuntimeCliWriters(
+                    run_result=write_run_result,
+                    evidence=evidence_writer,
+                    script_policy_result=write_script_policy_result,
+                    script_execution_result=write_script_execution_result,
+                ),
+            )
+        except AgentRuntimeCliDependencyError as err:
+            raise CliConfigurationError(str(err)) from err
 
     return run
 
