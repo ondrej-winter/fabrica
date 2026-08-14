@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from fabrica.adapters.inbound.cli.contracts import CliCommandRegistration
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -36,22 +37,26 @@ def register_developer_workflow_cli_commands(
     commit_command: DeveloperWorkflowCliHandler[CliCommitCommand],
 ) -> None:
     """Register developer-workflow owned commands on the product CLI parser."""
-    commit_message_parser = commands.add_command(
-        COMMIT_MESSAGE_COMMAND_NAME,
-        handler=_handler_for_commit_message_command(commit_message_command),
-        command_help="preview a read-only commit message for staged git changes",
-        description="Read staged git diff context and propose a commit message without creating a commit.",
+    commit_message_parser = commands.register_command(
+        CliCommandRegistration(
+            name=COMMIT_MESSAGE_COMMAND_NAME,
+            handler=_handler_for_commit_message_command(commit_message_command),
+            summary="preview a read-only commit message for staged git changes",
+            description="Read staged git diff context and propose a commit message without creating a commit.",
+        ),
     )
     _add_commit_message_generation_flags(commit_message_parser)
     _add_common_skill_root_flags(commit_message_parser)
 
-    commit_parser = commands.add_command(
-        COMMIT_COMMAND_NAME,
-        handler=_handler_for_commit_command(commit_command),
-        command_help="run pre-commit, then create a git commit from a generated message after confirmation",
-        description=(
-            "Run the staged pre-commit quality gate before message generation, "
-            "prompt for confirmation, then create a git commit only after approval."
+    commit_parser = commands.register_command(
+        CliCommandRegistration(
+            name=COMMIT_COMMAND_NAME,
+            handler=_handler_for_commit_command(commit_command),
+            summary="run pre-commit, then create a git commit from a generated message after confirmation",
+            description=(
+                "Run the staged pre-commit quality gate before message generation, "
+                "prompt for confirmation, then create a git commit only after approval."
+            ),
         ),
     )
     _add_commit_message_generation_flags(commit_parser)

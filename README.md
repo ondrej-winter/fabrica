@@ -167,8 +167,8 @@ uv run fabrica commit \
   --skill-root .agents/skills
 ```
 
-Fabrica-wide reporting and diagnostic flags are passed before the subcommand and
-apply to commands that produce model runtime evidence:
+Fabrica-wide reporting and diagnostic flags may be passed before or after the
+subcommand and apply to commands that produce model runtime evidence:
 
 ```bash
 uv run fabrica --print-usage --print-prices --verbose-diagnostics commit-message \
@@ -176,11 +176,11 @@ uv run fabrica --print-usage --print-prices --verbose-diagnostics commit-message
   --skill-root .agents/skills
 ```
 
-For the interactive commit workflow, place the same global reporting flags before
-the `commit` subcommand:
+For the interactive commit workflow, the same global reporting flags are accepted
+in either position:
 
 ```bash
-uv run fabrica --print-usage --print-prices --verbose-diagnostics commit \
+uv run fabrica commit --print-usage --print-prices --verbose-diagnostics \
   --skill conventional-commits \
   --skill-root .agents/skills
 ```
@@ -867,9 +867,10 @@ feature slices:
 
 The product CLI keeps the same boundaries. Generic shell modules under
 `src/fabrica/adapters/inbound/cli/` own feature-neutral parser construction,
-global option parsing, and shared CLI contracts only; they do not import feature
-slices. Feature slices own their subcommand registration, adapter-local parsed
-command models, CLI runners, and output mapping under
+global option parsing, execution-only invocation dispatch, and shared CLI
+contracts only; they do not import feature slices. Feature slices own their
+subcommand registration values, adapter-local parsed command models, CLI runners,
+and output mapping under
 `features/<feature>/adapters/inbound/cli/`. Bootstrap-owned handler factories in
 `src/fabrica/bootstrap/cli.py` attach per-command handlers and lazily assemble
 those feature CLI adapters with default concrete dependencies only when the

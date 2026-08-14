@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from fabrica.adapters.inbound.cli.contracts import CliCommandRegistration
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
@@ -45,11 +46,13 @@ def register_agent_runtime_cli_commands(
     script_execute_command: AgentRuntimeCliHandler[CliScriptExecuteCommand],
 ) -> None:
     """Register agent-runtime owned commands on the product CLI parser."""
-    run_parser = commands.add_command(
-        RUN_COMMAND_NAME,
-        handler=_handler_for_run_command(run_command),
-        command_help="run one local runtime prompt",
-        description="Run one local runtime prompt with explicitly selected context only.",
+    run_parser = commands.register_command(
+        CliCommandRegistration(
+            name=RUN_COMMAND_NAME,
+            handler=_handler_for_run_command(run_command),
+            summary="run one local runtime prompt",
+            description="Run one local runtime prompt with explicitly selected context only.",
+        ),
     )
     run_parser.add_argument(
         "--prompt",
@@ -76,11 +79,13 @@ def register_agent_runtime_cli_commands(
     )
     _add_common_skill_root_flags(run_parser)
 
-    policy_parser = commands.add_command(
-        SCRIPT_POLICY_COMMAND_NAME,
-        handler=_handler_for_script_policy_command(script_policy_command),
-        command_help="inspect selected skill script policy without executing it",
-        description="Evaluate policy for one explicitly selected Agent Skill script without executing it.",
+    policy_parser = commands.register_command(
+        CliCommandRegistration(
+            name=SCRIPT_POLICY_COMMAND_NAME,
+            handler=_handler_for_script_policy_command(script_policy_command),
+            summary="inspect selected skill script policy without executing it",
+            description="Evaluate policy for one explicitly selected Agent Skill script without executing it.",
+        ),
     )
     policy_parser.add_argument(
         "--skill-id",
@@ -96,13 +101,15 @@ def register_agent_runtime_cli_commands(
     )
     _add_common_skill_root_flags(policy_parser)
 
-    execute_parser = commands.add_command(
-        SCRIPT_EXECUTE_COMMAND_NAME,
-        handler=_handler_for_script_execute_command(script_execute_command),
-        command_help="execute one explicitly selected skill script with metadata-bound approval",
-        description=(
-            "Execute one explicitly selected Agent Skill script only when the supplied "
-            "non-interactive approval metadata matches the inspected script. This is not production sandboxing."
+    execute_parser = commands.register_command(
+        CliCommandRegistration(
+            name=SCRIPT_EXECUTE_COMMAND_NAME,
+            handler=_handler_for_script_execute_command(script_execute_command),
+            summary="execute one explicitly selected skill script with metadata-bound approval",
+            description=(
+                "Execute one explicitly selected Agent Skill script only when the supplied "
+                "non-interactive approval metadata matches the inspected script. This is not production sandboxing."
+            ),
         ),
     )
     execute_parser.add_argument(

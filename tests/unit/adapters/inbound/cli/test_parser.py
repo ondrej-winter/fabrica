@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from fabrica.adapters.inbound.cli import (
+    CliCommandHandler,
+    CliCommandRegistration,
     CliCommandRegistry,
     CliConfigurationError,
     CliExecutionContext,
@@ -121,22 +123,60 @@ def _recording_command_registrars(handlers: RecordingHandlers) -> tuple[CliComma
 
 
 def test_parse_cli_invocation_round_trips_bound_handler() -> None:
+    handlers = RecordingHandlers()
     invocation = _parse_cli_invocation(
         ("synthetic",),
-        command_registrars=(_register_synthetic_command,),
+        command_registrars=(_synthetic_command_registrar(handlers),),
+    )
+    exit_code = invocation.execute(stdin=StringIO(), stdout=StringIO(), stderr=StringIO())
+
+    assert exit_code == 0
+    assert handlers.invocation == ParsedInvocation(
+        command="synthetic",
+        global_options=CliGlobalOptions(),
+        composition_options=None,
     )
 
-    assert invocation.handler is _synthetic_handler
-    assert invocation.global_options == CliGlobalOptions()
+
+def _synthetic_command_registrar(handlers: RecordingHandlers) -> CliCommandRegistrar:
+    def register(commands: CliCommandRegistry) -> None:
+        commands.register_command(
+            CliCommandRegistration(
+                name="synthetic",
+                handler=_synthetic_handler(handlers),
+                summary="synthetic command",
+            ),
+        )
+
+    return register
 
 
 def _register_synthetic_command(commands: CliCommandRegistry) -> None:
-    commands.add_command("synthetic", handler=_synthetic_handler)
+    commands.register_command(
+        CliCommandRegistration(
+            name="synthetic",
+            handler=_noop_synthetic_handler,
+            summary="synthetic command",
+        ),
+    )
 
 
-def _synthetic_handler(namespace: object, context: CliExecutionContext) -> int:
+def _noop_synthetic_handler(namespace: object, context: CliExecutionContext) -> int:
     _ = (namespace, context)
     return 0
+
+
+def _synthetic_handler(handlers: RecordingHandlers) -> CliCommandHandler:
+    def run(namespace: object, context: CliExecutionContext) -> int:
+        _ = (namespace,)
+        handlers.invocation = ParsedInvocation(
+            command="synthetic",
+            global_options=context.global_options,
+            composition_options=None,
+        )
+        return 0
+
+    return run
 
 
 def test_parse_cli_invocation_rejects_duplicate_command_registration() -> None:
@@ -145,8 +185,20 @@ def test_parse_cli_invocation_rejects_duplicate_command_registration() -> None:
 
 
 def _register_duplicate_synthetic_commands(commands: CliCommandRegistry) -> None:
-    commands.add_command("synthetic", handler=_synthetic_handler)
-    commands.add_command("synthetic", handler=_synthetic_handler)
+    commands.register_command(
+        CliCommandRegistration(
+            name="synthetic",
+            handler=_noop_synthetic_handler,
+            summary="synthetic command",
+        ),
+    )
+    commands.register_command(
+        CliCommandRegistration(
+            name="synthetic",
+            handler=_noop_synthetic_handler,
+            summary="synthetic command",
+        ),
+    )
 
 
 def test_build_parser_renders_help_without_runtime_side_effects(capsys: pytest.CaptureFixture[str]) -> None:
@@ -262,11 +314,42 @@ def test_parse_commit_message_command_supports_skill_root_and_diagnostics_overri
     )
 
 
-def test_parse_command_rejects_global_options_after_subcommand() -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        parse_args(["commit-message", "--verbose-diagnostics"])
+def test_parse_command_accepts_global_options_after_subcommand() -> None:
+    invocation = parse_args(["commit-message", "--verbose-diagnostics"])
 
-    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
+    assert invocation == ParsedInvocation(
+        command=CliCommitMessageCommand(skill_id="conventional-commits"),
+        global_options=CliGlobalOptions(verbose_diagnostics=True),
+        composition_options=CliDeveloperWorkflowCompositionOptions(),
+    )
+
+
+@pytest.mark.parametrize(
+    ("registration", "expected_message"),
+    [
+        (
+            CliCommandRegistration(name="", handler=_noop_synthetic_handler, summary="synthetic command"),
+            "name must be a non-empty trimmed value",
+        ),
+        (
+            CliCommandRegistration(name=" synthetic", handler=_noop_synthetic_handler, summary="synthetic command"),
+            "name must be a non-empty trimmed value",
+        ),
+        (
+            CliCommandRegistration(name="synthetic", handler=_noop_synthetic_handler, summary=""),
+            "summary must be a non-empty trimmed value",
+        ),
+    ],
+)
+def test_parse_cli_invocation_rejects_invalid_command_registration(
+    registration: CliCommandRegistration,
+    expected_message: str,
+) -> None:
+    def register_invalid_command(commands: CliCommandRegistry) -> None:
+        commands.register_command(registration)
+
+    with pytest.raises(CliConfigurationError, match=expected_message):
+        _parse_cli_invocation(("synthetic",), command_registrars=(register_invalid_command,))
 
 
 def test_parse_commit_message_command_supports_usage_and_price_reporting() -> None:

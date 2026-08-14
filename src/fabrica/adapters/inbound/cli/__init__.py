@@ -3,6 +3,7 @@
 from fabrica.adapters.inbound.cli.contracts import (
     CliCommandHandler,
     CliCommandRegistrar,
+    CliCommandRegistration,
     CliCommandRegistry,
     CliConfigurationError,
     CliError,
@@ -18,6 +19,7 @@ from fabrica.adapters.inbound.cli.parser import (
 __all__ = [
     "CliCommandHandler",
     "CliCommandRegistrar",
+    "CliCommandRegistration",
     "CliCommandRegistry",
     "CliConfigurationError",
     "CliError",

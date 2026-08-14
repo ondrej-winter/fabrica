@@ -14,15 +14,21 @@ if TYPE_CHECKING:
 class CliCommandRegistry(Protocol):
     """Public behavior needed to register feature-owned CLI commands."""
 
-    def add_command(
+    def register_command(
         self,
-        name: str,
-        *,
-        handler: CliCommandHandler,
-        command_help: str | None = None,
-        description: str | None = None,
+        registration: CliCommandRegistration,
     ) -> argparse.ArgumentParser:
         """Add one named subcommand parser and bind its execution handler."""
+
+
+@dataclass(frozen=True, slots=True)
+class CliCommandRegistration:
+    """Feature-owned command registration for the product CLI shell."""
+
+    name: str
+    handler: CliCommandHandler
+    summary: str
+    description: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,25 +53,11 @@ class CliExecutionContext:
 type CliCommandHandler = Callable[[argparse.Namespace, CliExecutionContext], int]
 
 
-@dataclass(frozen=True, slots=True)
-class CliInvocation:
+class CliInvocation(Protocol):
     """Parsed CLI invocation ready to execute through a bound command handler."""
-
-    namespace: argparse.Namespace
-    global_options: CliGlobalOptions
-    handler: CliCommandHandler
 
     def execute(self, *, stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
         """Run the selected CLI command with explicit process streams."""
-        return self.handler(
-            self.namespace,
-            CliExecutionContext(
-                global_options=self.global_options,
-                stdin=stdin,
-                stdout=stdout,
-                stderr=stderr,
-            ),
-        )
 
 
 type CliCommandRegistrar = Callable[[CliCommandRegistry], None]
@@ -82,6 +74,7 @@ class CliConfigurationError(CliError):
 __all__ = [
     "CliCommandHandler",
     "CliCommandRegistrar",
+    "CliCommandRegistration",
     "CliCommandRegistry",
     "CliConfigurationError",
     "CliError",
