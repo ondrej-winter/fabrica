@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import TextIO
 
 from fabrica.adapters.inbound.cli import (
-    CliCommand,
     CliCommandExecutionOptions,
     CliInvocation,
 )
@@ -47,7 +46,7 @@ EXPECTED_TIMED_OUT_EXIT_CODE = 7
 
 
 def run_product_cli_command(
-    invocation: CliCommand | CliInvocation,
+    invocation: CliInvocation,
     *,
     dependencies: AgentRuntimeCliDependencies | None = None,
     stdin: TextIO | None = None,

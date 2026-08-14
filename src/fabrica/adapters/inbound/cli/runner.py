@@ -6,21 +6,14 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TextIO
 
-from fabrica.adapters.inbound.cli.contributions import (
-    CliDispatchError,
-    CliExecutionContext,
-    validate_cli_contributions,
-)
-from fabrica.adapters.inbound.cli.options import CliGlobalOptions
-from fabrica.adapters.inbound.cli.parser import (
-    CliCommand,
-    CliInvocation,
-)
+from fabrica.adapters.inbound.cli.contracts import CliDispatchError
+from fabrica.adapters.inbound.cli.contributions import CliExecutionContext
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from fabrica.adapters.inbound.cli.contributions import CliContribution
+    from fabrica.adapters.inbound.cli.parser import CliInvocation
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,29 +27,21 @@ class CliCommandExecutionOptions:
 
 
 def run_cli_command(
-    invocation: CliCommand | CliInvocation,
+    invocation: CliInvocation,
     *,
     options: CliCommandExecutionOptions,
 ) -> int:
     """Run one parsed CLI command and return a process exit code."""
-    validate_cli_contributions(options.contributions)
-    command, global_options, composition_options = _normalize_invocation(invocation)
     context = CliExecutionContext(
-        global_options=global_options,
-        composition_options=composition_options,
+        global_options=invocation.global_options,
+        composition_options=invocation.composition_options,
         stdin=options.stdin or sys.stdin,
         stdout=options.stdout or sys.stdout,
         stderr=options.stderr or sys.stderr,
     )
     for contribution in options.contributions:
-        if contribution.can_handle(command):
-            return contribution.run_command(command, context)
+        if contribution.can_handle(invocation.command):
+            return contribution.run_command(invocation.command, context)
 
-    msg = f"no CLI contribution registered for command: {type(command).__name__}"
+    msg = f"no CLI contribution registered for command: {type(invocation.command).__name__}"
     raise CliDispatchError(msg)
-
-
-def _normalize_invocation(invocation: CliCommand | CliInvocation) -> tuple[CliCommand, CliGlobalOptions, object | None]:
-    if isinstance(invocation, CliInvocation):
-        return invocation.command, invocation.global_options, invocation.composition_options
-    return invocation, CliGlobalOptions(), None

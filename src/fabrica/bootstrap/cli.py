@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Protocol, TextIO
 
-from fabrica.adapters.inbound.cli.contributions import CliError
+from fabrica.adapters.inbound.cli.contracts import CliError
 from fabrica.adapters.inbound.cli.output import write_line, write_model_evidence_report
 from fabrica.adapters.inbound.cli.parser import parse_args
 from fabrica.adapters.inbound.cli.runner import CliCommandExecutionOptions, run_cli_command
@@ -57,56 +57,26 @@ def create_cli_contributions(
     return (
         create_agent_runtime_cli_contribution(
             dependencies=agent_runtime_dependencies,
-            evidence_writer=_write_requested_agent_runtime_model_evidence,
+            evidence_writer=_write_requested_model_evidence,
         ),
         create_developer_workflow_cli_contribution(
             dependencies=developer_workflow_dependencies,
-            evidence_writer=_write_requested_developer_workflow_model_evidence,
+            evidence_writer=_write_requested_model_evidence,
         ),
-    )
-
-
-def _write_requested_agent_runtime_model_evidence(
-    result: ModelEvidenceResult,
-    *,
-    include_usage: bool,
-    include_prices: bool,
-    stdout: TextIO,
-) -> None:
-    _write_requested_model_evidence(
-        result,
-        print_usage=include_usage,
-        print_prices=include_prices,
-        stdout=stdout,
-    )
-
-
-def _write_requested_developer_workflow_model_evidence(
-    result: ModelEvidenceResult,
-    *,
-    include_usage: bool,
-    include_prices: bool,
-    stdout: TextIO,
-) -> None:
-    _write_requested_model_evidence(
-        result,
-        print_usage=include_usage,
-        print_prices=include_prices,
-        stdout=stdout,
     )
 
 
 def _write_requested_model_evidence(
     result: ModelEvidenceResult,
     *,
-    print_usage: bool,
-    print_prices: bool,
+    include_usage: bool,
+    include_prices: bool,
     stdout: TextIO,
 ) -> None:
     write_model_evidence_report(
         usage_evidence=result.usage_evidence,
         cost_evidence=result.cost_evidence,
         stdout=stdout,
-        include_usage=print_usage,
-        include_prices=print_prices,
+        include_usage=include_usage,
+        include_prices=include_prices,
     )

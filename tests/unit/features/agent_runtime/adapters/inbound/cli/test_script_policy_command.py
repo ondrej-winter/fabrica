@@ -9,7 +9,6 @@ import pytest
 
 import fabrica.bootstrap.cli_contributions.agent_runtime as agent_runtime_cli_contribution
 from fabrica.adapters.inbound.cli import (
-    CliCommand,
     CliCommandExecutionOptions,
     CliInvocation,
 )
@@ -44,7 +43,7 @@ EXPECTED_POLICY_DENIED_EXIT_CODE = 5
 
 
 def run_product_cli_command(
-    invocation: CliCommand | CliInvocation,
+    invocation: CliInvocation,
     *,
     dependencies: AgentRuntimeCliDependencies | None = None,
     stdin: TextIO | None = None,

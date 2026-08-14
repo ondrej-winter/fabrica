@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli.contributions import CliConfigurationError, CliContribution, CliDispatchError
+from fabrica.adapters.inbound.cli.contributions import (
+    CliConfigurationError,
+    CliContribution,
+    resolve_composition_options,
+)
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
@@ -33,6 +37,8 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.runner import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from fabrica.adapters.inbound.cli.contributions import CliExecutionContext
     from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import EvidenceWriter
     from fabrica.features.agent_runtime.application.ports import (
@@ -47,7 +53,7 @@ def create_agent_runtime_cli_contribution(
     *,
     dependencies: AgentRuntimeCliDependencies | None = None,
     evidence_writer: EvidenceWriter,
-) -> CliContribution:
+) -> CliContribution[CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand]:
     """Create the agent-runtime CLI contribution with bootstrap-owned defaults."""
     return CliContribution(
         name="agent_runtime",
@@ -62,11 +68,10 @@ def _run_agent_runtime_contribution(
     overrides: AgentRuntimeCliDependencies | None,
     *,
     evidence_writer: EvidenceWriter,
-):
-    def run(command: object, context: CliExecutionContext) -> int:
-        if not isinstance(command, CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand):
-            msg = f"agent-runtime CLI contribution cannot handle command: {type(command).__name__}"
-            raise CliDispatchError(msg)
+) -> Callable[[CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand, CliExecutionContext], int]:
+    def run(
+        command: CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand, context: CliExecutionContext
+    ) -> int:
         try:
             return run_agent_runtime_cli_command(
                 command,
@@ -124,15 +129,12 @@ def _agent_runtime_dependencies_for_command(
 
 
 def _agent_runtime_composition_options_from_context(context: CliExecutionContext) -> AgentRuntimeCliCompositionOptions:
-    if context.composition_options is None:
-        return AgentRuntimeCliCompositionOptions()
-    if not isinstance(context.composition_options, AgentRuntimeCliCompositionOptions):
-        msg = (
-            "agent-runtime CLI contribution received incompatible composition options: "
-            f"{type(context.composition_options).__name__}"
-        )
-        raise CliConfigurationError(msg)
-    return context.composition_options
+    return resolve_composition_options(
+        context,
+        AgentRuntimeCliCompositionOptions,
+        contribution_name="agent-runtime",
+        default_factory=AgentRuntimeCliCompositionOptions,
+    )
 
 
 def _create_default_selected_context_runtime(

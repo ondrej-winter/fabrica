@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING
 
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
@@ -16,16 +16,12 @@ from fabrica.features.developer_workflow.application.dtos import (
     GenerateCommitMessageCommand,
 )
 
+if TYPE_CHECKING:
+    from fabrica.adapters.inbound.cli.contracts import CliSubparsers
+
 COMMIT_MESSAGE_COMMAND_NAME = "commit-message"
 COMMIT_COMMAND_NAME = "commit"
 DEVELOPER_WORKFLOW_CLI_COMMAND_NAMES = (COMMIT_MESSAGE_COMMAND_NAME, COMMIT_COMMAND_NAME)
-
-
-class CliSubparsers(Protocol):
-    """Subparser behavior needed by developer-workflow CLI registration."""
-
-    def add_parser(self, name: str, **kwargs: object) -> argparse.ArgumentParser:
-        """Add one named subcommand parser to the product CLI."""
 
 
 def register_developer_workflow_cli_commands(subparsers: CliSubparsers) -> None:

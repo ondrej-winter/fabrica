@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli.contributions import CliConfigurationError, CliContribution, CliDispatchError
+from fabrica.adapters.inbound.cli.contributions import (
+    CliConfigurationError,
+    CliContribution,
+    resolve_composition_options,
+)
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -31,6 +35,8 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.runner import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from fabrica.adapters.inbound.cli.contributions import CliExecutionContext
     from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import EvidenceWriter
     from fabrica.features.developer_workflow.application.ports import (
@@ -43,7 +49,7 @@ def create_developer_workflow_cli_contribution(
     *,
     dependencies: DeveloperWorkflowCliDependencies | None = None,
     evidence_writer: EvidenceWriter,
-) -> CliContribution:
+) -> CliContribution[CliCommitMessageCommand | CliCommitCommand]:
     """Create the developer-workflow CLI contribution with bootstrap-owned defaults.
 
     The feature runner maps only use-case input into application commands. Default
@@ -62,11 +68,8 @@ def _run_developer_workflow_contribution(
     overrides: DeveloperWorkflowCliDependencies | None,
     *,
     evidence_writer: EvidenceWriter,
-):
-    def run(command: object, context: CliExecutionContext) -> int:
-        if not isinstance(command, CliCommitMessageCommand | CliCommitCommand):
-            msg = f"developer-workflow CLI contribution cannot handle command: {type(command).__name__}"
-            raise CliDispatchError(msg)
+) -> Callable[[CliCommitMessageCommand | CliCommitCommand, CliExecutionContext], int]:
+    def run(command: CliCommitMessageCommand | CliCommitCommand, context: CliExecutionContext) -> int:
         try:
             return run_developer_workflow_cli_command(
                 command,
@@ -113,15 +116,12 @@ def _developer_workflow_dependencies_for_command(
 def _developer_workflow_composition_options_from_context(
     context: CliExecutionContext,
 ) -> CliDeveloperWorkflowCompositionOptions:
-    if context.composition_options is None:
-        return CliDeveloperWorkflowCompositionOptions()
-    if not isinstance(context.composition_options, CliDeveloperWorkflowCompositionOptions):
-        msg = (
-            "developer-workflow CLI contribution received incompatible composition options: "
-            f"{type(context.composition_options).__name__}"
-        )
-        raise CliConfigurationError(msg)
-    return context.composition_options
+    return resolve_composition_options(
+        context,
+        CliDeveloperWorkflowCompositionOptions,
+        contribution_name="developer-workflow",
+        default_factory=CliDeveloperWorkflowCompositionOptions,
+    )
 
 
 def _create_default_commit_message_workflow(

@@ -9,9 +9,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from fabrica.adapters.inbound.cli import CliCommandExecutionOptions, build_parser, run_cli_command
+from fabrica.adapters.inbound.cli import CliCommandExecutionOptions, CliInvocation, build_parser, run_cli_command
 from fabrica.adapters.inbound.cli import parse_args as parse_cli_args
-from fabrica.adapters.inbound.cli.contributions import CliConfigurationError, CliContribution, CliDispatchError
+from fabrica.adapters.inbound.cli.contracts import CliConfigurationError, CliDispatchError
+from fabrica.adapters.inbound.cli.contributions import CliContribution
 from fabrica.bootstrap import cli as bootstrap_cli
 from fabrica.bootstrap.cli import create_cli_contributions
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
@@ -36,7 +37,7 @@ from fabrica.features.developer_workflow.application.dtos import (
 )
 
 if TYPE_CHECKING:
-    from fabrica.adapters.inbound.cli.contributions import CliSubparsers
+    from fabrica.adapters.inbound.cli.contracts import CliSubparsers
 
 ARGPARSE_USAGE_ERROR = 2
 CLI_CONFIGURATION_ERROR_EXIT_CODE = 2
@@ -59,12 +60,15 @@ def test_runner_dispatches_only_supplied_contributions() -> None:
     """Keep command dispatch explicit instead of hidden behind a default registry."""
     command = _SyntheticCommand(name="synthetic")
 
-    exit_code = run_cli_command(command, options=CliCommandExecutionOptions(contributions=(_synthetic_contribution(),)))
+    exit_code = run_cli_command(
+        CliInvocation(command=command),
+        options=CliCommandExecutionOptions(contributions=(_synthetic_contribution(),)),
+    )
 
     assert exit_code == SYNTHETIC_EXIT_CODE
 
     with pytest.raises(CliDispatchError, match="no CLI contribution registered"):
-        run_cli_command(command, options=CliCommandExecutionOptions(contributions=()))
+        run_cli_command(CliInvocation(command=command), options=CliCommandExecutionOptions(contributions=()))
 
 
 def test_parser_rejects_contribution_without_command_factory() -> None:
@@ -91,12 +95,6 @@ def test_contribution_validation_rejects_duplicate_command_ownership() -> None:
     with pytest.raises(CliConfigurationError, match="duplicate CLI command type ownership"):
         build_parser((_synthetic_contribution(), duplicate))
 
-    with pytest.raises(CliConfigurationError, match="duplicate CLI command type ownership"):
-        run_cli_command(
-            _SyntheticCommand(name="synthetic"),
-            options=CliCommandExecutionOptions(contributions=(_synthetic_contribution(), duplicate)),
-        )
-
 
 def test_contribution_validation_rejects_overlapping_command_ownership() -> None:
     """Keep isinstance-based dispatch from depending on contribution order."""
@@ -117,12 +115,6 @@ def test_contribution_validation_rejects_overlapping_command_ownership() -> None
 
     with pytest.raises(CliConfigurationError, match="overlapping CLI command type ownership"):
         build_parser((base_owner, child_owner))
-
-    with pytest.raises(CliConfigurationError, match="overlapping CLI command type ownership"):
-        run_cli_command(
-            _SyntheticChildCommand(name="synthetic"),
-            options=CliCommandExecutionOptions(contributions=(base_owner, child_owner)),
-        )
 
 
 def test_contribution_validation_rejects_duplicate_names() -> None:

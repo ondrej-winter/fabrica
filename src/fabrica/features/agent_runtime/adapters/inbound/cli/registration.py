@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING
 
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
@@ -23,17 +23,13 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptType,
 )
 
+if TYPE_CHECKING:
+    from fabrica.adapters.inbound.cli.contracts import CliSubparsers
+
 RUN_COMMAND_NAME = "run"
 SCRIPT_POLICY_COMMAND_NAME = "script-policy"
 SCRIPT_EXECUTE_COMMAND_NAME = "script-execute"
 AGENT_RUNTIME_CLI_COMMAND_NAMES = (RUN_COMMAND_NAME, SCRIPT_POLICY_COMMAND_NAME, SCRIPT_EXECUTE_COMMAND_NAME)
-
-
-class CliSubparsers(Protocol):
-    """Subparser behavior needed by agent-runtime CLI registration."""
-
-    def add_parser(self, name: str, **kwargs: object) -> argparse.ArgumentParser:
-        """Add one named subcommand parser to the product CLI."""
 
 
 def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:

@@ -4,35 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, TextIO
+from typing import TYPE_CHECKING, TextIO
+
+from fabrica.adapters.inbound.cli.contracts import CliConfigurationError, CliSubparsers
 
 if TYPE_CHECKING:
-    import argparse
-
     from fabrica.adapters.inbound.cli.options import CliGlobalOptions
 
-
-class CliSubparsers(Protocol):
-    """Public behavior needed to register feature-owned CLI commands."""
-
-    def add_parser(self, name: str, **kwargs: object) -> argparse.ArgumentParser:
-        """Add one named subcommand parser to the product CLI."""
-
-
 type CommandRegistrar = Callable[[CliSubparsers], None]
-type ContributionRunner = Callable[[object, "CliExecutionContext"], int]
-
-
-class CliError(Exception):
-    """Base class for expected product CLI boundary failures."""
-
-
-class CliConfigurationError(CliError):
-    """Raised when CLI registration or composition is invalid."""
-
-
-class CliDispatchError(CliError):
-    """Raised when a parsed command cannot be dispatched safely."""
+type ContributionRunner[TCommand] = Callable[[TCommand, "CliExecutionContext"], int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,14 +27,14 @@ class CliExecutionContext:
 
 
 @dataclass(frozen=True, slots=True)
-class CliContribution:
+class CliContribution[TCommand]:
     """One feature-owned command contribution aggregated by the product CLI."""
 
     name: str
     command_names: tuple[str, ...]
-    command_types: tuple[type[object], ...]
+    command_types: tuple[type[TCommand], ...]
     register_commands: CommandRegistrar
-    run_command: ContributionRunner
+    run_command: ContributionRunner[TCommand]
 
     def can_handle(self, command: object) -> bool:
         """Return whether this contribution owns the parsed command."""
@@ -102,6 +82,25 @@ def validate_cli_contributions(contributions: Sequence[CliContribution]) -> None
                 )
                 raise CliConfigurationError(msg)
             owners_by_command_type[command_type] = contribution.name
+
+
+def resolve_composition_options[TOptions](
+    context: CliExecutionContext,
+    options_type: type[TOptions],
+    *,
+    contribution_name: str,
+    default_factory: Callable[[], TOptions],
+) -> TOptions:
+    """Return typed composition options for one contribution execution context."""
+    if context.composition_options is None:
+        return default_factory()
+    if not isinstance(context.composition_options, options_type):
+        msg = (
+            f"{contribution_name} CLI contribution received incompatible composition options: "
+            f"{type(context.composition_options).__name__}"
+        )
+        raise CliConfigurationError(msg)
+    return context.composition_options
 
 
 def _overlapping_command_owner(

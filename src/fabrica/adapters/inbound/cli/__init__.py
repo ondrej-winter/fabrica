@@ -1,6 +1,6 @@
 """Feature-neutral command-line shell for Fabrica workflows."""
 
-from fabrica.adapters.inbound.cli.contributions import CliConfigurationError, CliDispatchError, CliError
+from fabrica.adapters.inbound.cli.contracts import CliConfigurationError, CliDispatchError, CliError, CliSubparsers
 from fabrica.adapters.inbound.cli.options import CliGlobalOptions
 from fabrica.adapters.inbound.cli.parser import (
     CliCommand,
@@ -21,6 +21,7 @@ __all__ = [
     "CliError",
     "CliGlobalOptions",
     "CliInvocation",
+    "CliSubparsers",
     "build_parser",
     "parse_args",
     "run_cli_command",

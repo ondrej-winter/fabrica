@@ -21,7 +21,7 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.registration import (
     SCRIPT_POLICY_COMMAND_NAME as AGENT_RUNTIME_SCRIPT_POLICY_COMMAND_NAME,
 )
 
-AGENT_RUNTIME_CLI_COMMAND_TYPES: tuple[type[object], ...] = (
+AGENT_RUNTIME_CLI_COMMAND_TYPES: tuple[type[CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand], ...] = (
     CliRunCommand,
     CliScriptPolicyCommand,
     CliScriptExecuteCommand,

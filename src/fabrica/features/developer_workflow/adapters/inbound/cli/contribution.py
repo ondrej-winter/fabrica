@@ -13,7 +13,7 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.registration impor
     register_developer_workflow_cli_commands,
 )
 
-DEVELOPER_WORKFLOW_CLI_COMMAND_TYPES: tuple[type[object], ...] = (
+DEVELOPER_WORKFLOW_CLI_COMMAND_TYPES: tuple[type[CliCommitMessageCommand | CliCommitCommand], ...] = (
     CliCommitMessageCommand,
     CliCommitCommand,
 )

@@ -31,7 +31,7 @@ def build_parser(contributions: Sequence[CliContribution]) -> argparse.ArgumentP
     validate_cli_contributions(contributions)
     parser = argparse.ArgumentParser(
         prog="fabrica",
-        description="Run local subscription-backed agent runtime experiments.",
+        description="Run local Fabrica workflows.",
     )
     parser.add_argument(
         "--print-usage",
