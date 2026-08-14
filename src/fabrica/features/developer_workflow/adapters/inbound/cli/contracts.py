@@ -10,10 +10,6 @@ if TYPE_CHECKING:
         CommitMessageWorkflowResult,
         ConfirmedCommitWorkflowResult,
     )
-    from fabrica.features.developer_workflow.application.ports import (
-        CommitMessageWorkflowRunner,
-        ConfirmedCommitWorkflowRunner,
-    )
 
 
 class RuntimeResultWriter(Protocol):
@@ -39,29 +35,12 @@ class DeveloperWorkflowCliOptions:
 
 
 @dataclass(frozen=True, slots=True)
-class DeveloperWorkflowCliDependencies:
-    """Injected dependencies for developer-workflow CLI commands."""
-
-    commit_message_workflow: CommitMessageWorkflowRunner | None = None
-    confirmed_commit_workflow: ConfirmedCommitWorkflowRunner | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class DeveloperWorkflowCliStreams:
     """Normalized CLI input/output streams for developer-workflow commands."""
 
     stdin: TextIO
     stdout: TextIO
     stderr: TextIO
-
-
-@dataclass(frozen=True, slots=True)
-class DeveloperWorkflowCliWriters:
-    """Injected output writers for developer-workflow CLI commands."""
-
-    evidence: EvidenceWriter
-    runtime_result: RuntimeResultWriter
-    confirmed_commit_result: ConfirmedCommitResultWriter
 
 
 class EvidenceWriter(Protocol):

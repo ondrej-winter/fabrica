@@ -8,22 +8,7 @@ from typing import TYPE_CHECKING, Protocol, TextIO
 if TYPE_CHECKING:
     from fabrica.features.agent_runtime.application.dtos import (
         LocalAgentRunResult,
-        SkillScriptExecutionResult,
-        SkillScriptPolicyEvaluationResult,
     )
-    from fabrica.features.agent_runtime.application.ports import (
-        LocalAgentRuntime,
-        SelectedContextLocalAgentRuntime,
-        SkillScriptPolicyEvaluator,
-        SkillScriptRunner,
-    )
-
-
-class RunResultWriter(Protocol):
-    """Writer for one local agent runtime result."""
-
-    def __call__(self, result: LocalAgentRunResult, *, stdout: TextIO, stderr: TextIO) -> int:
-        """Write a local runtime result and return a process exit code."""
 
 
 class EvidenceWriter(Protocol):
@@ -40,46 +25,12 @@ class EvidenceWriter(Protocol):
         """Write model evidence selected by global CLI options."""
 
 
-class ScriptPolicyResultWriter(Protocol):
-    """Writer for one selected script policy result."""
-
-    def __call__(self, result: SkillScriptPolicyEvaluationResult, *, stdout: TextIO, stderr: TextIO) -> int:
-        """Write a selected script policy result and return a process exit code."""
-
-
-class ScriptExecutionResultWriter(Protocol):
-    """Writer for one selected script execution result."""
-
-    def __call__(self, result: SkillScriptExecutionResult, *, stdout: TextIO, stderr: TextIO) -> int:
-        """Write a selected script execution result and return a process exit code."""
-
-
 @dataclass(frozen=True, slots=True)
 class AgentRuntimeCliOptions:
     """Product CLI option values consumed by agent-runtime commands."""
 
     print_usage: bool = False
     print_prices: bool = False
-
-
-@dataclass(frozen=True, slots=True)
-class AgentRuntimeCliDependencies:
-    """Injected dependencies for agent-runtime CLI commands."""
-
-    runtime: LocalAgentRuntime | None = None
-    selected_context_runtime: SelectedContextLocalAgentRuntime | None = None
-    script_policy_evaluator: SkillScriptPolicyEvaluator | None = None
-    script_executor: SkillScriptRunner | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class AgentRuntimeCliWriters:
-    """Injected output writers for agent-runtime CLI commands."""
-
-    run_result: RunResultWriter
-    evidence: EvidenceWriter
-    script_policy_result: ScriptPolicyResultWriter
-    script_execution_result: ScriptExecutionResultWriter
 
 
 @dataclass(frozen=True, slots=True)

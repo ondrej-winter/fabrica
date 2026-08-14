@@ -3,32 +3,22 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli.contributions import CliConfigurationError, validate_cli_contributions
-from fabrica.adapters.inbound.cli.options import CliGlobalOptions
+from fabrica.adapters.inbound.cli.contracts import (
+    CLI_HANDLER_NAMESPACE_ATTRIBUTE,
+    CliConfigurationError,
+    CliGlobalOptions,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Sequence
 
-    from fabrica.adapters.inbound.cli.contributions import CliContribution
-
-type CliCommand = object
+    from fabrica.adapters.inbound.cli.contracts import CliCommandHandler, CliCommandRegistrar
 
 
-@dataclass(frozen=True, slots=True)
-class CliInvocation:
-    """Parsed CLI invocation with shared options and one selected command."""
-
-    command: CliCommand
-    global_options: CliGlobalOptions = field(default_factory=CliGlobalOptions)
-    composition_options: object | None = None
-
-
-def build_parser(contributions: Sequence[CliContribution]) -> argparse.ArgumentParser:
+def build_parser(command_registrars: Sequence[CliCommandRegistrar]) -> argparse.ArgumentParser:
     """Build the side-effect-free CLI argument parser."""
-    validate_cli_contributions(contributions)
     parser = argparse.ArgumentParser(
         prog="fabrica",
         description="Run local Fabrica workflows.",
@@ -49,11 +39,11 @@ def build_parser(contributions: Sequence[CliContribution]) -> argparse.ArgumentP
         help="Include additional diagnostics without exposing secrets or executing scripts.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for contribution in contributions:
+    for register_commands in command_registrars:
         try:
-            contribution.register_commands(subparsers)
+            register_commands(subparsers)
         except argparse.ArgumentError as err:
-            msg = f"CLI contribution {contribution.name!r} registered invalid subcommands: {err}"
+            msg = f"CLI command registration failed: {err}"
             raise CliConfigurationError(msg) from err
 
     return parser
@@ -62,35 +52,25 @@ def build_parser(contributions: Sequence[CliContribution]) -> argparse.ArgumentP
 def parse_args(
     args: tuple[str, ...] | list[str] | None,
     *,
-    contributions: Sequence[CliContribution],
-) -> CliInvocation:
-    """Parse command-line arguments into an adapter-local invocation object."""
-    namespace = build_parser(contributions).parse_args(args)
-    command_factory = _command_factory_from_namespace(namespace)
-    return CliInvocation(
-        command=command_factory(namespace),
-        global_options=CliGlobalOptions(
-            print_usage=namespace.print_usage,
-            print_prices=namespace.print_prices,
-            verbose_diagnostics=namespace.verbose_diagnostics,
-        ),
-        composition_options=_composition_options_from_namespace(namespace),
+    command_registrars: Sequence[CliCommandRegistrar],
+) -> argparse.Namespace:
+    """Parse command-line arguments into an argparse namespace with a command handler."""
+    return build_parser(command_registrars).parse_args(args)
+
+
+def cli_global_options_from_namespace(namespace: argparse.Namespace) -> CliGlobalOptions:
+    """Return feature-neutral global CLI options from one parsed namespace."""
+    return CliGlobalOptions(
+        print_usage=namespace.print_usage,
+        print_prices=namespace.print_prices,
+        verbose_diagnostics=namespace.verbose_diagnostics,
     )
 
 
-def _command_factory_from_namespace(namespace: argparse.Namespace) -> Callable[[argparse.Namespace], CliCommand]:
-    command_factory = getattr(namespace, "command_factory", None)
-    if not callable(command_factory):
-        msg = "CLI contribution did not configure a command factory for the selected command"
+def cli_handler_from_namespace(namespace: argparse.Namespace) -> CliCommandHandler:
+    """Return the command handler attached by the selected subcommand registration."""
+    handler = getattr(namespace, CLI_HANDLER_NAMESPACE_ATTRIBUTE, None)
+    if not callable(handler):
+        msg = "CLI command registration did not configure a handler for the selected command"
         raise CliConfigurationError(msg)
-    return command_factory
-
-
-def _composition_options_from_namespace(namespace: argparse.Namespace) -> object | None:
-    composition_options_factory = getattr(namespace, "composition_options_factory", None)
-    if composition_options_factory is None:
-        return None
-    if not callable(composition_options_factory):
-        msg = "CLI contribution configured a non-callable composition options factory"
-        raise CliConfigurationError(msg)
-    return composition_options_factory(namespace)
+    return handler

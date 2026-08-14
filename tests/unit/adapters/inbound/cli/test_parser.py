@@ -1,13 +1,20 @@
-"""Tests for the local agent runtime CLI parser."""
+"""Tests for the product CLI parser and feature command registrations."""
 
-from dataclasses import FrozenInstanceError
+from __future__ import annotations
+
+import sys
+from dataclasses import FrozenInstanceError, dataclass
+from io import StringIO
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from fabrica.adapters.inbound.cli import (
+    CliExecutionContext,
     CliGlobalOptions,
-    CliInvocation,
+    cli_global_options_from_namespace,
+    cli_handler_from_namespace,
 )
 from fabrica.adapters.inbound.cli import (
     build_parser as _build_parser,
@@ -15,7 +22,7 @@ from fabrica.adapters.inbound.cli import (
 from fabrica.adapters.inbound.cli import (
     parse_args as _parse_args,
 )
-from fabrica.bootstrap.cli import create_cli_contributions
+from fabrica.bootstrap.cli import create_cli_command_registrars
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
@@ -24,25 +31,103 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliScriptPolicyCommand,
     CliSelectedResource,
 )
+from fabrica.features.agent_runtime.adapters.inbound.cli.registration import register_agent_runtime_cli_commands
 from fabrica.features.agent_runtime.application.dtos import SkillScriptApprovalBinding, SkillScriptType
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
     CliDeveloperWorkflowCompositionOptions,
 )
+from fabrica.features.developer_workflow.adapters.inbound.cli.registration import (
+    register_developer_workflow_cli_commands,
+)
+
+if TYPE_CHECKING:
+    from fabrica.adapters.inbound.cli.contracts import CliCommandRegistrar
 
 ARGPARSE_USAGE_ERROR = 2
 
 
+@dataclass(frozen=True, slots=True)
+class ParsedInvocation:
+    """Test-only view of what a parser-attached handler receives."""
+
+    command: object
+    global_options: CliGlobalOptions
+    composition_options: object
+
+
+@dataclass(slots=True)
+class RecordingHandlers:
+    """Record one parsed command without running real composition."""
+
+    invocation: ParsedInvocation | None = None
+
+    def record_agent_runtime_command(
+        self,
+        command: CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand,
+        composition_options: AgentRuntimeCliCompositionOptions,
+        context: CliExecutionContext,
+    ) -> int:
+        self.invocation = ParsedInvocation(
+            command=command,
+            global_options=context.global_options,
+            composition_options=composition_options,
+        )
+        return 0
+
+    def record_developer_workflow_command(
+        self,
+        command: CliCommitMessageCommand | CliCommitCommand,
+        composition_options: CliDeveloperWorkflowCompositionOptions,
+        context: CliExecutionContext,
+    ) -> int:
+        self.invocation = ParsedInvocation(
+            command=command,
+            global_options=context.global_options,
+            composition_options=composition_options,
+        )
+        return 0
+
+
 def build_parser():
-    return _build_parser(create_cli_contributions())
+    return _build_parser(create_cli_command_registrars())
 
 
-def parse_args(args: tuple[str, ...] | list[str]) -> CliInvocation:
-    return _parse_args(args, contributions=create_cli_contributions())
+def parse_args(args: tuple[str, ...] | list[str]) -> ParsedInvocation:
+    handlers = RecordingHandlers()
+    namespace = _parse_args(args, command_registrars=_recording_command_registrars(handlers))
+    context = CliExecutionContext(
+        global_options=cli_global_options_from_namespace(namespace),
+        stdin=StringIO(),
+        stdout=StringIO(),
+        stderr=StringIO(),
+    )
+    exit_code = cli_handler_from_namespace(namespace)(namespace, context)
+
+    assert exit_code == 0
+    assert handlers.invocation is not None
+    return handlers.invocation
+
+
+def _recording_command_registrars(handlers: RecordingHandlers) -> tuple[CliCommandRegistrar, ...]:
+    return (
+        lambda subparsers: register_agent_runtime_cli_commands(
+            subparsers,
+            run_command=handlers.record_agent_runtime_command,
+            script_policy_command=handlers.record_agent_runtime_command,
+            script_execute_command=handlers.record_agent_runtime_command,
+        ),
+        lambda subparsers: register_developer_workflow_cli_commands(
+            subparsers,
+            commit_message_command=handlers.record_developer_workflow_command,
+            commit_command=handlers.record_developer_workflow_command,
+        ),
+    )
 
 
 def test_build_parser_renders_help_without_runtime_side_effects(capsys: pytest.CaptureFixture[str]) -> None:
+    _clear_bootstrap_composition_modules()
     parser = build_parser()
 
     with pytest.raises(SystemExit) as exc_info:
@@ -58,10 +143,20 @@ def test_build_parser_renders_help_without_runtime_side_effects(capsys: pytest.C
     assert "--print-usage" in captured.out
     assert "--print-prices" in captured.out
     assert "--verbose-diagnostics" in captured.out
+    assert "fabrica.bootstrap.composition.codex_runtime" not in sys.modules
+    assert "fabrica.bootstrap.composition.developer_workflow" not in sys.modules
+    assert "fabrica.bootstrap.composition.skill_context" not in sys.modules
+    assert "fabrica.bootstrap.composition.skill_scripts" not in sys.modules
+
+
+def _clear_bootstrap_composition_modules() -> None:
+    for module_name in tuple(sys.modules):
+        if module_name.startswith("fabrica.bootstrap.composition"):
+            del sys.modules[module_name]
 
 
 def test_parse_run_command_supports_prompt_model_and_explicit_context() -> None:
-    command = parse_args(
+    invocation = parse_args(
         [
             "--print-usage",
             "--print-prices",
@@ -80,7 +175,7 @@ def test_parse_run_command_supports_prompt_model_and_explicit_context() -> None:
         ],
     )
 
-    assert command == CliInvocation(
+    assert invocation == ParsedInvocation(
         command=CliRunCommand(
             prompt="Reply with pong",
             skill_ids=("python-testing", "code-review"),
@@ -92,10 +187,11 @@ def test_parse_run_command_supports_prompt_model_and_explicit_context() -> None:
 
 
 def test_parse_run_command_uses_empty_explicit_context_defaults() -> None:
-    command = parse_args(["run", "--prompt", "Reply with pong"])
+    invocation = parse_args(["run", "--prompt", "Reply with pong"])
 
-    assert command == CliInvocation(
+    assert invocation == ParsedInvocation(
         command=CliRunCommand(prompt="Reply with pong"),
+        global_options=CliGlobalOptions(),
         composition_options=AgentRuntimeCliCompositionOptions(),
     )
 
@@ -108,16 +204,17 @@ def test_parse_run_command_rejects_unsupported_model_override() -> None:
 
 
 def test_parse_commit_message_command_defaults_to_conventional_commits_skill() -> None:
-    command = parse_args(["commit-message"])
+    invocation = parse_args(["commit-message"])
 
-    assert command == CliInvocation(
+    assert invocation == ParsedInvocation(
         command=CliCommitMessageCommand(skill_id="conventional-commits"),
+        global_options=CliGlobalOptions(),
         composition_options=CliDeveloperWorkflowCompositionOptions(),
     )
 
 
 def test_parse_commit_message_command_supports_skill_root_and_diagnostics_overrides() -> None:
-    command = parse_args(
+    invocation = parse_args(
         [
             "--verbose-diagnostics",
             "commit-message",
@@ -131,10 +228,8 @@ def test_parse_commit_message_command_supports_skill_root_and_diagnostics_overri
             "./skills",
         ],
     )
-    assert command == CliInvocation(
-        command=CliCommitMessageCommand(
-            skill_id="team-style",
-        ),
+    assert invocation == ParsedInvocation(
+        command=CliCommitMessageCommand(skill_id="team-style"),
         global_options=CliGlobalOptions(verbose_diagnostics=True),
         composition_options=CliDeveloperWorkflowCompositionOptions(
             model="gpt-5.6-sol",
@@ -146,20 +241,15 @@ def test_parse_commit_message_command_supports_skill_root_and_diagnostics_overri
 
 def test_parse_command_rejects_global_options_after_subcommand() -> None:
     with pytest.raises(SystemExit) as exc_info:
-        parse_args(
-            [
-                "commit-message",
-                "--verbose-diagnostics",
-            ],
-        )
+        parse_args(["commit-message", "--verbose-diagnostics"])
 
     assert exc_info.value.code == ARGPARSE_USAGE_ERROR
 
 
 def test_parse_commit_message_command_supports_usage_and_price_reporting() -> None:
-    command = parse_args(["--print-usage", "--print-prices", "commit-message"])
+    invocation = parse_args(["--print-usage", "--print-prices", "commit-message"])
 
-    assert command == CliInvocation(
+    assert invocation == ParsedInvocation(
         command=CliCommitMessageCommand(skill_id="conventional-commits"),
         global_options=CliGlobalOptions(print_usage=True, print_prices=True),
         composition_options=CliDeveloperWorkflowCompositionOptions(),
@@ -193,10 +283,11 @@ def test_parse_developer_workflow_commands_reject_invalid_boundary_values(
 
 
 def test_parse_commit_command_defaults_to_conventional_commits_skill() -> None:
-    command = parse_args(["commit"])
+    invocation = parse_args(["commit"])
 
-    assert command == CliInvocation(
+    assert invocation == ParsedInvocation(
         command=CliCommitCommand(skill_id="conventional-commits"),
+        global_options=CliGlobalOptions(),
         composition_options=CliDeveloperWorkflowCompositionOptions(),
     )
 
@@ -214,7 +305,7 @@ def test_commit_command_help_documents_mutating_pre_commit_gate(capsys: pytest.C
 
 
 def test_parse_commit_command_supports_commit_message_generation_options() -> None:
-    command = parse_args(
+    invocation = parse_args(
         [
             "--verbose-diagnostics",
             "commit",
@@ -229,10 +320,8 @@ def test_parse_commit_command_supports_commit_message_generation_options() -> No
         ],
     )
 
-    assert command == CliInvocation(
-        command=CliCommitCommand(
-            skill_id="team-style",
-        ),
+    assert invocation == ParsedInvocation(
+        command=CliCommitCommand(skill_id="team-style"),
         global_options=CliGlobalOptions(verbose_diagnostics=True),
         composition_options=CliDeveloperWorkflowCompositionOptions(
             model="gpt-5.6-sol",
@@ -338,7 +427,7 @@ def test_parse_agent_runtime_commands_reject_invalid_boundary_values(
 
 
 def test_parse_script_policy_command_supports_explicit_selected_script() -> None:
-    command = parse_args(
+    invocation = parse_args(
         [
             "--verbose-diagnostics",
             "script-policy",
@@ -351,18 +440,15 @@ def test_parse_script_policy_command_supports_explicit_selected_script() -> None
         ],
     )
 
-    assert command == CliInvocation(
-        command=CliScriptPolicyCommand(
-            skill_id="python-testing",
-            script_id="scripts/check.py",
-        ),
+    assert invocation == ParsedInvocation(
+        command=CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
         global_options=CliGlobalOptions(verbose_diagnostics=True),
         composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("./skills"),)),
     )
 
 
 def test_parse_script_execute_command_requires_metadata_bound_approval() -> None:
-    command = parse_args(
+    invocation = parse_args(
         [
             "--verbose-diagnostics",
             "script-execute",
@@ -383,7 +469,7 @@ def test_parse_script_execute_command_requires_metadata_bound_approval() -> None
         ],
     )
 
-    assert command == CliInvocation(
+    assert invocation == ParsedInvocation(
         command=CliScriptExecuteCommand(
             skill_id="python-testing",
             script_id="scripts/check.py",
@@ -415,11 +501,11 @@ def test_parse_script_execute_command_rejects_missing_approval_metadata() -> Non
 
 
 def test_parsed_commands_are_immutable_boundary_values() -> None:
-    run_command = parse_args(["run", "--prompt", "Reply with pong"])
-    policy_command = parse_args(
+    run_invocation = parse_args(["run", "--prompt", "Reply with pong"])
+    policy_invocation = parse_args(
         ["script-policy", "--skill-id", "python-testing", "--script-id", "scripts/check.py"],
     )
-    execution_command = parse_args(
+    execution_invocation = parse_args(
         [
             "script-execute",
             "--skill-id",
@@ -436,16 +522,16 @@ def test_parsed_commands_are_immutable_boundary_values() -> None:
             "sha256:abc123",
         ],
     )
-    commit_message_command = parse_args(["commit-message"])
-    commit_command = parse_args(["commit"])
+    commit_message_invocation = parse_args(["commit-message"])
+    commit_invocation = parse_args(["commit"])
 
     with pytest.raises(FrozenInstanceError):
-        setattr(run_command, "command", CliRunCommand(prompt="changed"))  # noqa: B010
+        setattr(run_invocation.command, "prompt", "changed")  # noqa: B010
     with pytest.raises(FrozenInstanceError):
-        setattr(policy_command.command, "script_id", "changed")  # noqa: B010
+        setattr(policy_invocation.command, "script_id", "changed")  # noqa: B010
     with pytest.raises(FrozenInstanceError):
-        setattr(execution_command.command, "script_id", "changed")  # noqa: B010
+        setattr(execution_invocation.command, "script_id", "changed")  # noqa: B010
     with pytest.raises(FrozenInstanceError):
-        setattr(commit_message_command.command, "skill_id", "changed")  # noqa: B010
+        setattr(commit_message_invocation.command, "skill_id", "changed")  # noqa: B010
     with pytest.raises(FrozenInstanceError):
-        setattr(commit_command.command, "skill_id", "changed")  # noqa: B010
+        setattr(commit_invocation.command, "skill_id", "changed")  # noqa: B010

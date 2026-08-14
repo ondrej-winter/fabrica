@@ -1,27 +1,23 @@
 """Tests for the interactive confirmed commit CLI command."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from io import StringIO
 from typing import TextIO
 
 import pytest
 
-from fabrica.adapters.inbound.cli import CliGlobalOptions, CliInvocation
+from fabrica.adapters.inbound.cli import CliGlobalOptions
 from fabrica.adapters.inbound.cli.output import write_model_evidence_report
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
-    DeveloperWorkflowCliDependencies,
     DeveloperWorkflowCliOptions,
     DeveloperWorkflowCliStreams,
-    DeveloperWorkflowCliWriters,
 )
-from fabrica.features.developer_workflow.adapters.inbound.cli.output import (
-    write_confirmed_commit_result,
-    write_developer_workflow_result,
-)
-from fabrica.features.developer_workflow.adapters.inbound.cli.runner import run_developer_workflow_cli_command
+from fabrica.features.developer_workflow.adapters.inbound.cli.runner import run_confirmed_commit_cli_command
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageRecommendation,
     CommitMessageWorkflowResult,
@@ -43,42 +39,30 @@ EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2
 EXPECTED_INTERRUPTED_EXIT_CODE = 5
 
 
-def run_feature_cli_command(
-    invocation: CliCommitCommand | CliInvocation,
+def run_feature_cli_command(  # noqa: PLR0913
+    command: CliCommitCommand,
     *,
-    dependencies: DeveloperWorkflowCliDependencies | None = None,
+    workflow: FakeConfirmedCommitWorkflow,
+    global_options: CliGlobalOptions | None = None,
     stdin: TextIO | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    command, global_options = _normalize_invocation(invocation)
-    return run_developer_workflow_cli_command(
+    options = global_options or CliGlobalOptions()
+    return run_confirmed_commit_cli_command(
         command,
         options=DeveloperWorkflowCliOptions(
-            print_usage=global_options.print_usage,
-            print_prices=global_options.print_prices,
+            print_usage=options.print_usage,
+            print_prices=options.print_prices,
         ),
-        dependencies=dependencies or DeveloperWorkflowCliDependencies(),
         streams=DeveloperWorkflowCliStreams(
             stdin=stdin or StringIO(),
             stdout=stdout or StringIO(),
             stderr=stderr or StringIO(),
         ),
-        writers=DeveloperWorkflowCliWriters(
-            evidence=_write_evidence,
-            runtime_result=write_developer_workflow_result,
-            confirmed_commit_result=write_confirmed_commit_result,
-        ),
+        workflow=workflow,
+        evidence_writer=_write_evidence,
     )
-
-
-def _normalize_invocation(invocation: CliCommitCommand | CliInvocation) -> tuple[CliCommitCommand, CliGlobalOptions]:
-    if isinstance(invocation, CliInvocation):
-        if not isinstance(invocation.command, CliCommitCommand):
-            msg = "commit tests only support CliCommitCommand invocations"
-            raise TypeError(msg)
-        return invocation.command, invocation.global_options
-    return invocation, CliGlobalOptions()
 
 
 def _write_evidence(
@@ -136,7 +120,7 @@ def test_commit_command_prints_recommendation_prompts_and_commits_on_approval(co
 
     exit_code = run_feature_cli_command(
         command,
-        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
+        workflow=workflow,
         stdin=StringIO(confirmation),
         stdout=stdout,
         stderr=stderr,
@@ -162,7 +146,7 @@ def test_commit_command_rejects_no_without_invoking_commit() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
+        workflow=workflow,
         stdin=StringIO("n\n"),
         stdout=stdout,
         stderr=StringIO(),
@@ -178,7 +162,7 @@ def test_commit_command_treats_eof_as_successful_noop() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
+        workflow=workflow,
         stdin=StringIO(""),
         stdout=StringIO(),
         stderr=StringIO(),
@@ -194,7 +178,7 @@ def test_commit_command_interrupted_input_exits_nonzero_without_commit() -> None
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
+        workflow=workflow,
         stdin=InterruptingInput(),
         stdout=StringIO(),
         stderr=stderr,
@@ -223,7 +207,7 @@ def test_commit_command_generation_failure_skips_prompt_and_commit() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
+        workflow=workflow,
         stdin=StringIO("yes\n"),
         stdout=stdout,
         stderr=stderr,
@@ -255,7 +239,7 @@ def test_commit_command_pre_commit_stop_skips_prompt_and_commit() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
+        workflow=workflow,
         stdin=StringIO("yes\n"),
         stdout=stdout,
         stderr=stderr,
@@ -277,11 +261,9 @@ def test_commit_command_appends_evidence_on_rejection() -> None:
     stdout = StringIO()
 
     exit_code = run_feature_cli_command(
-        CliInvocation(
-            command=CliCommitCommand(),
-            global_options=CliGlobalOptions(print_usage=True),
-        ),
-        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
+        CliCommitCommand(),
+        workflow=workflow,
+        global_options=CliGlobalOptions(print_usage=True),
         stdin=StringIO("no\n"),
         stdout=stdout,
         stderr=StringIO(),
@@ -314,8 +296,9 @@ def test_commit_command_reports_commit_failure_without_reprinting_recommendation
     stderr = StringIO()
 
     exit_code = run_feature_cli_command(
-        CliInvocation(command=CliCommitCommand(), global_options=CliGlobalOptions(print_usage=True)),
-        dependencies=DeveloperWorkflowCliDependencies(confirmed_commit_workflow=workflow),
+        CliCommitCommand(),
+        workflow=workflow,
+        global_options=CliGlobalOptions(print_usage=True),
         stdin=StringIO("y\n"),
         stdout=stdout,
         stderr=stderr,

@@ -8,27 +8,13 @@ from io import StringIO
 from pathlib import Path
 from typing import TextIO
 
-from fabrica.adapters.inbound.cli import (
-    CliCommandExecutionOptions,
-    CliInvocation,
-)
-from fabrica.adapters.inbound.cli import (
-    run_cli_command as _run_cli_command,
-)
-from fabrica.bootstrap.cli import create_cli_contributions
+from fabrica.bootstrap.cli import run_cli
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
-    AgentRuntimeCliCompositionOptions,
     CliScriptApprovalOptions,
     CliScriptExecuteCommand,
 )
-from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
-    AgentRuntimeCliDependencies,
-    AgentRuntimeCliOptions,
-    AgentRuntimeCliStreams,
-    AgentRuntimeCliWriters,
-)
-from fabrica.features.agent_runtime.adapters.inbound.cli.output import write_script_execution_result
-from fabrica.features.agent_runtime.adapters.inbound.cli.runner import run_agent_runtime_cli_command
+from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliStreams
+from fabrica.features.agent_runtime.adapters.inbound.cli.runner import run_script_execute_cli_command
 from fabrica.features.agent_runtime.application.dtos import (
     SelectedSkillScript,
     SkillScriptApprovalBinding,
@@ -45,60 +31,18 @@ EXPECTED_EXECUTION_FAILED_EXIT_CODE = 6
 EXPECTED_TIMED_OUT_EXIT_CODE = 7
 
 
-def run_product_cli_command(
-    invocation: CliInvocation,
-    *,
-    dependencies: AgentRuntimeCliDependencies | None = None,
-    stdin: TextIO | None = None,
-    stdout: TextIO | None = None,
-    stderr: TextIO | None = None,
-) -> int:
-    options = CliCommandExecutionOptions(
-        contributions=create_cli_contributions(agent_runtime_dependencies=dependencies),
-        stdin=stdin,
-        stdout=stdout,
-        stderr=stderr,
-    )
-    return _run_cli_command(invocation, options=options)
-
-
 def run_feature_cli_command(
     command: CliScriptExecuteCommand,
     *,
-    dependencies: AgentRuntimeCliDependencies | None = None,
+    executor: FakeScriptExecutor,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    return run_agent_runtime_cli_command(
+    return run_script_execute_cli_command(
         command,
-        options=AgentRuntimeCliOptions(),
-        dependencies=dependencies or AgentRuntimeCliDependencies(),
         streams=AgentRuntimeCliStreams(stdout=stdout or StringIO(), stderr=stderr or StringIO()),
-        writers=AgentRuntimeCliWriters(
-            run_result=_unexpected_run_result_writer,
-            evidence=_unexpected_evidence_writer,
-            script_policy_result=_unexpected_script_policy_result_writer,
-            script_execution_result=write_script_execution_result,
-        ),
+        executor=executor,
     )
-
-
-def _unexpected_run_result_writer(*args: object, **kwargs: object) -> int:
-    _ = args, kwargs
-    msg = "script-execute tests must not execute run-result writer"
-    raise AssertionError(msg)
-
-
-def _unexpected_evidence_writer(*args: object, **kwargs: object) -> None:
-    _ = args, kwargs
-    msg = "script-execute tests must not execute evidence writer"
-    raise AssertionError(msg)
-
-
-def _unexpected_script_policy_result_writer(*args: object, **kwargs: object) -> int:
-    _ = args, kwargs
-    msg = "script-execute tests must not execute script-policy writer"
-    raise AssertionError(msg)
 
 
 @dataclass
@@ -126,7 +70,7 @@ def test_script_execute_command_maps_explicit_selection_to_executor() -> None:
 
     exit_code = run_feature_cli_command(
         _command(),
-        dependencies=AgentRuntimeCliDependencies(script_executor=executor),
+        executor=executor,
         stdout=stdout,
         stderr=stderr,
     )
@@ -149,7 +93,7 @@ def test_script_execute_command_maps_failure_statuses_to_stable_exit_codes() -> 
 
         exit_code = run_feature_cli_command(
             _command(),
-            dependencies=AgentRuntimeCliDependencies(script_executor=executor),
+            executor=executor,
             stdout=StringIO(),
             stderr=StringIO(),
         )
@@ -177,7 +121,7 @@ def test_script_execute_command_writes_bounded_failure_details_to_stderr() -> No
 
     exit_code = run_feature_cli_command(
         _command(),
-        dependencies=AgentRuntimeCliDependencies(script_executor=executor),
+        executor=executor,
         stdout=stdout,
         stderr=stderr,
     )
@@ -196,13 +140,23 @@ def test_script_execute_default_composition_executes_only_matching_approved_synt
     stdout = StringIO()
     stderr = StringIO()
 
-    exit_code = run_product_cli_command(
-        CliInvocation(
-            command=_command(
-                approval_byte_size=binding.byte_size,
-                approval_content_digest=binding.content_digest,
-            ),
-            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(tmp_path,)),
+    exit_code = run_cli(
+        (
+            "script-execute",
+            "--skill-id",
+            "python-testing",
+            "--script-id",
+            "scripts/check.py",
+            "--approve-script-type",
+            "python",
+            "--approve-suffix",
+            ".py",
+            "--approve-byte-size",
+            str(binding.byte_size),
+            "--approve-content-digest",
+            binding.content_digest,
+            "--skill-root",
+            str(tmp_path),
         ),
         stdout=stdout,
         stderr=stderr,
@@ -230,14 +184,23 @@ def test_script_execute_default_composition_denies_mismatched_approval_without_e
     stdout = StringIO()
     stderr = StringIO()
 
-    exit_code = run_product_cli_command(
-        CliInvocation(
-            command=_command(
-                script_id="scripts/write.py",
-                approval_byte_size=binding.byte_size,
-                approval_content_digest="sha256:not-current",
-            ),
-            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(tmp_path,)),
+    exit_code = run_cli(
+        (
+            "script-execute",
+            "--skill-id",
+            "python-testing",
+            "--script-id",
+            "scripts/write.py",
+            "--approve-script-type",
+            "python",
+            "--approve-suffix",
+            ".py",
+            "--approve-byte-size",
+            str(binding.byte_size),
+            "--approve-content-digest",
+            "sha256:not-current",
+            "--skill-root",
+            str(tmp_path),
         ),
         stdout=stdout,
         stderr=stderr,

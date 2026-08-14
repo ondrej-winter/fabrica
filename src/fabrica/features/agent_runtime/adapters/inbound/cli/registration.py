@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from fabrica.adapters.inbound.cli.contracts import CLI_HANDLER_NAMESPACE_ATTRIBUTE
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
@@ -24,15 +25,26 @@ from fabrica.features.agent_runtime.application.dtos import (
 )
 
 if TYPE_CHECKING:
-    from fabrica.adapters.inbound.cli.contracts import CliSubparsers
+    from collections.abc import Callable
+
+    from fabrica.adapters.inbound.cli.contracts import CliExecutionContext, CliSubparsers
 
 RUN_COMMAND_NAME = "run"
 SCRIPT_POLICY_COMMAND_NAME = "script-policy"
 SCRIPT_EXECUTE_COMMAND_NAME = "script-execute"
 AGENT_RUNTIME_CLI_COMMAND_NAMES = (RUN_COMMAND_NAME, SCRIPT_POLICY_COMMAND_NAME, SCRIPT_EXECUTE_COMMAND_NAME)
+type AgentRuntimeCliHandler[TCommand] = Callable[
+    [TCommand, AgentRuntimeCliCompositionOptions, CliExecutionContext], int
+]
 
 
-def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
+def register_agent_runtime_cli_commands(
+    subparsers: CliSubparsers,
+    *,
+    run_command: AgentRuntimeCliHandler[CliRunCommand],
+    script_policy_command: AgentRuntimeCliHandler[CliScriptPolicyCommand],
+    script_execute_command: AgentRuntimeCliHandler[CliScriptExecuteCommand],
+) -> None:
     """Register agent-runtime owned commands on the product CLI parser."""
     run_parser = subparsers.add_parser(
         RUN_COMMAND_NAME,
@@ -63,8 +75,7 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
         help="Explicit selected Agent Skill resource. May be repeated.",
     )
     _add_common_skill_root_flags(run_parser)
-    run_parser.set_defaults(command_factory=_run_command_from_namespace)
-    run_parser.set_defaults(composition_options_factory=_agent_runtime_composition_options_from_namespace)
+    run_parser.set_defaults(**{CLI_HANDLER_NAMESPACE_ATTRIBUTE: _handler_for_run_command(run_command)})
 
     policy_parser = subparsers.add_parser(
         SCRIPT_POLICY_COMMAND_NAME,
@@ -84,8 +95,9 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
         help="Relative selected script ID within the skill.",
     )
     _add_common_skill_root_flags(policy_parser)
-    policy_parser.set_defaults(command_factory=_script_policy_command_from_namespace)
-    policy_parser.set_defaults(composition_options_factory=_agent_runtime_composition_options_from_namespace)
+    policy_parser.set_defaults(
+        **{CLI_HANDLER_NAMESPACE_ATTRIBUTE: _handler_for_script_policy_command(script_policy_command)}
+    )
 
     execute_parser = subparsers.add_parser(
         SCRIPT_EXECUTE_COMMAND_NAME,
@@ -132,8 +144,9 @@ def register_agent_runtime_cli_commands(subparsers: CliSubparsers) -> None:
         help="Approved content digest bound to the selected script metadata, such as sha256:....",
     )
     _add_common_skill_root_flags(execute_parser)
-    execute_parser.set_defaults(command_factory=_script_execute_command_from_namespace)
-    execute_parser.set_defaults(composition_options_factory=_agent_runtime_composition_options_from_namespace)
+    execute_parser.set_defaults(
+        **{CLI_HANDLER_NAMESPACE_ATTRIBUTE: _handler_for_script_execute_command(script_execute_command)}
+    )
 
 
 def _add_common_skill_root_flags(parser: argparse.ArgumentParser) -> None:
@@ -269,6 +282,45 @@ def _script_execute_command_from_namespace(namespace: argparse.Namespace) -> Cli
         ),
         approval_binding=approval_binding,
     )
+
+
+def _handler_for_run_command(
+    handler: AgentRuntimeCliHandler[CliRunCommand],
+) -> Callable[[argparse.Namespace, CliExecutionContext], int]:
+    def run(namespace: argparse.Namespace, context: CliExecutionContext) -> int:
+        return handler(
+            _run_command_from_namespace(namespace),
+            _agent_runtime_composition_options_from_namespace(namespace),
+            context,
+        )
+
+    return run
+
+
+def _handler_for_script_policy_command(
+    handler: AgentRuntimeCliHandler[CliScriptPolicyCommand],
+) -> Callable[[argparse.Namespace, CliExecutionContext], int]:
+    def run(namespace: argparse.Namespace, context: CliExecutionContext) -> int:
+        return handler(
+            _script_policy_command_from_namespace(namespace),
+            _agent_runtime_composition_options_from_namespace(namespace),
+            context,
+        )
+
+    return run
+
+
+def _handler_for_script_execute_command(
+    handler: AgentRuntimeCliHandler[CliScriptExecuteCommand],
+) -> Callable[[argparse.Namespace, CliExecutionContext], int]:
+    def run(namespace: argparse.Namespace, context: CliExecutionContext) -> int:
+        return handler(
+            _script_execute_command_from_namespace(namespace),
+            _agent_runtime_composition_options_from_namespace(namespace),
+            context,
+        )
+
+    return run
 
 
 def _agent_runtime_composition_options_from_namespace(

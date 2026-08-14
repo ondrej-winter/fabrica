@@ -866,9 +866,11 @@ feature slices:
   checks and explicit I/O-facing integration checks.
 
 The product CLI keeps the same boundaries. Generic shell modules under
-`src/fabrica/adapters/inbound/cli/` own global option parsing and contribution
-dispatch only; they do not import feature slices. Feature slices own their
-subcommand registration, adapter-local parsed command models, CLI runners, and
-output mapping under `features/<feature>/adapters/inbound/cli/`. Bootstrap-owned
-factories under `src/fabrica/bootstrap/cli_contributions/` assemble those feature
-CLI adapters with default concrete dependencies.
+`src/fabrica/adapters/inbound/cli/` own feature-neutral parser construction,
+global option parsing, and shared CLI contracts only; they do not import feature
+slices. Feature slices own their subcommand registration, adapter-local parsed
+command models, CLI runners, and output mapping under
+`features/<feature>/adapters/inbound/cli/`. Bootstrap-owned handler factories in
+`src/fabrica/bootstrap/cli.py` attach per-command handlers and lazily assemble
+those feature CLI adapters with default concrete dependencies only when the
+selected command runs.

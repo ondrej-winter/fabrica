@@ -1,33 +1,16 @@
 """Tests for the local agent runtime CLI script-policy command."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from io import StringIO
-from pathlib import Path
-from typing import TextIO
+from typing import TYPE_CHECKING, TextIO
 
-import pytest
-
-import fabrica.bootstrap.cli_contributions.agent_runtime as agent_runtime_cli_contribution
-from fabrica.adapters.inbound.cli import (
-    CliCommandExecutionOptions,
-    CliInvocation,
-)
-from fabrica.adapters.inbound.cli import (
-    run_cli_command as _run_cli_command,
-)
-from fabrica.bootstrap.cli import create_cli_contributions
-from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
-    AgentRuntimeCliCompositionOptions,
-    CliScriptPolicyCommand,
-)
-from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
-    AgentRuntimeCliDependencies,
-    AgentRuntimeCliOptions,
-    AgentRuntimeCliStreams,
-    AgentRuntimeCliWriters,
-)
-from fabrica.features.agent_runtime.adapters.inbound.cli.output import write_script_policy_result
-from fabrica.features.agent_runtime.adapters.inbound.cli.runner import run_agent_runtime_cli_command
+import fabrica.bootstrap.cli as bootstrap_cli
+from fabrica.bootstrap.cli import run_cli
+from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import CliScriptPolicyCommand
+from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliStreams
+from fabrica.features.agent_runtime.adapters.inbound.cli.runner import run_script_policy_cli_command
 from fabrica.features.agent_runtime.application.dtos import (
     SelectedSkillScript,
     SkillScriptApprovalBinding,
@@ -37,65 +20,28 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptType,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
+
 EXPECTED_METADATA_ERROR_EXIT_CODE = 2
 EXPECTED_UNSUPPORTED_EXIT_CODE = 4
 EXPECTED_POLICY_DENIED_EXIT_CODE = 5
 
 
-def run_product_cli_command(
-    invocation: CliInvocation,
-    *,
-    dependencies: AgentRuntimeCliDependencies | None = None,
-    stdin: TextIO | None = None,
-    stdout: TextIO | None = None,
-    stderr: TextIO | None = None,
-) -> int:
-    options = CliCommandExecutionOptions(
-        contributions=create_cli_contributions(agent_runtime_dependencies=dependencies),
-        stdin=stdin,
-        stdout=stdout,
-        stderr=stderr,
-    )
-    return _run_cli_command(invocation, options=options)
-
-
 def run_feature_cli_command(
     command: CliScriptPolicyCommand,
     *,
-    dependencies: AgentRuntimeCliDependencies | None = None,
+    evaluator: FakeScriptPolicyEvaluator,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    return run_agent_runtime_cli_command(
+    return run_script_policy_cli_command(
         command,
-        options=AgentRuntimeCliOptions(),
-        dependencies=dependencies or AgentRuntimeCliDependencies(),
         streams=AgentRuntimeCliStreams(stdout=stdout or StringIO(), stderr=stderr or StringIO()),
-        writers=AgentRuntimeCliWriters(
-            run_result=_unexpected_run_result_writer,
-            evidence=_unexpected_evidence_writer,
-            script_policy_result=write_script_policy_result,
-            script_execution_result=_unexpected_script_execution_result_writer,
-        ),
+        evaluator=evaluator,
     )
-
-
-def _unexpected_run_result_writer(*args: object, **kwargs: object) -> int:
-    _ = args, kwargs
-    msg = "script-policy tests must not execute run-result writer"
-    raise AssertionError(msg)
-
-
-def _unexpected_evidence_writer(*args: object, **kwargs: object) -> None:
-    _ = args, kwargs
-    msg = "script-policy tests must not execute evidence writer"
-    raise AssertionError(msg)
-
-
-def _unexpected_script_execution_result_writer(*args: object, **kwargs: object) -> int:
-    _ = args, kwargs
-    msg = "script-policy tests must not execute script-execution writer"
-    raise AssertionError(msg)
 
 
 @dataclass
@@ -121,11 +67,8 @@ def test_script_policy_command_maps_explicit_selection_to_policy_evaluator() -> 
     stderr = StringIO()
 
     exit_code = run_feature_cli_command(
-        CliScriptPolicyCommand(
-            skill_id="python-testing",
-            script_id="scripts/check.py",
-        ),
-        dependencies=AgentRuntimeCliDependencies(script_policy_evaluator=evaluator),
+        CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
+        evaluator=evaluator,
         stdout=stdout,
         stderr=stderr,
     )
@@ -150,7 +93,7 @@ def test_script_policy_command_writes_approved_status_to_stdout() -> None:
 
     exit_code = run_feature_cli_command(
         CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
-        dependencies=AgentRuntimeCliDependencies(script_policy_evaluator=evaluator),
+        evaluator=evaluator,
         stdout=stdout,
         stderr=stderr,
     )
@@ -179,7 +122,7 @@ def test_script_policy_command_maps_non_approved_statuses_to_stable_exit_codes()
 
         exit_code = run_feature_cli_command(
             CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
-            dependencies=AgentRuntimeCliDependencies(script_policy_evaluator=evaluator),
+            evaluator=evaluator,
             stdout=StringIO(),
             stderr=StringIO(),
         )
@@ -188,18 +131,20 @@ def test_script_policy_command_maps_non_approved_statuses_to_stable_exit_codes()
 
 
 def test_script_policy_command_default_composition_denies_synthetic_script_without_execution(tmp_path: Path) -> None:
-    script_file = tmp_path / "python-testing" / "scripts" / "check.py"
-    script_file.parent.mkdir(parents=True)
-    script_file.write_text("print('not executed by policy inspection')\n", encoding="utf-8")
+    _write_script(tmp_path, "python-testing", "scripts/check.py", "print('not executed by policy inspection')\n")
     stdout = StringIO()
     stderr = StringIO()
 
-    exit_code = run_product_cli_command(
-        CliInvocation(
-            command=CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
-            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(tmp_path,)),
+    exit_code = run_cli(
+        (
+            "script-policy",
+            "--skill-id",
+            "python-testing",
+            "--script-id",
+            "scripts/check.py",
+            "--skill-root",
+            str(tmp_path),
         ),
-        stdin=None,
         stdout=stdout,
         stderr=stderr,
     )
@@ -219,15 +164,18 @@ def test_script_policy_default_composition_does_not_create_codex_runtime(
         msg = "script-policy must not create the Codex runtime"
         raise AssertionError(msg)
 
-    monkeypatch.setattr(agent_runtime_cli_contribution, "_create_default_runtime", fail_if_runtime_is_created)
-    script_file = tmp_path / "python-testing" / "scripts" / "check.py"
-    script_file.parent.mkdir(parents=True)
-    script_file.write_text("print('not executed by policy inspection')\n", encoding="utf-8")
+    monkeypatch.setattr(bootstrap_cli, "_create_default_runtime", fail_if_runtime_is_created)
+    _write_script(tmp_path, "python-testing", "scripts/check.py", "print('not executed by policy inspection')\n")
 
-    exit_code = run_product_cli_command(
-        CliInvocation(
-            command=CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
-            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(tmp_path,)),
+    exit_code = run_cli(
+        (
+            "script-policy",
+            "--skill-id",
+            "python-testing",
+            "--script-id",
+            "scripts/check.py",
+            "--skill-root",
+            str(tmp_path),
         ),
         stdout=StringIO(),
         stderr=StringIO(),
@@ -237,16 +185,19 @@ def test_script_policy_default_composition_does_not_create_codex_runtime(
 
 
 def test_script_policy_invocation_passes_composition_skill_roots_to_default_composition(tmp_path: Path) -> None:
-    script_file = tmp_path / "python-testing" / "scripts" / "check.py"
-    script_file.parent.mkdir(parents=True)
-    script_file.write_text("print('not executed by policy inspection')\n", encoding="utf-8")
+    _write_script(tmp_path, "python-testing", "scripts/check.py", "print('not executed by policy inspection')\n")
     stdout = StringIO()
     stderr = StringIO()
 
-    exit_code = run_product_cli_command(
-        CliInvocation(
-            command=CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
-            composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(tmp_path,)),
+    exit_code = run_cli(
+        (
+            "script-policy",
+            "--skill-id",
+            "python-testing",
+            "--script-id",
+            "scripts/check.py",
+            "--skill-root",
+            str(tmp_path),
         ),
         stdout=stdout,
         stderr=stderr,
@@ -270,3 +221,10 @@ def _binding() -> SkillScriptApprovalBinding:
         byte_size=128,
         content_digest="sha256:abc123",
     )
+
+
+def _write_script(root: Path, skill_id: str, script_id: str, text: str) -> Path:
+    script_file = root / skill_id / script_id
+    script_file.parent.mkdir(parents=True, exist_ok=True)
+    script_file.write_text(text, encoding="utf-8")
+    return script_file

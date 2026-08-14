@@ -1,24 +1,21 @@
 """Tests for the selected-skill commit-message CLI command."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from io import StringIO
 from typing import TextIO
 
-import pytest
-
-from fabrica.adapters.inbound.cli import CliGlobalOptions, CliInvocation
+from fabrica.adapters.inbound.cli import CliGlobalOptions
 from fabrica.adapters.inbound.cli.output import write_model_evidence_report
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitMessageCommand,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
-    DeveloperWorkflowCliDependencies,
     DeveloperWorkflowCliOptions,
     DeveloperWorkflowCliStreams,
-    DeveloperWorkflowCliWriters,
 )
-from fabrica.features.developer_workflow.adapters.inbound.cli.output import write_developer_workflow_result
-from fabrica.features.developer_workflow.adapters.inbound.cli.runner import run_developer_workflow_cli_command
+from fabrica.features.developer_workflow.adapters.inbound.cli.runner import run_commit_message_cli_command
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageRecommendation,
     CommitMessageWorkflowResult,
@@ -41,44 +38,30 @@ from fabrica.shared_kernel.model_usage import (
 EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2
 
 
-def run_feature_cli_command(
-    invocation: CliCommitMessageCommand | CliInvocation,
+def run_feature_cli_command(  # noqa: PLR0913
+    command: CliCommitMessageCommand,
     *,
-    dependencies: DeveloperWorkflowCliDependencies | None = None,
+    workflow: FakeCommitMessageWorkflow,
+    global_options: CliGlobalOptions | None = None,
     stdin: TextIO | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    command, global_options = _normalize_invocation(invocation)
-    return run_developer_workflow_cli_command(
+    options = global_options or CliGlobalOptions()
+    return run_commit_message_cli_command(
         command,
         options=DeveloperWorkflowCliOptions(
-            print_usage=global_options.print_usage,
-            print_prices=global_options.print_prices,
+            print_usage=options.print_usage,
+            print_prices=options.print_prices,
         ),
-        dependencies=dependencies or DeveloperWorkflowCliDependencies(),
         streams=DeveloperWorkflowCliStreams(
             stdin=stdin or StringIO(),
             stdout=stdout or StringIO(),
             stderr=stderr or StringIO(),
         ),
-        writers=DeveloperWorkflowCliWriters(
-            evidence=_write_evidence,
-            runtime_result=write_developer_workflow_result,
-            confirmed_commit_result=_unexpected_confirmed_commit_result_writer,
-        ),
+        workflow=workflow,
+        evidence_writer=_write_evidence,
     )
-
-
-def _normalize_invocation(
-    invocation: CliCommitMessageCommand | CliInvocation,
-) -> tuple[CliCommitMessageCommand, CliGlobalOptions]:
-    if isinstance(invocation, CliInvocation):
-        if not isinstance(invocation.command, CliCommitMessageCommand):
-            msg = "commit-message tests only support CliCommitMessageCommand invocations"
-            raise TypeError(msg)
-        return invocation.command, invocation.global_options
-    return invocation, CliGlobalOptions()
 
 
 def _write_evidence(
@@ -95,12 +78,6 @@ def _write_evidence(
         include_usage=include_usage,
         include_prices=include_prices,
     )
-
-
-def _unexpected_confirmed_commit_result_writer(*args: object, **kwargs: object) -> int:
-    _ = args, kwargs
-    msg = "commit-message tests must not execute confirmed-commit writer"
-    raise AssertionError(msg)
 
 
 @dataclass
@@ -131,7 +108,7 @@ def test_commit_message_command_uses_injected_workflow_and_writes_success_output
 
     exit_code = run_feature_cli_command(
         command,
-        dependencies=DeveloperWorkflowCliDependencies(commit_message_workflow=workflow),
+        workflow=workflow,
         stdout=stdout,
         stderr=stderr,
     )
@@ -162,7 +139,7 @@ def test_commit_message_command_writes_success_output_without_cli_line_truncatio
 
     exit_code = run_feature_cli_command(
         CliCommitMessageCommand(),
-        dependencies=DeveloperWorkflowCliDependencies(commit_message_workflow=workflow),
+        workflow=workflow,
         stdout=stdout,
         stderr=StringIO(),
     )
@@ -205,11 +182,9 @@ def test_commit_message_invocation_appends_requested_usage_and_price_evidence() 
     stdout = StringIO()
 
     exit_code = run_feature_cli_command(
-        CliInvocation(
-            command=CliCommitMessageCommand(),
-            global_options=CliGlobalOptions(print_usage=True, print_prices=True),
-        ),
-        dependencies=DeveloperWorkflowCliDependencies(commit_message_workflow=workflow),
+        CliCommitMessageCommand(),
+        workflow=workflow,
+        global_options=CliGlobalOptions(print_usage=True, print_prices=True),
         stdout=stdout,
         stderr=StringIO(),
     )
@@ -242,7 +217,7 @@ def test_commit_message_command_reports_pre_model_configuration_failures() -> No
 
     exit_code = run_feature_cli_command(
         CliCommitMessageCommand(),
-        dependencies=DeveloperWorkflowCliDependencies(commit_message_workflow=workflow),
+        workflow=workflow,
         stdout=StringIO(),
         stderr=stderr,
     )
@@ -252,8 +227,3 @@ def test_commit_message_command_reports_pre_model_configuration_failures() -> No
         stderr.getvalue()
         == "status: configuration_error\nobservation: no staged git changes were found category=no_staged_changes\n"
     )
-
-
-def test_commit_message_command_reports_missing_injected_workflow() -> None:
-    with pytest.raises(RuntimeError, match="commit_message_workflow"):
-        run_feature_cli_command(CliCommitMessageCommand())

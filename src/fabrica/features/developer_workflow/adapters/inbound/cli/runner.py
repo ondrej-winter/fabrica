@@ -5,11 +5,11 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
-    CliCommitCommand,
-    CliCommitMessageCommand,
+from fabrica.features.developer_workflow.adapters.inbound.cli.output import (
+    format_commit_message_recommendation,
+    write_confirmed_commit_result,
+    write_developer_workflow_result,
 )
-from fabrica.features.developer_workflow.adapters.inbound.cli.output import format_commit_message_recommendation
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageWorkflowResult,
     DeveloperWorkflowObservation,
@@ -18,85 +18,56 @@ from fabrica.features.developer_workflow.application.dtos import (
 )
 
 if TYPE_CHECKING:
+    from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
+        CliCommitCommand,
+        CliCommitMessageCommand,
+    )
     from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
-        DeveloperWorkflowCliDependencies,
         DeveloperWorkflowCliOptions,
         DeveloperWorkflowCliStreams,
-        DeveloperWorkflowCliWriters,
+        EvidenceWriter,
     )
     from fabrica.features.developer_workflow.application.dtos import ConfirmedCommitWorkflowResult
-
-
-class DeveloperWorkflowCliDependencyError(RuntimeError):
-    """Raised when the developer-workflow CLI adapter is missing a required dependency."""
-
-
-def run_developer_workflow_cli_command(
-    command: CliCommitMessageCommand | CliCommitCommand,
-    *,
-    options: DeveloperWorkflowCliOptions,
-    dependencies: DeveloperWorkflowCliDependencies,
-    streams: DeveloperWorkflowCliStreams,
-    writers: DeveloperWorkflowCliWriters,
-) -> int:
-    """Run one developer-workflow owned CLI command."""
-    if isinstance(command, CliCommitMessageCommand):
-        return _run_commit_message_preview(
-            command,
-            options=options,
-            dependencies=dependencies,
-            streams=streams,
-            writers=writers,
-        )
-    return _run_confirmed_commit(
-        command,
-        options=options,
-        dependencies=dependencies,
-        streams=streams,
-        writers=writers,
+    from fabrica.features.developer_workflow.application.ports import (
+        CommitMessageWorkflowRunner,
+        ConfirmedCommitWorkflowRunner,
     )
 
 
-def _run_commit_message_preview(
+def run_commit_message_cli_command(
     command: CliCommitMessageCommand,
     *,
     options: DeveloperWorkflowCliOptions,
-    dependencies: DeveloperWorkflowCliDependencies,
     streams: DeveloperWorkflowCliStreams,
-    writers: DeveloperWorkflowCliWriters,
+    workflow: CommitMessageWorkflowRunner,
+    evidence_writer: EvidenceWriter,
 ) -> int:
-    workflow = _require_dependency(
-        dependencies.commit_message_workflow,
-        dependency_name="commit_message_workflow",
-    )
+    """Run a read-only commit-message preview command."""
     result = workflow.run(_generate_commit_message_command(command))
     return _write_runtime_result(
         result,
         options=options,
         streams=streams,
-        writers=writers,
+        evidence_writer=evidence_writer,
     )
 
 
-def _run_confirmed_commit(
+def run_confirmed_commit_cli_command(
     command: CliCommitCommand,
     *,
     options: DeveloperWorkflowCliOptions,
-    dependencies: DeveloperWorkflowCliDependencies,
     streams: DeveloperWorkflowCliStreams,
-    writers: DeveloperWorkflowCliWriters,
+    workflow: ConfirmedCommitWorkflowRunner,
+    evidence_writer: EvidenceWriter,
 ) -> int:
-    workflow = _require_dependency(
-        dependencies.confirmed_commit_workflow,
-        dependency_name="confirmed_commit_workflow",
-    )
+    """Run an interactive confirmed commit command."""
     generation_result = workflow.generate(_generate_commit_message_command(command))
     if not generation_result.succeeded or generation_result.recommendation is None:
         return _write_confirmed_commit_result(
             generation_result,
             options=options,
             streams=streams,
-            writers=writers,
+            evidence_writer=evidence_writer,
         )
 
     confirmation = _prompt_for_commit_confirmation(generation_result, streams=streams)
@@ -105,14 +76,14 @@ def _run_confirmed_commit(
             generation_result,
             options=options,
             streams=streams,
-            writers=writers,
+            evidence_writer=evidence_writer,
         )
     if not confirmation:
         return _write_cancelled_confirmation_result(
             generation_result,
             options=options,
             streams=streams,
-            writers=writers,
+            evidence_writer=evidence_writer,
         )
 
     commit_result = workflow.commit(generation_result.recommendation)
@@ -126,7 +97,7 @@ def _run_confirmed_commit(
         options=options,
         streams=streams,
         output_already_written=True,
-        writers=writers,
+        evidence_writer=evidence_writer,
     )
 
 
@@ -157,7 +128,7 @@ def _write_interrupted_confirmation_result(
     *,
     options: DeveloperWorkflowCliOptions,
     streams: DeveloperWorkflowCliStreams,
-    writers: DeveloperWorkflowCliWriters,
+    evidence_writer: EvidenceWriter,
 ) -> int:
     interrupted_result = CommitMessageWorkflowResult(
         status=DeveloperWorkflowStatus.SAFETY_DENIED,
@@ -174,7 +145,7 @@ def _write_interrupted_confirmation_result(
         interrupted_result,
         options=options,
         streams=streams,
-        writers=writers,
+        evidence_writer=evidence_writer,
     )
 
 
@@ -183,10 +154,10 @@ def _write_cancelled_confirmation_result(
     *,
     options: DeveloperWorkflowCliOptions,
     streams: DeveloperWorkflowCliStreams,
-    writers: DeveloperWorkflowCliWriters,
+    evidence_writer: EvidenceWriter,
 ) -> int:
     streams.stdout.write("Commit cancelled; no commit created.\n")
-    writers.evidence(
+    evidence_writer(
         generation_result,
         include_usage=options.print_usage,
         include_prices=options.print_prices,
@@ -200,11 +171,11 @@ def _write_runtime_result(
     *,
     options: DeveloperWorkflowCliOptions,
     streams: DeveloperWorkflowCliStreams,
-    writers: DeveloperWorkflowCliWriters,
+    evidence_writer: EvidenceWriter,
 ) -> int:
-    exit_code = writers.runtime_result(result, stdout=streams.stdout, stderr=streams.stderr)
+    exit_code = write_developer_workflow_result(result, stdout=streams.stdout, stderr=streams.stderr)
     if options.print_usage or options.print_prices:
-        writers.evidence(
+        evidence_writer(
             result,
             include_usage=options.print_usage,
             include_prices=options.print_prices,
@@ -218,27 +189,20 @@ def _write_confirmed_commit_result(
     *,
     options: DeveloperWorkflowCliOptions,
     streams: DeveloperWorkflowCliStreams,
-    writers: DeveloperWorkflowCliWriters,
+    evidence_writer: EvidenceWriter,
     output_already_written: bool = False,
 ) -> int:
     if output_already_written:
         result = replace(result, recommendation=None, output_text=None)
-    exit_code = writers.confirmed_commit_result(result, stdout=streams.stdout, stderr=streams.stderr)
+    exit_code = write_confirmed_commit_result(result, stdout=streams.stdout, stderr=streams.stderr)
     if options.print_usage or options.print_prices:
-        writers.evidence(
+        evidence_writer(
             result,
             include_usage=options.print_usage,
             include_prices=options.print_prices,
             stdout=streams.stdout,
         )
     return exit_code
-
-
-def _require_dependency(dependency: object | None, *, dependency_name: str):
-    if dependency is None:
-        msg = f"developer-workflow CLI dependency is not configured: {dependency_name}"
-        raise DeveloperWorkflowCliDependencyError(msg)
-    return dependency
 
 
 def _generate_commit_message_command(

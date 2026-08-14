@@ -6,32 +6,30 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.command_models imp
     CliDeveloperWorkflowCompositionOptions,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
-    DeveloperWorkflowCliDependencies,
     DeveloperWorkflowCliOptions,
     DeveloperWorkflowCliStreams,
-    DeveloperWorkflowCliWriters,
     EvidenceWriter,
-    RuntimeResultWriter,
 )
-from fabrica.features.developer_workflow.adapters.inbound.cli.contribution import DEVELOPER_WORKFLOW_CLI_COMMAND_TYPES
 from fabrica.features.developer_workflow.adapters.inbound.cli.registration import (
+    DEVELOPER_WORKFLOW_CLI_COMMAND_NAMES,
+    DeveloperWorkflowCliHandler,
     register_developer_workflow_cli_commands,
 )
 from fabrica.features.developer_workflow.adapters.inbound.cli.runner import (
-    run_developer_workflow_cli_command,
+    run_commit_message_cli_command,
+    run_confirmed_commit_cli_command,
 )
 
 __all__ = [
-    "DEVELOPER_WORKFLOW_CLI_COMMAND_TYPES",
+    "DEVELOPER_WORKFLOW_CLI_COMMAND_NAMES",
     "CliCommitCommand",
     "CliCommitMessageCommand",
     "CliDeveloperWorkflowCompositionOptions",
-    "DeveloperWorkflowCliDependencies",
+    "DeveloperWorkflowCliHandler",
     "DeveloperWorkflowCliOptions",
     "DeveloperWorkflowCliStreams",
-    "DeveloperWorkflowCliWriters",
     "EvidenceWriter",
-    "RuntimeResultWriter",
     "register_developer_workflow_cli_commands",
-    "run_developer_workflow_cli_command",
+    "run_commit_message_cli_command",
+    "run_confirmed_commit_cli_command",
 ]

@@ -1,28 +1,33 @@
 """Feature-neutral command-line shell for Fabrica workflows."""
 
-from fabrica.adapters.inbound.cli.contracts import CliConfigurationError, CliDispatchError, CliError, CliSubparsers
-from fabrica.adapters.inbound.cli.options import CliGlobalOptions
-from fabrica.adapters.inbound.cli.parser import (
-    CliCommand,
-    CliInvocation,
-    build_parser,
-    parse_args,
+from fabrica.adapters.inbound.cli.contracts import (
+    CLI_HANDLER_NAMESPACE_ATTRIBUTE,
+    CliCommandHandler,
+    CliCommandRegistrar,
+    CliConfigurationError,
+    CliError,
+    CliExecutionContext,
+    CliGlobalOptions,
+    CliSubparsers,
 )
-from fabrica.adapters.inbound.cli.runner import (
-    CliCommandExecutionOptions,
-    run_cli_command,
+from fabrica.adapters.inbound.cli.parser import (
+    build_parser,
+    cli_global_options_from_namespace,
+    cli_handler_from_namespace,
+    parse_args,
 )
 
 __all__ = [
-    "CliCommand",
-    "CliCommandExecutionOptions",
+    "CLI_HANDLER_NAMESPACE_ATTRIBUTE",
+    "CliCommandHandler",
+    "CliCommandRegistrar",
     "CliConfigurationError",
-    "CliDispatchError",
     "CliError",
+    "CliExecutionContext",
     "CliGlobalOptions",
-    "CliInvocation",
     "CliSubparsers",
     "build_parser",
+    "cli_global_options_from_namespace",
+    "cli_handler_from_namespace",
     "parse_args",
-    "run_cli_command",
 ]

@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from fabrica.adapters.inbound.cli.contracts import CLI_HANDLER_NAMESPACE_ATTRIBUTE
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -17,14 +18,24 @@ from fabrica.features.developer_workflow.application.dtos import (
 )
 
 if TYPE_CHECKING:
-    from fabrica.adapters.inbound.cli.contracts import CliSubparsers
+    from collections.abc import Callable
+
+    from fabrica.adapters.inbound.cli.contracts import CliExecutionContext, CliSubparsers
 
 COMMIT_MESSAGE_COMMAND_NAME = "commit-message"
 COMMIT_COMMAND_NAME = "commit"
 DEVELOPER_WORKFLOW_CLI_COMMAND_NAMES = (COMMIT_MESSAGE_COMMAND_NAME, COMMIT_COMMAND_NAME)
+type DeveloperWorkflowCliHandler[TCommand] = Callable[
+    [TCommand, CliDeveloperWorkflowCompositionOptions, CliExecutionContext], int
+]
 
 
-def register_developer_workflow_cli_commands(subparsers: CliSubparsers) -> None:
+def register_developer_workflow_cli_commands(
+    subparsers: CliSubparsers,
+    *,
+    commit_message_command: DeveloperWorkflowCliHandler[CliCommitMessageCommand],
+    commit_command: DeveloperWorkflowCliHandler[CliCommitCommand],
+) -> None:
     """Register developer-workflow owned commands on the product CLI parser."""
     commit_message_parser = subparsers.add_parser(
         COMMIT_MESSAGE_COMMAND_NAME,
@@ -33,9 +44,8 @@ def register_developer_workflow_cli_commands(subparsers: CliSubparsers) -> None:
     )
     _add_commit_message_generation_flags(commit_message_parser)
     _add_common_skill_root_flags(commit_message_parser)
-    commit_message_parser.set_defaults(command_factory=_commit_message_command_from_namespace)
     commit_message_parser.set_defaults(
-        composition_options_factory=_developer_workflow_composition_options_from_namespace
+        **{CLI_HANDLER_NAMESPACE_ATTRIBUTE: _handler_for_commit_message_command(commit_message_command)}
     )
 
     commit_parser = subparsers.add_parser(
@@ -48,8 +58,7 @@ def register_developer_workflow_cli_commands(subparsers: CliSubparsers) -> None:
     )
     _add_commit_message_generation_flags(commit_parser)
     _add_common_skill_root_flags(commit_parser)
-    commit_parser.set_defaults(command_factory=_commit_command_from_namespace)
-    commit_parser.set_defaults(composition_options_factory=_developer_workflow_composition_options_from_namespace)
+    commit_parser.set_defaults(**{CLI_HANDLER_NAMESPACE_ATTRIBUTE: _handler_for_commit_command(commit_command)})
 
 
 def _add_common_skill_root_flags(parser: argparse.ArgumentParser) -> None:
@@ -96,6 +105,32 @@ def _commit_message_command_from_namespace(namespace: argparse.Namespace) -> Cli
 
 def _commit_command_from_namespace(namespace: argparse.Namespace) -> CliCommitCommand:
     return CliCommitCommand(skill_id=namespace.skill_id)
+
+
+def _handler_for_commit_message_command(
+    handler: DeveloperWorkflowCliHandler[CliCommitMessageCommand],
+) -> Callable[[argparse.Namespace, CliExecutionContext], int]:
+    def run(namespace: argparse.Namespace, context: CliExecutionContext) -> int:
+        return handler(
+            _commit_message_command_from_namespace(namespace),
+            _developer_workflow_composition_options_from_namespace(namespace),
+            context,
+        )
+
+    return run
+
+
+def _handler_for_commit_command(
+    handler: DeveloperWorkflowCliHandler[CliCommitCommand],
+) -> Callable[[argparse.Namespace, CliExecutionContext], int]:
+    def run(namespace: argparse.Namespace, context: CliExecutionContext) -> int:
+        return handler(
+            _commit_command_from_namespace(namespace),
+            _developer_workflow_composition_options_from_namespace(namespace),
+            context,
+        )
+
+    return run
 
 
 def _developer_workflow_composition_options_from_namespace(
