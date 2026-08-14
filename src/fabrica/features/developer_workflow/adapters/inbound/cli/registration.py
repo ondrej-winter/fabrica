@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli.contracts import CLI_HANDLER_NAMESPACE_ATTRIBUTE
+from fabrica.adapters.inbound.cli.contracts import bind_cli_handler
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -44,9 +44,7 @@ def register_developer_workflow_cli_commands(
     )
     _add_commit_message_generation_flags(commit_message_parser)
     _add_common_skill_root_flags(commit_message_parser)
-    commit_message_parser.set_defaults(
-        **{CLI_HANDLER_NAMESPACE_ATTRIBUTE: _handler_for_commit_message_command(commit_message_command)}
-    )
+    bind_cli_handler(commit_message_parser, _handler_for_commit_message_command(commit_message_command))
 
     commit_parser = subparsers.add_parser(
         COMMIT_COMMAND_NAME,
@@ -58,7 +56,7 @@ def register_developer_workflow_cli_commands(
     )
     _add_commit_message_generation_flags(commit_parser)
     _add_common_skill_root_flags(commit_parser)
-    commit_parser.set_defaults(**{CLI_HANDLER_NAMESPACE_ATTRIBUTE: _handler_for_commit_command(commit_command)})
+    bind_cli_handler(commit_parser, _handler_for_commit_command(commit_command))
 
 
 def _add_common_skill_root_flags(parser: argparse.ArgumentParser) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 from dataclasses import FrozenInstanceError, dataclass
 from io import StringIO
@@ -11,8 +12,10 @@ from typing import TYPE_CHECKING
 import pytest
 
 from fabrica.adapters.inbound.cli import (
+    CliConfigurationError,
     CliExecutionContext,
     CliGlobalOptions,
+    bind_cli_handler,
     cli_global_options_from_namespace,
     cli_handler_from_namespace,
 )
@@ -124,6 +127,26 @@ def _recording_command_registrars(handlers: RecordingHandlers) -> tuple[CliComma
             commit_command=handlers.record_developer_workflow_command,
         ),
     )
+
+
+def test_bind_cli_handler_round_trips_handler_through_parsed_namespace() -> None:
+    parser = _build_parser(
+        (lambda subparsers: bind_cli_handler(subparsers.add_parser("synthetic"), _synthetic_handler),)
+    )
+
+    namespace = parser.parse_args(["synthetic"])
+
+    assert cli_handler_from_namespace(namespace) is _synthetic_handler
+
+
+def _synthetic_handler(namespace: object, context: CliExecutionContext) -> int:
+    _ = (namespace, context)
+    return 0
+
+
+def test_cli_handler_from_namespace_rejects_unbound_namespace() -> None:
+    with pytest.raises(CliConfigurationError, match="did not configure a handler"):
+        cli_handler_from_namespace(argparse.Namespace())
 
 
 def test_build_parser_renders_help_without_runtime_side_effects(capsys: pytest.CaptureFixture[str]) -> None:

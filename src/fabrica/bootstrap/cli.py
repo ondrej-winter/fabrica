@@ -6,11 +6,10 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, TextIO
 
-from fabrica.adapters.inbound.cli.contracts import CliError, CliExecutionContext
+from fabrica.adapters.inbound.cli.contracts import CliError, CliExecutionContext, cli_handler_from_namespace
 from fabrica.adapters.inbound.cli.output import write_line, write_model_evidence_report
 from fabrica.adapters.inbound.cli.parser import (
     cli_global_options_from_namespace,
-    cli_handler_from_namespace,
     parse_args,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (

@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli.contracts import CLI_HANDLER_NAMESPACE_ATTRIBUTE
+from fabrica.adapters.inbound.cli.contracts import bind_cli_handler
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
@@ -75,7 +75,7 @@ def register_agent_runtime_cli_commands(
         help="Explicit selected Agent Skill resource. May be repeated.",
     )
     _add_common_skill_root_flags(run_parser)
-    run_parser.set_defaults(**{CLI_HANDLER_NAMESPACE_ATTRIBUTE: _handler_for_run_command(run_command)})
+    bind_cli_handler(run_parser, _handler_for_run_command(run_command))
 
     policy_parser = subparsers.add_parser(
         SCRIPT_POLICY_COMMAND_NAME,
@@ -95,9 +95,7 @@ def register_agent_runtime_cli_commands(
         help="Relative selected script ID within the skill.",
     )
     _add_common_skill_root_flags(policy_parser)
-    policy_parser.set_defaults(
-        **{CLI_HANDLER_NAMESPACE_ATTRIBUTE: _handler_for_script_policy_command(script_policy_command)}
-    )
+    bind_cli_handler(policy_parser, _handler_for_script_policy_command(script_policy_command))
 
     execute_parser = subparsers.add_parser(
         SCRIPT_EXECUTE_COMMAND_NAME,
@@ -144,9 +142,7 @@ def register_agent_runtime_cli_commands(
         help="Approved content digest bound to the selected script metadata, such as sha256:....",
     )
     _add_common_skill_root_flags(execute_parser)
-    execute_parser.set_defaults(
-        **{CLI_HANDLER_NAMESPACE_ATTRIBUTE: _handler_for_script_execute_command(script_execute_command)}
-    )
+    bind_cli_handler(execute_parser, _handler_for_script_execute_command(script_execute_command))
 
 
 def _add_common_skill_root_flags(parser: argparse.ArgumentParser) -> None:

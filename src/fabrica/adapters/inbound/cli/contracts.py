@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     import argparse
     from typing import TextIO
 
-CLI_HANDLER_NAMESPACE_ATTRIBUTE = "cli_handler"
+_CLI_HANDLER_NAMESPACE_ATTRIBUTE = "cli_handler"
 
 
 class CliSubparsers(Protocol):
@@ -39,11 +39,28 @@ class CliExecutionContext:
     stderr: TextIO
 
 
-class CliCommandHandler(Protocol):
-    """Callable attached to a parsed argparse subcommand by feature registrations."""
+type CliCommandHandler = Callable[[argparse.Namespace, CliExecutionContext], int]
 
-    def __call__(self, namespace: argparse.Namespace, context: CliExecutionContext) -> int:
-        """Run the selected command and return a process exit code."""
+
+class CliHandlerBindingTarget(Protocol):
+    """Parser behavior needed to bind a command handler during CLI registration."""
+
+    def set_defaults(self, **kwargs: object) -> None:
+        """Attach parser defaults used after argument parsing."""
+
+
+def bind_cli_handler(parser: CliHandlerBindingTarget, handler: CliCommandHandler) -> None:
+    """Bind a command handler to one CLI subcommand parser."""
+    parser.set_defaults(**{_CLI_HANDLER_NAMESPACE_ATTRIBUTE: handler})
+
+
+def cli_handler_from_namespace(namespace: argparse.Namespace) -> CliCommandHandler:
+    """Return the command handler bound to a parsed subcommand namespace."""
+    handler = getattr(namespace, _CLI_HANDLER_NAMESPACE_ATTRIBUTE, None)
+    if not callable(handler):
+        msg = "CLI command registration did not configure a handler for the selected command"
+        raise CliConfigurationError(msg)
+    return handler
 
 
 type CliCommandRegistrar = Callable[[CliSubparsers], None]
@@ -58,12 +75,14 @@ class CliConfigurationError(CliError):
 
 
 __all__ = [
-    "CLI_HANDLER_NAMESPACE_ATTRIBUTE",
     "CliCommandHandler",
     "CliCommandRegistrar",
     "CliConfigurationError",
     "CliError",
     "CliExecutionContext",
     "CliGlobalOptions",
+    "CliHandlerBindingTarget",
     "CliSubparsers",
+    "bind_cli_handler",
+    "cli_handler_from_namespace",
 ]

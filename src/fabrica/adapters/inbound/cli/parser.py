@@ -6,7 +6,6 @@ import argparse
 from typing import TYPE_CHECKING
 
 from fabrica.adapters.inbound.cli.contracts import (
-    CLI_HANDLER_NAMESPACE_ATTRIBUTE,
     CliConfigurationError,
     CliGlobalOptions,
 )
@@ -14,7 +13,7 @@ from fabrica.adapters.inbound.cli.contracts import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from fabrica.adapters.inbound.cli.contracts import CliCommandHandler, CliCommandRegistrar
+    from fabrica.adapters.inbound.cli.contracts import CliCommandRegistrar
 
 
 def build_parser(command_registrars: Sequence[CliCommandRegistrar]) -> argparse.ArgumentParser:
@@ -65,12 +64,3 @@ def cli_global_options_from_namespace(namespace: argparse.Namespace) -> CliGloba
         print_prices=namespace.print_prices,
         verbose_diagnostics=namespace.verbose_diagnostics,
     )
-
-
-def cli_handler_from_namespace(namespace: argparse.Namespace) -> CliCommandHandler:
-    """Return the command handler attached by the selected subcommand registration."""
-    handler = getattr(namespace, CLI_HANDLER_NAMESPACE_ATTRIBUTE, None)
-    if not callable(handler):
-        msg = "CLI command registration did not configure a handler for the selected command"
-        raise CliConfigurationError(msg)
-    return handler
