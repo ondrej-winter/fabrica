@@ -4,16 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TextIO
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping
+from fabrica.adapters.inbound.cli.text import bound_text, write_line
 
+if TYPE_CHECKING:
     from fabrica.shared_kernel.model_usage import (
         ModelCostEvidence,
         ModelUsageEvidence,
         ModelUsageObservation,
     )
-
-MAX_OUTPUT_LINE_CHARS = 4_000
 
 
 def write_model_evidence_report(
@@ -40,28 +38,6 @@ def write_model_evidence_report(
                 write_line(stdout, f"- {_format_cost_evidence(evidence)}")
         else:
             write_line(stdout, "- unavailable")
-
-
-def write_line(stream: TextIO, text: str) -> None:
-    """Write one bounded text line to a CLI stream."""
-    bounded = bound_text(text)
-    stream.write(bounded)
-    if not bounded.endswith("\n"):
-        stream.write("\n")
-
-
-def format_metadata(metadata: Mapping[str, object]) -> str:
-    """Format safe observation metadata as sorted key-value fields."""
-    if not metadata:
-        return ""
-    return " ".join(f"{key}={bound_text(str(value))}" for key, value in sorted(metadata.items()))
-
-
-def bound_text(text: str) -> str:
-    """Return text bounded to one safe CLI output line."""
-    if len(text) <= MAX_OUTPUT_LINE_CHARS:
-        return text
-    return f"{text[:MAX_OUTPUT_LINE_CHARS]}...<truncated>"
 
 
 def _format_usage_evidence(evidence: ModelUsageEvidence) -> str:

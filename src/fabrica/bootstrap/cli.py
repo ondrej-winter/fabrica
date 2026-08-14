@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, TextIO
 
 from fabrica.adapters.inbound.cli.contracts import CliError, CliExecutionContext
-from fabrica.adapters.inbound.cli.output import write_line, write_model_evidence_report
+from fabrica.adapters.inbound.cli.output import write_model_evidence_report
 from fabrica.adapters.inbound.cli.parser import parse_cli_invocation
+from fabrica.adapters.inbound.cli.text import write_line
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     AgentRuntimeCliOptions,
     AgentRuntimeCliStreams,

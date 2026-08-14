@@ -6,7 +6,6 @@ import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli.contracts import bind_cli_handler
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -20,7 +19,7 @@ from fabrica.features.developer_workflow.application.dtos import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from fabrica.adapters.inbound.cli.contracts import CliExecutionContext, CliSubparsers
+    from fabrica.adapters.inbound.cli.contracts import CliCommandRegistry, CliExecutionContext
 
 COMMIT_MESSAGE_COMMAND_NAME = "commit-message"
 COMMIT_COMMAND_NAME = "commit"
@@ -31,24 +30,25 @@ type DeveloperWorkflowCliHandler[TCommand] = Callable[
 
 
 def register_developer_workflow_cli_commands(
-    subparsers: CliSubparsers,
+    commands: CliCommandRegistry,
     *,
     commit_message_command: DeveloperWorkflowCliHandler[CliCommitMessageCommand],
     commit_command: DeveloperWorkflowCliHandler[CliCommitCommand],
 ) -> None:
     """Register developer-workflow owned commands on the product CLI parser."""
-    commit_message_parser = subparsers.add_parser(
+    commit_message_parser = commands.add_command(
         COMMIT_MESSAGE_COMMAND_NAME,
-        help="preview a read-only commit message for staged git changes",
+        handler=_handler_for_commit_message_command(commit_message_command),
+        command_help="preview a read-only commit message for staged git changes",
         description="Read staged git diff context and propose a commit message without creating a commit.",
     )
     _add_commit_message_generation_flags(commit_message_parser)
     _add_common_skill_root_flags(commit_message_parser)
-    bind_cli_handler(commit_message_parser, _handler_for_commit_message_command(commit_message_command))
 
-    commit_parser = subparsers.add_parser(
+    commit_parser = commands.add_command(
         COMMIT_COMMAND_NAME,
-        help="run pre-commit, then create a git commit from a generated message after confirmation",
+        handler=_handler_for_commit_command(commit_command),
+        command_help="run pre-commit, then create a git commit from a generated message after confirmation",
         description=(
             "Run the staged pre-commit quality gate before message generation, "
             "prompt for confirmation, then create a git commit only after approval."
@@ -56,7 +56,6 @@ def register_developer_workflow_cli_commands(
     )
     _add_commit_message_generation_flags(commit_parser)
     _add_common_skill_root_flags(commit_parser)
-    bind_cli_handler(commit_parser, _handler_for_commit_command(commit_command))
 
 
 def _add_common_skill_root_flags(parser: argparse.ArgumentParser) -> None:

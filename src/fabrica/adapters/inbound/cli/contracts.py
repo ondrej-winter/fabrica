@@ -10,14 +10,19 @@ if TYPE_CHECKING:
     import argparse
     from typing import TextIO
 
-_CLI_HANDLER_NAMESPACE_ATTRIBUTE = "cli_handler"
 
-
-class CliSubparsers(Protocol):
+class CliCommandRegistry(Protocol):
     """Public behavior needed to register feature-owned CLI commands."""
 
-    def add_parser(self, name: str, **kwargs: object) -> argparse.ArgumentParser:
-        """Add one named subcommand parser to the product CLI."""
+    def add_command(
+        self,
+        name: str,
+        *,
+        handler: CliCommandHandler,
+        command_help: str | None = None,
+        description: str | None = None,
+    ) -> argparse.ArgumentParser:
+        """Add one named subcommand parser and bind its execution handler."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,28 +68,7 @@ class CliInvocation:
         )
 
 
-class CliHandlerBindingTarget(Protocol):
-    """Parser behavior needed to bind a command handler during CLI registration."""
-
-    def set_defaults(self, **kwargs: object) -> None:
-        """Attach parser defaults used after argument parsing."""
-
-
-def bind_cli_handler(parser: CliHandlerBindingTarget, handler: CliCommandHandler) -> None:
-    """Bind a command handler to one CLI subcommand parser."""
-    parser.set_defaults(**{_CLI_HANDLER_NAMESPACE_ATTRIBUTE: handler})
-
-
-def cli_handler_from_namespace(namespace: argparse.Namespace) -> CliCommandHandler:
-    """Return the command handler bound to a parsed subcommand namespace."""
-    handler = getattr(namespace, _CLI_HANDLER_NAMESPACE_ATTRIBUTE, None)
-    if not callable(handler):
-        msg = "CLI command registration did not configure a handler for the selected command"
-        raise CliConfigurationError(msg)
-    return handler
-
-
-type CliCommandRegistrar = Callable[[CliSubparsers], None]
+type CliCommandRegistrar = Callable[[CliCommandRegistry], None]
 
 
 class CliError(Exception):
@@ -98,13 +82,10 @@ class CliConfigurationError(CliError):
 __all__ = [
     "CliCommandHandler",
     "CliCommandRegistrar",
+    "CliCommandRegistry",
     "CliConfigurationError",
     "CliError",
     "CliExecutionContext",
     "CliGlobalOptions",
-    "CliHandlerBindingTarget",
     "CliInvocation",
-    "CliSubparsers",
-    "bind_cli_handler",
-    "cli_handler_from_namespace",
 ]

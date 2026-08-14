@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TextIO
+from typing import TextIO
 
+from fabrica.adapters.inbound.cli.text import format_metadata, write_line, write_text
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunResult,
     LocalAgentRunStatus,
@@ -12,9 +13,6 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptPolicyEvaluationResult,
     SkillScriptPolicyStatus,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
 
 EXIT_CODE_BY_STATUS: dict[LocalAgentRunStatus, int] = {
     LocalAgentRunStatus.SUCCESS: 0,
@@ -42,20 +40,17 @@ EXIT_CODE_BY_SCRIPT_EXECUTION_STATUS: dict[SkillScriptExecutionStatus, int] = {
 }
 
 
-MAX_OUTPUT_LINE_CHARS = 4_000
-
-
 def write_run_result(result: LocalAgentRunResult, *, stdout: TextIO, stderr: TextIO) -> int:
     """Write a local runtime result and return the matching process exit code."""
     if result.output_text:
-        _write_text(stdout, result.output_text)
+        write_text(stdout, result.output_text)
 
     if not result.succeeded:
-        _write_line(stderr, f"status: {result.status.value}")
+        write_line(stderr, f"status: {result.status.value}")
         for observation in result.observations:
-            metadata = _format_metadata(observation.metadata)
+            metadata = format_metadata(observation.metadata)
             suffix = f" {metadata}" if metadata else ""
-            _write_line(stderr, f"observation: {observation.message}{suffix}")
+            write_line(stderr, f"observation: {observation.message}{suffix}")
 
     return EXIT_CODE_BY_STATUS[result.status]
 
@@ -63,17 +58,17 @@ def write_run_result(result: LocalAgentRunResult, *, stdout: TextIO, stderr: Tex
 def write_script_policy_result(result: SkillScriptPolicyEvaluationResult, *, stdout: TextIO, stderr: TextIO) -> int:
     """Write a selected script policy result and return the matching exit code."""
     stream = stdout if result.approved else stderr
-    _write_line(stream, f"status: {result.status.value}")
+    write_line(stream, f"status: {result.status.value}")
     if result.approved and result.binding is not None:
-        _write_line(stream, f"approve-script-type: {result.binding.script_type.value}")
-        _write_line(stream, f"approve-suffix: {result.binding.suffix}")
-        _write_line(stream, f"approve-byte-size: {result.binding.byte_size}")
-        _write_line(stream, f"approve-content-digest: {result.binding.content_digest}")
+        write_line(stream, f"approve-script-type: {result.binding.script_type.value}")
+        write_line(stream, f"approve-suffix: {result.binding.suffix}")
+        write_line(stream, f"approve-byte-size: {result.binding.byte_size}")
+        write_line(stream, f"approve-content-digest: {result.binding.content_digest}")
 
     for observation in result.observations:
-        metadata = _format_metadata(observation.metadata)
+        metadata = format_metadata(observation.metadata)
         suffix = f" {metadata}" if metadata else ""
-        _write_line(stream, f"observation: {observation.message}{suffix}")
+        write_line(stream, f"observation: {observation.message}{suffix}")
 
     return EXIT_CODE_BY_SCRIPT_POLICY_STATUS[result.status]
 
@@ -81,50 +76,25 @@ def write_script_policy_result(result: SkillScriptPolicyEvaluationResult, *, std
 def write_script_execution_result(result: SkillScriptExecutionResult, *, stdout: TextIO, stderr: TextIO) -> int:
     """Write a selected script execution result and return the matching exit code."""
     if result.stdout.text:
-        _write_text(stdout, result.stdout.text)
+        write_text(stdout, result.stdout.text)
     if result.stderr.text:
-        _write_text(stderr, result.stderr.text)
+        write_text(stderr, result.stderr.text)
 
     stream = stdout if result.succeeded else stderr
-    _write_line(stream, f"status: {result.status.value}")
+    write_line(stream, f"status: {result.status.value}")
     if result.exit_code is not None:
-        _write_line(stream, f"exit_code: {result.exit_code}")
+        write_line(stream, f"exit_code: {result.exit_code}")
     if result.stdout.truncated:
-        _write_line(stream, f"stdout: truncated max_chars={result.stdout.max_chars}")
+        write_line(stream, f"stdout: truncated max_chars={result.stdout.max_chars}")
     if result.stderr.truncated:
-        _write_line(stream, f"stderr: truncated max_chars={result.stderr.max_chars}")
+        write_line(stream, f"stderr: truncated max_chars={result.stderr.max_chars}")
 
     for observation in result.observations:
-        metadata = _format_metadata(observation.metadata)
+        metadata = format_metadata(observation.metadata)
         suffix = f" {metadata}" if metadata else ""
-        _write_line(stream, f"observation: {observation.message}{suffix}")
+        write_line(stream, f"observation: {observation.message}{suffix}")
 
     return EXIT_CODE_BY_SCRIPT_EXECUTION_STATUS[result.status]
-
-
-def _write_line(stream: TextIO, text: str) -> None:
-    bounded = _bound_text(text)
-    stream.write(bounded)
-    if not bounded.endswith("\n"):
-        stream.write("\n")
-
-
-def _write_text(stream: TextIO, text: str) -> None:
-    stream.write(text)
-    if not text.endswith("\n"):
-        stream.write("\n")
-
-
-def _format_metadata(metadata: Mapping[str, object]) -> str:
-    if not metadata:
-        return ""
-    return " ".join(f"{key}={_bound_text(str(value))}" for key, value in sorted(metadata.items()))
-
-
-def _bound_text(text: str) -> str:
-    if len(text) <= MAX_OUTPUT_LINE_CHARS:
-        return text
-    return f"{text[:MAX_OUTPUT_LINE_CHARS]}...<truncated>"
 
 
 __all__ = [

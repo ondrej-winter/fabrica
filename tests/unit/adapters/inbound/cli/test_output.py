@@ -5,11 +5,12 @@ from __future__ import annotations
 from decimal import Decimal
 from io import StringIO
 
-from fabrica.adapters.inbound.cli.output import (
+from fabrica.adapters.inbound.cli.output import write_model_evidence_report
+from fabrica.adapters.inbound.cli.text import (
     MAX_OUTPUT_LINE_CHARS,
     bound_text,
     format_metadata,
-    write_model_evidence_report,
+    write_text,
 )
 from fabrica.shared_kernel.model_usage import (
     ModelCostEvidence,
@@ -34,6 +35,14 @@ def test_format_metadata_sorts_and_bounds_values() -> None:
     metadata = {"z": "last", "a": "x" * (MAX_OUTPUT_LINE_CHARS + 1)}
 
     assert format_metadata(metadata) == f"a={'x' * MAX_OUTPUT_LINE_CHARS}...<truncated> z=last"
+
+
+def test_write_text_terminates_output_when_missing_newline() -> None:
+    stdout = StringIO()
+
+    write_text(stdout, "hello")
+
+    assert stdout.getvalue() == "hello\n"
 
 
 def test_write_model_evidence_report_formats_requested_usage_and_pricing() -> None:

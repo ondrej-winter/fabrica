@@ -11,11 +11,10 @@ from typing import TYPE_CHECKING
 import pytest
 
 from fabrica.adapters.inbound.cli import (
+    CliCommandRegistry,
     CliConfigurationError,
     CliExecutionContext,
     CliGlobalOptions,
-    CliSubparsers,
-    bind_cli_handler,
 )
 from fabrica.adapters.inbound.cli import (
     build_parser as _build_parser,
@@ -131,8 +130,8 @@ def test_parse_cli_invocation_round_trips_bound_handler() -> None:
     assert invocation.global_options == CliGlobalOptions()
 
 
-def _register_synthetic_command(subparsers: CliSubparsers) -> None:
-    bind_cli_handler(subparsers.add_parser("synthetic"), _synthetic_handler)
+def _register_synthetic_command(commands: CliCommandRegistry) -> None:
+    commands.add_command("synthetic", handler=_synthetic_handler)
 
 
 def _synthetic_handler(namespace: object, context: CliExecutionContext) -> int:
@@ -140,13 +139,14 @@ def _synthetic_handler(namespace: object, context: CliExecutionContext) -> int:
     return 0
 
 
-def test_parse_cli_invocation_rejects_unbound_command_registration() -> None:
-    with pytest.raises(CliConfigurationError, match="did not configure a handler"):
-        _parse_cli_invocation(("synthetic",), command_registrars=(_register_unbound_synthetic_command,))
+def test_parse_cli_invocation_rejects_duplicate_command_registration() -> None:
+    with pytest.raises(CliConfigurationError, match="CLI command registration failed"):
+        _parse_cli_invocation(("synthetic",), command_registrars=(_register_duplicate_synthetic_commands,))
 
 
-def _register_unbound_synthetic_command(subparsers: CliSubparsers) -> None:
-    subparsers.add_parser("synthetic")
+def _register_duplicate_synthetic_commands(commands: CliCommandRegistry) -> None:
+    commands.add_command("synthetic", handler=_synthetic_handler)
+    commands.add_command("synthetic", handler=_synthetic_handler)
 
 
 def test_build_parser_renders_help_without_runtime_side_effects(capsys: pytest.CaptureFixture[str]) -> None:
