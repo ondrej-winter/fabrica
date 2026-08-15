@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli.contracts import CliCommandRegistration
+from fabrica.adapters.inbound.cli import CliCommandRegistration
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -21,7 +21,7 @@ from fabrica.features.developer_workflow.application.dtos import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from fabrica.adapters.inbound.cli.contracts import CliCommandRegistry, CliExecutionContext
+    from fabrica.adapters.inbound.cli import CliCommandRegistry, CliExecutionContext
 
 COMMIT_MESSAGE_COMMAND_NAME = "commit-message"
 COMMIT_COMMAND_NAME = "commit"

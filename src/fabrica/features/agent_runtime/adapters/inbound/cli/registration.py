@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli.contracts import CliCommandRegistration
+from fabrica.adapters.inbound.cli import CliCommandRegistration
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
@@ -28,7 +28,7 @@ from fabrica.features.agent_runtime.application.dtos import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from fabrica.adapters.inbound.cli.contracts import CliCommandRegistry, CliExecutionContext
+    from fabrica.adapters.inbound.cli import CliCommandRegistry, CliExecutionContext
 
 RUN_COMMAND_NAME = "run"
 SCRIPT_POLICY_COMMAND_NAME = "script-policy"

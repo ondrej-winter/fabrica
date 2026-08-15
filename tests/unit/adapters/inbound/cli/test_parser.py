@@ -25,7 +25,7 @@ from fabrica.adapters.inbound.cli.parser import (
 from fabrica.adapters.inbound.cli.parser import (
     parse_cli_invocation as _parse_cli_invocation,
 )
-from fabrica.bootstrap.cli import create_cli_command_registrars
+from fabrica.bootstrap.cli import create_cli_command_registrars, run_cli
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
@@ -47,6 +47,7 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.registration impor
 
 if TYPE_CHECKING:
     import argparse
+    from collections.abc import Callable
 
     from fabrica.adapters.inbound.cli.contracts import CliCommandRegistrar
 
@@ -192,7 +193,8 @@ def _configure_noop_synthetic_parser(parser: argparse.ArgumentParser) -> None:
 
 
 def _decode_synthetic_command(namespace: argparse.Namespace) -> str:
-    _ = namespace
+    assert not hasattr(namespace, "cli_decoder")
+    assert not hasattr(namespace, "cli_handler")
     return "synthetic"
 
 
@@ -214,7 +216,7 @@ def _synthetic_handler(handlers: RecordingHandlers) -> CliCommandHandler[str]:
 
 
 def test_parse_cli_invocation_rejects_duplicate_command_registration() -> None:
-    with pytest.raises(CliConfigurationError, match="CLI command registration failed"):
+    with pytest.raises(CliConfigurationError, match="CLI command 'synthetic' is already registered"):
         _parse_cli_invocation(("synthetic",), command_registrars=(_register_duplicate_synthetic_commands,))
 
 
@@ -237,6 +239,41 @@ def _register_duplicate_synthetic_commands(commands: CliCommandRegistry) -> None
             handler=_noop_synthetic_handler,
         ),
     )
+
+
+def test_run_cli_routes_help_to_injected_stdout_without_raising() -> None:
+    stdout = StringIO()
+    stderr = StringIO()
+
+    exit_code = run_cli(("--help",), stdout=stdout, stderr=stderr)
+
+    assert exit_code == 0
+    assert "Run local Fabrica workflows." in stdout.getvalue()
+    assert "run" in stdout.getvalue()
+    assert stderr.getvalue() == ""
+
+
+def test_run_cli_routes_usage_errors_to_injected_stderr_without_raising() -> None:
+    stdout = StringIO()
+    stderr = StringIO()
+
+    exit_code = run_cli(("run",), stdout=stdout, stderr=stderr)
+
+    assert exit_code == ARGPARSE_USAGE_ERROR
+    assert stdout.getvalue() == ""
+    assert "error:" in stderr.getvalue()
+    assert "--prompt" in stderr.getvalue()
+
+
+def test_run_cli_routes_unknown_command_to_injected_stderr_without_raising() -> None:
+    stdout = StringIO()
+    stderr = StringIO()
+
+    exit_code = run_cli(("unknown-command",), stdout=stdout, stderr=stderr)
+
+    assert exit_code == ARGPARSE_USAGE_ERROR
+    assert stdout.getvalue() == ""
+    assert "invalid choice: 'unknown-command'" in stderr.getvalue()
 
 
 def test_build_parser_renders_help_without_runtime_side_effects(capsys: pytest.CaptureFixture[str]) -> None:
@@ -363,10 +400,10 @@ def test_parse_command_accepts_global_options_after_subcommand() -> None:
 
 
 @pytest.mark.parametrize(
-    ("registration", "expected_message"),
+    ("registration_factory", "expected_message"),
     [
         (
-            CliCommandRegistration(
+            lambda: CliCommandRegistration(
                 name="",
                 summary="synthetic command",
                 configure_parser=_configure_noop_synthetic_parser,
@@ -376,7 +413,7 @@ def test_parse_command_accepts_global_options_after_subcommand() -> None:
             "name must be a non-empty trimmed value",
         ),
         (
-            CliCommandRegistration(
+            lambda: CliCommandRegistration(
                 name=" synthetic",
                 summary="synthetic command",
                 configure_parser=_configure_noop_synthetic_parser,
@@ -386,7 +423,7 @@ def test_parse_command_accepts_global_options_after_subcommand() -> None:
             "name must be a non-empty trimmed value",
         ),
         (
-            CliCommandRegistration(
+            lambda: CliCommandRegistration(
                 name="synthetic",
                 summary="",
                 configure_parser=_configure_noop_synthetic_parser,
@@ -398,14 +435,11 @@ def test_parse_command_accepts_global_options_after_subcommand() -> None:
     ],
 )
 def test_parse_cli_invocation_rejects_invalid_command_registration(
-    registration: CliCommandRegistration,
+    registration_factory: Callable[[], CliCommandRegistration[object]],
     expected_message: str,
 ) -> None:
-    def register_invalid_command(commands: CliCommandRegistry) -> None:
-        commands.register_command(registration)
-
     with pytest.raises(CliConfigurationError, match=expected_message):
-        _parse_cli_invocation(("synthetic",), command_registrars=(register_invalid_command,))
+        registration_factory()
 
 
 def test_parse_commit_message_command_supports_usage_and_price_reporting() -> None:

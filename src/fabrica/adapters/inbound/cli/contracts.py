@@ -32,6 +32,16 @@ class CliCommandRegistration[TCommand]:
     handler: CliCommandHandler[TCommand]
     description: str | None = None
 
+    def __post_init__(self) -> None:
+        """Validate the feature-owned registration before parser construction."""
+        _validate_registration_text("name", self.name)
+        _validate_registration_text("summary", self.summary)
+        if self.description is not None:
+            _validate_registration_text("description", self.description)
+        _validate_registration_callable("parser configurer", self.configure_parser)
+        _validate_registration_callable("decoder", self.decode)
+        _validate_registration_callable("handler", self.handler)
+
 
 @dataclass(frozen=True, slots=True)
 class CliGlobalOptions:
@@ -73,6 +83,18 @@ class CliError(Exception):
 
 class CliConfigurationError(CliError):
     """Raised when CLI registration or composition is invalid."""
+
+
+def _validate_registration_text(field_name: str, value: str) -> None:
+    if not value or value.strip() != value:
+        msg = f"CLI command registration {field_name} must be a non-empty trimmed value"
+        raise CliConfigurationError(msg)
+
+
+def _validate_registration_callable(name: str, value: object) -> None:
+    if not callable(value):
+        msg = f"CLI command registration {name} must be callable"
+        raise CliConfigurationError(msg)
 
 
 __all__ = [
