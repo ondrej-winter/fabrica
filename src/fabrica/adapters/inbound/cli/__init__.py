@@ -11,7 +11,7 @@ from fabrica.adapters.inbound.cli.contracts import (
     CliError,
     CliExecutionContext,
     CliGlobalOptions,
-    CliInvocation,
+    CliUsageError,
 )
 
 __all__ = [
@@ -25,5 +25,5 @@ __all__ = [
     "CliError",
     "CliExecutionContext",
     "CliGlobalOptions",
-    "CliInvocation",
+    "CliUsageError",
 ]

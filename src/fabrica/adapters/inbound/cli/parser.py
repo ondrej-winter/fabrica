@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import redirect_stderr, redirect_stdout
+import sys
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Never, cast
 
 from fabrica.adapters.inbound.cli.contracts import (
     CliCommandHandler,
@@ -13,7 +13,7 @@ from fabrica.adapters.inbound.cli.contracts import (
     CliConfigurationError,
     CliExecutionContext,
     CliGlobalOptions,
-    CliInvocation,
+    CliUsageError,
 )
 
 if TYPE_CHECKING:
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 class _ArgparseCliCommandRegistry:
     """Argparse-backed implementation of the atomic CLI command registry."""
 
-    def __init__(self, subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    def __init__(self, subparsers: argparse._SubParsersAction[Any]) -> None:
         self._subparsers = subparsers
         self._registrations: dict[str, CliCommandRegistration[object]] = {}
 
@@ -54,6 +54,47 @@ class _ArgparseCliCommandRegistry:
         except KeyError as err:
             msg = f"CLI command {command_name!r} is not registered"
             raise CliConfigurationError(msg) from err
+
+
+class _StreamBoundArgumentParser(argparse.ArgumentParser):
+    """Argument parser that writes help and usage errors to explicit streams."""
+
+    def bind_streams(self, *, stdout: TextIO | None, stderr: TextIO | None) -> None:
+        """Bind parser diagnostics to explicit streams."""
+        self._stdout = stdout if stdout is not None else sys.stdout
+        self._stderr = stderr if stderr is not None else sys.stderr
+
+    def print_help(self, file: Any = None) -> None:
+        """Print help to explicit stdout by default."""
+        super().print_help(file or getattr(self, "_stdout", sys.stdout))
+
+    def print_usage(self, file: Any = None) -> None:
+        """Print usage to explicit stdout by default."""
+        super().print_usage(file or getattr(self, "_stdout", sys.stdout))
+
+    def error(self, message: str) -> Never:
+        """Print argparse usage errors to explicit stderr."""
+        self.print_usage(self._stderr)
+        self.exit(2, f"{self.prog}: error: {message}\n")
+
+    def exit(self, status: int = 0, message: str | None = None) -> Never:
+        """Exit after routing parser messages to explicit stderr."""
+        if message:
+            getattr(self, "_stderr", sys.stderr).write(message)
+        raise SystemExit(status)
+
+
+def _stream_bound_parser_class(
+    *,
+    stdout: TextIO | None,
+    stderr: TextIO | None,
+) -> type[_StreamBoundArgumentParser]:
+    class _StreamBoundSubparser(_StreamBoundArgumentParser):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            self.bind_streams(stdout=stdout, stderr=stderr)
+
+    return _StreamBoundSubparser
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,15 +126,20 @@ def build_parser(command_registrars: Sequence[CliCommandRegistrar]) -> argparse.
 
 def _build_parser_with_registry(
     command_registrars: Sequence[CliCommandRegistrar],
+    *,
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
 ) -> tuple[argparse.ArgumentParser, _ArgparseCliCommandRegistry]:
-    parser = argparse.ArgumentParser(
+    parser = _StreamBoundArgumentParser(
         prog="fabrica",
         description="Run local Fabrica workflows.",
     )
+    parser.bind_streams(stdout=stdout, stderr=stderr)
     _add_global_options(parser)
     subparsers = parser.add_subparsers(
         dest="command",
         required=True,
+        parser_class=_stream_bound_parser_class(stdout=stdout, stderr=stderr),
     )
     command_registry = _ArgparseCliCommandRegistry(subparsers)
     for register_commands in command_registrars:
@@ -131,16 +177,9 @@ def parse_cli_invocation(
     args: Sequence[str] | None,
     *,
     command_registrars: Sequence[CliCommandRegistrar],
-) -> CliInvocation:
+) -> _ArgparseCliInvocation:
     """Parse command-line arguments into an executable CLI invocation."""
-    parser, command_registry = _build_parser_with_registry(command_registrars)
-    namespace = parser.parse_args(args)
-    registration = command_registry.registration_for(_command_name_from_namespace(namespace))
-    return _ArgparseCliInvocation(
-        global_options=cli_global_options_from_namespace(namespace),
-        command=_decode_cli_command(parser, registration.decode, namespace),
-        handler=registration.handler,
-    )
+    return _parse_cli_invocation(args, command_registrars=command_registrars)
 
 
 def execute_cli_invocation(
@@ -153,18 +192,32 @@ def execute_cli_invocation(
 ) -> int:
     """Parse and execute a CLI invocation while honoring explicit process streams."""
     try:
-        with redirect_stdout(stdout), redirect_stderr(stderr):
-            parser, command_registry = _build_parser_with_registry(command_registrars)
-            namespace = parser.parse_args(args)
-            registration = command_registry.registration_for(_command_name_from_namespace(namespace))
-            invocation = _ArgparseCliInvocation(
-                global_options=cli_global_options_from_namespace(namespace),
-                command=_decode_cli_command(parser, registration.decode, namespace),
-                handler=registration.handler,
-            )
-        return invocation.execute(stdin=stdin, stdout=stdout, stderr=stderr)
+        invocation = _parse_cli_invocation(
+            args,
+            command_registrars=command_registrars,
+            stdout=stdout,
+            stderr=stderr,
+        )
     except SystemExit as err:
         return int(err.code or 0)
+    return invocation.execute(stdin=stdin, stdout=stdout, stderr=stderr)
+
+
+def _parse_cli_invocation(
+    args: Sequence[str] | None,
+    *,
+    command_registrars: Sequence[CliCommandRegistrar],
+    stdout: TextIO | None = None,
+    stderr: TextIO | None = None,
+) -> _ArgparseCliInvocation:
+    parser, command_registry = _build_parser_with_registry(command_registrars, stdout=stdout, stderr=stderr)
+    namespace = parser.parse_args(args)
+    registration = command_registry.registration_for(_command_name_from_namespace(namespace))
+    return _ArgparseCliInvocation(
+        global_options=cli_global_options_from_namespace(namespace),
+        command=_decode_cli_command(parser, registration.decode, namespace),
+        handler=registration.handler,
+    )
 
 
 def cli_global_options_from_namespace(namespace: argparse.Namespace) -> CliGlobalOptions:
@@ -193,5 +246,5 @@ def _decode_cli_command(
         return decoder(namespace)
     except argparse.ArgumentTypeError as err:
         parser.error(str(err))
-    except ValueError as err:
+    except CliUsageError as err:
         parser.error(str(err))

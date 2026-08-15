@@ -18,9 +18,13 @@ from fabrica.adapters.inbound.cli import (
     CliConfigurationError,
     CliExecutionContext,
     CliGlobalOptions,
+    CliUsageError,
 )
 from fabrica.adapters.inbound.cli.parser import (
     build_parser as _build_parser,
+)
+from fabrica.adapters.inbound.cli.parser import (
+    execute_cli_invocation as _execute_cli_invocation,
 )
 from fabrica.adapters.inbound.cli.parser import (
     parse_cli_invocation as _parse_cli_invocation,
@@ -52,6 +56,7 @@ if TYPE_CHECKING:
     from fabrica.adapters.inbound.cli.contracts import CliCommandRegistrar
 
 ARGPARSE_USAGE_ERROR = 2
+SYNTHETIC_HANDLER_EXIT_CODE = 7
 EXPECTED_CLI_PACKAGE_EXPORTS = [
     "CliArgumentConfigurer",
     "CliCommandDecoder",
@@ -63,7 +68,7 @@ EXPECTED_CLI_PACKAGE_EXPORTS = [
     "CliError",
     "CliExecutionContext",
     "CliGlobalOptions",
-    "CliInvocation",
+    "CliUsageError",
 ]
 
 
@@ -203,6 +208,11 @@ def _noop_synthetic_handler(command: str, context: CliExecutionContext) -> int:
     return 0
 
 
+def _system_exit_synthetic_handler(command: str, context: CliExecutionContext) -> int:
+    _ = (command, context)
+    raise SystemExit(SYNTHETIC_HANDLER_EXIT_CODE)
+
+
 def _synthetic_handler(handlers: RecordingHandlers) -> CliCommandHandler[str]:
     def run(command: str, context: CliExecutionContext) -> int:
         handlers.invocation = ParsedInvocation(
@@ -239,6 +249,75 @@ def _register_duplicate_synthetic_commands(commands: CliCommandRegistry) -> None
             handler=_noop_synthetic_handler,
         ),
     )
+
+
+def test_run_cli_does_not_swallow_handler_system_exit() -> None:
+    def register(commands: CliCommandRegistry) -> None:
+        commands.register_command(
+            CliCommandRegistration(
+                name="synthetic",
+                summary="synthetic command",
+                configure_parser=_configure_noop_synthetic_parser,
+                decode=_decode_synthetic_command,
+                handler=_system_exit_synthetic_handler,
+            ),
+        )
+
+    with pytest.raises(SystemExit) as exc_info:
+        _execute_cli_invocation(
+            ("synthetic",),
+            command_registrars=(register,),
+            stdin=StringIO(),
+            stdout=StringIO(),
+            stderr=StringIO(),
+        )
+
+    assert exc_info.value.code == SYNTHETIC_HANDLER_EXIT_CODE
+
+
+def test_parse_cli_invocation_treats_cli_usage_error_as_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
+    def decode_user_error(namespace: argparse.Namespace) -> str:
+        _ = namespace
+        msg = "synthetic user error"
+        raise CliUsageError(msg)
+
+    def register(commands: CliCommandRegistry) -> None:
+        commands.register_command(
+            CliCommandRegistration(
+                name="synthetic",
+                summary="synthetic command",
+                configure_parser=_configure_noop_synthetic_parser,
+                decode=decode_user_error,
+                handler=_noop_synthetic_handler,
+            ),
+        )
+
+    with pytest.raises(SystemExit) as exc_info:
+        _parse_cli_invocation(("synthetic",), command_registrars=(register,))
+
+    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
+    assert "synthetic user error" in capsys.readouterr().err
+
+
+def test_parse_cli_invocation_propagates_unexpected_decoder_value_error() -> None:
+    def decode_programmer_error(namespace: argparse.Namespace) -> str:
+        _ = namespace
+        msg = "synthetic programmer error"
+        raise ValueError(msg)
+
+    def register(commands: CliCommandRegistry) -> None:
+        commands.register_command(
+            CliCommandRegistration(
+                name="synthetic",
+                summary="synthetic command",
+                configure_parser=_configure_noop_synthetic_parser,
+                decode=decode_programmer_error,
+                handler=_noop_synthetic_handler,
+            ),
+        )
+
+    with pytest.raises(ValueError, match="synthetic programmer error"):
+        _parse_cli_invocation(("synthetic",), command_registrars=(register,))
 
 
 def test_run_cli_routes_help_to_injected_stdout_without_raising() -> None:
@@ -421,6 +500,16 @@ def test_parse_command_accepts_global_options_after_subcommand() -> None:
                 handler=_noop_synthetic_handler,
             ),
             "name must be a non-empty trimmed value",
+        ),
+        (
+            lambda: CliCommandRegistration(
+                name="Synthetic",
+                summary="synthetic command",
+                configure_parser=_configure_noop_synthetic_parser,
+                decode=_decode_synthetic_command,
+                handler=_noop_synthetic_handler,
+            ),
+            "name must be lowercase kebab-case",
         ),
         (
             lambda: CliCommandRegistration(

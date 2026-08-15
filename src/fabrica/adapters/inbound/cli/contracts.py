@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from typing import TextIO
+
+CLI_COMMAND_NAME_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 
 
 class CliCommandRegistry(Protocol):
@@ -34,7 +37,7 @@ class CliCommandRegistration[TCommand]:
 
     def __post_init__(self) -> None:
         """Validate the feature-owned registration before parser construction."""
-        _validate_registration_text("name", self.name)
+        _validate_registration_name(self.name)
         _validate_registration_text("summary", self.summary)
         if self.description is not None:
             _validate_registration_text("description", self.description)
@@ -67,13 +70,6 @@ type CliCommandDecoder[TCommand] = Callable[[argparse.Namespace], TCommand]
 type CliCommandHandler[TCommand] = Callable[[TCommand, CliExecutionContext], int]
 
 
-class CliInvocation(Protocol):
-    """Parsed CLI invocation ready to execute through a bound command handler."""
-
-    def execute(self, *, stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
-        """Run the selected CLI command with explicit process streams."""
-
-
 type CliCommandRegistrar = Callable[[CliCommandRegistry], None]
 
 
@@ -83,6 +79,17 @@ class CliError(Exception):
 
 class CliConfigurationError(CliError):
     """Raised when CLI registration or composition is invalid."""
+
+
+class CliUsageError(CliError):
+    """Raised by command decoders for invalid user-supplied CLI values."""
+
+
+def _validate_registration_name(value: str) -> None:
+    _validate_registration_text("name", value)
+    if CLI_COMMAND_NAME_PATTERN.fullmatch(value) is None:
+        msg = "CLI command registration name must be lowercase kebab-case"
+        raise CliConfigurationError(msg)
 
 
 def _validate_registration_text(field_name: str, value: str) -> None:
@@ -108,5 +115,5 @@ __all__ = [
     "CliError",
     "CliExecutionContext",
     "CliGlobalOptions",
-    "CliInvocation",
+    "CliUsageError",
 ]
