@@ -6,9 +6,10 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, TextIO
 
-from fabrica.adapters.inbound.cli import CliExecutionContext, CliRegistrationError, run_cli_shell
-from fabrica.adapters.inbound.cli.output import write_model_evidence_report
-from fabrica.adapters.inbound.cli.text import write_line
+from fabrica.adapters.inbound.cli import CommandContext, RegistrationError
+from fabrica.adapters.inbound.cli.model_evidence import write_model_evidence_report
+from fabrica.adapters.inbound.cli.rendering import write_line
+from fabrica.adapters.inbound.cli.runtime import run_cli as run_product_cli
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     AgentRuntimeCliOptions,
     AgentRuntimeCliStreams,
@@ -40,7 +41,7 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.runner import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from fabrica.adapters.inbound.cli import CliCommandRegistrar
+    from fabrica.adapters.inbound.cli.command import CommandRegistrar
     from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
         AgentRuntimeCliCompositionOptions,
         CliRunCommand,
@@ -111,14 +112,14 @@ def run_cli(
     resolved_stdout = stdout if stdout is not None else sys.stdout
     resolved_stderr = stderr if stderr is not None else sys.stderr
     try:
-        return run_cli_shell(
+        return run_product_cli(
             tuple(argv) if argv is not None else tuple(sys.argv[1:]),
             command_registrars=create_cli_command_registrars(overrides=overrides),
             stdin=resolved_stdin,
             stdout=resolved_stdout,
             stderr=resolved_stderr,
         )
-    except CliRegistrationError as err:
+    except RegistrationError as err:
         write_line(resolved_stderr, f"error: {err}")
         return CLI_CONFIGURATION_ERROR_EXIT_CODE
 
@@ -126,7 +127,7 @@ def run_cli(
 def create_cli_command_registrars(
     *,
     overrides: CliDependencyOverrides | None = None,
-) -> tuple[CliCommandRegistrar, ...]:
+) -> tuple[CommandRegistrar, ...]:
     """Create feature-owned command registrars with bootstrap-owned handlers."""
     dependency_overrides = overrides or CliDependencyOverrides()
     return (
@@ -155,7 +156,7 @@ def _run_agent_runtime_command(
     def run(
         command: CliRunCommand,
         composition_options: AgentRuntimeCliCompositionOptions,
-        context: CliExecutionContext,
+        context: CommandContext,
     ) -> int:
         options = AgentRuntimeCliOptions(
             print_usage=context.global_options.print_usage,
@@ -193,7 +194,7 @@ def _run_script_policy_command(
     def run(
         command: CliScriptPolicyCommand,
         composition_options: AgentRuntimeCliCompositionOptions,
-        context: CliExecutionContext,
+        context: CommandContext,
     ) -> int:
         return run_script_policy_cli_command(
             command,
@@ -214,7 +215,7 @@ def _run_script_execute_command(
     def run(
         command: CliScriptExecuteCommand,
         composition_options: AgentRuntimeCliCompositionOptions,
-        context: CliExecutionContext,
+        context: CommandContext,
     ) -> int:
         return run_script_execute_cli_command(
             command,
@@ -236,7 +237,7 @@ def _run_commit_message_command(
     def run(
         command: CliCommitMessageCommand,
         composition_options: CliDeveloperWorkflowCompositionOptions,
-        context: CliExecutionContext,
+        context: CommandContext,
     ) -> int:
         return run_commit_message_cli_command(
             command,
@@ -262,7 +263,7 @@ def _run_confirmed_commit_command(
     def run(
         command: CliCommitCommand,
         composition_options: CliDeveloperWorkflowCompositionOptions,
-        context: CliExecutionContext,
+        context: CommandContext,
     ) -> int:
         return run_confirmed_commit_cli_command(
             command,
@@ -367,7 +368,7 @@ def _create_default_script_executor(
 
 def _create_default_commit_message_workflow(
     *,
-    context: CliExecutionContext,
+    context: CommandContext,
     composition_options: CliDeveloperWorkflowCompositionOptions,
 ) -> CommitMessageWorkflowRunner:
     from fabrica.bootstrap.composition.developer_workflow import (  # noqa: PLC0415
@@ -387,7 +388,7 @@ def _create_default_commit_message_workflow(
 
 def _create_default_confirmed_commit_workflow(
     *,
-    context: CliExecutionContext,
+    context: CommandContext,
     composition_options: CliDeveloperWorkflowCompositionOptions,
 ) -> ConfirmedCommitWorkflowRunner:
     from fabrica.bootstrap.composition.developer_workflow import (  # noqa: PLC0415

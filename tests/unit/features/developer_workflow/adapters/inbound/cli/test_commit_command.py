@@ -8,8 +8,8 @@ from typing import TextIO
 
 import pytest
 
-from fabrica.adapters.inbound.cli import CliGlobalOptions
-from fabrica.adapters.inbound.cli.output import write_model_evidence_report
+from fabrica.adapters.inbound.cli import GlobalOptions
+from fabrica.adapters.inbound.cli.model_evidence import write_model_evidence_report
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
 )
@@ -43,12 +43,12 @@ def run_feature_cli_command(  # noqa: PLR0913
     command: CliCommitCommand,
     *,
     workflow: FakeConfirmedCommitWorkflow,
-    global_options: CliGlobalOptions | None = None,
+    global_options: GlobalOptions | None = None,
     stdin: TextIO | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    options = global_options or CliGlobalOptions()
+    options = global_options or GlobalOptions()
     return run_confirmed_commit_cli_command(
         command,
         options=DeveloperWorkflowCliOptions(
@@ -263,7 +263,7 @@ def test_commit_command_appends_evidence_on_rejection() -> None:
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
         workflow=workflow,
-        global_options=CliGlobalOptions(print_usage=True),
+        global_options=GlobalOptions(print_usage=True),
         stdin=StringIO("no\n"),
         stdout=stdout,
         stderr=StringIO(),
@@ -298,7 +298,7 @@ def test_commit_command_reports_commit_failure_without_reprinting_recommendation
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
         workflow=workflow,
-        global_options=CliGlobalOptions(print_usage=True),
+        global_options=GlobalOptions(print_usage=True),
         stdin=StringIO("y\n"),
         stdout=stdout,
         stderr=stderr,

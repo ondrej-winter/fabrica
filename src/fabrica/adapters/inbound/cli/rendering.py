@@ -1,4 +1,4 @@
-"""Feature-neutral text formatting primitives for CLI adapters."""
+"""Feature-neutral text rendering primitives for CLI adapters."""
 
 from __future__ import annotations
 

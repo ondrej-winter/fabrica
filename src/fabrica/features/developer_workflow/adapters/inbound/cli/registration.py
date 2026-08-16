@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli import CliCommandSpec
+from fabrica.adapters.inbound.cli.command import Command
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -21,13 +21,13 @@ from fabrica.features.developer_workflow.application.dtos import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from fabrica.adapters.inbound.cli import CliCommandRegistry, CliExecutionContext
+    from fabrica.adapters.inbound.cli.command import CommandContext, CommandRegistry
 
 COMMIT_MESSAGE_COMMAND_NAME = "commit-message"
 COMMIT_COMMAND_NAME = "commit"
 DEVELOPER_WORKFLOW_CLI_COMMAND_NAMES = (COMMIT_MESSAGE_COMMAND_NAME, COMMIT_COMMAND_NAME)
 type DeveloperWorkflowCliHandler[TCommand] = Callable[
-    [TCommand, CliDeveloperWorkflowCompositionOptions, CliExecutionContext], int
+    [TCommand, CliDeveloperWorkflowCompositionOptions, CommandContext], int
 ]
 
 
@@ -38,30 +38,30 @@ class _ParsedDeveloperWorkflowCliCommand[TCommand]:
 
 
 def register_developer_workflow_cli_commands(
-    commands: CliCommandRegistry,
+    commands: CommandRegistry,
     *,
     commit_message_command: DeveloperWorkflowCliHandler[CliCommitMessageCommand],
     commit_command: DeveloperWorkflowCliHandler[CliCommitCommand],
 ) -> None:
     """Register developer-workflow owned commands on the product CLI parser."""
     commands.register(
-        CliCommandSpec(
+        Command(
             name=COMMIT_MESSAGE_COMMAND_NAME,
             summary="preview a read-only commit message for staged git changes",
-            configure_parser=_configure_commit_message_parser,
+            configure=_configure_commit_message_parser,
             decode=_parsed_commit_message_command_from_namespace,
-            handler=_handler_for_commit_message_command(commit_message_command),
+            run=_handler_for_commit_message_command(commit_message_command),
             description="Read staged git diff context and propose a commit message without creating a commit.",
         ),
     )
 
     commands.register(
-        CliCommandSpec(
+        Command(
             name=COMMIT_COMMAND_NAME,
             summary="run pre-commit, then create a git commit from a generated message after confirmation",
-            configure_parser=_configure_commit_parser,
+            configure=_configure_commit_parser,
             decode=_parsed_commit_command_from_namespace,
-            handler=_handler_for_commit_command(commit_command),
+            run=_handler_for_commit_command(commit_command),
             description=(
                 "Run the staged pre-commit quality gate before message generation, "
                 "prompt for confirmation, then create a git commit only after approval."
@@ -146,8 +146,8 @@ def _parsed_commit_command_from_namespace(
 
 def _handler_for_commit_message_command(
     handler: DeveloperWorkflowCliHandler[CliCommitMessageCommand],
-) -> Callable[[_ParsedDeveloperWorkflowCliCommand[CliCommitMessageCommand], CliExecutionContext], int]:
-    def run(parsed: _ParsedDeveloperWorkflowCliCommand[CliCommitMessageCommand], context: CliExecutionContext) -> int:
+) -> Callable[[_ParsedDeveloperWorkflowCliCommand[CliCommitMessageCommand], CommandContext], int]:
+    def run(parsed: _ParsedDeveloperWorkflowCliCommand[CliCommitMessageCommand], context: CommandContext) -> int:
         return handler(
             parsed.command,
             parsed.composition_options,
@@ -159,8 +159,8 @@ def _handler_for_commit_message_command(
 
 def _handler_for_commit_command(
     handler: DeveloperWorkflowCliHandler[CliCommitCommand],
-) -> Callable[[_ParsedDeveloperWorkflowCliCommand[CliCommitCommand], CliExecutionContext], int]:
-    def run(parsed: _ParsedDeveloperWorkflowCliCommand[CliCommitCommand], context: CliExecutionContext) -> int:
+) -> Callable[[_ParsedDeveloperWorkflowCliCommand[CliCommitCommand], CommandContext], int]:
+    def run(parsed: _ParsedDeveloperWorkflowCliCommand[CliCommitCommand], context: CommandContext) -> int:
         return handler(
             parsed.command,
             parsed.composition_options,

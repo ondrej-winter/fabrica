@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from io import StringIO
 from typing import TextIO
 
-from fabrica.adapters.inbound.cli import CliGlobalOptions
-from fabrica.adapters.inbound.cli.output import write_model_evidence_report
+from fabrica.adapters.inbound.cli import GlobalOptions
+from fabrica.adapters.inbound.cli.model_evidence import write_model_evidence_report
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitMessageCommand,
 )
@@ -42,12 +42,12 @@ def run_feature_cli_command(  # noqa: PLR0913
     command: CliCommitMessageCommand,
     *,
     workflow: FakeCommitMessageWorkflow,
-    global_options: CliGlobalOptions | None = None,
+    global_options: GlobalOptions | None = None,
     stdin: TextIO | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    options = global_options or CliGlobalOptions()
+    options = global_options or GlobalOptions()
     return run_commit_message_cli_command(
         command,
         options=DeveloperWorkflowCliOptions(
@@ -184,7 +184,7 @@ def test_commit_message_invocation_appends_requested_usage_and_price_evidence() 
     exit_code = run_feature_cli_command(
         CliCommitMessageCommand(),
         workflow=workflow,
-        global_options=CliGlobalOptions(print_usage=True, print_prices=True),
+        global_options=GlobalOptions(print_usage=True, print_prices=True),
         stdout=stdout,
         stderr=StringIO(),
     )

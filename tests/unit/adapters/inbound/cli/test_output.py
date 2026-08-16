@@ -5,8 +5,8 @@ from __future__ import annotations
 from decimal import Decimal
 from io import StringIO
 
-from fabrica.adapters.inbound.cli.output import write_model_evidence_report
-from fabrica.adapters.inbound.cli.text import (
+from fabrica.adapters.inbound.cli.model_evidence import write_model_evidence_report
+from fabrica.adapters.inbound.cli.rendering import (
     MAX_OUTPUT_LINE_CHARS,
     TRUNCATED_TEXT_MARKER,
     bound_text,

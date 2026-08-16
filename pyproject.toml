@@ -97,8 +97,8 @@ name = "Feature slices must not import product CLI or bootstrap"
 type = "forbidden"
 source_modules = ["fabrica.features"]
 forbidden_modules = [
-    "fabrica.adapters.inbound.cli.output",
-    "fabrica.adapters.inbound.cli.shell",
+    "fabrica.adapters.inbound.cli.model_evidence",
+    "fabrica.adapters.inbound.cli.runtime",
     "fabrica.bootstrap",
 ]
 
@@ -159,9 +159,14 @@ type = "forbidden"
 allow_indirect_imports = true
 source_modules = [
     "fabrica.adapters.inbound.cli",
-    "fabrica.adapters.inbound.cli.contracts",
-    "fabrica.adapters.inbound.cli.output",
-    "fabrica.adapters.inbound.cli.shell",
+    "fabrica.adapters.inbound.cli.command",
+    "fabrica.adapters.inbound.cli.destinations",
+    "fabrica.adapters.inbound.cli.model_evidence",
+    "fabrica.adapters.inbound.cli.options",
+    "fabrica.adapters.inbound.cli.parser",
+    "fabrica.adapters.inbound.cli.registry",
+    "fabrica.adapters.inbound.cli.rendering",
+    "fabrica.adapters.inbound.cli.runtime",
 ]
 forbidden_modules = [
     "fabrica.features",

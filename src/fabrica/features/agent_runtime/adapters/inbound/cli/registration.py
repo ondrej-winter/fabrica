@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fabrica.adapters.inbound.cli import CliCommandSpec
+from fabrica.adapters.inbound.cli.command import Command
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
@@ -28,15 +28,13 @@ from fabrica.features.agent_runtime.application.dtos import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from fabrica.adapters.inbound.cli import CliCommandRegistry, CliExecutionContext
+    from fabrica.adapters.inbound.cli.command import CommandContext, CommandRegistry
 
 RUN_COMMAND_NAME = "run"
 SCRIPT_POLICY_COMMAND_NAME = "script-policy"
 SCRIPT_EXECUTE_COMMAND_NAME = "script-execute"
 AGENT_RUNTIME_CLI_COMMAND_NAMES = (RUN_COMMAND_NAME, SCRIPT_POLICY_COMMAND_NAME, SCRIPT_EXECUTE_COMMAND_NAME)
-type AgentRuntimeCliHandler[TCommand] = Callable[
-    [TCommand, AgentRuntimeCliCompositionOptions, CliExecutionContext], int
-]
+type AgentRuntimeCliHandler[TCommand] = Callable[[TCommand, AgentRuntimeCliCompositionOptions, CommandContext], int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,7 +44,7 @@ class _ParsedAgentRuntimeCliCommand[TCommand]:
 
 
 def register_agent_runtime_cli_commands(
-    commands: CliCommandRegistry,
+    commands: CommandRegistry,
     *,
     run_command: AgentRuntimeCliHandler[CliRunCommand],
     script_policy_command: AgentRuntimeCliHandler[CliScriptPolicyCommand],
@@ -54,34 +52,34 @@ def register_agent_runtime_cli_commands(
 ) -> None:
     """Register agent-runtime owned commands on the product CLI parser."""
     commands.register(
-        CliCommandSpec(
+        Command(
             name=RUN_COMMAND_NAME,
             summary="run one local runtime prompt",
-            configure_parser=_configure_run_parser,
+            configure=_configure_run_parser,
             decode=_parsed_run_command_from_namespace,
-            handler=_handler_for_run_command(run_command),
+            run=_handler_for_run_command(run_command),
             description="Run one local runtime prompt with explicitly selected context only.",
         ),
     )
 
     commands.register(
-        CliCommandSpec(
+        Command(
             name=SCRIPT_POLICY_COMMAND_NAME,
             summary="inspect selected skill script policy without executing it",
-            configure_parser=_configure_script_policy_parser,
+            configure=_configure_script_policy_parser,
             decode=_parsed_script_policy_command_from_namespace,
-            handler=_handler_for_script_policy_command(script_policy_command),
+            run=_handler_for_script_policy_command(script_policy_command),
             description="Evaluate policy for one explicitly selected Agent Skill script without executing it.",
         ),
     )
 
     commands.register(
-        CliCommandSpec(
+        Command(
             name=SCRIPT_EXECUTE_COMMAND_NAME,
             summary="execute one explicitly selected skill script with metadata-bound approval",
-            configure_parser=_configure_script_execute_parser,
+            configure=_configure_script_execute_parser,
             decode=_parsed_script_execute_command_from_namespace,
-            handler=_handler_for_script_execute_command(script_execute_command),
+            run=_handler_for_script_execute_command(script_execute_command),
             description=(
                 "Execute one explicitly selected Agent Skill script only when the supplied "
                 "non-interactive approval metadata matches the inspected script. This is not production sandboxing."
@@ -335,8 +333,8 @@ def _parsed_script_execute_command_from_namespace(
 
 def _handler_for_run_command(
     handler: AgentRuntimeCliHandler[CliRunCommand],
-) -> Callable[[_ParsedAgentRuntimeCliCommand[CliRunCommand], CliExecutionContext], int]:
-    def run(parsed: _ParsedAgentRuntimeCliCommand[CliRunCommand], context: CliExecutionContext) -> int:
+) -> Callable[[_ParsedAgentRuntimeCliCommand[CliRunCommand], CommandContext], int]:
+    def run(parsed: _ParsedAgentRuntimeCliCommand[CliRunCommand], context: CommandContext) -> int:
         return handler(
             parsed.command,
             parsed.composition_options,
@@ -348,8 +346,8 @@ def _handler_for_run_command(
 
 def _handler_for_script_policy_command(
     handler: AgentRuntimeCliHandler[CliScriptPolicyCommand],
-) -> Callable[[_ParsedAgentRuntimeCliCommand[CliScriptPolicyCommand], CliExecutionContext], int]:
-    def run(parsed: _ParsedAgentRuntimeCliCommand[CliScriptPolicyCommand], context: CliExecutionContext) -> int:
+) -> Callable[[_ParsedAgentRuntimeCliCommand[CliScriptPolicyCommand], CommandContext], int]:
+    def run(parsed: _ParsedAgentRuntimeCliCommand[CliScriptPolicyCommand], context: CommandContext) -> int:
         return handler(
             parsed.command,
             parsed.composition_options,
@@ -361,8 +359,8 @@ def _handler_for_script_policy_command(
 
 def _handler_for_script_execute_command(
     handler: AgentRuntimeCliHandler[CliScriptExecuteCommand],
-) -> Callable[[_ParsedAgentRuntimeCliCommand[CliScriptExecuteCommand], CliExecutionContext], int]:
-    def run(parsed: _ParsedAgentRuntimeCliCommand[CliScriptExecuteCommand], context: CliExecutionContext) -> int:
+) -> Callable[[_ParsedAgentRuntimeCliCommand[CliScriptExecuteCommand], CommandContext], int]:
+    def run(parsed: _ParsedAgentRuntimeCliCommand[CliScriptExecuteCommand], context: CommandContext) -> int:
         return handler(
             parsed.command,
             parsed.composition_options,

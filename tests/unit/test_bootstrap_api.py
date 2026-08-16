@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import NoReturn
 
 from fabrica import bootstrap
-from fabrica.adapters.inbound.cli import CliRegistrationError
+from fabrica.adapters.inbound.cli import RegistrationError
 from fabrica.bootstrap import cli as bootstrap_cli
 from fabrica.bootstrap._composition_exports import (
     COMPOSITION_EXPORT_NAMES,
@@ -130,7 +130,7 @@ def test_product_cli_translates_bootstrap_wiring_errors_to_stable_stderr(
     def fail_command_registration_creation(*, overrides: object | None = None) -> NoReturn:
         _ = overrides
         msg = "synthetic CLI wiring failure"
-        raise CliRegistrationError(msg)
+        raise RegistrationError(msg)
 
     monkeypatch.setattr(bootstrap_cli, "create_cli_command_registrars", fail_command_registration_creation)
 

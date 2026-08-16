@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TextIO
 
-from fabrica.adapters.inbound.cli.text import format_metadata, write_line, write_text
+from fabrica.adapters.inbound.cli.rendering import format_metadata, write_line, write_text
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunResult,
     LocalAgentRunStatus,

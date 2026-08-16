@@ -7,8 +7,8 @@ from io import StringIO
 from typing import TYPE_CHECKING, TextIO
 
 import fabrica.bootstrap.cli as bootstrap_cli
-from fabrica.adapters.inbound.cli import CliGlobalOptions
-from fabrica.adapters.inbound.cli.output import write_model_evidence_report
+from fabrica.adapters.inbound.cli import GlobalOptions
+from fabrica.adapters.inbound.cli.model_evidence import write_model_evidence_report
 from fabrica.bootstrap.cli import CliDependencyOverrides, run_cli
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     CliRunCommand,
@@ -52,11 +52,11 @@ def run_feature_cli_command(  # noqa: PLR0913
     *,
     runtime: FakeRuntime | None = None,
     selected_context_runtime: FakeSelectedContextRuntime | None = None,
-    global_options: CliGlobalOptions | None = None,
+    global_options: GlobalOptions | None = None,
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> int:
-    options = global_options or CliGlobalOptions()
+    options = global_options or GlobalOptions()
     streams = AgentRuntimeCliStreams(stdout=stdout or StringIO(), stderr=stderr or StringIO())
     if command.skill_ids or command.resources:
         assert selected_context_runtime is not None
@@ -252,7 +252,7 @@ def test_run_command_appends_requested_usage_and_price_evidence() -> None:
     exit_code = run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong"),
         runtime=runtime,
-        global_options=CliGlobalOptions(print_usage=True, print_prices=True),
+        global_options=GlobalOptions(print_usage=True, print_prices=True),
         stdout=stdout,
         stderr=StringIO(),
     )
