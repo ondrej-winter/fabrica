@@ -6,20 +6,21 @@ import sys
 from dataclasses import FrozenInstanceError, dataclass
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
 from fabrica.adapters.inbound import cli
 from fabrica.adapters.inbound.cli import (
     CliCommandRegistry,
+    CliCommandSpec,
     CliExecutionContext,
     CliGlobalOptions,
     CliRegistrationError,
     CliUsageError,
+    run_cli_shell,
     shell,
 )
-from fabrica.adapters.inbound.cli.shell import run_cli_shell
 from fabrica.bootstrap.cli import create_cli_command_registrars, run_cli
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
@@ -51,20 +52,21 @@ SYNTHETIC_HANDLER_EXIT_CODE = 7
 EXPECTED_CLI_PACKAGE_EXPORTS = [
     "CliCommandRegistrar",
     "CliCommandRegistry",
+    "CliCommandSpec",
     "CliExecutionContext",
     "CliGlobalOptions",
     "CliRegistrationError",
     "CliUsageError",
+    "run_cli_shell",
 ]
 EXPECTED_CLI_SHELL_EXPORTS = ["run_cli_shell"]
 
 
-def test_cli_package_exports_only_registration_contracts() -> None:
+def test_cli_package_exports_curated_command_shell_api() -> None:
     assert cli.__all__ == EXPECTED_CLI_PACKAGE_EXPORTS
     assert not hasattr(cli, "parse_cli_invocation")
     assert not hasattr(cli, "build_parser")
     assert not hasattr(cli, "execute_cli_invocation")
-    assert not hasattr(cli, "run_cli_shell")
 
 
 def test_cli_shell_exports_only_supported_shell_boundary() -> None:
@@ -168,24 +170,56 @@ def test_run_cli_shell_round_trips_bound_handler() -> None:
 
 def _synthetic_command_registrar(handlers: RecordingHandlers) -> CliCommandRegistrar:
     def register(commands: CliCommandRegistry) -> None:
-        commands.register_command(
-            name="synthetic",
-            summary="synthetic command",
-            configure_parser=_configure_noop_synthetic_parser,
-            decode=_decode_synthetic_command,
-            handler=_synthetic_handler(handlers),
+        commands.register(
+            _synthetic_command_with_handler(_synthetic_handler(handlers)),
         )
 
     return register
 
 
 def _register_synthetic_command(commands: CliCommandRegistry) -> None:
-    commands.register_command(
+    commands.register(_synthetic_command_spec())
+
+
+def _synthetic_command_spec() -> CliCommandSpec[str]:
+    return CliCommandSpec(
         name="synthetic",
         summary="synthetic command",
         configure_parser=_configure_noop_synthetic_parser,
         decode=_decode_synthetic_command,
         handler=_noop_synthetic_handler,
+    )
+
+
+def _synthetic_command_with_parser(
+    configure_parser: Callable[[argparse.ArgumentParser], None],
+) -> CliCommandSpec[str]:
+    return CliCommandSpec(
+        name="synthetic",
+        summary="synthetic command",
+        configure_parser=configure_parser,
+        decode=_decode_synthetic_command,
+        handler=_noop_synthetic_handler,
+    )
+
+
+def _synthetic_command_with_decode(decode: Callable[[argparse.Namespace], str]) -> CliCommandSpec[str]:
+    return CliCommandSpec(
+        name="synthetic",
+        summary="synthetic command",
+        configure_parser=_configure_noop_synthetic_parser,
+        decode=decode,
+        handler=_noop_synthetic_handler,
+    )
+
+
+def _synthetic_command_with_handler(handler: Callable[[str, CliExecutionContext], int]) -> CliCommandSpec[str]:
+    return CliCommandSpec(
+        name="synthetic",
+        summary="synthetic command",
+        configure_parser=_configure_noop_synthetic_parser,
+        decode=_decode_synthetic_command,
+        handler=handler,
     )
 
 
@@ -196,6 +230,10 @@ def _configure_noop_synthetic_parser(parser: argparse.ArgumentParser) -> None:
 def _decode_synthetic_command(namespace: argparse.Namespace) -> str:
     assert not hasattr(namespace, "cli_decoder")
     assert not hasattr(namespace, "cli_handler")
+    assert not hasattr(namespace, "_fabrica_cli_command")
+    assert not hasattr(namespace, "_fabrica_cli_print_usage")
+    assert not hasattr(namespace, "_fabrica_cli_print_prices")
+    assert not hasattr(namespace, "_fabrica_cli_verbose_diagnostics")
     return "synthetic"
 
 
@@ -233,20 +271,8 @@ def test_run_cli_shell_rejects_duplicate_command_registration() -> None:
 
 
 def _register_duplicate_synthetic_commands(commands: CliCommandRegistry) -> None:
-    commands.register_command(
-        name="synthetic",
-        summary="synthetic command",
-        configure_parser=_configure_noop_synthetic_parser,
-        decode=_decode_synthetic_command,
-        handler=_noop_synthetic_handler,
-    )
-    commands.register_command(
-        name="synthetic",
-        summary="synthetic command",
-        configure_parser=_configure_noop_synthetic_parser,
-        decode=_decode_synthetic_command,
-        handler=_noop_synthetic_handler,
-    )
+    commands.register(_synthetic_command_spec())
+    commands.register(_synthetic_command_spec())
 
 
 def test_run_cli_shell_translates_argparse_registration_conflicts() -> None:
@@ -254,13 +280,7 @@ def test_run_cli_shell_translates_argparse_registration_conflicts() -> None:
         parser.add_argument("--print-usage")
 
     def register(commands: CliCommandRegistry) -> None:
-        commands.register_command(
-            name="synthetic",
-            summary="synthetic command",
-            configure_parser=configure_conflicting_parser,
-            decode=_decode_synthetic_command,
-            handler=_noop_synthetic_handler,
-        )
+        commands.register(_synthetic_command_with_parser(configure_conflicting_parser))
 
     with pytest.raises(CliRegistrationError, match="CLI command registration failed"):
         run_cli_shell(
@@ -272,15 +292,35 @@ def test_run_cli_shell_translates_argparse_registration_conflicts() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "reserved_dest",
+    [
+        "_fabrica_cli_command",
+        "_fabrica_cli_print_usage",
+        "_fabrica_cli_print_prices",
+        "_fabrica_cli_verbose_diagnostics",
+    ],
+)
+def test_run_cli_shell_rejects_feature_arguments_using_reserved_shell_destinations(reserved_dest: str) -> None:
+    def configure_reserved_parser(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--feature-value", dest=reserved_dest)
+
+    def register(commands: CliCommandRegistry) -> None:
+        commands.register(_synthetic_command_with_parser(configure_reserved_parser))
+
+    with pytest.raises(CliRegistrationError, match="uses reserved parser destination"):
+        run_cli_shell(
+            ("synthetic",),
+            command_registrars=(register,),
+            stdin=StringIO(),
+            stdout=StringIO(),
+            stderr=StringIO(),
+        )
+
+
 def test_run_cli_does_not_swallow_handler_system_exit() -> None:
     def register(commands: CliCommandRegistry) -> None:
-        commands.register_command(
-            name="synthetic",
-            summary="synthetic command",
-            configure_parser=_configure_noop_synthetic_parser,
-            decode=_decode_synthetic_command,
-            handler=_system_exit_synthetic_handler,
-        )
+        commands.register(_synthetic_command_with_handler(_system_exit_synthetic_handler))
 
     with pytest.raises(SystemExit) as exc_info:
         run_cli_shell(
@@ -303,13 +343,7 @@ def test_run_cli_shell_treats_cli_usage_error_as_usage_error() -> None:
         raise CliUsageError(msg)
 
     def register(commands: CliCommandRegistry) -> None:
-        commands.register_command(
-            name="synthetic",
-            summary="synthetic command",
-            configure_parser=_configure_noop_synthetic_parser,
-            decode=decode_user_error,
-            handler=_noop_synthetic_handler,
-        )
+        commands.register(_synthetic_command_with_decode(decode_user_error))
 
     exit_code = run_cli_shell(
         ("synthetic",),
@@ -330,13 +364,7 @@ def test_run_cli_shell_propagates_unexpected_decoder_value_error() -> None:
         raise ValueError(msg)
 
     def register(commands: CliCommandRegistry) -> None:
-        commands.register_command(
-            name="synthetic",
-            summary="synthetic command",
-            configure_parser=_configure_noop_synthetic_parser,
-            decode=decode_programmer_error,
-            handler=_noop_synthetic_handler,
-        )
+        commands.register(_synthetic_command_with_decode(decode_programmer_error))
 
     with pytest.raises(ValueError, match="synthetic programmer error"):
         run_cli_shell(
@@ -516,83 +544,99 @@ def test_parse_command_accepts_global_options_after_subcommand() -> None:
     ("register", "expected_message"),
     [
         (
-            lambda commands: commands.register_command(
-                name="",
-                summary="synthetic command",
-                configure_parser=_configure_noop_synthetic_parser,
-                decode=_decode_synthetic_command,
-                handler=_noop_synthetic_handler,
+            lambda commands: commands.register(
+                CliCommandSpec(
+                    name="",
+                    summary="synthetic command",
+                    configure_parser=_configure_noop_synthetic_parser,
+                    decode=_decode_synthetic_command,
+                    handler=_noop_synthetic_handler,
+                ),
             ),
             "name must be a non-empty trimmed value",
         ),
         (
-            lambda commands: commands.register_command(
-                name=" synthetic",
-                summary="synthetic command",
-                configure_parser=_configure_noop_synthetic_parser,
-                decode=_decode_synthetic_command,
-                handler=_noop_synthetic_handler,
+            lambda commands: commands.register(
+                CliCommandSpec(
+                    name=" synthetic",
+                    summary="synthetic command",
+                    configure_parser=_configure_noop_synthetic_parser,
+                    decode=_decode_synthetic_command,
+                    handler=_noop_synthetic_handler,
+                ),
             ),
             "name must be a non-empty trimmed value",
         ),
         (
-            lambda commands: commands.register_command(
-                name="Synthetic",
-                summary="synthetic command",
-                configure_parser=_configure_noop_synthetic_parser,
-                decode=_decode_synthetic_command,
-                handler=_noop_synthetic_handler,
+            lambda commands: commands.register(
+                CliCommandSpec(
+                    name="Synthetic",
+                    summary="synthetic command",
+                    configure_parser=_configure_noop_synthetic_parser,
+                    decode=_decode_synthetic_command,
+                    handler=_noop_synthetic_handler,
+                ),
             ),
             "name must be lowercase kebab-case",
         ),
         (
-            lambda commands: commands.register_command(
-                name="synthetic",
-                summary="",
-                configure_parser=_configure_noop_synthetic_parser,
-                decode=_decode_synthetic_command,
-                handler=_noop_synthetic_handler,
+            lambda commands: commands.register(
+                CliCommandSpec(
+                    name="synthetic",
+                    summary="",
+                    configure_parser=_configure_noop_synthetic_parser,
+                    decode=_decode_synthetic_command,
+                    handler=_noop_synthetic_handler,
+                ),
             ),
             "summary must be a non-empty trimmed value",
         ),
         (
-            lambda commands: commands.register_command(
-                name="synthetic",
-                summary="synthetic command",
-                configure_parser=_configure_noop_synthetic_parser,
-                decode=_decode_synthetic_command,
-                handler=_noop_synthetic_handler,
-                description=" synthetic description",
+            lambda commands: commands.register(
+                CliCommandSpec(
+                    name="synthetic",
+                    summary="synthetic command",
+                    configure_parser=_configure_noop_synthetic_parser,
+                    decode=_decode_synthetic_command,
+                    handler=_noop_synthetic_handler,
+                    description=" synthetic description",
+                ),
             ),
             "description must be a non-empty trimmed value",
         ),
         (
-            lambda commands: commands.register_command(
-                name="synthetic",
-                summary="synthetic command",
-                configure_parser=None,  # type: ignore[arg-type]
-                decode=_decode_synthetic_command,
-                handler=_noop_synthetic_handler,
+            lambda commands: commands.register(
+                CliCommandSpec(
+                    name="synthetic",
+                    summary="synthetic command",
+                    configure_parser=cast("Any", None),
+                    decode=_decode_synthetic_command,
+                    handler=_noop_synthetic_handler,
+                ),
             ),
             "parser configurer must be callable",
         ),
         (
-            lambda commands: commands.register_command(
-                name="synthetic",
-                summary="synthetic command",
-                configure_parser=_configure_noop_synthetic_parser,
-                decode=None,  # type: ignore[arg-type]
-                handler=_noop_synthetic_handler,
+            lambda commands: commands.register(
+                CliCommandSpec(
+                    name="synthetic",
+                    summary="synthetic command",
+                    configure_parser=_configure_noop_synthetic_parser,
+                    decode=cast("Any", None),
+                    handler=_noop_synthetic_handler,
+                ),
             ),
             "decoder must be callable",
         ),
         (
-            lambda commands: commands.register_command(
-                name="synthetic",
-                summary="synthetic command",
-                configure_parser=_configure_noop_synthetic_parser,
-                decode=_decode_synthetic_command,
-                handler=None,  # type: ignore[arg-type]
+            lambda commands: commands.register(
+                CliCommandSpec(
+                    name="synthetic",
+                    summary="synthetic command",
+                    configure_parser=_configure_noop_synthetic_parser,
+                    decode=_decode_synthetic_command,
+                    handler=cast("Any", None),
+                ),
             ),
             "handler must be callable",
         ),

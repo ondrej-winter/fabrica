@@ -17,17 +17,33 @@ CLI_COMMAND_NAME_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 class CliCommandRegistry(Protocol):
     """Public behavior needed to register feature-owned CLI commands."""
 
-    def register_command[TCommand](  # noqa: PLR0913
+    def register[TCommand](
         self,
-        *,
-        name: str,
-        summary: str,
-        configure_parser: Callable[[argparse.ArgumentParser], None],
-        decode: Callable[[argparse.Namespace], TCommand],
-        handler: Callable[[TCommand, CliExecutionContext], int],
-        description: str | None = None,
+        command: CliCommandSpec[TCommand],
     ) -> None:
         """Add one named subcommand parser with typed decoding and execution."""
+
+
+@dataclass(frozen=True, slots=True)
+class CliCommandSpec[TCommand]:
+    """Feature-owned command definition for the product CLI shell."""
+
+    name: str
+    summary: str
+    configure_parser: Callable[[argparse.ArgumentParser], None]
+    decode: Callable[[argparse.Namespace], TCommand]
+    handler: Callable[[TCommand, CliExecutionContext], int]
+    description: str | None = None
+
+    def __post_init__(self) -> None:
+        """Validate the feature-owned definition before parser construction."""
+        _validate_registration_name(self.name)
+        _validate_registration_text("summary", self.summary)
+        if self.description is not None:
+            _validate_registration_text("description", self.description)
+        _validate_registration_callable("parser configurer", self.configure_parser)
+        _validate_registration_callable("decoder", self.decode)
+        _validate_registration_callable("handler", self.handler)
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +98,7 @@ def _validate_registration_callable(name: str, value: object) -> None:
 __all__ = [
     "CliCommandRegistrar",
     "CliCommandRegistry",
+    "CliCommandSpec",
     "CliExecutionContext",
     "CliGlobalOptions",
     "CliRegistrationError",

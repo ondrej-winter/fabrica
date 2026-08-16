@@ -8,13 +8,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Never, cast
 
 from fabrica.adapters.inbound.cli.contracts import (
+    CliCommandSpec,
     CliExecutionContext,
     CliGlobalOptions,
     CliRegistrationError,
     CliUsageError,
-    _validate_registration_callable,
-    _validate_registration_name,
-    _validate_registration_text,
 )
 
 if TYPE_CHECKING:
@@ -23,74 +21,50 @@ if TYPE_CHECKING:
 
     from fabrica.adapters.inbound.cli.contracts import CliCommandRegistrar
 
+SHELL_COMMAND_DEST = "_fabrica_cli_command"
+SHELL_GLOBAL_OPTION_DESTS = frozenset(
+    {
+        "_fabrica_cli_print_usage",
+        "_fabrica_cli_print_prices",
+        "_fabrica_cli_verbose_diagnostics",
+    },
+)
+SHELL_RESERVED_DESTS = frozenset({SHELL_COMMAND_DEST, *SHELL_GLOBAL_OPTION_DESTS})
+
 
 class _ArgparseCliCommandRegistry:
     """Argparse-backed implementation of the atomic CLI command registry."""
 
     def __init__(self, subparsers: argparse._SubParsersAction[Any]) -> None:
         self._subparsers = subparsers
-        self._registrations: dict[str, _CliCommandRegistration[object]] = {}
+        self._registrations: dict[str, CliCommandSpec[object]] = {}
 
-    def register_command[TCommand](  # noqa: PLR0913
+    def register[TCommand](
         self,
-        *,
-        name: str,
-        summary: str,
-        configure_parser: Callable[[argparse.ArgumentParser], None],
-        decode: Callable[[argparse.Namespace], TCommand],
-        handler: Callable[[TCommand, CliExecutionContext], int],
-        description: str | None = None,
+        command: CliCommandSpec[TCommand],
     ) -> None:
         """Add one named subcommand parser with typed decoding and execution."""
-        registration = _CliCommandRegistration(
-            name=name,
-            summary=summary,
-            configure_parser=configure_parser,
-            decode=decode,
-            handler=handler,
-            description=description,
-        )
-        if registration.name in self._registrations:
-            msg = f"CLI command {registration.name!r} is already registered"
+        if command.name in self._registrations:
+            msg = f"CLI command {command.name!r} is already registered"
             raise CliRegistrationError(msg)
         parser = self._subparsers.add_parser(
-            registration.name,
-            help=registration.summary,
-            description=registration.description,
+            command.name,
+            help=command.summary,
+            description=command.description,
         )
         _add_global_options(parser, default=argparse.SUPPRESS)
-        registration.configure_parser(parser)
-        self._registrations[registration.name] = cast("_CliCommandRegistration[object]", registration)
+        shell_dest_count = len(parser._actions)  # noqa: SLF001
+        command.configure_parser(parser)
+        _reject_reserved_feature_dests(parser, command_name=command.name, shell_dest_count=shell_dest_count)
+        self._registrations[command.name] = cast("CliCommandSpec[object]", command)
 
-    def registration_for(self, command_name: str) -> _CliCommandRegistration[object]:
+    def registration_for(self, command_name: str) -> CliCommandSpec[object]:
         """Return the registration bound to one parsed command name."""
         try:
             return self._registrations[command_name]
         except KeyError as err:
             msg = f"CLI command {command_name!r} is not registered"
             raise CliRegistrationError(msg) from err
-
-
-@dataclass(frozen=True, slots=True)
-class _CliCommandRegistration[TCommand]:
-    """Validated feature-owned command registration."""
-
-    name: str
-    summary: str
-    configure_parser: Callable[[argparse.ArgumentParser], None]
-    decode: Callable[[argparse.Namespace], TCommand]
-    handler: Callable[[TCommand, CliExecutionContext], int]
-    description: str | None = None
-
-    def __post_init__(self) -> None:
-        """Validate the feature-owned registration before parser construction."""
-        _validate_registration_name(self.name)
-        _validate_registration_text("summary", self.summary)
-        if self.description is not None:
-            _validate_registration_text("description", self.description)
-        _validate_registration_callable("parser configurer", self.configure_parser)
-        _validate_registration_callable("decoder", self.decode)
-        _validate_registration_callable("handler", self.handler)
 
 
 class _StreamBoundArgumentParser(argparse.ArgumentParser):
@@ -168,7 +142,7 @@ def _build_parser(
     parser.bind_streams(stdout=stdout, stderr=stderr)
     _add_global_options(parser)
     subparsers = parser.add_subparsers(
-        dest="command",
+        dest=SHELL_COMMAND_DEST,
         required=True,
         parser_class=_stream_bound_parser_class(stdout=stdout, stderr=stderr),
     )
@@ -187,18 +161,21 @@ def _add_global_options(parser: argparse.ArgumentParser, *, default: bool | obje
     parser.add_argument(
         "--print-usage",
         action="store_true",
+        dest="_fabrica_cli_print_usage",
         default=default,
         help="Print model usage evidence after command output when available.",
     )
     parser.add_argument(
         "--print-prices",
         action="store_true",
+        dest="_fabrica_cli_print_prices",
         default=default,
         help="Print model pricing/cost evidence after command output when available.",
     )
     parser.add_argument(
         "--verbose-diagnostics",
         action="store_true",
+        dest="_fabrica_cli_verbose_diagnostics",
         default=default,
         help="Include additional diagnostics without exposing secrets or executing scripts.",
     )
@@ -250,14 +227,14 @@ def _parse_cli_invocation(
 def cli_global_options_from_namespace(namespace: argparse.Namespace) -> CliGlobalOptions:
     """Return feature-neutral global CLI options from one parsed namespace."""
     return CliGlobalOptions(
-        print_usage=getattr(namespace, "print_usage", False),
-        print_prices=getattr(namespace, "print_prices", False),
-        verbose_diagnostics=getattr(namespace, "verbose_diagnostics", False),
+        print_usage=getattr(namespace, "_fabrica_cli_print_usage", False),
+        print_prices=getattr(namespace, "_fabrica_cli_print_prices", False),
+        verbose_diagnostics=getattr(namespace, "_fabrica_cli_verbose_diagnostics", False),
     )
 
 
 def _command_name_from_namespace(namespace: argparse.Namespace) -> str:
-    command_name = getattr(namespace, "command", None)
+    command_name = getattr(namespace, SHELL_COMMAND_DEST, None)
     if not isinstance(command_name, str) or not command_name:
         msg = "CLI parser did not capture the selected command name"
         raise CliRegistrationError(msg)
@@ -270,11 +247,35 @@ def _decode_cli_command(
     namespace: argparse.Namespace,
 ) -> object:
     try:
-        return decoder(namespace)
+        return decoder(_feature_namespace_from(namespace))
     except argparse.ArgumentTypeError as err:
         parser.error(str(err))
     except CliUsageError as err:
         parser.error(str(err))
+
+
+def _feature_namespace_from(namespace: argparse.Namespace) -> argparse.Namespace:
+    values = vars(namespace).copy()
+    for reserved_dest in SHELL_RESERVED_DESTS:
+        values.pop(reserved_dest, None)
+    return argparse.Namespace(**values)
+
+
+def _reject_reserved_feature_dests(
+    parser: argparse.ArgumentParser,
+    *,
+    command_name: str,
+    shell_dest_count: int,
+) -> None:
+    collisions = sorted(
+        action.dest
+        for action in parser._actions[shell_dest_count:]  # noqa: SLF001
+        if action.dest in SHELL_RESERVED_DESTS
+    )
+    if collisions:
+        joined_collisions = ", ".join(collisions)
+        msg = f"CLI command {command_name!r} uses reserved parser destination(s): {joined_collisions}"
+        raise CliRegistrationError(msg)
 
 
 __all__ = ["run_cli_shell"]

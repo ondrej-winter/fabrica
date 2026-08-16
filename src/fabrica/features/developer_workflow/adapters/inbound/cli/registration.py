@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from fabrica.adapters.inbound.cli import CliCommandSpec
 from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
     CliCommitCommand,
     CliCommitMessageCommand,
@@ -43,24 +44,28 @@ def register_developer_workflow_cli_commands(
     commit_command: DeveloperWorkflowCliHandler[CliCommitCommand],
 ) -> None:
     """Register developer-workflow owned commands on the product CLI parser."""
-    commands.register_command(
-        name=COMMIT_MESSAGE_COMMAND_NAME,
-        summary="preview a read-only commit message for staged git changes",
-        configure_parser=_configure_commit_message_parser,
-        decode=_parsed_commit_message_command_from_namespace,
-        handler=_handler_for_commit_message_command(commit_message_command),
-        description="Read staged git diff context and propose a commit message without creating a commit.",
+    commands.register(
+        CliCommandSpec(
+            name=COMMIT_MESSAGE_COMMAND_NAME,
+            summary="preview a read-only commit message for staged git changes",
+            configure_parser=_configure_commit_message_parser,
+            decode=_parsed_commit_message_command_from_namespace,
+            handler=_handler_for_commit_message_command(commit_message_command),
+            description="Read staged git diff context and propose a commit message without creating a commit.",
+        ),
     )
 
-    commands.register_command(
-        name=COMMIT_COMMAND_NAME,
-        summary="run pre-commit, then create a git commit from a generated message after confirmation",
-        configure_parser=_configure_commit_parser,
-        decode=_parsed_commit_command_from_namespace,
-        handler=_handler_for_commit_command(commit_command),
-        description=(
-            "Run the staged pre-commit quality gate before message generation, "
-            "prompt for confirmation, then create a git commit only after approval."
+    commands.register(
+        CliCommandSpec(
+            name=COMMIT_COMMAND_NAME,
+            summary="run pre-commit, then create a git commit from a generated message after confirmation",
+            configure_parser=_configure_commit_parser,
+            decode=_parsed_commit_command_from_namespace,
+            handler=_handler_for_commit_command(commit_command),
+            description=(
+                "Run the staged pre-commit quality gate before message generation, "
+                "prompt for confirmation, then create a git commit only after approval."
+            ),
         ),
     )
 
