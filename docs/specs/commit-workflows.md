@@ -301,7 +301,7 @@ slice.
 - Spec: `docs/specs/commit-workflows.md`.
 - Related git subprocess/tool adapter spec: `docs/specs/git-workflow-tools.md`.
 - CLI parser and parsed command DTOs:
-  `src/fabrica/adapters/inbound/cli/parser.py` and
+  `src/fabrica/adapters/inbound/cli/shell.py` and
   `src/fabrica/features/developer_workflow/adapters/inbound/cli/`.
 - CLI runner, prompt handling, and terminal output:
   `src/fabrica/features/developer_workflow/adapters/inbound/cli/runner.py`,

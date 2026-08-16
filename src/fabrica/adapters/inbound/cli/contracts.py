@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import argparse
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
+    import argparse
     from typing import TextIO
 
 CLI_COMMAND_NAME_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
@@ -17,33 +17,17 @@ CLI_COMMAND_NAME_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 class CliCommandRegistry(Protocol):
     """Public behavior needed to register feature-owned CLI commands."""
 
-    def register_command[TCommand](
+    def register_command[TCommand](  # noqa: PLR0913
         self,
-        registration: CliCommandRegistration[TCommand],
+        *,
+        name: str,
+        summary: str,
+        configure_parser: Callable[[argparse.ArgumentParser], None],
+        decode: Callable[[argparse.Namespace], TCommand],
+        handler: Callable[[TCommand, CliExecutionContext], int],
+        description: str | None = None,
     ) -> None:
         """Add one named subcommand parser with typed decoding and execution."""
-
-
-@dataclass(frozen=True, slots=True)
-class CliCommandRegistration[TCommand]:
-    """Feature-owned command registration for the product CLI shell."""
-
-    name: str
-    summary: str
-    configure_parser: CliArgumentConfigurer
-    decode: CliCommandDecoder[TCommand]
-    handler: CliCommandHandler[TCommand]
-    description: str | None = None
-
-    def __post_init__(self) -> None:
-        """Validate the feature-owned registration before parser construction."""
-        _validate_registration_name(self.name)
-        _validate_registration_text("summary", self.summary)
-        if self.description is not None:
-            _validate_registration_text("description", self.description)
-        _validate_registration_callable("parser configurer", self.configure_parser)
-        _validate_registration_callable("decoder", self.decode)
-        _validate_registration_callable("handler", self.handler)
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,23 +49,14 @@ class CliExecutionContext:
     stderr: TextIO
 
 
-type CliArgumentConfigurer = Callable[[argparse.ArgumentParser], None]
-type CliCommandDecoder[TCommand] = Callable[[argparse.Namespace], TCommand]
-type CliCommandHandler[TCommand] = Callable[[TCommand, CliExecutionContext], int]
-
-
 type CliCommandRegistrar = Callable[[CliCommandRegistry], None]
 
 
-class CliError(Exception):
-    """Base class for expected product CLI boundary failures."""
-
-
-class CliConfigurationError(CliError):
+class CliRegistrationError(Exception):
     """Raised when CLI registration or composition is invalid."""
 
 
-class CliUsageError(CliError):
+class CliUsageError(Exception):
     """Raised by command decoders for invalid user-supplied CLI values."""
 
 
@@ -89,31 +64,26 @@ def _validate_registration_name(value: str) -> None:
     _validate_registration_text("name", value)
     if CLI_COMMAND_NAME_PATTERN.fullmatch(value) is None:
         msg = "CLI command registration name must be lowercase kebab-case"
-        raise CliConfigurationError(msg)
+        raise CliRegistrationError(msg)
 
 
 def _validate_registration_text(field_name: str, value: str) -> None:
     if not value or value.strip() != value:
         msg = f"CLI command registration {field_name} must be a non-empty trimmed value"
-        raise CliConfigurationError(msg)
+        raise CliRegistrationError(msg)
 
 
 def _validate_registration_callable(name: str, value: object) -> None:
     if not callable(value):
         msg = f"CLI command registration {name} must be callable"
-        raise CliConfigurationError(msg)
+        raise CliRegistrationError(msg)
 
 
 __all__ = [
-    "CliArgumentConfigurer",
-    "CliCommandDecoder",
-    "CliCommandHandler",
     "CliCommandRegistrar",
-    "CliCommandRegistration",
     "CliCommandRegistry",
-    "CliConfigurationError",
-    "CliError",
     "CliExecutionContext",
     "CliGlobalOptions",
+    "CliRegistrationError",
     "CliUsageError",
 ]

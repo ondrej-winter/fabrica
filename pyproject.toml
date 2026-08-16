@@ -98,7 +98,7 @@ type = "forbidden"
 source_modules = ["fabrica.features"]
 forbidden_modules = [
     "fabrica.adapters.inbound.cli.output",
-    "fabrica.adapters.inbound.cli.parser",
+    "fabrica.adapters.inbound.cli.shell",
     "fabrica.bootstrap",
 ]
 
@@ -161,7 +161,7 @@ source_modules = [
     "fabrica.adapters.inbound.cli",
     "fabrica.adapters.inbound.cli.contracts",
     "fabrica.adapters.inbound.cli.output",
-    "fabrica.adapters.inbound.cli.parser",
+    "fabrica.adapters.inbound.cli.shell",
 ]
 forbidden_modules = [
     "fabrica.features",

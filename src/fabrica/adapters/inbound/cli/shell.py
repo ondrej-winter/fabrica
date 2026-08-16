@@ -1,4 +1,4 @@
-"""Product CLI parser and command registration shell."""
+"""Product CLI shell and command registration runtime."""
 
 from __future__ import annotations
 
@@ -8,19 +8,20 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Never, cast
 
 from fabrica.adapters.inbound.cli.contracts import (
-    CliCommandHandler,
-    CliCommandRegistration,
-    CliConfigurationError,
     CliExecutionContext,
     CliGlobalOptions,
+    CliRegistrationError,
     CliUsageError,
+    _validate_registration_callable,
+    _validate_registration_name,
+    _validate_registration_text,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from typing import TextIO
 
-    from fabrica.adapters.inbound.cli.contracts import CliCommandDecoder, CliCommandRegistrar
+    from fabrica.adapters.inbound.cli.contracts import CliCommandRegistrar
 
 
 class _ArgparseCliCommandRegistry:
@@ -28,16 +29,30 @@ class _ArgparseCliCommandRegistry:
 
     def __init__(self, subparsers: argparse._SubParsersAction[Any]) -> None:
         self._subparsers = subparsers
-        self._registrations: dict[str, CliCommandRegistration[object]] = {}
+        self._registrations: dict[str, _CliCommandRegistration[object]] = {}
 
-    def register_command[TCommand](
+    def register_command[TCommand](  # noqa: PLR0913
         self,
-        registration: CliCommandRegistration[TCommand],
+        *,
+        name: str,
+        summary: str,
+        configure_parser: Callable[[argparse.ArgumentParser], None],
+        decode: Callable[[argparse.Namespace], TCommand],
+        handler: Callable[[TCommand, CliExecutionContext], int],
+        description: str | None = None,
     ) -> None:
         """Add one named subcommand parser with typed decoding and execution."""
+        registration = _CliCommandRegistration(
+            name=name,
+            summary=summary,
+            configure_parser=configure_parser,
+            decode=decode,
+            handler=handler,
+            description=description,
+        )
         if registration.name in self._registrations:
             msg = f"CLI command {registration.name!r} is already registered"
-            raise CliConfigurationError(msg)
+            raise CliRegistrationError(msg)
         parser = self._subparsers.add_parser(
             registration.name,
             help=registration.summary,
@@ -45,15 +60,37 @@ class _ArgparseCliCommandRegistry:
         )
         _add_global_options(parser, default=argparse.SUPPRESS)
         registration.configure_parser(parser)
-        self._registrations[registration.name] = cast("CliCommandRegistration[object]", registration)
+        self._registrations[registration.name] = cast("_CliCommandRegistration[object]", registration)
 
-    def registration_for(self, command_name: str) -> CliCommandRegistration[object]:
+    def registration_for(self, command_name: str) -> _CliCommandRegistration[object]:
         """Return the registration bound to one parsed command name."""
         try:
             return self._registrations[command_name]
         except KeyError as err:
             msg = f"CLI command {command_name!r} is not registered"
-            raise CliConfigurationError(msg) from err
+            raise CliRegistrationError(msg) from err
+
+
+@dataclass(frozen=True, slots=True)
+class _CliCommandRegistration[TCommand]:
+    """Validated feature-owned command registration."""
+
+    name: str
+    summary: str
+    configure_parser: Callable[[argparse.ArgumentParser], None]
+    decode: Callable[[argparse.Namespace], TCommand]
+    handler: Callable[[TCommand, CliExecutionContext], int]
+    description: str | None = None
+
+    def __post_init__(self) -> None:
+        """Validate the feature-owned registration before parser construction."""
+        _validate_registration_name(self.name)
+        _validate_registration_text("summary", self.summary)
+        if self.description is not None:
+            _validate_registration_text("description", self.description)
+        _validate_registration_callable("parser configurer", self.configure_parser)
+        _validate_registration_callable("decoder", self.decode)
+        _validate_registration_callable("handler", self.handler)
 
 
 class _StreamBoundArgumentParser(argparse.ArgumentParser):
@@ -103,7 +140,7 @@ class _ArgparseCliInvocation:
 
     global_options: CliGlobalOptions
     command: object
-    handler: CliCommandHandler[object]
+    handler: Callable[[object, CliExecutionContext], int]
 
     def execute(self, *, stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
         """Run the selected CLI command with explicit process streams."""
@@ -141,7 +178,7 @@ def _build_parser(
             register_commands(command_registry)
         except argparse.ArgumentError as err:
             msg = f"CLI command registration failed: {err}"
-            raise CliConfigurationError(msg) from err
+            raise CliRegistrationError(msg) from err
 
     return parser, command_registry
 
@@ -168,7 +205,7 @@ def _add_global_options(parser: argparse.ArgumentParser, *, default: bool | obje
 
 
 def run_cli_shell(
-    args: Sequence[str] | None,
+    argv: Sequence[str],
     *,
     command_registrars: Sequence[CliCommandRegistrar],
     stdin: TextIO,
@@ -183,7 +220,7 @@ def run_cli_shell(
     """
     try:
         invocation = _parse_cli_invocation(
-            args,
+            argv,
             command_registrars=command_registrars,
             stdout=stdout,
             stderr=stderr,
@@ -194,14 +231,14 @@ def run_cli_shell(
 
 
 def _parse_cli_invocation(
-    args: Sequence[str] | None,
+    argv: Sequence[str],
     *,
     command_registrars: Sequence[CliCommandRegistrar],
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> _ArgparseCliInvocation:
     parser, command_registry = _build_parser(command_registrars, stdout=stdout, stderr=stderr)
-    namespace = parser.parse_args(args)
+    namespace = parser.parse_args(argv)
     registration = command_registry.registration_for(_command_name_from_namespace(namespace))
     return _ArgparseCliInvocation(
         global_options=cli_global_options_from_namespace(namespace),
@@ -223,13 +260,13 @@ def _command_name_from_namespace(namespace: argparse.Namespace) -> str:
     command_name = getattr(namespace, "command", None)
     if not isinstance(command_name, str) or not command_name:
         msg = "CLI parser did not capture the selected command name"
-        raise CliConfigurationError(msg)
+        raise CliRegistrationError(msg)
     return command_name
 
 
 def _decode_cli_command(
     parser: argparse.ArgumentParser,
-    decoder: CliCommandDecoder[object],
+    decoder: Callable[[argparse.Namespace], object],
     namespace: argparse.Namespace,
 ) -> object:
     try:
