@@ -6,16 +6,19 @@ import sys
 from dataclasses import FrozenInstanceError, dataclass
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TextIO, cast, get_type_hints
 
 import pytest
 
 from fabrica.adapters.inbound import cli
 from fabrica.adapters.inbound.cli import (
+    CliCommandDecoder,
+    CliCommandHandler,
     CliCommandRegistry,
     CliCommandSpec,
     CliExecutionContext,
     CliGlobalOptions,
+    CliParserConfigurer,
     CliRegistrationError,
     CliUsageError,
     run_cli_shell,
@@ -50,11 +53,14 @@ if TYPE_CHECKING:
 ARGPARSE_USAGE_ERROR = 2
 SYNTHETIC_HANDLER_EXIT_CODE = 7
 EXPECTED_CLI_PACKAGE_EXPORTS = [
+    "CliCommandDecoder",
+    "CliCommandHandler",
     "CliCommandRegistrar",
     "CliCommandRegistry",
     "CliCommandSpec",
     "CliExecutionContext",
     "CliGlobalOptions",
+    "CliParserConfigurer",
     "CliRegistrationError",
     "CliUsageError",
     "run_cli_shell",
@@ -73,6 +79,28 @@ def test_cli_shell_exports_only_supported_shell_boundary() -> None:
     assert shell.__all__ == EXPECTED_CLI_SHELL_EXPORTS
     assert not hasattr(shell, "build_parser")
     assert not hasattr(shell, "parse_cli_invocation")
+
+
+def test_cli_registration_contract_annotations_are_runtime_resolvable() -> None:
+    assert get_type_hints(CliCommandSpec)
+    assert get_type_hints(CliExecutionContext)["stdout"] is TextIO
+    assert get_type_hints(run_cli_shell)["return"] is int
+    assert CliParserConfigurer.__value__
+    assert CliCommandDecoder.__value__
+    assert CliCommandHandler.__value__
+
+
+def test_cli_command_spec_requires_keyword_arguments() -> None:
+    command_spec_factory = cast("Any", CliCommandSpec)
+
+    with pytest.raises(TypeError, match="positional argument"):
+        command_spec_factory(
+            "synthetic",
+            "synthetic command",
+            _configure_noop_synthetic_parser,
+            _decode_synthetic_command,
+            _noop_synthetic_handler,
+        )
 
 
 @dataclass(frozen=True, slots=True)

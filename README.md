@@ -875,3 +875,42 @@ and output mapping under
 `src/fabrica/bootstrap/cli.py` attach per-command handlers and lazily assemble
 those feature CLI adapters with default concrete dependencies only when the
 selected command runs.
+
+Feature-owned CLI registrations contribute commands through the shared
+keyword-only `CliCommandSpec` contract. A registration configures only its
+subcommand parser, decodes the resulting `argparse.Namespace` into an
+adapter-local immutable command value, and handles expected user input failures
+with `CliUsageError`; unexpected decoder failures remain programmer errors.
+
+```python
+from argparse import ArgumentParser, Namespace
+
+from fabrica.adapters.inbound.cli import CliCommandRegistry, CliCommandSpec, CliExecutionContext, CliUsageError
+
+
+def register_example_commands(commands: CliCommandRegistry) -> None:
+    commands.register(
+        CliCommandSpec(
+            name="example",
+            summary="run one example workflow",
+            configure_parser=_configure_parser,
+            decode=_decode_command,
+            handler=_handle_command,
+        ),
+    )
+
+
+def _configure_parser(parser: ArgumentParser) -> None:
+    parser.add_argument("--name", required=True)
+
+
+def _decode_command(namespace: Namespace) -> str:
+    if not namespace.name.strip():
+        raise CliUsageError("name must not be blank")
+    return namespace.name
+
+
+def _handle_command(name: str, context: CliExecutionContext) -> int:
+    context.stdout.write(f"hello {name}\n")
+    return 0
+```

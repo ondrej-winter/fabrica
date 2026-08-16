@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+import argparse
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
-
-if TYPE_CHECKING:
-    import argparse
-    from typing import TextIO
+from typing import Protocol, TextIO
 
 CLI_COMMAND_NAME_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
+type CliParserConfigurer = Callable[[argparse.ArgumentParser], None]
+type CliCommandDecoder[TCommand] = Callable[[argparse.Namespace], TCommand]
+type CliCommandHandler[TCommand] = Callable[[TCommand, CliExecutionContext], int]
 
 
 class CliCommandRegistry(Protocol):
@@ -24,15 +24,15 @@ class CliCommandRegistry(Protocol):
         """Add one named subcommand parser with typed decoding and execution."""
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class CliCommandSpec[TCommand]:
     """Feature-owned command definition for the product CLI shell."""
 
     name: str
     summary: str
-    configure_parser: Callable[[argparse.ArgumentParser], None]
-    decode: Callable[[argparse.Namespace], TCommand]
-    handler: Callable[[TCommand, CliExecutionContext], int]
+    configure_parser: CliParserConfigurer
+    decode: CliCommandDecoder[TCommand]
+    handler: CliCommandHandler[TCommand]
     description: str | None = None
 
     def __post_init__(self) -> None:
@@ -96,11 +96,14 @@ def _validate_registration_callable(name: str, value: object) -> None:
 
 
 __all__ = [
+    "CliCommandDecoder",
+    "CliCommandHandler",
     "CliCommandRegistrar",
     "CliCommandRegistry",
     "CliCommandSpec",
     "CliExecutionContext",
     "CliGlobalOptions",
+    "CliParserConfigurer",
     "CliRegistrationError",
     "CliUsageError",
 ]
