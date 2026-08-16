@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Protocol, TextIO
 
 from fabrica.adapters.inbound.cli.contracts import CliError, CliExecutionContext
 from fabrica.adapters.inbound.cli.output import write_model_evidence_report
-from fabrica.adapters.inbound.cli.parser import execute_cli_invocation
+from fabrica.adapters.inbound.cli.parser import run_cli_shell
 from fabrica.adapters.inbound.cli.text import write_line
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     AgentRuntimeCliOptions,
@@ -112,7 +112,7 @@ def run_cli(
     resolved_stdout = stdout if stdout is not None else sys.stdout
     resolved_stderr = stderr if stderr is not None else sys.stderr
     try:
-        return execute_cli_invocation(
+        return run_cli_shell(
             argv,
             command_registrars=create_cli_command_registrars(overrides=overrides),
             stdin=resolved_stdin,

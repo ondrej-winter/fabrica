@@ -118,13 +118,7 @@ class _ArgparseCliInvocation:
         )
 
 
-def build_parser(command_registrars: Sequence[CliCommandRegistrar]) -> argparse.ArgumentParser:
-    """Build the side-effect-free CLI argument parser."""
-    parser, _ = _build_parser_with_registry(command_registrars)
-    return parser
-
-
-def _build_parser_with_registry(
+def _build_parser(
     command_registrars: Sequence[CliCommandRegistrar],
     *,
     stdout: TextIO | None = None,
@@ -173,16 +167,7 @@ def _add_global_options(parser: argparse.ArgumentParser, *, default: bool | obje
     )
 
 
-def parse_cli_invocation(
-    args: Sequence[str] | None,
-    *,
-    command_registrars: Sequence[CliCommandRegistrar],
-) -> _ArgparseCliInvocation:
-    """Parse command-line arguments into an executable CLI invocation."""
-    return _parse_cli_invocation(args, command_registrars=command_registrars)
-
-
-def execute_cli_invocation(
+def run_cli_shell(
     args: Sequence[str] | None,
     *,
     command_registrars: Sequence[CliCommandRegistrar],
@@ -190,7 +175,12 @@ def execute_cli_invocation(
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
-    """Parse and execute a CLI invocation while honoring explicit process streams."""
+    """Parse and execute the product CLI shell with explicit process streams.
+
+    Argparse help and usage exits are converted to process exit codes. Command
+    handlers run outside that conversion boundary so handler-owned ``SystemExit``
+    and unexpected failures remain visible to the caller.
+    """
     try:
         invocation = _parse_cli_invocation(
             args,
@@ -210,7 +200,7 @@ def _parse_cli_invocation(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> _ArgparseCliInvocation:
-    parser, command_registry = _build_parser_with_registry(command_registrars, stdout=stdout, stderr=stderr)
+    parser, command_registry = _build_parser(command_registrars, stdout=stdout, stderr=stderr)
     namespace = parser.parse_args(args)
     registration = command_registry.registration_for(_command_name_from_namespace(namespace))
     return _ArgparseCliInvocation(
@@ -248,3 +238,6 @@ def _decode_cli_command(
         parser.error(str(err))
     except CliUsageError as err:
         parser.error(str(err))
+
+
+__all__ = ["run_cli_shell"]

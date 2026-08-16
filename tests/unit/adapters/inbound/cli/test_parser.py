@@ -20,15 +20,7 @@ from fabrica.adapters.inbound.cli import (
     CliGlobalOptions,
     CliUsageError,
 )
-from fabrica.adapters.inbound.cli.parser import (
-    build_parser as _build_parser,
-)
-from fabrica.adapters.inbound.cli.parser import (
-    execute_cli_invocation as _execute_cli_invocation,
-)
-from fabrica.adapters.inbound.cli.parser import (
-    parse_cli_invocation as _parse_cli_invocation,
-)
+from fabrica.adapters.inbound.cli.parser import run_cli_shell
 from fabrica.bootstrap.cli import create_cli_command_registrars, run_cli
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
@@ -74,8 +66,10 @@ EXPECTED_CLI_PACKAGE_EXPORTS = [
 
 def test_cli_package_exports_only_registration_contracts() -> None:
     assert cli.__all__ == EXPECTED_CLI_PACKAGE_EXPORTS
-    assert not hasattr(cli, "build_parser")
     assert not hasattr(cli, "parse_cli_invocation")
+    assert not hasattr(cli, "build_parser")
+    assert not hasattr(cli, "execute_cli_invocation")
+    assert not hasattr(cli, "run_cli_shell")
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,15 +114,18 @@ class RecordingHandlers:
         return 0
 
 
-def build_parser():
-    return _build_parser(create_cli_command_registrars())
-
-
 def parse_args(args: tuple[str, ...] | list[str]) -> ParsedInvocation:
     handlers = RecordingHandlers()
-    invocation = _parse_cli_invocation(args, command_registrars=_recording_command_registrars(handlers))
-    exit_code = invocation.execute(stdin=StringIO(), stdout=StringIO(), stderr=StringIO())
+    exit_code = run_cli_shell(
+        args,
+        command_registrars=_recording_command_registrars(handlers),
+        stdin=StringIO(),
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+    )
 
+    if exit_code != 0:
+        raise SystemExit(exit_code)
     assert exit_code == 0
     assert handlers.invocation is not None
     return handlers.invocation
@@ -150,13 +147,15 @@ def _recording_command_registrars(handlers: RecordingHandlers) -> tuple[CliComma
     )
 
 
-def test_parse_cli_invocation_round_trips_bound_handler() -> None:
+def test_run_cli_shell_round_trips_bound_handler() -> None:
     handlers = RecordingHandlers()
-    invocation = _parse_cli_invocation(
+    exit_code = run_cli_shell(
         ("synthetic",),
         command_registrars=(_synthetic_command_registrar(handlers),),
+        stdin=StringIO(),
+        stdout=StringIO(),
+        stderr=StringIO(),
     )
-    exit_code = invocation.execute(stdin=StringIO(), stdout=StringIO(), stderr=StringIO())
 
     assert exit_code == 0
     assert handlers.invocation == ParsedInvocation(
@@ -225,9 +224,15 @@ def _synthetic_handler(handlers: RecordingHandlers) -> CliCommandHandler[str]:
     return run
 
 
-def test_parse_cli_invocation_rejects_duplicate_command_registration() -> None:
+def test_run_cli_shell_rejects_duplicate_command_registration() -> None:
     with pytest.raises(CliConfigurationError, match="CLI command 'synthetic' is already registered"):
-        _parse_cli_invocation(("synthetic",), command_registrars=(_register_duplicate_synthetic_commands,))
+        run_cli_shell(
+            ("synthetic",),
+            command_registrars=(_register_duplicate_synthetic_commands,),
+            stdin=StringIO(),
+            stdout=StringIO(),
+            stderr=StringIO(),
+        )
 
 
 def _register_duplicate_synthetic_commands(commands: CliCommandRegistry) -> None:
@@ -264,7 +269,7 @@ def test_run_cli_does_not_swallow_handler_system_exit() -> None:
         )
 
     with pytest.raises(SystemExit) as exc_info:
-        _execute_cli_invocation(
+        run_cli_shell(
             ("synthetic",),
             command_registrars=(register,),
             stdin=StringIO(),
@@ -275,7 +280,9 @@ def test_run_cli_does_not_swallow_handler_system_exit() -> None:
     assert exc_info.value.code == SYNTHETIC_HANDLER_EXIT_CODE
 
 
-def test_parse_cli_invocation_treats_cli_usage_error_as_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
+def test_run_cli_shell_treats_cli_usage_error_as_usage_error() -> None:
+    stderr = StringIO()
+
     def decode_user_error(namespace: argparse.Namespace) -> str:
         _ = namespace
         msg = "synthetic user error"
@@ -292,14 +299,19 @@ def test_parse_cli_invocation_treats_cli_usage_error_as_usage_error(capsys: pyte
             ),
         )
 
-    with pytest.raises(SystemExit) as exc_info:
-        _parse_cli_invocation(("synthetic",), command_registrars=(register,))
+    exit_code = run_cli_shell(
+        ("synthetic",),
+        command_registrars=(register,),
+        stdin=StringIO(),
+        stdout=StringIO(),
+        stderr=stderr,
+    )
 
-    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
-    assert "synthetic user error" in capsys.readouterr().err
+    assert exit_code == ARGPARSE_USAGE_ERROR
+    assert "synthetic user error" in stderr.getvalue()
 
 
-def test_parse_cli_invocation_propagates_unexpected_decoder_value_error() -> None:
+def test_run_cli_shell_propagates_unexpected_decoder_value_error() -> None:
     def decode_programmer_error(namespace: argparse.Namespace) -> str:
         _ = namespace
         msg = "synthetic programmer error"
@@ -317,7 +329,13 @@ def test_parse_cli_invocation_propagates_unexpected_decoder_value_error() -> Non
         )
 
     with pytest.raises(ValueError, match="synthetic programmer error"):
-        _parse_cli_invocation(("synthetic",), command_registrars=(register,))
+        run_cli_shell(
+            ("synthetic",),
+            command_registrars=(register,),
+            stdin=StringIO(),
+            stdout=StringIO(),
+            stderr=StringIO(),
+        )
 
 
 def test_run_cli_routes_help_to_injected_stdout_without_raising() -> None:
@@ -355,23 +373,29 @@ def test_run_cli_routes_unknown_command_to_injected_stderr_without_raising() -> 
     assert "invalid choice: 'unknown-command'" in stderr.getvalue()
 
 
-def test_build_parser_renders_help_without_runtime_side_effects(capsys: pytest.CaptureFixture[str]) -> None:
+def test_run_cli_shell_renders_help_without_runtime_side_effects() -> None:
     _clear_bootstrap_composition_modules()
-    parser = build_parser()
+    stdout = StringIO()
+    stderr = StringIO()
 
-    with pytest.raises(SystemExit) as exc_info:
-        parser.parse_args(["--help"])
+    exit_code = run_cli_shell(
+        ("--help",),
+        command_registrars=create_cli_command_registrars(),
+        stdin=StringIO(),
+        stdout=stdout,
+        stderr=stderr,
+    )
 
-    assert exc_info.value.code == 0
-    captured = capsys.readouterr()
-    assert "run" in captured.out
-    assert "commit" in captured.out
-    assert "commit-message" in captured.out
-    assert "script-policy" in captured.out
-    assert "script-execute" in captured.out
-    assert "--print-usage" in captured.out
-    assert "--print-prices" in captured.out
-    assert "--verbose-diagnostics" in captured.out
+    assert exit_code == 0
+    assert stderr.getvalue() == ""
+    assert "run" in stdout.getvalue()
+    assert "commit" in stdout.getvalue()
+    assert "commit-message" in stdout.getvalue()
+    assert "script-policy" in stdout.getvalue()
+    assert "script-execute" in stdout.getvalue()
+    assert "--print-usage" in stdout.getvalue()
+    assert "--print-prices" in stdout.getvalue()
+    assert "--verbose-diagnostics" in stdout.getvalue()
     assert "fabrica.bootstrap.composition.codex_runtime" not in sys.modules
     assert "fabrica.bootstrap.composition.developer_workflow" not in sys.modules
     assert "fabrica.bootstrap.composition.skill_context" not in sys.modules
@@ -523,7 +547,7 @@ def test_parse_command_accepts_global_options_after_subcommand() -> None:
         ),
     ],
 )
-def test_parse_cli_invocation_rejects_invalid_command_registration(
+def test_cli_command_registration_rejects_invalid_values(
     registration_factory: Callable[[], CliCommandRegistration[object]],
     expected_message: str,
 ) -> None:
@@ -577,16 +601,22 @@ def test_parse_commit_command_defaults_to_conventional_commits_skill() -> None:
     )
 
 
-def test_commit_command_help_documents_mutating_pre_commit_gate(capsys: pytest.CaptureFixture[str]) -> None:
-    parser = build_parser()
+def test_commit_command_help_documents_mutating_pre_commit_gate() -> None:
+    stdout = StringIO()
+    stderr = StringIO()
 
-    with pytest.raises(SystemExit) as exc_info:
-        parser.parse_args(["commit", "--help"])
+    exit_code = run_cli_shell(
+        ("commit", "--help"),
+        command_registrars=create_cli_command_registrars(),
+        stdin=StringIO(),
+        stdout=stdout,
+        stderr=stderr,
+    )
 
-    assert exc_info.value.code == 0
-    captured = capsys.readouterr()
-    assert "Run the staged pre-commit quality gate before message generation" in captured.out
-    assert "create a git commit only after approval" in captured.out
+    assert exit_code == 0
+    assert stderr.getvalue() == ""
+    assert "Run the staged pre-commit quality gate before message generation" in stdout.getvalue()
+    assert "create a git commit only after approval" in stdout.getvalue()
 
 
 def test_parse_commit_command_supports_commit_message_generation_options() -> None:
