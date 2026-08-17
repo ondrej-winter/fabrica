@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, TextIO
 
 from fabrica.adapters.inbound.cli import CommandContext, RegistrationError
+from fabrica.adapters.inbound.cli import run_cli as run_product_cli
 from fabrica.adapters.inbound.cli.model_evidence import write_model_evidence_report
 from fabrica.adapters.inbound.cli.rendering import write_line
-from fabrica.adapters.inbound.cli.runtime import run_cli as run_product_cli
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     AgentRuntimeCliOptions,
     AgentRuntimeCliStreams,
@@ -41,7 +41,7 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.runner import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from fabrica.adapters.inbound.cli.command import CommandRegistrar
+    from fabrica.adapters.inbound.cli import CommandRegistrar
     from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
         AgentRuntimeCliCompositionOptions,
         CliRunCommand,

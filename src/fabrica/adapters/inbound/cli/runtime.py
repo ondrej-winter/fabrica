@@ -1,4 +1,4 @@
-"""Runtime orchestration for the product CLI adapter."""
+"""Runtime helpers for the product CLI adapter."""
 
 from __future__ import annotations
 
@@ -41,32 +41,6 @@ class Invocation:
                 stderr=stderr,
             ),
         )
-
-
-def run_cli(
-    argv: Sequence[str],
-    *,
-    command_registrars: Sequence[CommandRegistrar],
-    stdin: TextIO,
-    stdout: TextIO,
-    stderr: TextIO,
-) -> int:
-    """Parse and execute the product CLI with explicit process streams.
-
-    Argparse help and usage exits are converted to process exit codes. Command
-    runners execute outside that conversion boundary so runner-owned
-    ``SystemExit`` and unexpected failures remain visible to the caller.
-    """
-    try:
-        invocation = parse_invocation(
-            argv,
-            command_registrars=command_registrars,
-            stdout=stdout,
-            stderr=stderr,
-        )
-    except SystemExit as err:
-        return int(err.code or 0)
-    return invocation.execute(stdin=stdin, stdout=stdout, stderr=stderr)
 
 
 def parse_invocation(

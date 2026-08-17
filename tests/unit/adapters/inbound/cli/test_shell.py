@@ -14,13 +14,18 @@ from fabrica.adapters.inbound import cli
 from fabrica.adapters.inbound.cli import (
     Command,
     CommandContext,
+    CommandDecoder,
+    CommandRegistrar,
     CommandRegistry,
+    CommandRunner,
     GlobalOptions,
+    ParserConfigurer,
     RegistrationError,
     UsageError,
 )
-from fabrica.adapters.inbound.cli.command import CommandDecoder, CommandRegistrar, CommandRunner, ParserConfigurer
-from fabrica.adapters.inbound.cli.runtime import run_cli as run_product_cli
+from fabrica.adapters.inbound.cli import (
+    run_cli as run_product_cli,
+)
 from fabrica.bootstrap.cli import create_cli_command_registrars
 from fabrica.bootstrap.cli import run_cli as run_bootstrap_cli
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
@@ -51,8 +56,12 @@ SYNTHETIC_HANDLER_EXIT_CODE = 7
 EXPECTED_CLI_PACKAGE_EXPORTS = [
     "Command",
     "CommandContext",
+    "CommandDecoder",
+    "CommandRegistrar",
     "CommandRegistry",
+    "CommandRunner",
     "GlobalOptions",
+    "ParserConfigurer",
     "RegistrationError",
     "UsageError",
     "run_cli",
@@ -64,6 +73,8 @@ def test_cli_package_exports_curated_command_shell_api() -> None:
     assert not hasattr(cli, "parse_cli_invocation")
     assert not hasattr(cli, "build_parser")
     assert not hasattr(cli, "execute_cli_invocation")
+    assert not hasattr(cli, "Invocation")
+    assert not hasattr(cli, "parse_invocation")
 
 
 def test_cli_registration_contract_annotations_are_runtime_resolvable() -> None:
