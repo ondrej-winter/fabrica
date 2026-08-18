@@ -299,23 +299,6 @@ def _register_duplicate_synthetic_commands(commands: CommandRegistry) -> None:
     commands.register(_synthetic_command_spec())
 
 
-def test_run_cli_translates_argparse_registration_conflicts() -> None:
-    def configure_conflicting_parser(parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--print-usage")
-
-    def register(commands: CommandRegistry) -> None:
-        commands.register(_synthetic_command_with_parser(configure_conflicting_parser))
-
-    with pytest.raises(RegistrationError, match="CLI command registration failed"):
-        run_product_cli(
-            ("synthetic",),
-            command_registrars=(register,),
-            stdin=StringIO(),
-            stdout=StringIO(),
-            stderr=StringIO(),
-        )
-
-
 @pytest.mark.parametrize(
     "reserved_dest",
     [
@@ -554,14 +537,12 @@ def test_parse_commit_message_command_supports_skill_root_and_diagnostics_overri
     )
 
 
-def test_parse_command_accepts_global_options_after_subcommand() -> None:
-    invocation = parse_args(["commit-message", "--verbose-diagnostics"])
+@pytest.mark.parametrize("global_option", ["--print-usage", "--print-prices", "--verbose-diagnostics"])
+def test_parse_command_rejects_global_options_after_subcommand(global_option: str) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        parse_args(["commit-message", global_option])
 
-    assert invocation == ParsedInvocation(
-        command=CliCommitMessageCommand(skill_id="conventional-commits"),
-        global_options=GlobalOptions(verbose_diagnostics=True),
-        composition_options=CliDeveloperWorkflowCompositionOptions(),
-    )
+    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
 
 
 @pytest.mark.parametrize(

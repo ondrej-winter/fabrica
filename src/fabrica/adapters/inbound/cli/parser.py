@@ -1,4 +1,4 @@
-"""Argparse parser construction for the product CLI adapter."""
+"""Argparse parser construction for the product CLI shell."""
 
 from __future__ import annotations
 
@@ -16,35 +16,40 @@ if TYPE_CHECKING:
 
 
 class StreamArgumentParser(argparse.ArgumentParser):
-    """Argument parser that writes help and usage errors to explicit streams."""
+    """Argument parser that writes help and usage errors to explicit streams.
+
+    ``argparse`` defaults to process-global ``sys.stdout`` and ``sys.stderr``.
+    This subclass lets bootstrap and tests inject streams while preserving
+    argparse's normal help, usage, and exit behavior.
+    """
 
     def bind_streams(self, *, stdout: TextIO | None, stderr: TextIO | None) -> None:
-        """Bind parser diagnostics to explicit streams."""
+        """Bind parser diagnostics to explicit streams or process defaults."""
         self.stdout = stdout if stdout is not None else sys.stdout
         self.stderr = stderr if stderr is not None else sys.stderr
 
     def print_help(self, file: Any = None) -> None:
-        """Print help to explicit stdout by default."""
+        """Print help to the bound stdout when no file is supplied."""
         super().print_help(file or getattr(self, "stdout", sys.stdout))
 
     def print_usage(self, file: Any = None) -> None:
-        """Print usage to explicit stdout by default."""
+        """Print usage to the bound stdout when no file is supplied."""
         super().print_usage(file or getattr(self, "stdout", sys.stdout))
 
     def error(self, message: str) -> Never:
-        """Print argparse usage errors to explicit stderr."""
+        """Print argparse usage errors to the bound stderr."""
         self.print_usage(self.stderr)
         self.exit(2, f"{self.prog}: error: {message}\n")
 
     def exit(self, status: int = 0, message: str | None = None) -> Never:
-        """Exit after routing parser messages to explicit stderr."""
+        """Raise ``SystemExit`` after routing exit messages to bound stderr."""
         if message:
             getattr(self, "stderr", sys.stderr).write(message)
         raise SystemExit(status)
 
 
 def stream_parser_class(*, stdout: TextIO | None, stderr: TextIO | None) -> type[StreamArgumentParser]:
-    """Create a stream-bound subparser class for argparse."""
+    """Create a stream-bound parser class for argparse subcommands."""
 
     class StreamSubparser(StreamArgumentParser):
         def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -60,7 +65,21 @@ def build_parser(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> tuple[argparse.ArgumentParser, ArgparseCommandRegistry]:
-    """Build the product CLI parser and register feature-owned commands."""
+    """Build the product CLI parser and register feature-owned commands.
+
+    Args:
+        command_registrars: Feature-owned callbacks that add subcommands.
+        stdout: Optional stream for help output.
+        stderr: Optional stream for usage and registration diagnostics.
+
+    Returns:
+        The root parser and the registry containing command definitions.
+
+    Raises:
+        RegistrationError: If argparse rejects contributed arguments while
+            building a subcommand parser.
+
+    """
     parser = StreamArgumentParser(
         prog="fabrica",
         description="Run local Fabrica workflows.",

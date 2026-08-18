@@ -1,4 +1,4 @@
-"""Feature-neutral text rendering primitives for CLI adapters."""
+"""Feature-neutral text rendering primitives for CLI output."""
 
 from __future__ import annotations
 
@@ -12,7 +12,11 @@ TRUNCATED_TEXT_MARKER = "...<truncated>"
 
 
 def write_line(stream: TextIO, text: str) -> None:
-    """Write one bounded text line to a CLI stream."""
+    """Write one bounded logical line to a CLI stream.
+
+    Embedded line breaks are escaped and long content is truncated so a single
+    observation or metadata field cannot create unbounded multi-line output.
+    """
     bounded = bound_text(text)
     stream.write(bounded)
     if not bounded.endswith("\n"):
@@ -20,14 +24,14 @@ def write_line(stream: TextIO, text: str) -> None:
 
 
 def write_text(stream: TextIO, text: str) -> None:
-    """Write text to a CLI stream and terminate it with a newline when missing."""
+    """Write already-formatted text and append a trailing newline when missing."""
     stream.write(text)
     if not text.endswith("\n"):
         stream.write("\n")
 
 
 def format_metadata(metadata: Mapping[str, object]) -> str:
-    """Format safe observation metadata as sorted key-value fields."""
+    """Format safe observation metadata as sorted bounded key-value fields."""
     if not metadata:
         return ""
     return bound_text(" ".join(f"{key}={value!s}" for key, value in sorted(metadata.items())))

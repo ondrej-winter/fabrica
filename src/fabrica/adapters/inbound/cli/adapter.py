@@ -1,4 +1,4 @@
-"""Public entry point for the product CLI adapter."""
+"""Public entry point for the feature-neutral product CLI shell."""
 
 from __future__ import annotations
 
@@ -21,11 +21,27 @@ def run_cli(
     stdout: TextIO,
     stderr: TextIO,
 ) -> int:
-    """Parse and execute the product CLI with explicit process streams.
+    """Parse and execute one product CLI invocation.
 
-    Argparse help and usage exits are converted to process exit codes. Command
-    runners execute outside that conversion boundary so runner-owned
-    ``SystemExit`` and unexpected failures remain visible to the caller.
+    Parser construction and command decoding happen inside the argparse exit
+    conversion boundary, so help requests and usage errors return process-style
+    exit codes instead of raising ``SystemExit``. Command runners execute after
+    parsing has succeeded, which keeps runner-owned ``SystemExit`` and
+    unexpected failures visible to the caller.
+
+    Args:
+        argv: Command-line arguments excluding the executable name.
+        command_registrars: Feature-owned callbacks that register subcommands.
+        stdin: Input stream passed to the selected command runner.
+        stdout: Output stream for help text and command output.
+        stderr: Error stream for usage diagnostics.
+
+    Returns:
+        The process exit code for help, usage failures, or the selected command.
+
+    Raises:
+        RegistrationError: If contributed command definitions are invalid.
+
     """
     try:
         invocation = parse_invocation(

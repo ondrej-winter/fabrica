@@ -1,4 +1,4 @@
-"""Runtime helpers for the product CLI adapter."""
+"""Runtime helpers for parsed product CLI invocations."""
 
 from __future__ import annotations
 
@@ -24,7 +24,12 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class Invocation:
-    """Parsed CLI invocation ready to execute."""
+    """Parsed CLI invocation ready to execute.
+
+    The invocation stores shell-level options, the feature command object
+    produced by the selected decoder, and the matching runner. It is built only
+    after argparse parsing and decoder validation have succeeded.
+    """
 
     global_options: GlobalOptions
     command: object
@@ -50,7 +55,11 @@ def parse_invocation(
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
 ) -> Invocation:
-    """Parse command-line arguments into an executable invocation."""
+    """Parse command-line arguments into an executable invocation.
+
+    Global shell fields remain available for ``GlobalOptions`` extraction, but
+    they are removed before the selected feature decoder receives its namespace.
+    """
     parser, command_registry = build_parser(command_registrars, stdout=stdout, stderr=stderr)
     namespace = parser.parse_args(argv)
     registration = command_registry.registration_for(command_name_from_namespace(namespace))
@@ -75,7 +84,13 @@ def decode_command(
     decoder: Callable[[argparse.Namespace], object],
     namespace: argparse.Namespace,
 ) -> object:
-    """Decode feature command arguments while translating user errors."""
+    """Decode feature command arguments while translating user errors.
+
+    Feature decoders raise ``UsageError`` or ``argparse.ArgumentTypeError`` for
+    invalid user input. The shell maps those failures back into argparse's
+    standard usage path and intentionally lets other exceptions propagate as
+    programmer errors.
+    """
     try:
         return decoder(feature_namespace_from(namespace))
     except argparse.ArgumentTypeError as err:
@@ -85,7 +100,7 @@ def decode_command(
 
 
 def feature_namespace_from(namespace: argparse.Namespace) -> argparse.Namespace:
-    """Remove product CLI-owned fields before feature command decoding."""
+    """Remove shell-owned fields before feature command decoding."""
     values = vars(namespace).copy()
     for reserved_dest in RESERVED_DESTS:
         values.pop(reserved_dest, None)

@@ -1,4 +1,9 @@
-"""Argparse destination names owned by the product CLI adapter."""
+"""Argparse destination names reserved by the product CLI shell.
+
+Feature command parsers must not use these destinations. The shell writes them
+while parsing shared state, removes them before feature decoders run, and rejects
+feature-owned arguments that would collide with them.
+"""
 
 COMMAND_DEST = "_fabrica_cli_command"
 GLOBAL_OPTION_DESTS = frozenset(

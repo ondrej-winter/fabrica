@@ -1,4 +1,4 @@
-"""Model evidence output for the product CLI adapter."""
+"""Model evidence output helpers for the product CLI shell."""
 
 from __future__ import annotations
 
@@ -22,7 +22,13 @@ def write_model_evidence_report(
     include_usage: bool,
     include_prices: bool,
 ) -> None:
-    """Write requested model usage and pricing evidence after command output."""
+    """Write requested model usage and pricing evidence after command output.
+
+    Empty requested sections are rendered as unavailable so callers can
+    distinguish “the user asked for evidence but none was collected” from “the
+    user did not request this evidence section.” Observation messages are bounded
+    to one safe CLI output line.
+    """
     if include_usage:
         write_line(stdout, "Usage evidence:")
         if usage_evidence:
@@ -41,7 +47,7 @@ def write_model_evidence_report(
 
 
 def format_usage_evidence(evidence: ModelUsageEvidence) -> str:
-    """Format one model usage evidence record for CLI output."""
+    """Format one model usage evidence record as stable CLI fields."""
     fields = [
         f"provider={evidence.provider}",
         f"status={evidence.status.value}",
@@ -58,7 +64,7 @@ def format_usage_evidence(evidence: ModelUsageEvidence) -> str:
 
 
 def format_cost_evidence(evidence: ModelCostEvidence) -> str:
-    """Format one model cost evidence record for CLI output."""
+    """Format one model cost evidence record as stable CLI fields."""
     fields = [
         f"status={evidence.pricing_status.value}",
         f"source={evidence.source.value}",
@@ -72,7 +78,7 @@ def format_cost_evidence(evidence: ModelCostEvidence) -> str:
 
 
 def format_token_fields(evidence: ModelUsageEvidence) -> list[str]:
-    """Format present token evidence fields."""
+    """Format only token evidence fields that were collected."""
     return present_fields(
         evidence.tokens,
         ("input_tokens", "output_tokens", "total_tokens", "cached_input_tokens", "reasoning_tokens"),
@@ -80,12 +86,12 @@ def format_token_fields(evidence: ModelUsageEvidence) -> list[str]:
 
 
 def present_fields(value: object, names: tuple[str, ...]) -> list[str]:
-    """Format object attributes that have present values."""
+    """Format named object attributes whose values are not ``None``."""
     return [f"{name}={field_value}" for name in names if (field_value := getattr(value, name)) is not None]
 
 
 def format_observation_messages(observations: tuple[ModelUsageObservation, ...]) -> list[str]:
-    """Format model evidence observation messages safely."""
+    """Format bounded model evidence observation messages for CLI output."""
     return [f"observation={bound_text(observation.message)!r}" for observation in observations]
 
 
