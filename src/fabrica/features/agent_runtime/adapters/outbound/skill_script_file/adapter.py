@@ -8,6 +8,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     SelectedSkillScript,
     SkillScriptApprovalBinding,
     SkillScriptMetadata,
+    SkillScriptSnapshot,
     skill_script_type_for_suffix,
 )
 from fabrica.features.agent_runtime.application.ports import SkillScriptMetadataLoadError
@@ -46,6 +47,15 @@ class SkillScriptFileMetadataLoader:
 
     def load_metadata(self, selection: SelectedSkillScript) -> SkillScriptMetadata:
         """Load read-only metadata for an explicitly selected skill script."""
+        snapshot = self.load_snapshot(selection)
+        return SkillScriptMetadata(
+            selection=snapshot.selection,
+            binding=snapshot.binding,
+            metadata=snapshot.metadata,
+        )
+
+    def load_snapshot(self, selection: SelectedSkillScript) -> SkillScriptSnapshot:
+        """Load immutable bytes for an explicitly selected skill script."""
         skill_relative_path = _relative_path_from_id(selection.skill_id)
         script_relative_path = _relative_path_from_id(selection.script_id)
         script_file = self._find_selected_file(selection, skill_relative_path, script_relative_path)
@@ -78,9 +88,10 @@ class SkillScriptFileMetadataLoader:
             byte_size=byte_size,
             content_digest=f"sha256:{sha256(script_bytes).hexdigest()}",
         )
-        return SkillScriptMetadata(
+        return SkillScriptSnapshot(
             selection=selection,
             binding=binding,
+            content=script_bytes,
             metadata={"file_name": script_file.name},
         )
 

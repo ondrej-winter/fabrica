@@ -22,7 +22,8 @@ belongs in `docs/specs/model-usage-and-cost-evidence.md`.
   feature slices.
 - Tooling: `uv` for environment and command execution, `ruff` for
   formatting/linting, `ty` for type checking, and `pytest` for tests.
-- Existing runtime code lives under `src/fabrica/features/agent_runtime/`.
+- Existing runtime code lives under `src/fabrica/features/agent_runtime/`,
+  including policy-controlled Agent Skill context loading and script execution.
 - Codex transport code lives under `src/fabrica/features/codex_transport/` and
   is the first provider support path for the runtime.
 - Composition and dependency wiring live under `src/fabrica/bootstrap/`.
@@ -40,7 +41,8 @@ belongs in `docs/specs/model-usage-and-cost-evidence.md`.
 - Default local tests and quality gates must not call live model backends or
   require real subscription credentials.
 - Agent Skills support is useful, but it should remain separate from transport
-  viability and runtime composition concerns.
+  viability and runtime composition concerns. Local script execution must remain
+  policy-controlled and bound to immutable approved script bytes.
 
 ## Desired behavior
 
@@ -54,6 +56,9 @@ Fabrica should expose a local Python agent runtime that can:
   transport provides them;
 - expose selected tools explicitly rather than granting ambient access to local
   system capabilities;
+- execute selected Agent Skill scripts only after policy approval, then run a
+  private temporary snapshot of the approved bytes instead of reopening the
+  selected script path;
 - keep all filesystem, process, network, credential, and framework I/O inside
   adapters or composition-root code;
 - keep default automated tests deterministic and offline.
@@ -69,8 +74,10 @@ Fabrica should expose a local Python agent runtime that can:
 4. Add model-callable tools through explicit, bounded capabilities such as the
    read-only git context tools in
    `docs/specs/git-workflow-tools.md`.
-5. Explore Agent Skills support only after runtime and transport boundaries are
-   stable enough to keep script execution explicit and policy-controlled.
+5. Keep Agent Skills script support explicit and policy-controlled: load
+   immutable script bytes with their computed approval binding, compare that
+   binding to the approved metadata, and execute only a private temporary
+   snapshot of the matched bytes.
 
 ## Explicitly out of scope for the runtime baseline
 
@@ -90,6 +97,9 @@ Fabrica should expose a local Python agent runtime that can:
 - Runtime application ports and DTOs: under the owning slice's
   `application/ports/` and `application/dtos/` packages.
 - Runtime adapters: under the owning slice's `adapters/` package.
+- Runtime script execution ports: `SkillScriptMetadataLoader`,
+  `SkillScriptSnapshotLoader`, and `SkillScriptExecutor` under
+  `src/fabrica/features/agent_runtime/application/ports/`.
 - Composition and optional CLI wiring: under `src/fabrica/bootstrap/` or a
   driving adapter owned by the relevant feature slice.
 - Unit tests: under `tests/unit/features/agent_runtime/`.
@@ -106,6 +116,10 @@ Fabrica should expose a local Python agent runtime that can:
   details out of the runtime core.
 - Keep environment, filesystem, credential, process, and network I/O inside
   adapters or composition-root code.
+- Keep script approval metadata and executed bytes bound together: snapshot
+  loading returns immutable content plus the binding computed from that content,
+  and subprocess execution targets a private temporary copy only after the binding
+  matches the approved decision.
 - Use explicit type annotations on public ports, DTOs, services, and adapter
   APIs.
 - Use layer-appropriate exceptions and preserve context with exception chaining.
@@ -118,6 +132,9 @@ Fabrica should expose a local Python agent runtime that can:
 - Unit-test runtime orchestration against fake model transports and fake tools.
 - Unit-test DTO mappings and result normalization without provider credentials.
 - Unit-test tool selection and tool-result loops with deterministic test doubles.
+- Unit-test Agent Skill script policy and execution boundaries with deterministic
+  filesystem/subprocess fakes, including regression coverage that stale approved
+  metadata cannot execute different bytes.
 - Keep provider adapter tests in the provider-owning feature slice.
 - Keep live backend checks opt-in and isolated from the default `uv run pytest`
   suite.
@@ -146,8 +163,8 @@ explicitly opt-in. It must not be part of the default local or CI test suite.
 - The first provider support path can be Codex without making the runtime Codex
   specific.
 - Runtime tests can run offline and deterministically.
-- Future tool, PydanticAI, and Agent Skills work has clear boundaries for where
-  code and tests belong.
+- Future tool, PydanticAI, and Agent Skills hardening work has clear boundaries
+  for where code and tests belong.
 
 ## Open questions
 
@@ -158,5 +175,5 @@ explicitly opt-in. It must not be part of the default local or CI test suite.
   expanded?
 - How much PydanticAI integration is useful before the runtime's own ports and
   DTOs become too thin to justify?
-- What approval and sandbox policy is sufficient before Agent Skill scripts are
-  exposed through the runtime?
+- What additional approval, isolation, and sandbox policy is sufficient before
+  Agent Skill scripts are exposed beyond constrained local subprocess execution?

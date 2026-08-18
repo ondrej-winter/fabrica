@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
 
@@ -16,11 +17,25 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptExecutionCommand,
     SkillScriptExecutionStatus,
     SkillScriptSandboxPolicy,
+    SkillScriptSnapshot,
     SkillScriptType,
 )
 
 EXPECTED_NON_ZERO_EXIT_CODE = 7
 SHORT_OUTPUT_BOUND = 3
+
+
+@dataclass
+class MutatingSkillScriptSnapshotLoader:
+    snapshot: SkillScriptSnapshot
+    replacement_file: Path
+    replacement_content: str
+    calls: list[SelectedSkillScript] = field(default_factory=list)
+
+    def load_snapshot(self, selection: SelectedSkillScript) -> SkillScriptSnapshot:
+        self.calls.append(selection)
+        self.replacement_file.write_text(self.replacement_content, encoding="utf-8")
+        return self.snapshot
 
 
 def test_execute_runs_approved_python_script_and_captures_stdout(tmp_path: Path) -> None:
@@ -75,6 +90,29 @@ def test_execute_refuses_mismatched_binding_without_running_script(tmp_path: Pat
     assert result.status is SkillScriptExecutionStatus.ADAPTER_ERROR
     assert result.observations[0].metadata["category"] == "binding_mismatch"
     assert not (working_directory / "created.txt").exists()
+
+
+def test_execute_runs_verified_snapshot_bytes_when_selected_path_changes(tmp_path: Path) -> None:
+    script = _write_script(tmp_path, "python-testing", "scripts/check.py", "print('path-replacement')\n")
+    selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")
+    approved_content = b"print('approved-snapshot')\n"
+    binding = _binding_for_content(selection, script.suffix, SkillScriptType.PYTHON, approved_content)
+    snapshot = SkillScriptSnapshot(selection=selection, binding=binding, content=approved_content)
+    snapshot_loader = MutatingSkillScriptSnapshotLoader(
+        snapshot=snapshot,
+        replacement_file=script,
+        replacement_content="print('mutated-path')\n",
+    )
+
+    result = _executor_with_snapshot_loader(snapshot_loader).execute(
+        SkillScriptExecutionCommand(selection=selection),
+        binding,
+    )
+
+    assert result.status is SkillScriptExecutionStatus.SUCCESS
+    assert result.stdout.text == "approved-snapshot\n"
+    assert script.read_text(encoding="utf-8") == "print('mutated-path')\n"
+    assert snapshot_loader.calls == [selection]
 
 
 def test_execute_maps_non_zero_exit_to_execution_failed(tmp_path: Path) -> None:
@@ -234,12 +272,18 @@ def _executor(
     working_directory: Path | None = None,
 ) -> SkillScriptSubprocessExecutor:
     return SkillScriptSubprocessExecutor(
-        metadata_loader=SkillScriptFileMetadataLoader(skill_roots=(skill_root,)),
-        skill_roots=(skill_root,),
+        snapshot_loader=SkillScriptFileMetadataLoader(skill_roots=(skill_root,)),
         settings=SkillScriptSubprocessExecutionSettings(
             shell_interpreter=shell_interpreter,
             working_directory=working_directory,
         ),
+    )
+
+
+def _executor_with_snapshot_loader(snapshot_loader: MutatingSkillScriptSnapshotLoader) -> SkillScriptSubprocessExecutor:
+    return SkillScriptSubprocessExecutor(
+        snapshot_loader=snapshot_loader,
+        settings=SkillScriptSubprocessExecutionSettings(),
     )
 
 
@@ -251,11 +295,22 @@ def _binding(
     content_digest: str | None = None,
 ) -> SkillScriptApprovalBinding:
     script_bytes = script_file.read_bytes()
+    return _binding_for_content(selection, script_file.suffix, script_type, script_bytes, content_digest=content_digest)
+
+
+def _binding_for_content(
+    selection: SelectedSkillScript,
+    suffix: str,
+    script_type: SkillScriptType,
+    script_bytes: bytes,
+    *,
+    content_digest: str | None = None,
+) -> SkillScriptApprovalBinding:
     return SkillScriptApprovalBinding(
         skill_id=selection.skill_id,
         script_id=selection.script_id,
         script_type=script_type,
-        suffix=script_file.suffix,
+        suffix=suffix,
         byte_size=len(script_bytes),
         content_digest=content_digest or f"sha256:{sha256(script_bytes).hexdigest()}",
     )

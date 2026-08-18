@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
+from hashlib import sha256
 from types import MappingProxyType
 
 from fabrica.features.agent_runtime.application.dtos.runtime import SafeRuntimeMetadataValue
@@ -113,6 +114,30 @@ class SkillScriptMetadata:
         if self.selection.skill_id != self.binding.skill_id or self.selection.script_id != self.binding.script_id:
             msg = "script metadata binding must match the selected script"
             raise ValueError(msg)
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+
+@dataclass(frozen=True, slots=True)
+class SkillScriptSnapshot:
+    """Immutable script bytes bound to the metadata used for approval."""
+
+    selection: SelectedSkillScript
+    binding: SkillScriptApprovalBinding
+    content: bytes
+    metadata: Mapping[str, SafeRuntimeMetadataValue] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.selection.skill_id != self.binding.skill_id or self.selection.script_id != self.binding.script_id:
+            msg = "script snapshot binding must match the selected script"
+            raise ValueError(msg)
+        content = bytes(self.content)
+        if len(content) != self.binding.byte_size:
+            msg = "script snapshot content length must match its approval binding"
+            raise ValueError(msg)
+        if f"sha256:{sha256(content).hexdigest()}" != self.binding.content_digest:
+            msg = "script snapshot content digest must match its approval binding"
+            raise ValueError(msg)
+        object.__setattr__(self, "content", content)
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
 

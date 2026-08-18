@@ -11,6 +11,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptExecutionCommand,
     SkillScriptExecutionResult,
     SkillScriptMetadata,
+    SkillScriptSnapshot,
 )
 
 
@@ -65,6 +66,14 @@ class SkillScriptMetadataLoader(Protocol):
 
     def load_metadata(self, selection: SelectedSkillScript) -> SkillScriptMetadata:
         """Load read-only metadata for an explicitly selected skill script."""
+        ...
+
+
+class SkillScriptSnapshotLoader(Protocol):
+    """Outbound port for loading approved script bytes from one bounded read."""
+
+    def load_snapshot(self, selection: SelectedSkillScript) -> SkillScriptSnapshot:
+        """Load immutable script bytes and the approval binding computed from them."""
         ...
 
 

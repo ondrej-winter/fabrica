@@ -1,6 +1,7 @@
 """Tests for selected Agent Skills script policy port contracts."""
 
 from dataclasses import dataclass, field
+from hashlib import sha256
 
 import pytest
 
@@ -14,6 +15,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptExecutionResult,
     SkillScriptExecutionStatus,
     SkillScriptMetadata,
+    SkillScriptSnapshot,
     SkillScriptType,
 )
 from fabrica.features.agent_runtime.application.ports import (
@@ -22,6 +24,7 @@ from fabrica.features.agent_runtime.application.ports import (
     SkillScriptExecutor,
     SkillScriptMetadataLoader,
     SkillScriptMetadataLoadError,
+    SkillScriptSnapshotLoader,
 )
 
 
@@ -54,6 +57,26 @@ class FakeSkillScriptMetadataLoader:
                 skill_id=selection.skill_id,
                 script_id=selection.script_id,
                 category="missing_script_metadata",
+                metadata={"script_id": selection.script_id},
+            ) from err
+
+
+@dataclass
+class FakeSkillScriptSnapshotLoader:
+    snapshots_by_selection: dict[tuple[str, str], SkillScriptSnapshot]
+    calls: list[SelectedSkillScript] = field(default_factory=list)
+
+    def load_snapshot(self, selection: SelectedSkillScript) -> SkillScriptSnapshot:
+        self.calls.append(selection)
+        try:
+            return self.snapshots_by_selection[(selection.skill_id, selection.script_id)]
+        except KeyError as err:
+            msg = "selected skill script snapshot is unavailable"
+            raise SkillScriptMetadataLoadError(
+                msg,
+                skill_id=selection.skill_id,
+                script_id=selection.script_id,
+                category="missing_script_snapshot",
                 metadata={"script_id": selection.script_id},
             ) from err
 
@@ -137,6 +160,25 @@ def test_script_metadata_loader_failure_is_application_safe() -> None:
     assert exc_info.value.metadata == {"script_id": "scripts/missing.py"}
 
 
+def test_script_snapshot_loader_port_supports_selected_script_snapshot_fakes() -> None:
+    selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")
+    content = b"print('ok')\n"
+    binding = _binding(byte_size=len(content), content_digest=f"sha256:{sha256(content).hexdigest()}")
+    expected = SkillScriptSnapshot(
+        selection=selection,
+        binding=binding,
+        content=content,
+        metadata={"file_name": "check.py"},
+    )
+    loader: SkillScriptSnapshotLoader = FakeSkillScriptSnapshotLoader(
+        snapshots_by_selection={("python-testing", "scripts/check.py"): expected},
+    )
+
+    snapshot = loader.load_snapshot(selection)
+
+    assert snapshot == expected
+
+
 def test_script_executor_port_supports_approved_execution_fakes() -> None:
     selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")
     command = SkillScriptExecutionCommand(selection=selection)
@@ -172,12 +214,16 @@ def test_script_executor_failure_is_application_safe() -> None:
     assert exc_info.value.metadata == {"script_id": "scripts/check.py"}
 
 
-def _binding() -> SkillScriptApprovalBinding:
+def _binding(
+    *,
+    byte_size: int = 128,
+    content_digest: str = "sha256:abc123",
+) -> SkillScriptApprovalBinding:
     return SkillScriptApprovalBinding(
         skill_id="python-testing",
         script_id="scripts/check.py",
         script_type=SkillScriptType.PYTHON,
         suffix=".py",
-        byte_size=128,
-        content_digest="sha256:abc123",
+        byte_size=byte_size,
+        content_digest=content_digest,
     )

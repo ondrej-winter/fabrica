@@ -19,21 +19,19 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptExecutionOutput,
     SkillScriptExecutionResult,
     SkillScriptExecutionStatus,
+    SkillScriptSnapshot,
     SkillScriptType,
 )
-from fabrica.features.agent_runtime.application.ports import SkillScriptExecutionError, SkillScriptMetadataLoader
+from fabrica.features.agent_runtime.application.ports import SkillScriptExecutionError, SkillScriptSnapshotLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
 
-_PATH_OUTSIDE_ROOT_MESSAGE = "selected skill script path is outside the configured skill root"
-_MISSING_SCRIPT_MESSAGE = "selected skill script was not found"
-_AMBIGUOUS_SCRIPT_MESSAGE = "selected skill script matched more than one configured skill root"
-_INVALID_SCRIPT_FILE_MESSAGE = "selected skill script path is not a readable file"
 _BINDING_MISMATCH_MESSAGE = "approved script binding does not match current script metadata"
 _UNSUPPORTED_SCRIPT_TYPE_MESSAGE = "selected script type is not supported for subprocess execution"
 _MISSING_INTERPRETER_MESSAGE = "selected script interpreter is unavailable"
 _SUBPROCESS_OS_ERROR_MESSAGE = "selected script subprocess execution failed"
+_SNAPSHOT_FILE_NAME = "selected-skill-script"
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,13 +57,11 @@ class SkillScriptSubprocessExecutor:
     def __init__(
         self,
         *,
-        metadata_loader: SkillScriptMetadataLoader,
-        skill_roots: tuple[Path, ...],
+        snapshot_loader: SkillScriptSnapshotLoader,
         settings: SkillScriptSubprocessExecutionSettings | None = None,
     ) -> None:
         execution_settings = settings or SkillScriptSubprocessExecutionSettings()
-        self._skill_roots = tuple(skill_roots)
-        self._metadata_loader = metadata_loader
+        self._snapshot_loader = snapshot_loader
         self._python_interpreter = str(execution_settings.python_interpreter or sys.executable)
         self._shell_interpreter = str(execution_settings.shell_interpreter)
         self._working_directory = execution_settings.working_directory
@@ -77,8 +73,8 @@ class SkillScriptSubprocessExecutor:
         approved_binding: SkillScriptApprovalBinding,
     ) -> SkillScriptExecutionResult:
         """Execute a selected script when the current metadata matches approval."""
-        metadata = self._metadata_loader.load_metadata(command.selection)
-        if metadata.binding != approved_binding:
+        snapshot = self._snapshot_loader.load_snapshot(command.selection)
+        if snapshot.binding != approved_binding:
             return self._result(
                 command,
                 approved_binding,
@@ -87,9 +83,8 @@ class SkillScriptSubprocessExecutor:
                 category="binding_mismatch",
             )
 
-        script_file = self._find_selected_file(command)
-        argv = self._argv_for_binding(metadata.binding, script_file)
-        if argv is None:
+        interpreter = self._interpreter_for_binding(snapshot.binding)
+        if interpreter is None:
             return self._result(
                 command,
                 approved_binding,
@@ -97,7 +92,7 @@ class SkillScriptSubprocessExecutor:
                 _UNSUPPORTED_SCRIPT_TYPE_MESSAGE,
                 category="unsupported_script_type",
             )
-        if not Path(argv[0]).is_file():
+        if not Path(interpreter).is_file():
             return self._result(
                 command,
                 approved_binding,
@@ -107,11 +102,14 @@ class SkillScriptSubprocessExecutor:
             )
 
         started = monotonic()
-        with self._execution_working_directory() as working_directory:
+        with (
+            self._execution_working_directory() as working_directory,
+            self._snapshot_script_file(snapshot) as script_file,
+        ):
             try:
-                # Intentional constrained execution: selected script path, explicit interpreter argv, no shell.
+                # Intentional constrained execution: verified snapshot bytes, explicit interpreter argv, no shell.
                 completed = subprocess.run(  # noqa: S603
-                    argv,
+                    [interpreter, str(script_file)],
                     check=False,
                     capture_output=True,
                     cwd=working_directory,
@@ -164,33 +162,20 @@ class SkillScriptSubprocessExecutor:
             duration_seconds=duration,
         )
 
-    def _find_selected_file(self, command: SkillScriptExecutionCommand) -> Path:
-        skill_relative_path = _relative_path_from_id(command.selection.skill_id)
-        script_relative_path = _relative_path_from_id(command.selection.script_id)
-        matches: list[Path] = []
-        for skill_root in self._skill_roots:
-            root = skill_root.resolve(strict=False)
-            skill_directory = (root / skill_relative_path).resolve(strict=False)
-            candidate = (skill_directory / script_relative_path).resolve(strict=False)
-            if not skill_directory.is_relative_to(root) or not candidate.is_relative_to(skill_directory):
-                raise self._execution_error(command, _PATH_OUTSIDE_ROOT_MESSAGE, category="invalid_script_path")
-            if candidate.exists():
-                if not candidate.is_file():
-                    raise self._execution_error(command, _INVALID_SCRIPT_FILE_MESSAGE, category="invalid_script_file")
-                matches.append(candidate)
-
-        if len(matches) > 1:
-            raise self._execution_error(command, _AMBIGUOUS_SCRIPT_MESSAGE, category="ambiguous_script")
-        if matches:
-            return matches[0]
-        raise self._execution_error(command, _MISSING_SCRIPT_MESSAGE, category="missing_script")
-
-    def _argv_for_binding(self, binding: SkillScriptApprovalBinding, script_file: Path) -> list[str] | None:
+    def _interpreter_for_binding(self, binding: SkillScriptApprovalBinding) -> str | None:
         if binding.script_type is SkillScriptType.PYTHON:
-            return [self._python_interpreter, str(script_file)]
+            return self._python_interpreter
         if binding.script_type is SkillScriptType.SHELL:
-            return [self._shell_interpreter, str(script_file)]
+            return self._shell_interpreter
         return None
+
+    @contextmanager
+    def _snapshot_script_file(self, snapshot: SkillScriptSnapshot) -> Iterator[Path]:
+        with tempfile.TemporaryDirectory(prefix="fabrica-skill-script-snapshot-") as directory:
+            script_file = Path(directory) / f"{_SNAPSHOT_FILE_NAME}{snapshot.binding.suffix}"
+            script_file.write_bytes(snapshot.content)
+            script_file.chmod(0o600)
+            yield script_file
 
     @contextmanager
     def _execution_working_directory(self) -> Iterator[Path]:
@@ -268,17 +253,3 @@ def _safe_text(value: str | bytes | None) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     return value
-
-
-def _relative_path_from_id(identifier: str) -> Path:
-    relative_path = Path(identifier)
-    if relative_path.is_absolute():
-        msg = "selected skill script identifiers must be relative"
-        raise SkillScriptExecutionError(
-            msg,
-            skill_id=identifier,
-            script_id=identifier,
-            category="invalid_script_path",
-            metadata={"diagnostic_mode": "safe"},
-        )
-    return relative_path

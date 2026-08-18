@@ -32,6 +32,7 @@ from fabrica.features.agent_runtime.application.dtos.skill_execution import (
     SkillScriptPolicyObservation,
     SkillScriptPolicyStatus,
     SkillScriptSandboxPolicy,
+    SkillScriptSnapshot,
     SkillScriptType,
     skill_script_type_for_suffix,
 )
@@ -160,6 +161,7 @@ __all__ = [
     "SkillScriptPolicyObservation",
     "SkillScriptPolicyStatus",
     "SkillScriptSandboxPolicy",
+    "SkillScriptSnapshot",
     "SkillScriptType",
     "SkillToolExposureStatus",
     "SkillToolPreparationCommand",

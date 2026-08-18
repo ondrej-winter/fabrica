@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from fabrica.features.agent_runtime.adapters.outbound.skill_script_file import SkillScriptFileMetadataLoader
-from fabrica.features.agent_runtime.application.dtos import SelectedSkillScript, SkillScriptType
+from fabrica.features.agent_runtime.application.dtos import SelectedSkillScript, SkillScriptSnapshot, SkillScriptType
 from fabrica.features.agent_runtime.application.ports import SkillScriptMetadataLoadError
 
 SYNTHETIC_SECRET = "synthetic-secret-token"  # noqa: S105 - synthetic test value, not a secret.
@@ -40,6 +40,31 @@ def test_load_metadata_returns_shell_script_type_for_sh_suffix(tmp_path: Path) -
 
     assert metadata.binding.script_type is SkillScriptType.SHELL
     assert metadata.binding.suffix == ".sh"
+
+
+def test_load_snapshot_returns_script_bytes_and_matching_binding_from_one_read(tmp_path: Path) -> None:
+    script_bytes = b"print('snapshot')\n"
+    script_file = _write_script(tmp_path, "python-testing", "scripts/check.py", script_bytes)
+    selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")
+
+    snapshot = SkillScriptFileMetadataLoader(skill_roots=(tmp_path,)).load_snapshot(selection)
+
+    assert isinstance(snapshot, SkillScriptSnapshot)
+    assert snapshot.selection == selection
+    assert snapshot.content == script_bytes
+    assert snapshot.binding.byte_size == len(script_bytes)
+    assert snapshot.binding.content_digest == f"sha256:{sha256(script_bytes).hexdigest()}"
+    assert snapshot.metadata == {"file_name": script_file.name}
+
+
+def test_load_snapshot_content_is_not_affected_by_later_script_replacement(tmp_path: Path) -> None:
+    script_file = _write_script(tmp_path, "python-testing", "scripts/check.py", b"print('approved')\n")
+    selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")
+
+    snapshot = SkillScriptFileMetadataLoader(skill_roots=(tmp_path,)).load_snapshot(selection)
+    script_file.write_bytes(b"print('replacement')\n")
+
+    assert snapshot.content == b"print('approved')\n"
 
 
 def test_load_metadata_searches_configured_skill_roots_and_rejects_ambiguous_matches(tmp_path: Path) -> None:

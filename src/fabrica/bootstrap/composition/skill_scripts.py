@@ -110,12 +110,11 @@ def create_skill_script_executor(
         ),
     )
     executor = SkillScriptSubprocessExecutor(
-        metadata_loader=SkillScriptFileMetadataLoader(
+        snapshot_loader=SkillScriptFileMetadataLoader(
             skill_roots=skill_roots,
             max_script_bytes=execution_options.max_script_bytes or execution_options.sandbox_policy.max_script_bytes,
             verbose_diagnostics=execution_options.verbose_diagnostics,
         ),
-        skill_roots=skill_roots,
         settings=SkillScriptSubprocessExecutionSettings(
             python_interpreter=execution_options.python_interpreter,
             shell_interpreter=execution_options.shell_interpreter,

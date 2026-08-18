@@ -38,6 +38,27 @@ def test_bound_text_escapes_line_breaks() -> None:
     assert bound_text("hello\r\nworld") == r"hello\r\nworld"
 
 
+def test_bound_text_escapes_terminal_control_sequences() -> None:
+    assert bound_text("plain\x1b[31mred\x1b[0m\x07") == r"plain\x1b[31mred\x1b[0m\x07"
+
+
+def test_bound_text_escapes_c1_controls_and_del() -> None:
+    assert bound_text("status\x85next\x9b31m\x7f") == r"status\x85next\x9b31m\x7f"
+
+
+def test_bound_text_preserves_safe_printable_text() -> None:
+    assert bound_text("safe text: provider=codex model=gpt-5") == "safe text: provider=codex model=gpt-5"
+
+
+def test_bound_text_escapes_before_truncating_control_sequences() -> None:
+    safe_prefix = "x" * (MAX_OUTPUT_LINE_CHARS - len(TRUNCATED_TEXT_MARKER))
+
+    bounded = bound_text(f"{safe_prefix}abcdefghijk\x1b")
+
+    assert len(bounded) == MAX_OUTPUT_LINE_CHARS
+    assert bounded == f"{safe_prefix}{TRUNCATED_TEXT_MARKER}"
+
+
 def test_write_line_always_writes_one_logical_line() -> None:
     stdout = StringIO()
 
@@ -56,12 +77,36 @@ def test_format_metadata_sorts_and_bounds_values() -> None:
     assert formatted.endswith(TRUNCATED_TEXT_MARKER)
 
 
+def test_format_metadata_returns_empty_text_for_empty_metadata() -> None:
+    assert format_metadata({}) == ""
+
+
+def test_format_metadata_escapes_untrusted_terminal_controls() -> None:
+    assert format_metadata({"message": "bad\x1b[2J\x07"}) == r"message=bad\x1b[2J\x07"
+
+
 def test_write_text_terminates_output_when_missing_newline() -> None:
     stdout = StringIO()
 
     write_text(stdout, "hello")
 
     assert stdout.getvalue() == "hello\n"
+
+
+def test_write_text_preserves_existing_trailing_newline() -> None:
+    stdout = StringIO()
+
+    write_text(stdout, "hello\n")
+
+    assert stdout.getvalue() == "hello\n"
+
+
+def test_write_text_preserves_raw_terminal_controls_for_trusted_output() -> None:
+    stdout = StringIO()
+
+    write_text(stdout, "raw\x1b[31mred\x1b[0m")
+
+    assert stdout.getvalue() == "raw\x1b[31mred\x1b[0m\n"
 
 
 def test_write_model_evidence_report_formats_requested_usage_and_pricing() -> None:
@@ -118,3 +163,27 @@ def test_write_model_evidence_report_marks_requested_empty_sections_unavailable(
     )
 
     assert stdout.getvalue() == "Usage evidence:\n- unavailable\nPricing evidence:\n- unavailable\n"
+
+
+def test_write_model_evidence_report_escapes_observation_terminal_controls() -> None:
+    stdout = StringIO()
+
+    write_model_evidence_report(
+        usage_evidence=(
+            ModelUsageEvidence(
+                provider="codex",
+                status=ModelUsageCollectionStatus.COLLECTED,
+                source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+                confidence=ModelUsageEvidenceConfidence.OBSERVED,
+                observations=(ModelUsageObservation("bad\x1b[2J\x07"),),
+            ),
+        ),
+        cost_evidence=(),
+        stdout=stdout,
+        include_usage=True,
+        include_prices=False,
+    )
+
+    assert r"observation='bad\\x1b[2J\\x07'" in stdout.getvalue()
+    assert "\x1b" not in stdout.getvalue()
+    assert "\x07" not in stdout.getvalue()

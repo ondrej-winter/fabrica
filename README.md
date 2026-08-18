@@ -167,8 +167,8 @@ uv run fabrica commit \
   --skill-root .agents/skills
 ```
 
-Fabrica-wide reporting and diagnostic flags may be passed before or after the
-subcommand and apply to commands that produce model runtime evidence:
+Fabrica-wide reporting and diagnostic flags must be passed before the
+subcommand. They apply to commands that produce model runtime evidence:
 
 ```bash
 uv run fabrica --print-usage --print-prices --verbose-diagnostics commit-message \
@@ -176,11 +176,11 @@ uv run fabrica --print-usage --print-prices --verbose-diagnostics commit-message
   --skill-root .agents/skills
 ```
 
-For the interactive commit workflow, the same global reporting flags are accepted
-in either position:
+For the interactive commit workflow, place the same global reporting flags before
+the `commit` subcommand:
 
 ```bash
-uv run fabrica commit --print-usage --print-prices --verbose-diagnostics \
+uv run fabrica --print-usage --print-prices --verbose-diagnostics commit \
   --skill conventional-commits \
   --skill-root .agents/skills
 ```
@@ -587,8 +587,11 @@ result = executor.execute(
 Execution always evaluates policy first. The selected script executes only when
 metadata inspection succeeds and the approval lookup returns an approved decision
 bound to the current script metadata: skill ID, relative script ID, suffix/type,
-byte size, and content digest. The default composition remains deny-by-default,
-so callers must supply approval state explicitly for execution to proceed.
+byte size, and content digest. The subprocess adapter then loads a private
+snapshot of the selected script bytes and executes that snapshot only if its
+binding still matches the approved metadata, so a later path replacement cannot
+change the executed bytes. The default composition remains deny-by-default, so
+callers must supply approval state explicitly for execution to proceed.
 
 The local subprocess adapter enforces conservative process-level constraints for
 the spike:
@@ -599,6 +602,9 @@ the spike:
   current interpreter
 - runs shell scripts through an explicit POSIX shell interpreter such as
   `/bin/sh`, never through shell expansion fallback
+- executes a private temporary snapshot of the bytes whose digest matches the
+  approved binding, rather than reopening the selected script path as the
+  interpreter target
 - does not inherit the caller's environment by default
 - uses an execution-specific temporary working directory by default
 - may use an explicitly supplied working directory for tests or controlled local
@@ -877,25 +883,27 @@ those feature CLI adapters with default concrete dependencies only when the
 selected command runs.
 
 Feature-owned CLI registrations contribute commands through the shared
-keyword-only `CliCommandSpec` contract. A registration configures only its
-subcommand parser, decodes the resulting `argparse.Namespace` into an
-adapter-local immutable command value, and handles expected user input failures
-with `CliUsageError`; unexpected decoder failures remain programmer errors.
+keyword-only `Command` contract. A registration configures only its subcommand
+parser, decodes the resulting `argparse.Namespace` into an adapter-local
+immutable command value, and handles expected user input failures with
+`UsageError`; unexpected decoder failures remain programmer errors. Feature
+parser configuration must not mutate shell-owned destinations through either
+argument actions or `ArgumentParser.set_defaults()`.
 
 ```python
 from argparse import ArgumentParser, Namespace
 
-from fabrica.adapters.inbound.cli import CliCommandRegistry, CliCommandSpec, CliExecutionContext, CliUsageError
+from fabrica.adapters.inbound.cli import Command, CommandContext, CommandRegistry, UsageError
 
 
-def register_example_commands(commands: CliCommandRegistry) -> None:
+def register_example_commands(commands: CommandRegistry) -> None:
     commands.register(
-        CliCommandSpec(
+        Command(
             name="example",
             summary="run one example workflow",
-            configure_parser=_configure_parser,
+            configure=_configure_parser,
             decode=_decode_command,
-            handler=_handle_command,
+            run=_handle_command,
         ),
     )
 
@@ -906,11 +914,11 @@ def _configure_parser(parser: ArgumentParser) -> None:
 
 def _decode_command(namespace: Namespace) -> str:
     if not namespace.name.strip():
-        raise CliUsageError("name must not be blank")
+        raise UsageError("name must not be blank")
     return namespace.name
 
 
-def _handle_command(name: str, context: CliExecutionContext) -> int:
+def _handle_command(name: str, context: CommandContext) -> int:
     context.stdout.write(f"hello {name}\n")
     return 0
 ```

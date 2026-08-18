@@ -19,6 +19,7 @@ from fabrica.features.agent_runtime.application.ports.skill_execution import (
     SkillScriptExecutor,
     SkillScriptMetadataLoader,
     SkillScriptMetadataLoadError,
+    SkillScriptSnapshotLoader,
 )
 from fabrica.features.agent_runtime.application.ports.skill_tools import (
     SkillToolPreparationError,
@@ -47,6 +48,7 @@ __all__ = [
     "SkillScriptMetadataLoader",
     "SkillScriptPolicyEvaluator",
     "SkillScriptRunner",
+    "SkillScriptSnapshotLoader",
     "SkillToolPreparationError",
     "SkillToolPreparer",
     "ToolAwareAgentModel",

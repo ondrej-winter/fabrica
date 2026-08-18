@@ -1,6 +1,7 @@
 """Tests for selected Agent Skills script policy DTO contracts."""
 
 from dataclasses import FrozenInstanceError
+from hashlib import sha256
 from typing import cast
 
 import pytest
@@ -28,6 +29,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillScriptPolicyObservation,
     SkillScriptPolicyStatus,
     SkillScriptSandboxPolicy,
+    SkillScriptSnapshot,
     SkillScriptType,
     skill_script_type_for_suffix,
 )
@@ -130,6 +132,43 @@ def test_script_metadata_requires_binding_to_match_selection() -> None:
         cast("dict[str, object]", loaded.metadata)["file_name"] = "mutated.py"
     with pytest.raises(ValueError, match="binding must match"):
         SkillScriptMetadata(selection=selection, binding=_binding(script_id="scripts/other.py"))
+
+
+def test_script_snapshot_binds_immutable_content_to_selected_script_metadata() -> None:
+    content = b"print('approved')\n"
+    selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")
+    metadata = {"file_name": "check.py"}
+    snapshot = SkillScriptSnapshot(
+        selection=selection,
+        binding=_binding(byte_size=len(content), content_digest=f"sha256:{sha256(content).hexdigest()}"),
+        content=content,
+        metadata=metadata,
+    )
+
+    metadata["file_name"] = "changed.py"
+
+    assert snapshot.content == content
+    assert snapshot.metadata["file_name"] == "check.py"
+    with pytest.raises(TypeError):
+        cast("dict[str, object]", snapshot.metadata)["file_name"] = "mutated.py"
+    with pytest.raises(FrozenInstanceError):
+        setattr(snapshot, "content", b"changed")  # noqa: B010
+
+
+def test_script_snapshot_rejects_content_that_does_not_match_binding() -> None:
+    selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")
+    content = b"print('approved')\n"
+
+    with pytest.raises(ValueError, match="binding must match"):
+        SkillScriptSnapshot(selection=selection, binding=_binding(script_id="scripts/other.py"), content=content)
+    with pytest.raises(ValueError, match="content length"):
+        SkillScriptSnapshot(selection=selection, binding=_binding(byte_size=1), content=content)
+    with pytest.raises(ValueError, match="content digest"):
+        SkillScriptSnapshot(
+            selection=selection,
+            binding=_binding(byte_size=len(content), content_digest="sha256:not-current"),
+            content=content,
+        )
 
 
 def test_approval_decision_models_non_interactive_statuses_and_immutability() -> None:

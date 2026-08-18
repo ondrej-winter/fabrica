@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 from dataclasses import FrozenInstanceError, dataclass
 from io import StringIO
@@ -26,6 +27,8 @@ from fabrica.adapters.inbound.cli import (
 from fabrica.adapters.inbound.cli import (
     run_cli as run_product_cli,
 )
+from fabrica.adapters.inbound.cli.registry import ArgparseCommandRegistry
+from fabrica.adapters.inbound.cli.runtime import command_name_from_namespace
 from fabrica.bootstrap.cli import create_cli_command_registrars
 from fabrica.bootstrap.cli import run_cli as run_bootstrap_cli
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
@@ -48,7 +51,6 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.registration impor
 )
 
 if TYPE_CHECKING:
-    import argparse
     from collections.abc import Callable
 
 ARGPARSE_USAGE_ERROR = 2
@@ -299,6 +301,45 @@ def _register_duplicate_synthetic_commands(commands: CommandRegistry) -> None:
     commands.register(_synthetic_command_spec())
 
 
+def test_run_cli_translates_argparse_registration_conflicts() -> None:
+    def configure_conflicting_parser(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--feature-value")
+        parser.add_argument("--feature-value")
+
+    def register(commands: CommandRegistry) -> None:
+        commands.register(_synthetic_command_with_parser(configure_conflicting_parser))
+
+    with pytest.raises(RegistrationError, match="CLI command registration failed") as exc_info:
+        run_product_cli(
+            ("synthetic",),
+            command_registrars=(register,),
+            stdin=StringIO(),
+            stdout=StringIO(),
+            stderr=StringIO(),
+        )
+
+    assert isinstance(exc_info.value.__cause__, argparse.ArgumentError)
+
+
+def test_argparse_command_registry_rejects_missing_registration_lookup() -> None:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
+    registry = ArgparseCommandRegistry(subparsers.add_parser)
+
+    with pytest.raises(RegistrationError, match="CLI command 'synthetic' is not registered") as exc_info:
+        registry.registration_for("synthetic")
+
+    assert isinstance(exc_info.value.__cause__, KeyError)
+
+
+@pytest.mark.parametrize("command_value", [None, "", 42])
+def test_command_name_from_namespace_rejects_invalid_shell_command_destinations(command_value: object) -> None:
+    namespace = argparse.Namespace(_fabrica_cli_command=command_value)
+
+    with pytest.raises(RegistrationError, match="CLI parser did not capture the selected command name"):
+        command_name_from_namespace(namespace)
+
+
 @pytest.mark.parametrize(
     "reserved_dest",
     [
@@ -323,6 +364,55 @@ def test_run_cli_rejects_feature_arguments_using_reserved_shell_destinations(res
             stdout=StringIO(),
             stderr=StringIO(),
         )
+
+
+@pytest.mark.parametrize(
+    "reserved_dest",
+    [
+        "_fabrica_cli_command",
+        "_fabrica_cli_print_usage",
+        "_fabrica_cli_print_prices",
+        "_fabrica_cli_verbose_diagnostics",
+    ],
+)
+def test_run_cli_rejects_feature_defaults_using_reserved_shell_destinations(reserved_dest: str) -> None:
+    def configure_reserved_parser_default(parser: argparse.ArgumentParser) -> None:
+        parser.set_defaults(**{reserved_dest: "feature-owned"})
+
+    def register(commands: CommandRegistry) -> None:
+        commands.register(_synthetic_command_with_parser(configure_reserved_parser_default))
+
+    with pytest.raises(RegistrationError) as exc_info:
+        run_product_cli(
+            ("synthetic",),
+            command_registrars=(register,),
+            stdin=StringIO(),
+            stdout=StringIO(),
+            stderr=StringIO(),
+        )
+
+    assert "uses reserved parser default destination(s)" in str(exc_info.value)
+    assert reserved_dest in str(exc_info.value)
+
+
+def test_run_cli_rejects_absent_reserved_feature_default_set_to_none() -> None:
+    def configure_reserved_parser_default(parser: argparse.ArgumentParser) -> None:
+        parser.set_defaults(_fabrica_cli_command=None)
+
+    def register(commands: CommandRegistry) -> None:
+        commands.register(_synthetic_command_with_parser(configure_reserved_parser_default))
+
+    with pytest.raises(RegistrationError) as exc_info:
+        run_product_cli(
+            ("synthetic",),
+            command_registrars=(register,),
+            stdin=StringIO(),
+            stdout=StringIO(),
+            stderr=StringIO(),
+        )
+
+    assert "uses reserved parser default destination(s)" in str(exc_info.value)
+    assert "_fabrica_cli_command" in str(exc_info.value)
 
 
 def test_run_cli_does_not_swallow_handler_system_exit() -> None:
@@ -362,6 +452,29 @@ def test_run_cli_treats_cli_usage_error_as_usage_error() -> None:
 
     assert exit_code == ARGPARSE_USAGE_ERROR
     assert "synthetic user error" in stderr.getvalue()
+
+
+def test_run_cli_treats_argparse_decoder_type_error_as_usage_error() -> None:
+    stderr = StringIO()
+
+    def decode_user_error(namespace: argparse.Namespace) -> str:
+        _ = namespace
+        msg = "synthetic type error"
+        raise argparse.ArgumentTypeError(msg)
+
+    def register(commands: CommandRegistry) -> None:
+        commands.register(_synthetic_command_with_decode(decode_user_error))
+
+    exit_code = run_product_cli(
+        ("synthetic",),
+        command_registrars=(register,),
+        stdin=StringIO(),
+        stdout=StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == ARGPARSE_USAGE_ERROR
+    assert "synthetic type error" in stderr.getvalue()
 
 
 def test_run_cli_propagates_unexpected_decoder_value_error() -> None:

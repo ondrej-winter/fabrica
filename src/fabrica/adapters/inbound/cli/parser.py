@@ -91,7 +91,7 @@ def build_parser(
         required=True,
         parser_class=stream_parser_class(stdout=stdout, stderr=stderr),
     )
-    command_registry = ArgparseCommandRegistry(subparsers)
+    command_registry = ArgparseCommandRegistry(subparsers.add_parser)
     for register_commands in command_registrars:
         try:
             register_commands(command_registry)
