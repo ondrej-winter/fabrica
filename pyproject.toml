@@ -93,11 +93,14 @@ root_package = "fabrica"
 
 [[tool.importlinter.contracts]]
 id = "features-do-not-import-product-cli-or-bootstrap"
-name = "Feature slices must not import product CLI or bootstrap"
+name = "Feature slices may import only the documented product CLI extension surface"
 type = "forbidden"
 source_modules = ["fabrica.features"]
 forbidden_modules = [
     "fabrica.adapters.inbound.cli.model_evidence",
+    "fabrica.adapters.inbound.cli.options",
+    "fabrica.adapters.inbound.cli.parser",
+    "fabrica.adapters.inbound.cli.registry",
     "fabrica.adapters.inbound.cli.runtime",
     "fabrica.bootstrap",
 ]

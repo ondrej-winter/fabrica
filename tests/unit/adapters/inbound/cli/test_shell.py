@@ -395,6 +395,59 @@ def test_run_cli_rejects_feature_defaults_using_reserved_shell_destinations(rese
     assert reserved_dest in str(exc_info.value)
 
 
+@pytest.mark.parametrize(
+    "reserved_dest",
+    [
+        "_fabrica_cli_command",
+        "_fabrica_cli_print_usage",
+        "_fabrica_cli_print_prices",
+        "_fabrica_cli_verbose_diagnostics",
+    ],
+)
+def test_run_cli_rejects_nested_feature_arguments_using_reserved_shell_destinations(reserved_dest: str) -> None:
+    def configure_nested_parser(parser: argparse.ArgumentParser) -> None:
+        nested_subparsers = parser.add_subparsers(dest="feature_action")
+        child_parser = nested_subparsers.add_parser("child")
+        child_parser.add_argument("--feature-value", dest=reserved_dest)
+
+    def register(commands: CommandRegistry) -> None:
+        commands.register(_synthetic_command_with_parser(configure_nested_parser))
+
+    with pytest.raises(RegistrationError) as exc_info:
+        run_product_cli(
+            ("synthetic", "child"),
+            command_registrars=(register,),
+            stdin=StringIO(),
+            stdout=StringIO(),
+            stderr=StringIO(),
+        )
+
+    assert "uses reserved parser destination(s)" in str(exc_info.value)
+    assert reserved_dest in str(exc_info.value)
+
+
+def test_run_cli_rejects_nested_parser_default_that_overwrites_selected_command() -> None:
+    def configure_nested_parser(parser: argparse.ArgumentParser) -> None:
+        nested_subparsers = parser.add_subparsers(dest="feature_action")
+        child_parser = nested_subparsers.add_parser("child")
+        child_parser.set_defaults(_fabrica_cli_command="other-command")
+
+    def register(commands: CommandRegistry) -> None:
+        commands.register(_synthetic_command_with_parser(configure_nested_parser))
+
+    with pytest.raises(RegistrationError) as exc_info:
+        run_product_cli(
+            ("synthetic", "child"),
+            command_registrars=(register,),
+            stdin=StringIO(),
+            stdout=StringIO(),
+            stderr=StringIO(),
+        )
+
+    assert "uses reserved parser default destination(s)" in str(exc_info.value)
+    assert "_fabrica_cli_command" in str(exc_info.value)
+
+
 def test_run_cli_rejects_absent_reserved_feature_default_set_to_none() -> None:
     def configure_reserved_parser_default(parser: argparse.ArgumentParser) -> None:
         parser.set_defaults(_fabrica_cli_command=None)

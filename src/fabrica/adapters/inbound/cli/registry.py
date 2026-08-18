@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
+import argparse
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from fabrica.adapters.inbound.cli.command import Command, RegistrationError
 from fabrica.adapters.inbound.cli.destinations import RESERVED_DESTS
-
-if TYPE_CHECKING:
-    import argparse
 
 _ABSENT_DEFAULT = object()
 
@@ -84,6 +82,7 @@ class ArgparseCommandRegistry:
             for action in feature_owned_actions(parser, shell_namespace=shell_namespace)
             if action.dest in RESERVED_DESTS
         )
+        collisions.extend(descendant_reserved_action_dests(parser))
         if collisions:
             joined_collisions = ", ".join(collisions)
             msg = f"CLI command {command_name!r} uses reserved parser destination(s): {joined_collisions}"
@@ -102,6 +101,7 @@ class ArgparseCommandRegistry:
             for dest, value in explicit_parser_defaults(parser).items()
             if dest in RESERVED_DESTS and shell_namespace.defaults.get(dest, _ABSENT_DEFAULT) != value
         )
+        collisions.extend(descendant_reserved_default_dests(parser))
         if collisions:
             joined_collisions = ", ".join(collisions)
             msg = f"CLI command {command_name!r} uses reserved parser default destination(s): {joined_collisions}"
@@ -130,3 +130,36 @@ def parser_actions(parser: argparse.ArgumentParser) -> list[argparse.Action]:
 def explicit_parser_defaults(parser: argparse.ArgumentParser) -> dict[str, object]:
     """Return explicit parser defaults while localizing unavoidable argparse private-state access."""
     return dict(parser._defaults)  # noqa: SLF001
+
+
+def descendant_reserved_action_dests(parser: argparse.ArgumentParser) -> list[str]:
+    """Return reserved destinations used by nested feature-owned parsers."""
+    return sorted(
+        action.dest
+        for descendant in descendant_parsers(parser)
+        for action in parser_actions(descendant)
+        if action.dest in RESERVED_DESTS
+    )
+
+
+def descendant_reserved_default_dests(parser: argparse.ArgumentParser) -> list[str]:
+    """Return reserved defaults used by nested feature-owned parsers."""
+    return sorted(
+        dest
+        for descendant in descendant_parsers(parser)
+        for dest in explicit_parser_defaults(descendant)
+        if dest in RESERVED_DESTS
+    )
+
+
+def descendant_parsers(parser: argparse.ArgumentParser) -> list[argparse.ArgumentParser]:
+    """Return nested parsers reachable from feature-owned subparser actions."""
+    descendants: list[argparse.ArgumentParser] = []
+    for action in parser_actions(parser):
+        choices = getattr(action, "choices", None)
+        if isinstance(choices, dict):
+            for choice in choices.values():
+                if isinstance(choice, argparse.ArgumentParser):
+                    descendants.append(choice)
+                    descendants.extend(descendant_parsers(choice))
+    return descendants

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TextIO
 
-from fabrica.adapters.inbound.cli.rendering import bound_text, write_line
+from fabrica.adapters.inbound.cli.rendering import bound_text, format_metadata, write_line
 
 if TYPE_CHECKING:
     from fabrica.shared_kernel.model_usage import (
@@ -92,7 +92,14 @@ def present_fields(value: object, names: tuple[str, ...]) -> list[str]:
 
 def format_observation_messages(observations: tuple[ModelUsageObservation, ...]) -> list[str]:
     """Format bounded model evidence observation messages for CLI output."""
-    return [f"observation={bound_text(observation.message)!r}" for observation in observations]
+    return [format_observation_message(observation) for observation in observations]
+
+
+def format_observation_message(observation: ModelUsageObservation) -> str:
+    """Format one bounded model evidence observation and its safe metadata."""
+    metadata = format_metadata(observation.metadata)
+    suffix = f" {metadata}" if metadata else ""
+    return f"observation={bound_text(observation.message)!r}{suffix}"
 
 
 __all__ = ["write_model_evidence_report"]

@@ -9,8 +9,10 @@ from fabrica.adapters.inbound.cli.model_evidence import write_model_evidence_rep
 from fabrica.adapters.inbound.cli.rendering import (
     MAX_OUTPUT_LINE_CHARS,
     TRUNCATED_TEXT_MARKER,
+    bound_multiline_text,
     bound_text,
     format_metadata,
+    terminal_safe_text,
     write_line,
     write_text,
 )
@@ -32,6 +34,10 @@ def test_bound_text_truncates_long_cli_lines() -> None:
 
     assert len(bounded) == MAX_OUTPUT_LINE_CHARS
     assert bounded == f"{'x' * (MAX_OUTPUT_LINE_CHARS - len(TRUNCATED_TEXT_MARKER))}{TRUNCATED_TEXT_MARKER}"
+
+
+def test_bound_text_preserves_text_at_exact_line_bound() -> None:
+    assert bound_text("x" * MAX_OUTPUT_LINE_CHARS) == "x" * MAX_OUTPUT_LINE_CHARS
 
 
 def test_bound_text_escapes_line_breaks() -> None:
@@ -101,12 +107,33 @@ def test_write_text_preserves_existing_trailing_newline() -> None:
     assert stdout.getvalue() == "hello\n"
 
 
-def test_write_text_preserves_raw_terminal_controls_for_trusted_output() -> None:
+def test_bound_multiline_text_preserves_newlines_and_escapes_terminal_controls() -> None:
+    assert bound_multiline_text("line 1\nline 2\x1b[2J") == "line 1\nline 2\\x1b[2J"
+
+
+def test_terminal_safe_text_escapes_controls_without_truncating() -> None:
+    long_text = f"{'x' * (MAX_OUTPUT_LINE_CHARS + 10)}\x1b[2J"
+
+    safe_text = terminal_safe_text(long_text)
+
+    assert safe_text == f"{'x' * (MAX_OUTPUT_LINE_CHARS + 10)}\\x1b[2J"
+
+
+def test_write_text_escapes_terminal_controls_from_untrusted_output() -> None:
     stdout = StringIO()
 
     write_text(stdout, "raw\x1b[31mred\x1b[0m")
 
-    assert stdout.getvalue() == "raw\x1b[31mred\x1b[0m\n"
+    assert stdout.getvalue() == r"raw\x1b[31mred\x1b[0m" "\n"
+
+
+def test_format_metadata_limits_field_count() -> None:
+    formatted = format_metadata({f"field_{index:02}": index for index in range(60)})
+
+    assert "field_00=0" in formatted
+    assert "field_49=49" in formatted
+    assert "field_50=50" not in formatted
+    assert "metadata_fields_truncated=true" in formatted
 
 
 def test_write_model_evidence_report_formats_requested_usage_and_pricing() -> None:
@@ -122,7 +149,7 @@ def test_write_model_evidence_report_formats_requested_usage_and_pricing() -> No
                 model="gpt-5.1",
                 tokens=ModelTokenUsageEvidence(input_tokens=12, output_tokens=7, total_tokens=19),
                 quota=ModelQuotaEvidence(limit=100, remaining=81, reset_at="2026-08-14T16:00:00Z"),
-                observations=(ModelUsageObservation("from response"),),
+                observations=(ModelUsageObservation("from response", metadata={"collection_status": "collected"}),),
             ),
         ),
         cost_evidence=(
@@ -132,7 +159,7 @@ def test_write_model_evidence_report_formats_requested_usage_and_pricing() -> No
                 confidence=ModelUsageEvidenceConfidence.ESTIMATED,
                 estimated_amount=Decimal("0.03"),
                 currency="USD",
-                observations=(ModelUsageObservation("estimated from public table"),),
+                observations=(ModelUsageObservation("estimated from public table", metadata={"provider": "codex"}),),
             ),
         ),
         stdout=stdout,
@@ -144,10 +171,10 @@ def test_write_model_evidence_report_formats_requested_usage_and_pricing() -> No
         "Usage evidence:\n"
         "- provider=codex status=collected source=response_payload confidence=observed model=gpt-5.1 "
         "input_tokens=12 output_tokens=7 total_tokens=19 limit=100 remaining=81 "
-        "reset_at=2026-08-14T16:00:00Z observation='from response'\n"
+        "reset_at=2026-08-14T16:00:00Z observation='from response' collection_status=collected\n"
         "Pricing evidence:\n"
         "- status=public_price_estimate source=manual_observation confidence=estimated estimated_amount=0.03 "
-        "currency=USD observation='estimated from public table'\n"
+        "currency=USD observation='estimated from public table' provider=codex\n"
     )
 
 
