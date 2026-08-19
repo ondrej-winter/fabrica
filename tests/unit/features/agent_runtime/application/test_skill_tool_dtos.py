@@ -1,5 +1,6 @@
 """Tests for selected Agent Skill tool exposure DTO contracts."""
 
+from collections.abc import Callable
 from dataclasses import FrozenInstanceError
 from typing import cast
 
@@ -94,7 +95,7 @@ def test_registered_declarations_require_tool_definition() -> None:
         ),
     ],
 )
-def test_skill_tool_declaration_safe_text_fields_are_bounded(factory, message: str) -> None:
+def test_skill_tool_declaration_safe_text_fields_are_bounded(factory: Callable[[], object], message: str) -> None:
     with pytest.raises(ValueError, match=message):
         factory()
 

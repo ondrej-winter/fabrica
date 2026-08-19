@@ -47,6 +47,7 @@ from fabrica.features.developer_workflow.application.use_cases import (
     GenerateCommitMessageOptions,
 )
 from fabrica.features.query_execution.application.use_cases import BoundedAsyncQueryFanoutExecutor
+from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,16 +136,16 @@ class EvidenceRecordingCommitMessageRuntime:
 
     def __init__(self, runtime: CommitMessageRuntime) -> None:
         self._runtime = runtime
-        self._usage_evidence = []
-        self._cost_evidence = []
+        self._usage_evidence: list[ModelUsageEvidence] = []
+        self._cost_evidence: list[ModelCostEvidence] = []
 
     @property
-    def usage_evidence(self):
+    def usage_evidence(self) -> tuple[ModelUsageEvidence, ...]:
         """Return collected usage evidence in model-call order."""
         return tuple(self._usage_evidence)
 
     @property
-    def cost_evidence(self):
+    def cost_evidence(self) -> tuple[ModelCostEvidence, ...]:
         """Return collected cost evidence in model-call order."""
         return tuple(self._cost_evidence)
 

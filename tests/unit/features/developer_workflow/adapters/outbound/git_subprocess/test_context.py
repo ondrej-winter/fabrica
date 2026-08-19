@@ -15,6 +15,7 @@ from fabrica.features.developer_workflow.application.dtos import (
     GitContextChangedFile,
     GitContextChangedFileList,
     GitContextChangedFileStatus,
+    GitContextDiff,
     GitContextDiffBounds,
     GitContextFailureCategory,
 )
@@ -64,7 +65,7 @@ class ProbeGitContextSubprocessLoader(GitContextSubprocessLoader):
         """Validate one changed path through the shared membership hook."""
         return self._ensure_changed_path(path, changed_files)
 
-    def bounded_diff_probe(self, text: str, *, suggestion: str | None = None):
+    def bounded_diff_probe(self, text: str, *, suggestion: str | None = None) -> GitContextDiff:
         """Build a bounded diff through the shared diff hook."""
         return self._bounded_diff(text, duration_seconds=1.2345678, suggestion=suggestion)
 

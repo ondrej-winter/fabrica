@@ -1,5 +1,6 @@
 """Tests for tool-loop application DTO contracts."""
 
+from collections.abc import Callable
 from dataclasses import FrozenInstanceError
 from typing import cast
 
@@ -80,7 +81,7 @@ def test_tool_definition_and_request_copy_mapping_fields() -> None:
         (lambda: ToolCallRequest(call_id="x" * (MAX_TOOL_CALL_ID_CHARS + 1), tool_name="safe"), "identifier bound"),
     ],
 )
-def test_tool_identifiers_and_descriptions_are_bounded(factory, message: str) -> None:
+def test_tool_identifiers_and_descriptions_are_bounded(factory: Callable[[], object], message: str) -> None:
     with pytest.raises(ValueError, match=message):
         factory()
 

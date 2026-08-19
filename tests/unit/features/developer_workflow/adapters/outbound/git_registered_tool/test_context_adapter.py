@@ -4,10 +4,11 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from fabrica.features.agent_runtime.adapters.outbound.registered_tool import RegisteredToolExecutor
+from fabrica.features.agent_runtime.adapters.outbound.registered_tool import RegisteredTool, RegisteredToolExecutor
 from fabrica.features.agent_runtime.application.dtos import (
     SafeRuntimeMetadataValue,
     ToolCallRequest,
+    ToolCallResult,
     ToolCallResultStatus,
     ToolDefinition,
     ToolLoopLimits,
@@ -378,7 +379,7 @@ def test_tool_result_limit_remains_governed_by_registered_tool_executor() -> Non
     assert result.error_message == "registered tool result exceeded output limit"
 
 
-def _create_tools(loader: FakeGitContextLoader):
+def _create_tools(loader: FakeGitContextLoader) -> tuple[RegisteredTool, ...]:
     return create_git_context_registered_tools(
         worktree_loader=loader,
         commit_loader=loader,
@@ -392,7 +393,7 @@ def _execute(
     loader: FakeGitContextLoader,
     arguments: dict[str, SafeRuntimeMetadataValue] | None = None,
     limits: ToolLoopLimits | None = None,
-):
+) -> ToolCallResult:
     executor = RegisteredToolExecutor(_create_tools(loader))
     return executor.execute_tool(
         ToolCallRequest(call_id="call-1", tool_name=tool_name, arguments=arguments or {}),

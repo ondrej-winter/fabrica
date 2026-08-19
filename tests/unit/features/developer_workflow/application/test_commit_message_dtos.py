@@ -1,7 +1,6 @@
 """Tests for evidence-first commit-message DTOs."""
 
 from dataclasses import FrozenInstanceError
-from typing import Any
 
 import pytest
 
@@ -153,7 +152,7 @@ def test_commit_message_recommendation_rejects_empty_required_text(field_name: s
 
 
 def _evidence(
-    **overrides: Any,
+    **overrides: object,
 ) -> StagedFileCommitEvidence:
     values = {
         "path": "src/file.py",

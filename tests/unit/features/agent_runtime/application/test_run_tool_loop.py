@@ -11,6 +11,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolCallResultStatus,
     ToolDefinition,
     ToolLoopLimits,
+    ToolLoopRunResult,
     ToolLoopRunStatus,
 )
 from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModelError, ToolExecutionError
@@ -228,7 +229,7 @@ def test_run_tool_loop_stops_at_max_iterations() -> None:
     )
 
 
-def _run_single_tool_result(status: ToolCallResultStatus):
+def _run_single_tool_result(status: ToolCallResultStatus) -> ToolLoopRunResult:
     command = LocalAgentRunCommand(prompt="Use a tool")
     tool_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note")
     tool_result = ToolCallResult(

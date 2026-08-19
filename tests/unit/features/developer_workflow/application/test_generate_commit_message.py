@@ -414,7 +414,7 @@ def _loader_for(staged_file: GitStagedFile, *, events: list[str]) -> FakeStagedC
     )
 
 
-def _result_for(recommendation: CommitMessageRecommendation):
+def _result_for(recommendation: CommitMessageRecommendation) -> GenerateCommitMessageResult:
     evidence = _evidence(
         GitStagedFile(path="src/file.py", status=GitStagedFileStatus.MODIFIED),
         summary="Adds CLI architecture cleanup.",

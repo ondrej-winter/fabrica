@@ -1,6 +1,6 @@
 """Tests for read-only git commit context subprocess behavior."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -339,7 +339,7 @@ def test_commit_diff_maps_empty_and_oversized_output_safely() -> None:
     assert empty_exc_info.value.category is GitContextFailureCategory.NO_MATCHING_CHANGES
 
 
-def lambda_load_commit_details(loader: GitContextSubprocessLoader):
+def lambda_load_commit_details(loader: GitContextSubprocessLoader) -> Callable[[], object]:
     """Return a no-argument action that loads HEAD commit details."""
 
     def load_head_details() -> object:
@@ -348,7 +348,7 @@ def lambda_load_commit_details(loader: GitContextSubprocessLoader):
     return load_head_details
 
 
-def lambda_list_commit_changed_files(loader: GitContextSubprocessLoader):
+def lambda_list_commit_changed_files(loader: GitContextSubprocessLoader) -> Callable[[], object]:
     """Return a no-argument action that lists HEAD commit changed files."""
 
     def list_head_changed_files() -> object:

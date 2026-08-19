@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+# argparse uses Any in these override signatures, so the dynamic surface is
+# contained at the parser adapter boundary.
 class StreamArgumentParser(argparse.ArgumentParser):
     """Argument parser that writes help and usage errors to explicit streams.
 
@@ -28,11 +30,11 @@ class StreamArgumentParser(argparse.ArgumentParser):
         self.stdout = stdout if stdout is not None else sys.stdout
         self.stderr = stderr if stderr is not None else sys.stderr
 
-    def print_help(self, file: Any = None) -> None:
+    def print_help(self, file: Any = None) -> None:  # noqa: ANN401
         """Print help to the bound stdout when no file is supplied."""
         super().print_help(file or getattr(self, "stdout", sys.stdout))
 
-    def print_usage(self, file: Any = None) -> None:
+    def print_usage(self, file: Any = None) -> None:  # noqa: ANN401
         """Print usage to the bound stdout when no file is supplied."""
         super().print_usage(file or getattr(self, "stdout", sys.stdout))
 
@@ -52,7 +54,7 @@ def stream_parser_class(*, stdout: TextIO | None, stderr: TextIO | None) -> type
     """Create a stream-bound parser class for argparse subcommands."""
 
     class StreamSubparser(StreamArgumentParser):
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: ANN401
             super().__init__(*args, **kwargs)
             self.bind_streams(stdout=stdout, stderr=stderr)
 

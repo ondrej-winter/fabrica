@@ -8,6 +8,7 @@ from fabrica.features.agent_runtime.adapters.outbound.registered_tool import Reg
 from fabrica.features.agent_runtime.application.dtos import (
     SafeRuntimeMetadataValue,
     ToolCallRequest,
+    ToolCallResult,
     ToolCallResultStatus,
     ToolDefinition,
     ToolLoopLimits,
@@ -186,7 +187,7 @@ def _execute(
     loader: FakeGitStagedChangesLoader,
     arguments: dict[str, SafeRuntimeMetadataValue] | None = None,
     limits: ToolLoopLimits | None = None,
-):
+) -> ToolCallResult:
     executor = RegisteredToolExecutor(create_git_staged_changes_registered_tools(loader))
     return executor.execute_tool(
         ToolCallRequest(call_id="call-1", tool_name=tool_name, arguments=arguments or {}),
