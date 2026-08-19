@@ -52,9 +52,10 @@ dev = [
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
+assets = ["uv.lock"]
 tag_format = "v{version}"
 commit_message = "chore(release): v{version}"
-build_command = "uv build"
+build_command = "uv lock && uv build"
 dist_path = "dist/"
 upload_to_pypi = false
 upload_to_release = false
