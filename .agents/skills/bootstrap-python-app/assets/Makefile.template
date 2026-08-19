@@ -1,0 +1,45 @@
+.PHONY: help format lint type import-lint test quality pre-commit deps-tree deps-outdated deps-audit
+
+help:
+	@echo "Available targets:"
+	@echo "  make format        Format Python code with Ruff"
+	@echo "  make lint          Run Ruff lint checks with safe fixes"
+	@echo "  make type          Run ty type checking"
+	@echo "  make import-lint   Run import-linter architecture contracts"
+	@echo "  make test          Run the default test suite"
+	@echo "  make quality       Run the local quality gate"
+	@echo "  make pre-commit    Run all configured pre-commit hooks"
+	@echo "  make deps-tree     Show the full dependency tree"
+	@echo "  make deps-outdated Show outdated top-level dependencies"
+	@echo "  make deps-audit    Audit dependencies for known vulnerabilities"
+
+format:
+	uv run ruff format .
+
+lint:
+	uv run ruff check . --fix
+
+type:
+	uv run ty check src tests
+
+import-lint:
+	uv run lint-imports
+
+test:
+	uv run pytest
+
+quality: lint format type import-lint test
+
+pre-commit:
+	uv run pre-commit run --all-files
+
+deps-tree:
+	uv tree --frozen
+
+deps-outdated:
+	uv tree --frozen --depth 1 --outdated
+
+deps-audit:
+	mkdir -p .tmp
+	uv export --frozen --no-hashes --format requirements.txt -o .tmp/requirements-audit.txt
+	uvx --from pip-audit pip-audit -r .tmp/requirements-audit.txt

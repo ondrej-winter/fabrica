@@ -1,0 +1,14 @@
+*.egg-info/
+*.py[cod]
+.coverage
+.grimp_cache/
+.import_linter_cache/
+.pytest_cache/
+.ruff_cache/
+.tmp/
+.ty/
+.venv/
+__pycache__/
+build/
+dist/
+htmlcov/

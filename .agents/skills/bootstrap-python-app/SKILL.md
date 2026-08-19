@@ -2,7 +2,7 @@
 name: bootstrap-python-app
 description: Initialize a new Python project with a hexagonal vertical-slice architecture layout, core tooling, quality checks, and GitHub Actions CI/CD when starting a Python application from scratch.
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
   dependencies:
     tools:
       - name: uv
@@ -27,7 +27,7 @@ metadata:
         purpose: Install optional local hooks that run the same project quality checks before commits.
         required: false
       - name: GitHub Actions
-        purpose: Run CI quality checks, build artifacts, create patch releases, and publish to PyPI.
+        purpose: Run reproducible CI quality checks, build artifacts, create semantic patch releases, and publish to PyPI.
         required: true
       - name: PyPI trusted publishing
         purpose: Publish release artifacts from GitHub Actions without committing PyPI tokens.
@@ -52,6 +52,10 @@ metadata:
 Use this skill to initialize a new Python project with a hexagonal
 (ports-and-adapters) architecture organized by vertical feature slices, local
 quality gates, and GitHub Actions CI/CD that mirrors the generated local checks.
+The scaffold is intentionally strict by default: Ruff selects all rules with a
+small documented ignore set, `ty` checks both `src` and `tests`, import-linter
+guards architectural boundaries, pytest runs with coverage, and CI creates
+semantic patch releases only after the quality job passes.
 
 ## Prerequisites
 
@@ -64,6 +68,9 @@ quality gates, and GitHub Actions CI/CD that mirrors the generated local checks.
   `https://github.com/<owner>/<repo>`.
 - `<default_branch>` — the release branch. Use `master` when mirroring this
   scaffold's default CI/CD behavior.
+- `<coverage_fail_under>` — the minimum total coverage percentage. Use `93` when
+  mirroring this scaffold's strict default; lower it only with an explicit
+  bootstrap-stage decision.
 
 Use a valid Python package identifier for `<app_name>` because the template uses
 it as both the distribution name and import package. If the published package
@@ -177,16 +184,33 @@ if __name__ == "__main__":
 
 ### 3. Configure pyproject.toml
 
-Create or update `pyproject.toml` from `assets/pyproject.template.toml`.
-Replace `<app_name>`, `<python_version>`, `<python_version_nodot>`, and
-`<repository_url>`. Keep the values `uv init` already set for `name`, `version`,
-and `requires-python` unless the user asked for something else.
+Create or update `pyproject.toml` from `assets/pyproject.toml.template`.
+Replace `<app_name>`, `<python_version>`, `<python_version_nodot>`,
+`<repository_url>`, and `<coverage_fail_under>`. Keep the values `uv init`
+already set for `name`, `version`, and `requires-python` unless the user asked
+for something else.
 
 The template uses Hatchling packaging, a `src/<app_name>` package, a `dev`
 dependency group, Ruff formatting/linting, `ty` type checking, import-linter
-architecture contracts, pytest, coverage configuration, semantic-release patch
-versioning, and a console script named `<app_name>`. Keep runtime dependencies in
-`[project].dependencies` and development-only tools in `[dependency-groups].dev`.
+architecture contracts, pytest with parallel execution and coverage, semantic
+patch-release versioning, and a console script named `<app_name>`. Keep runtime
+dependencies in `[project].dependencies` and development-only tools in
+`[dependency-groups].dev`.
+
+Use the generated tool policy as the default quality bar:
+
+- Ruff uses `select = ["ALL"]` with only formatter-conflict, docstring-style,
+  lightweight package/module, copyright, TODO, and FIXME ignores.
+- Do not globally ignore annotation rules. Public interfaces and boundary types
+  should stay explicitly typed; test fixtures get narrow per-file exceptions.
+- Exclude copied Agent Skills under `.agents` from Ruff and `ty` so skill
+  markdown/assets are not treated as application code.
+- `ty` checks `src` and `tests`; the CI and pre-commit commands should use the
+  same scope.
+- Pytest runs from `tests`, uses `pytest-xdist` with `-n=auto`, reports missing
+  coverage, and enforces branch coverage through `[tool.coverage.*]`.
+- Import-linter contracts should stay generic in the scaffold and be expanded
+  only when the new project introduces concrete cross-slice dependencies.
 
 ### 4. Install development dependencies
 
@@ -204,16 +228,34 @@ uv run pre-commit install
 ```
 
 Create `.pre-commit-config.yaml` from
-`assets/pre-commit-config.template.yaml`. Replace `<python_version>` with the
+`assets/pre-commit-config.yaml.template`. Replace `<python_version>` with the
 selected Python version, for example `3.13`, so the generated value is
 `python3.13`.
 
 The template uses local hooks so pre-commit runs the same `uv run ...` commands
 as the project quality gate, including import-linter architecture validation.
 
-### 6. Add GitHub Actions CI/CD
+### 6. Add local automation and ignore rules
 
-Create `.github/workflows/ci-cd.yaml` from `assets/ci-cd.template.yaml`.
+Create `Makefile` from `assets/Makefile.template`. The generated targets mirror
+the local and CI quality gate:
+
+- `make format` -> `uv run ruff format .`
+- `make lint` -> `uv run ruff check . --fix`
+- `make type` -> `uv run ty check src tests`
+- `make import-lint` -> `uv run lint-imports`
+- `make test` -> `uv run pytest`
+- `make quality` -> lint, format, type, import-lint, and test
+- `make pre-commit` -> all configured pre-commit hooks
+- dependency inspection targets for tree, outdated, and vulnerability review
+
+Create `.gitignore` from `assets/gitignore.template`. Keep generated caches,
+virtual environments, build outputs, coverage files, import-linter caches, and
+temporary audit files out of version control.
+
+### 7. Add GitHub Actions CI/CD
+
+Create `.github/workflows/ci-cd.yaml` from `assets/ci-cd.yaml.template`.
 Replace `<app_name>`, `<python_version>`, and `<default_branch>`.
 
 The workflow mirrors the local quality gate and release behavior:
@@ -224,10 +266,13 @@ The workflow mirrors the local quality gate and release behavior:
 - builds distribution packages with `uv build`
 - smoke-tests the local console package with `uvx --from . <app_name> --help`
 - uploads `dist/` as a CI artifact
-- creates a patch release on non-bot pushes to `<default_branch>` after quality
-  succeeds
-- publishes to PyPI through trusted publishing using the GitHub environment
-  named `pypi`
+- creates a semantic patch release on non-bot pushes to `<default_branch>` after
+  quality succeeds
+- updates `pyproject.toml` and `uv.lock`, commits `chore(release): v{version}`,
+  creates a `v{version}` tag, and builds distribution artifacts through
+  `python-semantic-release`
+- publishes to PyPI through trusted publishing using the GitHub environment named
+  `pypi`
 
 Before relying on the release job, configure the repository and PyPI project:
 
@@ -237,8 +282,12 @@ Before relying on the release job, configure the repository and PyPI project:
   `pypi`, and branch
 - release commits from `github-actions[bot]` are allowed to push to the release
   branch but do not recursively trigger another release
+- branch protection allows the release job to push version/tag updates, or the
+  project intentionally uses a separate approved release mechanism
+- automatic PyPI publication is disabled or deferred until trusted publishing is
+  configured; do not use long-lived PyPI tokens in repository secrets by default
 
-### 7. Verify the setup
+### 8. Verify the setup
 
 ```bash
 uv run ruff format .
@@ -251,15 +300,22 @@ uvx --from . <app_name> --help
 ```
 
 All commands must exit with code 0. If a check fails, fix the root cause and
-rerun the narrow failing command before repeating the full gate.
+rerun the narrow failing command before repeating the full gate. For a final
+local pre-commit parity check, run:
 
-### 8. Write a minimal README
+```bash
+uv run pre-commit run --all-files
+```
+
+### 9. Write a minimal README
 
 Write a `README.md` that includes:
 
 - What the application does.
 - How to install dependencies (`uv sync --group dev`).
 - How to run quality checks (`uv run ruff format .`, `uv run ruff check .`, `uv run ty check src tests`, `uv run lint-imports`, `uv run pytest`).
+- How to use `make quality`, `make pre-commit`, and the dependency inspection
+  targets when the generated Makefile is included.
 - How CI/CD runs in GitHub Actions and how patch releases are published from
   `<default_branch>` to PyPI.
 - A high-level architecture overview (features / domain / application / adapters).
@@ -283,8 +339,13 @@ pre-commit, and CI.
 ## CI/CD conventions
 
 - The GitHub Actions quality job must be reproducible locally with the same
-  `uv run ...` commands.
+  `uv run ...`, `uv build`, and `uvx --from .` commands.
 - Release automation must run only after the quality job passes.
+- Semantic patch releases use `python-semantic-release` with `--patch` for every
+  non-bot push to the release branch. Do not rely on Conventional Commit parsing
+  for version level unless the project intentionally changes the release policy.
+- The release build command should refresh the lockfile before building so the
+  release commit contains both `pyproject.toml` and `uv.lock` updates.
 - The release job publishes to PyPI with OIDC trusted publishing, not committed
   tokens or long-lived API keys.
 - Keep CI permissions least-privilege: read-only contents for quality, write
@@ -298,6 +359,8 @@ pre-commit, and CI.
 - Tooling is installed through `uv sync --group dev`.
 - Ruff formatting, Ruff linting, `ty`, import-linter, pytest, build, and console
   smoke checks pass through `uv run`, `uv build`, or `uvx --from .`.
+- `.pre-commit-config.yaml`, `Makefile`, `.gitignore`, `.python-version`, and
+  `uv.lock` are present and aligned with the generated `pyproject.toml`.
 - README setup, quality gate, CI/CD, release, and architecture notes match the
   generated project.
 - PyPI trusted publishing and the GitHub `pypi` environment are configured before

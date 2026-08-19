@@ -20,19 +20,21 @@ Repository = "<repository_url>"
 [dependency-groups]
 dev = [
     "import-linter>=2.13",
-    "pre-commit>=4.3.0",
+    "pre-commit>=4.6.2",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
     "python-semantic-release>=10.5.2",
-    "ruff>=0.16.1",
-    "ty>=0.0.69",
+    "ruff>=0.16.3",
+    "ty>=0.0.73",
 ]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
+assets = ["uv.lock"]
 tag_format = "v{version}"
 commit_message = "chore(release): v{version}"
-build_command = "uv build"
+build_command = "uv lock && uv build"
 dist_path = "dist/"
 upload_to_pypi = false
 upload_to_release = false
@@ -44,6 +46,7 @@ packages = ["src/<app_name>"]
 line-length = 120
 target-version = "py<python_version_nodot>" # e.g. py313 (version without the dot)
 src = ["src", "tests"]
+extend-exclude = [".agents"]
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -52,15 +55,24 @@ ignore = [
     "ISC001",  # implicit string concat — conflicts with ruff formatter
     "D203",    # one-blank-line-before-class — incompatible with D211
     "D213",    # multi-line-summary-second-line — incompatible with D212
-    "D1",      # missing docstrings — too noisy for early development
-    "ANN",     # type annotations — covered by ty for this scaffold
+    "D104",    # package __init__ modules are intentionally lightweight
+    "D105",    # magic methods are documented through their owning types
+    "D107",    # constructor contracts are documented on classes
     "CPY001",  # copyright headers are not used by default
     "TD",      # TODO comment format
     "FIX",     # fixme comments
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101"] # pytest-native assertions are expected in tests
+"tests/**/*.py" = [
+    "ANN001", # pytest fixture parameters are intentionally inferred by name
+    "ANN202", # private test helpers are typed when it improves clarity
+    "D1",     # test names document behavior more clearly than docstrings
+    "S101",   # pytest-native assertions are expected in tests
+]
+
+[tool.ty.src]
+exclude = [".agents/**"]
 
 [tool.importlinter]
 root_package = "<app_name>"
@@ -123,6 +135,7 @@ forbidden_modules = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = [
+    "-n=auto",
     "--cov=src",
     "--cov-report=term-missing",
 ]
@@ -132,6 +145,7 @@ branch = true
 source = ["src"]
 
 [tool.coverage.report]
+fail_under = <coverage_fail_under>
 exclude_also = [
     "if TYPE_CHECKING:",
     "if __name__ == .__main__.",
