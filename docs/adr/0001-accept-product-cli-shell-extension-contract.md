@@ -28,12 +28,23 @@ Feature slices may import only this documented surface from the product CLI. The
 feature-neutral CLI shell must remain independent of feature slices and
 bootstrap-owned composition.
 
+After the shell performs one argparse parse, it splits the resulting namespace
+into shell-owned state and feature-owned state before feature decoding. Shell
+state becomes the selected command name plus immutable global options carried in
+`CommandContext`. Feature decoders receive only feature-owned namespace values and
+must return effectively immutable adapter-local boundary values, including
+immutable containers for repeated arguments.
+
 ## Consequences
 
 - Feature CLI registrations can stay small and declarative while the product
   shell owns shared parser behavior and diagnostics.
 - Argparse details remain localized to CLI adapter boundaries rather than leaking
   into application ports or domain code.
+- Feature decoders cannot observe or accidentally retain shell-owned parser
+  destinations such as global options or selected-command internals.
+- Decoded CLI command values are stable snapshots of one user invocation, which
+  keeps runner behavior deterministic and testable.
 - The exception must remain narrow: feature slices must not import product CLI
   runtime, parser, registry, model-evidence, or bootstrap modules.
 - Import-linter policy names and forbidden-module lists must stay aligned with

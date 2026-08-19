@@ -13,7 +13,7 @@ type ParserConfigurer = Callable[[argparse.ArgumentParser], None]
 """Callback that adds feature-owned arguments to one subcommand parser."""
 
 type CommandDecoder[TCommand] = Callable[[argparse.Namespace], TCommand]
-"""Callback that maps parsed feature arguments into a command object."""
+"""Callback that maps parsed feature arguments into an immutable command object."""
 
 type CommandRunner[TCommand] = Callable[[TCommand, CommandContext], int]
 """Callback that executes a decoded command and returns a process exit code."""
@@ -48,7 +48,10 @@ class Command[TCommand]:
     The shell validates static registration data immediately, then calls
     ``configure`` during parser construction, ``decode`` after argparse parsing,
     and ``run`` only after decoding succeeds. The generic parameter represents
-    the feature command object returned by ``decode`` and consumed by ``run``.
+    the immutable feature command object returned by ``decode`` and consumed by
+    ``run``. Decoders should produce effectively immutable boundary values: use
+    frozen data classes or equivalent value objects, convert repeated arguments
+    to tuples or frozensets, and avoid retaining mutable ``argparse`` containers.
     """
 
     name: str
@@ -58,7 +61,7 @@ class Command[TCommand]:
     configure: ParserConfigurer
     """Callback that adds feature-owned arguments to the subcommand parser."""
     decode: CommandDecoder[TCommand]
-    """Callback that maps the parsed feature namespace into a command object."""
+    """Callback that maps the parsed feature namespace into an immutable command object."""
     run: CommandRunner[TCommand]
     """Callback that executes the decoded command with shell-provided context."""
     description: str | None = None

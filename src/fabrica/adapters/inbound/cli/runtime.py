@@ -62,10 +62,13 @@ def parse_invocation(
     """
     parser, command_registry = build_parser(command_registrars, stdout=stdout, stderr=stderr)
     namespace = parser.parse_args(argv)
-    registration = command_registry.registration_for(command_name_from_namespace(namespace))
+    command_name = command_name_from_namespace(namespace)
+    global_options = global_options_from_namespace(namespace)
+    feature_namespace = feature_namespace_from(namespace)
+    registration = command_registry.registration_for(command_name)
     return Invocation(
-        global_options=global_options_from_namespace(namespace),
-        command=decode_command(parser, registration.decode, namespace),
+        global_options=global_options,
+        command=decode_command(parser, registration.decode, feature_namespace),
         run=registration.run,
     )
 
@@ -82,7 +85,7 @@ def command_name_from_namespace(namespace: argparse.Namespace) -> str:
 def decode_command(
     parser: argparse.ArgumentParser,
     decoder: Callable[[argparse.Namespace], object],
-    namespace: argparse.Namespace,
+    feature_namespace: argparse.Namespace,
 ) -> object:
     """Decode feature command arguments while translating user errors.
 
@@ -92,7 +95,7 @@ def decode_command(
     programmer errors.
     """
     try:
-        return decoder(feature_namespace_from(namespace))
+        return decoder(feature_namespace)
     except argparse.ArgumentTypeError as err:
         parser.error(str(err))
     except UsageError as err:

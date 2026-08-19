@@ -884,11 +884,25 @@ selected command runs.
 
 Feature-owned CLI registrations contribute commands through the shared
 keyword-only `Command` contract. A registration configures only its subcommand
-parser, decodes the resulting `argparse.Namespace` into an adapter-local
-immutable command value, and handles expected user input failures with
-`UsageError`; unexpected decoder failures remain programmer errors. Feature
-parser configuration must not mutate shell-owned destinations through either
-argument actions or `ArgumentParser.set_defaults()`.
+parser, decodes the feature-owned part of the resulting `argparse.Namespace` into
+an adapter-local immutable command value, and handles expected user input failures
+with `UsageError`; unexpected decoder failures remain programmer errors. Repeated
+values should be converted to immutable containers such as tuples or frozensets
+before leaving the decoder. Feature parser configuration must not mutate
+shell-owned destinations through either argument actions or
+`ArgumentParser.set_defaults()`.
+
+After the single argparse parse, the shell explicitly splits the namespace before
+feature decoding:
+
+```text
+argparse.Namespace
+├── shell state   → selected command name + immutable GlobalOptions
+└── feature state → immutable decoded command + composition options
+```
+
+Global flags therefore remain shell-owned, are passed to runners through
+`CommandContext.global_options`, and must be supplied before the subcommand.
 
 ```python
 from argparse import ArgumentParser, Namespace

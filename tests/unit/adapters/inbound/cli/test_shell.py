@@ -110,6 +110,14 @@ class ParsedInvocation:
     composition_options: object
 
 
+@dataclass(frozen=True, slots=True)
+class SyntheticDecodedCommand:
+    """Test-only immutable command decoded from a feature-only namespace."""
+
+    global_options: GlobalOptions
+    feature_value: str | None = None
+
+
 @dataclass(slots=True)
 class RecordingHandlers:
     """Record one parsed command without running real composition."""
@@ -239,6 +247,18 @@ def _synthetic_command_with_decode(decode: Callable[[argparse.Namespace], str]) 
     )
 
 
+def _synthetic_decoded_command_with_parser(
+    configure_parser: Callable[[argparse.ArgumentParser], None],
+) -> Command[SyntheticDecodedCommand]:
+    return Command(
+        name="synthetic",
+        summary="synthetic command",
+        configure=configure_parser,
+        decode=_decode_synthetic_boundary_command,
+        run=_synthetic_boundary_handler,
+    )
+
+
 def _synthetic_command_with_handler(handler: Callable[[str, CommandContext], int]) -> Command[str]:
     return Command(
         name="synthetic",
@@ -263,6 +283,17 @@ def _decode_synthetic_command(namespace: argparse.Namespace) -> str:
     return "synthetic"
 
 
+def _decode_synthetic_boundary_command(namespace: argparse.Namespace) -> SyntheticDecodedCommand:
+    return SyntheticDecodedCommand(
+        global_options=GlobalOptions(
+            print_usage=hasattr(namespace, "_fabrica_cli_print_usage"),
+            print_prices=hasattr(namespace, "_fabrica_cli_print_prices"),
+            verbose_diagnostics=hasattr(namespace, "_fabrica_cli_verbose_diagnostics"),
+        ),
+        feature_value=namespace.feature_value,
+    )
+
+
 def _noop_synthetic_handler(command: str, context: CommandContext) -> int:
     _ = (command, context)
     return 0
@@ -283,6 +314,12 @@ def _synthetic_handler(handlers: RecordingHandlers) -> Callable[[str, CommandCon
         return 0
 
     return run
+
+
+def _synthetic_boundary_handler(command: SyntheticDecodedCommand, context: CommandContext) -> int:
+    assert command.global_options == GlobalOptions()
+    assert context.global_options == GlobalOptions(print_usage=True, print_prices=True, verbose_diagnostics=True)
+    return 0
 
 
 def test_run_cli_rejects_duplicate_command_registration() -> None:
@@ -466,6 +503,31 @@ def test_run_cli_rejects_absent_reserved_feature_default_set_to_none() -> None:
 
     assert "uses reserved parser default destination(s)" in str(exc_info.value)
     assert "_fabrica_cli_command" in str(exc_info.value)
+
+
+def test_run_cli_splits_shell_options_from_feature_decoder_namespace() -> None:
+    def configure_parser(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--feature-value", required=True)
+
+    def register(commands: CommandRegistry) -> None:
+        commands.register(_synthetic_decoded_command_with_parser(configure_parser))
+
+    exit_code = run_product_cli(
+        (
+            "--print-usage",
+            "--print-prices",
+            "--verbose-diagnostics",
+            "synthetic",
+            "--feature-value",
+            "feature-owned",
+        ),
+        command_registrars=(register,),
+        stdin=StringIO(),
+        stdout=StringIO(),
+        stderr=StringIO(),
+    )
+
+    assert exit_code == 0
 
 
 def test_run_cli_does_not_swallow_handler_system_exit() -> None:
@@ -1089,6 +1151,19 @@ def test_parse_script_execute_command_rejects_missing_approval_metadata() -> Non
 
 def test_parsed_commands_are_immutable_boundary_values() -> None:
     run_invocation = parse_args(["run", "--prompt", "Reply with pong"])
+    context_invocation = parse_args(
+        [
+            "run",
+            "--prompt",
+            "Reply with pong",
+            "--skill",
+            "python-testing",
+            "--resource",
+            "python-testing:references/example.md",
+            "--skill-root",
+            "./skills",
+        ],
+    )
     policy_invocation = parse_args(
         ["script-policy", "--skill-id", "python-testing", "--script-id", "scripts/check.py"],
     )
@@ -1114,6 +1189,13 @@ def test_parsed_commands_are_immutable_boundary_values() -> None:
 
     with pytest.raises(FrozenInstanceError):
         setattr(run_invocation.command, "prompt", "changed")  # noqa: B010
+    assert isinstance(context_invocation.command, CliRunCommand)
+    assert isinstance(context_invocation.command.skill_ids, tuple)
+    assert isinstance(context_invocation.command.resources, tuple)
+    assert isinstance(context_invocation.composition_options, AgentRuntimeCliCompositionOptions)
+    assert isinstance(context_invocation.composition_options.skill_roots, tuple)
+    with pytest.raises(FrozenInstanceError):
+        setattr(context_invocation.composition_options, "skill_roots", ())  # noqa: B010
     with pytest.raises(FrozenInstanceError):
         setattr(policy_invocation.command, "script_id", "changed")  # noqa: B010
     with pytest.raises(FrozenInstanceError):
