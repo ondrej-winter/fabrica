@@ -878,9 +878,9 @@ contracts only; they do not import feature slices. Feature slices own their
 subcommand registration values, adapter-local parsed command models, CLI runners,
 and output mapping under
 `features/<feature>/adapters/inbound/cli/`. Bootstrap-owned handler factories in
-`src/fabrica/bootstrap/cli.py` attach per-command handlers and lazily assemble
-those feature CLI adapters with default concrete dependencies only when the
-selected command runs.
+`src/fabrica/bootstrap/cli/features/` attach per-command handlers and lazily
+assemble those feature CLI adapters with default concrete dependencies only when
+the selected command runs.
 
 Feature-owned CLI registrations contribute commands through the shared
 keyword-only `Command` contract. A registration configures only its subcommand

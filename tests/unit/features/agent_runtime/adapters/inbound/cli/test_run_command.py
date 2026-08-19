@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from io import StringIO
 from typing import TYPE_CHECKING, TextIO
 
-import fabrica.bootstrap.cli as bootstrap_cli
+import fabrica.bootstrap.cli.features.agent_runtime as agent_runtime_bootstrap
 from fabrica.adapters.inbound.cli import GlobalOptions
 from fabrica.adapters.inbound.cli.model_evidence import write_model_evidence_report
 from fabrica.bootstrap.cli import CliDependencyOverrides, run_cli
@@ -291,7 +291,7 @@ def test_product_run_with_injected_selected_context_runtime_does_not_create_defa
         msg = "selected-context run must not create an unused default runtime"
         raise AssertionError(msg)
 
-    monkeypatch.setattr(bootstrap_cli, "_create_default_runtime", fail_if_created)
+    monkeypatch.setattr(agent_runtime_bootstrap, "_create_default_runtime", fail_if_created)
     selected_context_runtime = FakeSelectedContextRuntime()
 
     exit_code = run_cli(
@@ -321,7 +321,7 @@ def test_product_run_without_selected_context_does_not_create_selected_context_r
         msg = "plain run must not create an unused selected-context runtime"
         raise AssertionError(msg)
 
-    monkeypatch.setattr(bootstrap_cli, "_create_default_selected_context_runtime", fail_if_created)
+    monkeypatch.setattr(agent_runtime_bootstrap, "_create_default_selected_context_runtime", fail_if_created)
     runtime = FakeRuntime(result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="pong"))
 
     exit_code = run_cli(

@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import NoReturn
 
+import fabrica.bootstrap.cli.entrypoint as cli_entrypoint
 from fabrica import bootstrap
 from fabrica.adapters.inbound.cli import RegistrationError
 from fabrica.bootstrap import cli as bootstrap_cli
@@ -96,7 +97,7 @@ def test_bootstrap_option_defaults_preserve_safe_composition_contract() -> None:
 
 def test_product_cli_model_evidence_contract_uses_shared_kernel_owner() -> None:
     """Keep feature-neutral CLI evidence protocols pointed at the shared kernel."""
-    bootstrap_cli_source = Path("src/fabrica/bootstrap/cli.py").read_text(encoding="utf-8")
+    bootstrap_cli_source = Path("src/fabrica/bootstrap/cli/model_evidence.py").read_text(encoding="utf-8")
 
     assert "from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence" in bootstrap_cli_source
     assert (
@@ -116,7 +117,7 @@ def test_product_cli_translates_bootstrap_wiring_errors_to_stable_stderr(
         msg = "synthetic CLI wiring failure"
         raise RegistrationError(msg)
 
-    monkeypatch.setattr(bootstrap_cli, "create_cli_command_registrars", fail_command_registration_creation)
+    monkeypatch.setattr(cli_entrypoint, "create_cli_command_registrars", fail_command_registration_creation)
 
     exit_code = bootstrap_cli.main(())
 

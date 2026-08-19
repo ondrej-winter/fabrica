@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from io import StringIO
 from typing import TYPE_CHECKING, TextIO
 
-import fabrica.bootstrap.cli as bootstrap_cli
+import fabrica.bootstrap.cli.features.agent_runtime as agent_runtime_bootstrap
 from fabrica.bootstrap.cli import run_cli
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import CliScriptPolicyCommand
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliStreams
@@ -164,7 +164,7 @@ def test_script_policy_default_composition_does_not_create_codex_runtime(
         msg = "script-policy must not create the Codex runtime"
         raise AssertionError(msg)
 
-    monkeypatch.setattr(bootstrap_cli, "_create_default_runtime", fail_if_runtime_is_created)
+    monkeypatch.setattr(agent_runtime_bootstrap, "_create_default_runtime", fail_if_runtime_is_created)
     _write_script(tmp_path, "python-testing", "scripts/check.py", "print('not executed by policy inspection')\n")
 
     exit_code = run_cli(
