@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import pytest
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 
 from fabrica.bootstrap import (
@@ -206,6 +207,20 @@ def test_model_driven_skill_runtime_does_not_expose_unselected_or_script_deferre
     assert declarations[1].status is SkillToolExposureStatus.UNKNOWN_SELECTION
     assert script_deferred.exposes_model_tool is False
     assert script_deferred.tool is None
+
+
+def test_model_driven_skill_runtime_rejects_explicit_zero_tool_limit() -> None:
+    """Keep explicit invalid composition limits from being replaced by defaults."""
+    with pytest.raises(ValueError, match="max_selected_tools must be at least 1"):
+        create_model_driven_skill_runtime(
+            model=SyntheticSkillToolAwareModel(),
+            options=ModelDrivenSkillRuntimeOptions(
+                skill_context_options=SkillContextAugmentationOptions(
+                    skill_selections=(SelectedSkill(skill_id="python-testing"),),
+                ),
+                max_selected_tools=0,
+            ),
+        )
 
 
 def _skill_lookup_tool(skill_id: str) -> SkillAssociatedRegisteredTool:

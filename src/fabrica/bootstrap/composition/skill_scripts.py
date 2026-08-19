@@ -78,10 +78,13 @@ def create_skill_script_policy_evaluator(
     """
     policy_options = options or SkillScriptPolicyEvaluationOptions()
     sandbox_policy = policy_options.sandbox_policy
+    max_script_bytes = (
+        sandbox_policy.max_script_bytes if policy_options.max_script_bytes is None else policy_options.max_script_bytes
+    )
     return EvaluateSkillScriptPolicy(
         metadata_loader=SkillScriptFileMetadataLoader(
             skill_roots=policy_options.skill_roots,
-            max_script_bytes=policy_options.max_script_bytes or sandbox_policy.max_script_bytes,
+            max_script_bytes=max_script_bytes,
             verbose_diagnostics=policy_options.verbose_diagnostics,
         ),
         approval_lookup=policy_options.approval_lookup or DenyByDefaultSkillScriptApprovalLookup(),
@@ -99,12 +102,17 @@ def create_skill_script_executor(
     call backends.
     """
     execution_options = options or SkillScriptExecutionOptions()
-    skill_roots = execution_options.skill_roots or (DEFAULT_SKILL_ROOT,)
+    skill_roots = (DEFAULT_SKILL_ROOT,) if execution_options.skill_roots is None else execution_options.skill_roots
+    max_script_bytes = (
+        execution_options.sandbox_policy.max_script_bytes
+        if execution_options.max_script_bytes is None
+        else execution_options.max_script_bytes
+    )
     policy_evaluator = create_skill_script_policy_evaluator(
         SkillScriptPolicyEvaluationOptions(
             skill_roots=skill_roots,
             sandbox_policy=execution_options.sandbox_policy,
-            max_script_bytes=execution_options.max_script_bytes,
+            max_script_bytes=max_script_bytes,
             verbose_diagnostics=execution_options.verbose_diagnostics,
             approval_lookup=execution_options.approval_lookup,
         ),
@@ -112,7 +120,7 @@ def create_skill_script_executor(
     executor = SkillScriptSubprocessExecutor(
         snapshot_loader=SkillScriptFileMetadataLoader(
             skill_roots=skill_roots,
-            max_script_bytes=execution_options.max_script_bytes or execution_options.sandbox_policy.max_script_bytes,
+            max_script_bytes=max_script_bytes,
             verbose_diagnostics=execution_options.verbose_diagnostics,
         ),
         settings=SkillScriptSubprocessExecutionSettings(

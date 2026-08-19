@@ -304,10 +304,10 @@ details, response mapping, and usage evidence remain isolated in
 Create the composed runtime from the composition root:
 
 ```python
-from fabrica.bootstrap import create_codex_local_agent_runtime
+from fabrica.bootstrap import create_codex_runtime
 from fabrica.features.agent_runtime.application.dtos import LocalAgentRunCommand
 
-runtime = create_codex_local_agent_runtime()
+runtime = create_codex_runtime()
 result = runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong"))
 
 if result.succeeded:
@@ -369,7 +369,7 @@ credentials, call a backend, load skill roots, or execute scripts.
 ```python
 from dataclasses import dataclass
 
-from fabrica.bootstrap import create_pydantic_ai_local_agent_runtime
+from fabrica.bootstrap import create_pydantic_ai_runtime
 from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model import (
     PydanticAICompletionRequest,
 )
@@ -382,7 +382,7 @@ class SyntheticCompletion:
         return f"received: {request.prompt}"
 
 
-runtime = create_pydantic_ai_local_agent_runtime(completion=SyntheticCompletion())
+runtime = create_pydantic_ai_runtime(completion=SyntheticCompletion())
 result = runtime.run(LocalAgentRunCommand(prompt="Reply with pong"))
 ```
 
@@ -396,10 +396,10 @@ skill discovery, or sandboxing.
 For a Codex-backed PydanticAI composition experiment, use the dedicated helper:
 
 ```python
-from fabrica.bootstrap import create_codex_pydantic_ai_local_agent_runtime
+from fabrica.bootstrap import create_codex_pydantic_ai_runtime
 from fabrica.features.agent_runtime.application.dtos import LocalAgentRunCommand
 
-runtime = create_codex_pydantic_ai_local_agent_runtime()
+runtime = create_codex_pydantic_ai_runtime()
 result = runtime.run(LocalAgentRunCommand(prompt="Reply with pong"))
 ```
 
@@ -641,7 +641,7 @@ Use the composition helper with an injected tool-aware model and explicit tools:
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from fabrica.bootstrap import create_registered_tool_loop_runtime
+from fabrica.bootstrap import create_tool_loop_runtime
 from fabrica.features.agent_runtime.adapters.outbound.registered_tool import RegisteredTool
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
@@ -680,7 +680,7 @@ def lookup_note(arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
     return f"note:{note_id}"
 
 
-runtime = create_registered_tool_loop_runtime(
+runtime = create_tool_loop_runtime(
     model=SyntheticToolAwareModel(),
     tools=(
         RegisteredTool(
@@ -715,11 +715,11 @@ The PydanticAI-shaped tool-aware adapter can also be composed into the same
 registered-tool loop for offline integration proofs:
 
 ```python
-from fabrica.bootstrap import create_pydantic_ai_registered_tool_loop_runtime
+from fabrica.bootstrap import create_pydantic_ai_tool_loop_runtime
 from fabrica.features.agent_runtime.adapters.outbound.registered_tool import RegisteredTool
 from fabrica.features.agent_runtime.application.dtos import LocalAgentRunCommand, ToolDefinition
 
-runtime = create_pydantic_ai_registered_tool_loop_runtime(
+runtime = create_pydantic_ai_tool_loop_runtime(
     turn_runner=my_synthetic_pydantic_ai_turn_runner,
     tools=(
         RegisteredTool(
@@ -756,14 +756,14 @@ from pathlib import Path
 
 from fabrica.bootstrap import (
     StagedGitToolOptions,
-    create_registered_tool_loop_runtime,
+    create_tool_loop_runtime,
     create_staged_git_registered_tools,
 )
 
 tools = create_staged_git_registered_tools(
     StagedGitToolOptions(working_directory=Path.cwd()),
 )
-runtime = create_registered_tool_loop_runtime(
+runtime = create_tool_loop_runtime(
     model=my_tool_aware_model,
     tools=tools,
 )

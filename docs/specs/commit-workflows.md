@@ -80,6 +80,9 @@ The generation flow has three phases:
 2. **Per-file evidence analysis**
    - Load only one staged file diff at a time through `load_file_diff(path)`.
    - Run one evidence analysis model call or session for each staged file.
+   - Implementations may analyze multiple staged files concurrently through a
+     bounded query-execution port, but final evidence ordering must remain
+     deterministic and follow staged file order.
    - Summarize each file's relevant staged change briefly and factually.
    - Classify each change using categories such as behavior, tests, docs,
      configuration, architecture, refactor, or maintenance.
@@ -281,9 +284,9 @@ no commit is created after answering anything other than explicit yes.
 - Ask before changing the command name away from `fabrica commit`.
 - Ask before adding edit, regenerate, JSON output, auto-staging, hook bypassing,
   auto-push, or non-interactive approval behavior.
-- Ask before adding parallel per-file analysis, partial-evidence synthesis,
-  chunked large-diff orchestration, or model-callable git tools to commit-message
-  generation.
+- Ask before adding partial-evidence synthesis, chunked large-diff orchestration,
+  model-callable git tools, or changing the bounded parallel analysis semantics
+  for commit-message generation.
 - Never mutate repository state in `fabrica commit-message`.
 - Never silently fall back to unstaged changes.
 - Never require the final commit body to list every changed file by default.

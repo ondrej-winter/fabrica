@@ -128,6 +128,23 @@ def test_skill_script_policy_composition_uses_declared_sandbox_defaults(tmp_path
     }
 
 
+def test_skill_script_policy_composition_preserves_explicit_zero_byte_limit(tmp_path: Path) -> None:
+    """Keep explicit zero byte limits from being replaced by sandbox defaults."""
+    _write_script(tmp_path, "python-testing", "scripts/check.py", "x")
+    evaluator = create_skill_script_policy_evaluator(
+        SkillScriptPolicyEvaluationOptions(skill_roots=(tmp_path,), max_script_bytes=0),
+    )
+
+    result = evaluator.evaluate(
+        SkillScriptPolicyEvaluationCommand(
+            selection=SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py"),
+        ),
+    )
+
+    assert result.status is SkillScriptPolicyStatus.METADATA_ERROR
+    assert result.observations[0].metadata["category"] == "script_size_exceeds_adapter_limit"
+
+
 def test_skill_script_policy_composition_keeps_safe_diagnostics_by_default(tmp_path: Path) -> None:
     evaluator = create_skill_script_policy_evaluator(
         SkillScriptPolicyEvaluationOptions(skill_roots=(tmp_path,)),

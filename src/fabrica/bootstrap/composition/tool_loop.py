@@ -141,11 +141,16 @@ def create_model_driven_skill_runtime(
     """
     runtime_options = options or ModelDrivenSkillRuntimeOptions()
     context_options = runtime_options.skill_context_options
+    max_selected_tools = (
+        len(runtime_options.skill_tools) or 1
+        if runtime_options.max_selected_tools is None
+        else runtime_options.max_selected_tools
+    )
     preparer = PrepareSkillTools(preparer=RegisteredSkillToolPreparer(runtime_options.skill_tools))
     preparation = preparer.prepare(
         SkillToolPreparationCommand(
             selected_skills=context_options.skill_selections,
-            max_selected_tools=runtime_options.max_selected_tools or len(runtime_options.skill_tools) or 1,
+            max_selected_tools=max_selected_tools,
         ),
     )
     registered_tools = tuple(

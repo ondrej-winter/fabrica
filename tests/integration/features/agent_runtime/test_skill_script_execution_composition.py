@@ -95,6 +95,21 @@ def test_skill_script_execution_factory_does_not_read_skill_roots_during_constru
     assert result.observations[0].metadata["policy_status"] == "metadata_error"
 
 
+def test_skill_script_execution_composition_preserves_explicit_empty_skill_roots(tmp_path: Path) -> None:
+    """Keep explicit empty roots from widening access to the default skill root."""
+    _write_script(tmp_path, "python-testing", "scripts/check.py", "print('must not run')\n")
+
+    executor = create_skill_script_executor(SkillScriptExecutionOptions(skill_roots=()))
+    result = executor.execute(
+        SkillScriptExecutionCommand(
+            selection=SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py"),
+        ),
+    )
+
+    assert result.status is SkillScriptExecutionStatus.POLICY_DENIED
+    assert result.observations[0].metadata["policy_status"] == "metadata_error"
+
+
 def test_existing_policy_only_helper_remains_inert_when_execution_helper_exists(tmp_path: Path) -> None:
     script = _write_script(tmp_path, "python-testing", "scripts/check.py", "print('not executed')\n")
     selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")

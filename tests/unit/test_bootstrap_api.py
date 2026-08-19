@@ -92,6 +92,20 @@ def test_bootstrap_package_import_does_not_eagerly_load_composition_modules() ->
     assert "fabrica.bootstrap.composition.codex_runtime" not in sys.modules
 
 
+def test_readme_uses_current_bootstrap_runtime_helper_names() -> None:
+    """Keep documented Python API examples aligned with exported bootstrap names."""
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "create_codex_runtime" in readme
+    assert "create_pydantic_ai_runtime" in readme
+    assert "create_codex_pydantic_ai_runtime" in readme
+    assert "create_codex_local_agent_runtime" not in readme
+    assert "create_pydantic_ai_local_agent_runtime" not in readme
+    assert "create_codex_pydantic_ai_local_agent_runtime" not in readme
+    assert "create_registered_tool_loop_runtime" not in readme
+    assert "create_pydantic_ai_registered_tool_loop_runtime" not in readme
+
+
 def test_bootstrap_option_defaults_preserve_safe_composition_contract() -> None:
     """Document safety-relevant defaults for bootstrap option DTOs."""
     script_policy = bootstrap.SkillScriptPolicyEvaluationOptions()

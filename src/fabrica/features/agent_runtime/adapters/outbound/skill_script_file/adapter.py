@@ -41,7 +41,7 @@ class SkillScriptFileMetadataLoader:
         max_script_bytes: int = DEFAULT_MAX_SKILL_SCRIPT_BYTES,
         verbose_diagnostics: bool = False,
     ) -> None:
-        self._skill_roots = tuple(skill_roots or (DEFAULT_SKILL_ROOT,))
+        self._skill_roots = (DEFAULT_SKILL_ROOT,) if skill_roots is None else tuple(skill_roots)
         self._max_script_bytes = max_script_bytes
         self._verbose_diagnostics = verbose_diagnostics
 
