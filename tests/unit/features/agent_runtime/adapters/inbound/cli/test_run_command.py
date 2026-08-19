@@ -47,19 +47,24 @@ EXPECTED_MODEL_ERROR_EXIT_CODE = 3
 EXPECTED_BOUNDED_OUTPUT_LINE_CHARS = 4_000
 
 
-def run_feature_cli_command(  # noqa: PLR0913
+@dataclass
+class RunCommandHarness:
+    runtime: FakeRuntime | None = None
+    selected_context_runtime: FakeSelectedContextRuntime | None = None
+    global_options: GlobalOptions | None = None
+    stdout: TextIO | None = None
+    stderr: TextIO | None = None
+
+
+def run_feature_cli_command(
     command: CliRunCommand,
     *,
-    runtime: FakeRuntime | None = None,
-    selected_context_runtime: FakeSelectedContextRuntime | None = None,
-    global_options: GlobalOptions | None = None,
-    stdout: TextIO | None = None,
-    stderr: TextIO | None = None,
+    harness: RunCommandHarness,
 ) -> int:
-    options = global_options or GlobalOptions()
-    streams = AgentRuntimeCliStreams(stdout=stdout or StringIO(), stderr=stderr or StringIO())
+    options = harness.global_options or GlobalOptions()
+    streams = AgentRuntimeCliStreams(stdout=harness.stdout or StringIO(), stderr=harness.stderr or StringIO())
     if command.skill_ids or command.resources:
-        assert selected_context_runtime is not None
+        assert harness.selected_context_runtime is not None
         return run_selected_context_agent_cli_command(
             command,
             options=AgentRuntimeCliOptions(
@@ -67,11 +72,11 @@ def run_feature_cli_command(  # noqa: PLR0913
                 print_prices=options.print_prices,
             ),
             streams=streams,
-            runtime=selected_context_runtime,
+            runtime=harness.selected_context_runtime,
             evidence_writer=_write_evidence,
         )
 
-    assert runtime is not None
+    assert harness.runtime is not None
     return run_local_agent_cli_command(
         command,
         options=AgentRuntimeCliOptions(
@@ -79,7 +84,7 @@ def run_feature_cli_command(  # noqa: PLR0913
             print_prices=options.print_prices,
         ),
         streams=streams,
-        runtime=runtime,
+        runtime=harness.runtime,
         evidence_writer=_write_evidence,
     )
 
@@ -147,9 +152,7 @@ def test_run_command_maps_prompt_to_runtime_command() -> None:
 
     exit_code = run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong"),
-        runtime=runtime,
-        stdout=stdout,
-        stderr=stderr,
+        harness=RunCommandHarness(runtime=runtime, stdout=stdout, stderr=stderr),
     )
 
     assert exit_code == 0
@@ -167,9 +170,7 @@ def test_run_command_writes_success_output_without_cli_line_truncation() -> None
 
     exit_code = run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong"),
-        runtime=runtime,
-        stdout=stdout,
-        stderr=StringIO(),
+        harness=RunCommandHarness(runtime=runtime, stdout=stdout, stderr=StringIO()),
     )
 
     assert exit_code == 0
@@ -186,9 +187,9 @@ def test_run_command_uses_injected_augmenter_for_explicit_selected_context() -> 
             skill_ids=("python-testing",),
             resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
         ),
-        selected_context_runtime=selected_context_runtime,
-        stdout=StringIO(),
-        stderr=StringIO(),
+        harness=RunCommandHarness(
+            selected_context_runtime=selected_context_runtime, stdout=StringIO(), stderr=StringIO()
+        ),
     )
 
     assert exit_code == 0
@@ -207,9 +208,9 @@ def test_run_command_uses_selected_context_runtime_with_selected_skill() -> None
 
     exit_code = run_feature_cli_command(
         CliRunCommand(prompt="Use selected context", skill_ids=("python-testing",)),
-        selected_context_runtime=selected_context_runtime,
-        stdout=StringIO(),
-        stderr=StringIO(),
+        harness=RunCommandHarness(
+            selected_context_runtime=selected_context_runtime, stdout=StringIO(), stderr=StringIO()
+        ),
     )
 
     assert exit_code == 0
@@ -251,10 +252,12 @@ def test_run_command_appends_requested_usage_and_price_evidence() -> None:
 
     exit_code = run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong"),
-        runtime=runtime,
-        global_options=GlobalOptions(print_usage=True, print_prices=True),
-        stdout=stdout,
-        stderr=StringIO(),
+        harness=RunCommandHarness(
+            runtime=runtime,
+            global_options=GlobalOptions(print_usage=True, print_prices=True),
+            stdout=stdout,
+            stderr=StringIO(),
+        ),
     )
 
     assert exit_code == 0
@@ -276,9 +279,7 @@ def test_run_command_skips_augmentation_when_no_context_is_selected() -> None:
 
     run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong"),
-        runtime=runtime,
-        stdout=StringIO(),
-        stderr=StringIO(),
+        harness=RunCommandHarness(runtime=runtime, stdout=StringIO(), stderr=StringIO()),
     )
 
     assert selected_context_runtime.calls == []
@@ -352,9 +353,7 @@ def test_run_command_maps_non_success_status_to_stable_exit_code_and_stderr() ->
 
     exit_code = run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong"),
-        runtime=runtime,
-        stdout=stdout,
-        stderr=stderr,
+        harness=RunCommandHarness(runtime=runtime, stdout=stdout, stderr=stderr),
     )
 
     assert exit_code == EXPECTED_CONFIGURATION_ERROR_EXIT_CODE
@@ -381,9 +380,7 @@ def test_run_command_bounds_observation_metadata_for_safe_evidence_capture() -> 
 
     exit_code = run_feature_cli_command(
         CliRunCommand(prompt="Reply with pong"),
-        runtime=runtime,
-        stdout=StringIO(),
-        stderr=stderr,
+        harness=RunCommandHarness(runtime=runtime, stdout=StringIO(), stderr=stderr),
     )
 
     assert exit_code == EXPECTED_MODEL_ERROR_EXIT_CODE

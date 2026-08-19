@@ -147,5 +147,5 @@ def test_tool_loop_result_exposes_success_helper_and_is_immutable() -> None:
 
     assert result.succeeded is True
     with pytest.raises(FrozenInstanceError):
-        setattr(result, "status", ToolLoopRunStatus.MODEL_ERROR)  # noqa: B010
+        result.status = ToolLoopRunStatus.MODEL_ERROR  # ty: ignore[invalid-assignment]
     assert ToolLoopRunResult(status=ToolLoopRunStatus.MODEL_ERROR).succeeded is False

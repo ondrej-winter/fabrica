@@ -739,4 +739,4 @@ def test_synthetic_decoded_command_is_an_immutable_boundary_value() -> None:
     command = SyntheticDecodedCommand(global_options=GlobalOptions(), feature_value="value")
 
     with pytest.raises(FrozenInstanceError):
-        setattr(command, "feature_value", "changed")  # noqa: B010
+        command.feature_value = "changed"  # ty: ignore[invalid-assignment]

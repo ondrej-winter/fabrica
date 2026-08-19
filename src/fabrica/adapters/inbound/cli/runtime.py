@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence  # noqa: TC003 - public annotations must resolve at runtime.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TextIO
 
@@ -19,7 +18,7 @@ from fabrica.adapters.inbound.cli.options import global_options_from_namespace
 from fabrica.adapters.inbound.cli.parser import build_parser
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
 
 @dataclass(frozen=True, slots=True)

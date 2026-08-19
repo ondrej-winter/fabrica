@@ -5,6 +5,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from fabrica.bootstrap.cli.model_evidence import write_requested_model_evidence
+from fabrica.bootstrap.composition.codex_runtime import create_codex_runtime
+from fabrica.bootstrap.composition.skill_context import (
+    SkillContextAugmentationOptions,
+    create_selected_context_local_agent_runtime,
+)
+from fabrica.bootstrap.composition.skill_scripts import (
+    SkillScriptExecutionOptions,
+    SkillScriptPolicyEvaluationOptions,
+    create_skill_script_executor,
+    create_skill_script_policy_evaluator,
+)
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import (
     AgentRuntimeCliOptions,
     AgentRuntimeCliStreams,
@@ -15,6 +26,7 @@ from fabrica.features.agent_runtime.adapters.inbound.cli.runner import (
     run_script_policy_cli_command,
     run_selected_context_agent_cli_command,
 )
+from fabrica.features.agent_runtime.adapters.outbound.script_approval import MetadataBoundApprovalLookup
 
 if TYPE_CHECKING:
     from fabrica.adapters.inbound.cli import CommandContext
@@ -128,11 +140,6 @@ def _create_default_selected_context_runtime(
     composition_options: AgentRuntimeCliCompositionOptions,
     verbose_diagnostics: bool,
 ) -> SelectedContextLocalAgentRuntime:
-    from fabrica.bootstrap.composition.skill_context import (  # noqa: PLC0415
-        SkillContextAugmentationOptions,
-        create_selected_context_local_agent_runtime,
-    )
-
     return create_selected_context_local_agent_runtime(
         runtime=runtime,
         options=SkillContextAugmentationOptions(
@@ -143,8 +150,6 @@ def _create_default_selected_context_runtime(
 
 
 def _create_default_runtime() -> LocalAgentRuntime:
-    from fabrica.bootstrap.composition.codex_runtime import create_codex_runtime  # noqa: PLC0415
-
     return create_codex_runtime()
 
 
@@ -153,11 +158,6 @@ def _create_default_script_policy_evaluator(
     composition_options: AgentRuntimeCliCompositionOptions,
     verbose_diagnostics: bool,
 ) -> SkillScriptPolicyEvaluator:
-    from fabrica.bootstrap.composition.skill_scripts import (  # noqa: PLC0415
-        SkillScriptPolicyEvaluationOptions,
-        create_skill_script_policy_evaluator,
-    )
-
     return create_skill_script_policy_evaluator(
         SkillScriptPolicyEvaluationOptions(
             skill_roots=composition_options.skill_roots,
@@ -172,14 +172,6 @@ def _create_default_script_executor(
     composition_options: AgentRuntimeCliCompositionOptions,
     verbose_diagnostics: bool,
 ) -> SkillScriptRunner:
-    from fabrica.bootstrap.composition.skill_scripts import (  # noqa: PLC0415
-        SkillScriptExecutionOptions,
-        create_skill_script_executor,
-    )
-    from fabrica.features.agent_runtime.adapters.outbound.script_approval import (  # noqa: PLC0415
-        MetadataBoundApprovalLookup,
-    )
-
     return create_skill_script_executor(
         SkillScriptExecutionOptions(
             skill_roots=composition_options.skill_roots,

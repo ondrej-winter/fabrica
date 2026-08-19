@@ -16,6 +16,7 @@ from fabrica.features.codex_transport.application.exceptions import (
     CodexCredentialUnavailableError,
 )
 from fabrica.features.codex_transport.application.use_cases import CompleteWithCodexTransport
+from tests.synthetic_values import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
 
 
 @dataclass
@@ -49,8 +50,8 @@ class FakeCodexBackend:
 
 def test_complete_loads_credentials_and_executes_backend_completion() -> None:
     credentials = CodexCredentials(
-        access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-        account_id="synthetic-account",
+        access_token=CODEX_BEARER_VALUE,
+        account_id=CODEX_ACCOUNT_ID,
     )
     command = CodexCompletionCommand(prompt="Reply with the single word: pong")
     backend_result = CodexTransportResult(
@@ -106,8 +107,8 @@ def test_complete_returns_authentication_failed_for_credential_authentication_fa
 
 def test_complete_passes_through_backend_failure_result() -> None:
     credentials = CodexCredentials(
-        access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-        account_id="synthetic-account",
+        access_token=CODEX_BEARER_VALUE,
+        account_id=CODEX_ACCOUNT_ID,
     )
     command = CodexCompletionCommand(prompt="Reply with the single word: pong")
     backend_result = CodexTransportResult(

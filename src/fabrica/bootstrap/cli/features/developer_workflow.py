@@ -5,6 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from fabrica.bootstrap.cli.model_evidence import write_requested_model_evidence
+from fabrica.bootstrap.composition.developer_workflow import (
+    CommitMessageWorkflowOptions,
+    create_codex_commit_message_workflow,
+    create_codex_confirmed_commit_workflow,
+)
 from fabrica.features.developer_workflow.adapters.inbound.cli.contracts import (
     DeveloperWorkflowCliOptions,
     DeveloperWorkflowCliStreams,
@@ -89,11 +94,6 @@ def _create_default_commit_message_workflow(
     context: CommandContext,
     composition_options: CliDeveloperWorkflowCompositionOptions,
 ) -> CommitMessageWorkflowRunner:
-    from fabrica.bootstrap.composition.developer_workflow import (  # noqa: PLC0415
-        CommitMessageWorkflowOptions,
-        create_codex_commit_message_workflow,
-    )
-
     return create_codex_commit_message_workflow(
         CommitMessageWorkflowOptions(
             codex_model=composition_options.model,
@@ -109,11 +109,6 @@ def _create_default_confirmed_commit_workflow(
     context: CommandContext,
     composition_options: CliDeveloperWorkflowCompositionOptions,
 ) -> ConfirmedCommitWorkflowRunner:
-    from fabrica.bootstrap.composition.developer_workflow import (  # noqa: PLC0415
-        CommitMessageWorkflowOptions,
-        create_codex_confirmed_commit_workflow,
-    )
-
     return create_codex_confirmed_commit_workflow(
         CommitMessageWorkflowOptions(
             codex_model=composition_options.model,

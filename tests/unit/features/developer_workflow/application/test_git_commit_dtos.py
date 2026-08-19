@@ -38,4 +38,4 @@ def test_git_commit_dtos_are_immutable_boundary_values() -> None:
     command = CreateGitCommitCommand(message="feat: add boundary")
 
     with pytest.raises(FrozenInstanceError):
-        setattr(command, "message", "changed")  # noqa: B010
+        command.message = "changed"  # ty: ignore[invalid-assignment]

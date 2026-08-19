@@ -5,9 +5,10 @@ from pathlib import Path
 
 from fabrica.features.codex_transport.adapters.outbound.codex_auth_file import CodexAuthFileCredentialStore
 from fabrica.features.codex_transport.application.dtos import CodexCredentials
+from tests.synthetic_values import CODEX_ACCOUNT_ID_WITH_SUFFIX, CODEX_BEARER_VALUE
 
-SYNTHETIC_ACCESS_TOKEN = "synthetic-access-token"  # noqa: S105 - synthetic test value, not a secret.
-SYNTHETIC_ACCOUNT_ID = "synthetic-account-id"
+SYNTHETIC_ACCESS_TOKEN = CODEX_BEARER_VALUE
+SYNTHETIC_ACCOUNT_ID = CODEX_ACCOUNT_ID_WITH_SUFFIX
 
 
 def test_auth_file_adapter_reads_synthetic_temp_file_without_mutating_it(tmp_path: Path) -> None:

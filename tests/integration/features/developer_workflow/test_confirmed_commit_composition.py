@@ -1,6 +1,7 @@
 """Offline integration tests for confirmed commit workflow composition."""
 
 import json
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,6 +39,8 @@ from fabrica.features.developer_workflow.application.dtos import (
 )
 from fabrica.features.developer_workflow.application.ports import GitCommitError
 from fabrica.features.developer_workflow.application.use_cases import ConfirmedCommitWorkflow
+
+GIT_EXECUTABLE = shutil.which("git") or "git"
 
 
 @dataclass
@@ -429,12 +432,10 @@ def _install_failing_pre_commit_hook(git_repository: Path) -> None:
 
 
 def _git_commit_count(git_repository: Path) -> int:
-    result = subprocess.run(
-        ("git", "rev-list", "--count", "HEAD"),  # noqa: S607
+    result = _run_git(
+        (GIT_EXECUTABLE, "rev-list", "--count", "HEAD"),
         cwd=git_repository,
         check=False,
-        capture_output=True,
-        text=True,
     )
     if result.returncode != 0:
         return 0
@@ -442,36 +443,32 @@ def _git_commit_count(git_repository: Path) -> int:
 
 
 def _git_staged_file_names(git_repository: Path) -> tuple[str, ...]:
-    result = subprocess.run(
-        ("git", "diff", "--cached", "--name-only"),  # noqa: S607
+    result = _run_git(
+        (GIT_EXECUTABLE, "diff", "--cached", "--name-only"),
         cwd=git_repository,
-        check=True,
-        capture_output=True,
-        text=True,
     )
     return tuple(line for line in result.stdout.splitlines() if line)
 
 
 def _git_unstaged_file_names(git_repository: Path) -> tuple[str, ...]:
-    result = subprocess.run(
-        ("git", "diff", "--name-only"),  # noqa: S607
+    result = _run_git(
+        (GIT_EXECUTABLE, "diff", "--name-only"),
         cwd=git_repository,
-        check=True,
-        capture_output=True,
-        text=True,
     )
     return tuple(line for line in result.stdout.splitlines() if line)
 
 
 def _git_log_message(git_repository: Path) -> str:
-    return subprocess.run(
-        ("git", "log", "-1", "--pretty=%B"),  # noqa: S607
+    return _run_git(
+        (GIT_EXECUTABLE, "log", "-1", "--pretty=%B"),
         cwd=git_repository,
-        check=True,
-        capture_output=True,
-        text=True,
     ).stdout.strip()
 
 
-def _run_git(argv: tuple[str, ...], *, cwd: Path) -> None:
-    subprocess.run(argv, cwd=cwd, check=True, capture_output=True)  # noqa: S603
+def _run_git(
+    argv: tuple[str, ...],
+    *,
+    cwd: Path,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(argv, cwd=cwd, check=check, capture_output=True, text=True)  # noqa: S603

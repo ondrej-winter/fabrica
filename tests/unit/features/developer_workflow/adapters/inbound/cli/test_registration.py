@@ -278,8 +278,10 @@ def test_parsed_developer_workflow_commands_are_immutable_boundary_values() -> N
     commit_message_invocation = parse_args(("commit-message",))
     commit_invocation = parse_args(("commit",))
 
+    assert isinstance(commit_message_invocation.command, CliCommitMessageCommand)
     with pytest.raises(FrozenInstanceError):
-        setattr(commit_message_invocation.command, "skill_id", "changed")  # noqa: B010
+        commit_message_invocation.command.skill_id = "changed"  # ty: ignore[invalid-assignment]
+    assert isinstance(commit_invocation.command, CliCommitCommand)
     with pytest.raises(FrozenInstanceError):
-        setattr(commit_invocation.command, "skill_id", "changed")  # noqa: B010
+        commit_invocation.command.skill_id = "changed"  # ty: ignore[invalid-assignment]
     assert isinstance(commit_invocation.composition_options.skill_roots, tuple)

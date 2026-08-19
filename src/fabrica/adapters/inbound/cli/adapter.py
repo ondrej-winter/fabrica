@@ -1,13 +1,9 @@
 """Public entry point for the feature-neutral product CLI shell."""
 
-from __future__ import annotations
-
-from collections.abc import Sequence  # noqa: TC003 - public annotations must resolve at runtime.
+from collections.abc import Sequence
 from typing import TextIO
 
-from fabrica.adapters.inbound.cli.command import (
-    CommandRegistrar,  # noqa: TC001 - public annotations must resolve at runtime.
-)
+from fabrica.adapters.inbound.cli.command import CommandRegistrar
 from fabrica.adapters.inbound.cli.runtime import parse_invocation
 
 __all__ = ["run_cli"]

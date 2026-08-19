@@ -23,6 +23,7 @@ from fabrica.shared_kernel.model_usage import (
     ModelUsageEvidenceSource,
     ModelUsageObservation,
 )
+from tests.synthetic_values import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
 
 
 def test_transport_status_values_match_normalized_contract() -> None:
@@ -92,7 +93,7 @@ def test_result_carries_generic_usage_and_cost_evidence_immutably() -> None:
     assert result.usage_evidence == (usage_evidence,)
     assert result.cost_evidence == (cost_evidence,)
     with pytest.raises(FrozenInstanceError):
-        setattr(result, "usage_evidence", ())  # noqa: B010
+        result.usage_evidence = ()  # ty: ignore[invalid-assignment]
 
 
 def test_non_success_result_can_carry_failed_or_unavailable_evidence() -> None:
@@ -164,10 +165,11 @@ def test_observation_rejects_non_scalar_metadata_values() -> None:
 
 
 def test_credentials_are_immutable_secret_bearing_boundary_values() -> None:
-    access_token = "synthetic-token"  # noqa: S105 - synthetic test value, not a secret.
-    credentials = CodexCredentials(access_token=access_token, account_id="synthetic-account")
+    access_token = CODEX_BEARER_VALUE
+    credentials = CodexCredentials(access_token=access_token, account_id=CODEX_ACCOUNT_ID)
+    replacement = "replacement"
 
     assert credentials.access_token == access_token
     assert credentials.account_id == "synthetic-account"
     with pytest.raises(FrozenInstanceError):
-        setattr(credentials, "access_token", "replacement")  # noqa: B010
+        credentials.access_token = replacement  # ty: ignore[invalid-assignment]

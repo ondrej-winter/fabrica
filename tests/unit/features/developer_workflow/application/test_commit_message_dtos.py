@@ -135,7 +135,7 @@ def test_commit_message_recommendation_and_workflow_result_are_immutable_boundar
     assert result.recommendation is recommendation
     assert result.evidence_bundle is bundle
     with pytest.raises(FrozenInstanceError):
-        setattr(recommendation, "summary", "changed")  # noqa: B010
+        recommendation.summary = "changed"  # ty: ignore[invalid-assignment]
 
 
 @pytest.mark.parametrize("field_name", ["summary", "rationale", "commit_message"])

@@ -134,6 +134,6 @@ def test_runtime_dtos_are_immutable_boundary_values() -> None:
     result = LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS)
 
     with pytest.raises(FrozenInstanceError):
-        setattr(command, "prompt", "changed")  # noqa: B010
+        command.prompt = "changed"  # ty: ignore[invalid-assignment]
     with pytest.raises(FrozenInstanceError):
-        setattr(result, "status", LocalAgentRunStatus.MODEL_ERROR)  # noqa: B010
+        result.status = LocalAgentRunStatus.MODEL_ERROR  # ty: ignore[invalid-assignment]

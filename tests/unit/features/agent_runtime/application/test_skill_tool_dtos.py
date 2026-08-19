@@ -43,7 +43,7 @@ def test_registered_skill_tool_declaration_exposes_tool_definition() -> None:
     assert declaration.exposes_model_tool is True
     assert SkillToolPreparationResult(declarations=(declaration,)).tool_definitions == (tool,)
     with pytest.raises(FrozenInstanceError):
-        setattr(declaration, "status", SkillToolExposureStatus.DENIED)  # noqa: B010
+        declaration.status = SkillToolExposureStatus.DENIED  # ty: ignore[invalid-assignment]
     with pytest.raises(TypeError):
         cast("dict[str, object]", declaration.metadata)["source"] = "changed"
 

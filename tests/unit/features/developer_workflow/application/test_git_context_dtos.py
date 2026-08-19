@@ -81,7 +81,7 @@ def test_changed_file_list_is_immutable_and_validates_canonical_membership() -> 
     with pytest.raises(ValueError, match="git context path"):
         changed_files.contains_path("../src/file.py")
     with pytest.raises(FrozenInstanceError):
-        setattr(changed_files, "files", ())  # noqa: B010
+        changed_files.files = ()  # ty: ignore[invalid-assignment]
 
 
 def test_changed_file_list_rejects_empty_list() -> None:
@@ -181,7 +181,7 @@ def test_commit_and_ref_result_dtos_are_immutable_boundary_values() -> None:
     assert ahead_behind.ahead_count == EXPECTED_AHEAD_COUNT
     assert merge_base.short_hash == "1234567"
     with pytest.raises(FrozenInstanceError):
-        setattr(commit, "subject", "changed")  # noqa: B010
+        commit.subject = "changed"  # ty: ignore[invalid-assignment]
 
 
 def test_commit_details_rejects_oversized_message_body() -> None:

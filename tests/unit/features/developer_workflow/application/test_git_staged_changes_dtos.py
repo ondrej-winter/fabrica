@@ -42,7 +42,7 @@ def test_staged_diff_is_immutable_boundary_value() -> None:
     diff = GitStagedDiff(text="diff --git a/file.py b/file.py\n")
 
     with pytest.raises(FrozenInstanceError):
-        setattr(diff, "text", "changed")  # noqa: B010
+        diff.text = "changed"  # ty: ignore[invalid-assignment]
 
 
 def test_staged_file_accepts_safe_relative_path_and_status() -> None:
@@ -81,7 +81,7 @@ def test_staged_file_list_is_immutable_and_validates_membership() -> None:
     with pytest.raises(ValueError, match="staged file path"):
         staged_files.contains_path("../src/file.py")
     with pytest.raises(FrozenInstanceError):
-        setattr(staged_files, "files", ())  # noqa: B010
+        staged_files.files = ()  # ty: ignore[invalid-assignment]
 
 
 def test_staged_file_list_rejects_empty_list() -> None:

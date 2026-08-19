@@ -60,6 +60,6 @@ class EnvSettings(BaseSettings):
 def load_settings_from_env() -> EnvSettings:
     """Load and validate environment-backed settings."""
     try:
-        return EnvSettings()  # type: ignore[call-arg]
+        return EnvSettings()
     except ValidationError as exc:
         raise ConfigurationError(INVALID_CONFIGURATION_ERROR) from exc

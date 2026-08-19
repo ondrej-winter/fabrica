@@ -11,9 +11,10 @@ from fabrica.features.codex_transport.application.exceptions import (
     CodexCredentialAuthenticationError,
     CodexCredentialUnavailableError,
 )
+from tests.synthetic_values import CODEX_ACCOUNT_ID_WITH_SUFFIX, CODEX_BEARER_VALUE
 
-SYNTHETIC_ACCESS_TOKEN = "synthetic-access-token"  # noqa: S105 - synthetic test value, not a secret.
-SYNTHETIC_ACCOUNT_ID = "synthetic-account-id"
+SYNTHETIC_ACCESS_TOKEN = CODEX_BEARER_VALUE
+SYNTHETIC_ACCOUNT_ID = CODEX_ACCOUNT_ID_WITH_SUFFIX
 
 
 def test_load_returns_credentials_from_chatgpt_auth_file(tmp_path: Path) -> None:

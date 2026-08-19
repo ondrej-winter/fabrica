@@ -38,16 +38,21 @@ from fabrica.shared_kernel.model_usage import (
 EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2
 
 
-def run_feature_cli_command(  # noqa: PLR0913
+@dataclass
+class CommitMessageCommandHarness:
+    workflow: FakeCommitMessageWorkflow
+    global_options: GlobalOptions | None = None
+    stdin: TextIO | None = None
+    stdout: TextIO | None = None
+    stderr: TextIO | None = None
+
+
+def run_feature_cli_command(
     command: CliCommitMessageCommand,
     *,
-    workflow: FakeCommitMessageWorkflow,
-    global_options: GlobalOptions | None = None,
-    stdin: TextIO | None = None,
-    stdout: TextIO | None = None,
-    stderr: TextIO | None = None,
+    harness: CommitMessageCommandHarness,
 ) -> int:
-    options = global_options or GlobalOptions()
+    options = harness.global_options or GlobalOptions()
     return run_commit_message_cli_command(
         command,
         options=DeveloperWorkflowCliOptions(
@@ -55,11 +60,11 @@ def run_feature_cli_command(  # noqa: PLR0913
             print_prices=options.print_prices,
         ),
         streams=DeveloperWorkflowCliStreams(
-            stdin=stdin or StringIO(),
-            stdout=stdout or StringIO(),
-            stderr=stderr or StringIO(),
+            stdin=harness.stdin or StringIO(),
+            stdout=harness.stdout or StringIO(),
+            stderr=harness.stderr or StringIO(),
         ),
-        workflow=workflow,
+        workflow=harness.workflow,
         evidence_writer=_write_evidence,
     )
 
@@ -108,9 +113,7 @@ def test_commit_message_command_uses_injected_workflow_and_writes_success_output
 
     exit_code = run_feature_cli_command(
         command,
-        workflow=workflow,
-        stdout=stdout,
-        stderr=stderr,
+        harness=CommitMessageCommandHarness(workflow=workflow, stdout=stdout, stderr=stderr),
     )
 
     assert exit_code == 0
@@ -139,9 +142,7 @@ def test_commit_message_command_writes_success_output_without_cli_line_truncatio
 
     exit_code = run_feature_cli_command(
         CliCommitMessageCommand(),
-        workflow=workflow,
-        stdout=stdout,
-        stderr=StringIO(),
+        harness=CommitMessageCommandHarness(workflow=workflow, stdout=stdout, stderr=StringIO()),
     )
 
     assert exit_code == 0
@@ -183,10 +184,12 @@ def test_commit_message_invocation_appends_requested_usage_and_price_evidence() 
 
     exit_code = run_feature_cli_command(
         CliCommitMessageCommand(),
-        workflow=workflow,
-        global_options=GlobalOptions(print_usage=True, print_prices=True),
-        stdout=stdout,
-        stderr=StringIO(),
+        harness=CommitMessageCommandHarness(
+            workflow=workflow,
+            global_options=GlobalOptions(print_usage=True, print_prices=True),
+            stdout=stdout,
+            stderr=StringIO(),
+        ),
     )
 
     assert exit_code == 0
@@ -217,9 +220,7 @@ def test_commit_message_command_reports_pre_model_configuration_failures() -> No
 
     exit_code = run_feature_cli_command(
         CliCommitMessageCommand(),
-        workflow=workflow,
-        stdout=StringIO(),
-        stderr=stderr,
+        harness=CommitMessageCommandHarness(workflow=workflow, stdout=StringIO(), stderr=stderr),
     )
 
     assert exit_code == EXPECTED_CONFIGURATION_ERROR_EXIT_CODE

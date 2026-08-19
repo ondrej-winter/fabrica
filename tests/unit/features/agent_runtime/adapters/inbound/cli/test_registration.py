@@ -319,15 +319,18 @@ def test_parsed_agent_runtime_commands_are_immutable_boundary_values() -> None:
         ),
     )
 
+    assert isinstance(run_invocation.command, CliRunCommand)
     with pytest.raises(FrozenInstanceError):
-        setattr(run_invocation.command, "prompt", "changed")  # noqa: B010
+        run_invocation.command.prompt = "changed"  # ty: ignore[invalid-assignment]
     assert isinstance(context_invocation.command, CliRunCommand)
     assert isinstance(context_invocation.command.skill_ids, tuple)
     assert isinstance(context_invocation.command.resources, tuple)
     assert isinstance(context_invocation.composition_options.skill_roots, tuple)
     with pytest.raises(FrozenInstanceError):
-        setattr(context_invocation.composition_options, "skill_roots", ())  # noqa: B010
+        context_invocation.composition_options.skill_roots = ()  # ty: ignore[invalid-assignment]
+    assert isinstance(policy_invocation.command, CliScriptPolicyCommand)
     with pytest.raises(FrozenInstanceError):
-        setattr(policy_invocation.command, "script_id", "changed")  # noqa: B010
+        policy_invocation.command.script_id = "changed"  # ty: ignore[invalid-assignment]
+    assert isinstance(execution_invocation.command, CliScriptExecuteCommand)
     with pytest.raises(FrozenInstanceError):
-        setattr(execution_invocation.command, "script_id", "changed")  # noqa: B010
+        execution_invocation.command.script_id = "changed"  # ty: ignore[invalid-assignment]

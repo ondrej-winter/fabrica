@@ -15,8 +15,9 @@ from fabrica.features.agent_runtime.application.dtos import (
     SelectedSkillResource,
 )
 from fabrica.features.agent_runtime.application.ports import SkillContextLoadError
+from tests.synthetic_values import PRIVATE_FILE_CONTENT
 
-SYNTHETIC_SECRET = "synthetic-secret-token"  # noqa: S105 - synthetic test value, not a secret.
+SYNTHETIC_SECRET = PRIVATE_FILE_CONTENT
 
 
 def test_load_returns_loaded_skill_context_from_selected_skill_directory(tmp_path: Path) -> None:

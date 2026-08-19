@@ -109,7 +109,7 @@ def test_selected_skill_is_path_free_safe_and_immutable() -> None:
     with pytest.raises(TypeError):
         cast("dict[str, object]", selection.metadata)["priority"] = 3
     with pytest.raises(FrozenInstanceError):
-        setattr(selection, "skill_id", "changed")  # noqa: B010
+        selection.skill_id = "changed"  # ty: ignore[invalid-assignment]
 
 
 def test_selected_skill_rejects_unsafe_identifiers_and_labels() -> None:
@@ -166,7 +166,7 @@ def test_selected_skill_resource_is_path_free_safe_and_immutable() -> None:
     with pytest.raises(TypeError):
         cast("dict[str, object]", selection.metadata)["priority"] = 3
     with pytest.raises(FrozenInstanceError):
-        setattr(selection, "resource_id", "changed")  # noqa: B010
+        selection.resource_id = "changed"  # ty: ignore[invalid-assignment]
 
 
 def test_selected_skill_resource_rejects_unsafe_identifiers_and_labels() -> None:

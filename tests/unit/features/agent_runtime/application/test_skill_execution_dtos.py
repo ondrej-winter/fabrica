@@ -60,7 +60,7 @@ def test_selected_skill_script_is_path_free_safe_and_immutable() -> None:
     with pytest.raises(TypeError):
         cast("dict[str, object]", selection.metadata)["source"] = "mutated"
     with pytest.raises(FrozenInstanceError):
-        setattr(selection, "script_id", "changed.py")  # noqa: B010
+        selection.script_id = "changed.py"  # ty: ignore[invalid-assignment]
 
 
 def test_selected_skill_script_rejects_unsafe_identifiers_and_labels() -> None:
@@ -152,7 +152,7 @@ def test_script_snapshot_binds_immutable_content_to_selected_script_metadata() -
     with pytest.raises(TypeError):
         cast("dict[str, object]", snapshot.metadata)["file_name"] = "mutated.py"
     with pytest.raises(FrozenInstanceError):
-        setattr(snapshot, "content", b"changed")  # noqa: B010
+        snapshot.content = b"changed"  # ty: ignore[invalid-assignment]
 
 
 def test_script_snapshot_rejects_content_that_does_not_match_binding() -> None:

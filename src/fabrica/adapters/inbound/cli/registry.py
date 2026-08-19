@@ -124,11 +124,13 @@ def feature_owned_actions(
 
 def parser_actions(parser: argparse.ArgumentParser) -> list[argparse.Action]:
     """Return parser actions while localizing unavoidable argparse private-state access."""
+    # argparse has no public complete child-action API; keep private access behind this helper.
     return list(parser._actions)  # noqa: SLF001
 
 
 def explicit_parser_defaults(parser: argparse.ArgumentParser) -> dict[str, object]:
     """Return explicit parser defaults while localizing unavoidable argparse private-state access."""
+    # argparse stores explicit defaults privately; callers should use this helper instead of direct access.
     return dict(parser._defaults)  # noqa: SLF001
 
 

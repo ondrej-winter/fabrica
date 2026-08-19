@@ -8,8 +8,9 @@ import pytest
 from fabrica.features.agent_runtime.adapters.outbound.skill_script_file import SkillScriptFileMetadataLoader
 from fabrica.features.agent_runtime.application.dtos import SelectedSkillScript, SkillScriptSnapshot, SkillScriptType
 from fabrica.features.agent_runtime.application.ports import SkillScriptMetadataLoadError
+from tests.synthetic_values import PRIVATE_FILE_CONTENT
 
-SYNTHETIC_SECRET = "synthetic-secret-token"  # noqa: S105 - synthetic test value, not a secret.
+SYNTHETIC_SECRET = PRIVATE_FILE_CONTENT
 
 
 def test_load_metadata_returns_python_script_metadata_from_selected_script(tmp_path: Path) -> None:

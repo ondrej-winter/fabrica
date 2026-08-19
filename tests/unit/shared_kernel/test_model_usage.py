@@ -224,6 +224,6 @@ def test_usage_and_cost_evidence_are_immutable_boundary_values() -> None:
     )
 
     with pytest.raises(FrozenInstanceError):
-        setattr(usage_evidence, "provider", "changed")  # noqa: B010
+        usage_evidence.provider = "changed"  # ty: ignore[invalid-assignment]
     with pytest.raises(FrozenInstanceError):
-        setattr(cost_evidence, "currency", "EUR")  # noqa: B010
+        cost_evidence.currency = "EUR"  # ty: ignore[invalid-assignment]

@@ -19,6 +19,7 @@ from fabrica.features.codex_transport.application.exceptions import (
     CodexCredentialUnavailableError,
 )
 from fabrica.features.codex_transport.application.use_cases import ProbeCodexUsage
+from tests.synthetic_values import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
 
 
 @dataclass
@@ -52,8 +53,8 @@ class FakeUsageBackend:
 
 def test_probe_loads_credentials_and_fetches_usage_evidence() -> None:
     credentials = CodexCredentials(
-        access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-        account_id="synthetic-account",
+        access_token=CODEX_BEARER_VALUE,
+        account_id=CODEX_ACCOUNT_ID,
     )
     command = CodexUsageProbeCommand()
     backend_result = CodexUsageResult(

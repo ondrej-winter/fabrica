@@ -39,16 +39,21 @@ EXPECTED_CONFIGURATION_ERROR_EXIT_CODE = 2
 EXPECTED_INTERRUPTED_EXIT_CODE = 5
 
 
-def run_feature_cli_command(  # noqa: PLR0913
+@dataclass
+class CommitCommandHarness:
+    workflow: FakeConfirmedCommitWorkflow
+    global_options: GlobalOptions | None = None
+    stdin: TextIO | None = None
+    stdout: TextIO | None = None
+    stderr: TextIO | None = None
+
+
+def run_feature_cli_command(
     command: CliCommitCommand,
     *,
-    workflow: FakeConfirmedCommitWorkflow,
-    global_options: GlobalOptions | None = None,
-    stdin: TextIO | None = None,
-    stdout: TextIO | None = None,
-    stderr: TextIO | None = None,
+    harness: CommitCommandHarness,
 ) -> int:
-    options = global_options or GlobalOptions()
+    options = harness.global_options or GlobalOptions()
     return run_confirmed_commit_cli_command(
         command,
         options=DeveloperWorkflowCliOptions(
@@ -56,11 +61,11 @@ def run_feature_cli_command(  # noqa: PLR0913
             print_prices=options.print_prices,
         ),
         streams=DeveloperWorkflowCliStreams(
-            stdin=stdin or StringIO(),
-            stdout=stdout or StringIO(),
-            stderr=stderr or StringIO(),
+            stdin=harness.stdin or StringIO(),
+            stdout=harness.stdout or StringIO(),
+            stderr=harness.stderr or StringIO(),
         ),
-        workflow=workflow,
+        workflow=harness.workflow,
         evidence_writer=_write_evidence,
     )
 
@@ -120,10 +125,7 @@ def test_commit_command_prints_recommendation_prompts_and_commits_on_approval(co
 
     exit_code = run_feature_cli_command(
         command,
-        workflow=workflow,
-        stdin=StringIO(confirmation),
-        stdout=stdout,
-        stderr=stderr,
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO(confirmation), stdout=stdout, stderr=stderr),
     )
 
     assert exit_code == 0
@@ -150,10 +152,7 @@ def test_commit_command_escapes_terminal_controls_before_prompting() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        workflow=workflow,
-        stdin=StringIO("n\n"),
-        stdout=stdout,
-        stderr=StringIO(),
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO("n\n"), stdout=stdout, stderr=StringIO()),
     )
 
     assert exit_code == 0
@@ -176,10 +175,7 @@ def test_commit_command_escapes_output_text_before_prompting() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        workflow=workflow,
-        stdin=StringIO("n\n"),
-        stdout=stdout,
-        stderr=StringIO(),
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO("n\n"), stdout=stdout, stderr=StringIO()),
     )
 
     assert exit_code == 0
@@ -205,10 +201,7 @@ def test_commit_command_escapes_reported_commit_hash() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        workflow=workflow,
-        stdin=StringIO("y\n"),
-        stdout=stdout,
-        stderr=StringIO(),
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO("y\n"), stdout=stdout, stderr=StringIO()),
     )
 
     assert exit_code == 0
@@ -223,10 +216,7 @@ def test_commit_command_rejects_no_without_invoking_commit() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        workflow=workflow,
-        stdin=StringIO("n\n"),
-        stdout=stdout,
-        stderr=StringIO(),
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO("n\n"), stdout=stdout, stderr=StringIO()),
     )
 
     assert exit_code == 0
@@ -239,10 +229,7 @@ def test_commit_command_treats_eof_as_successful_noop() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        workflow=workflow,
-        stdin=StringIO(""),
-        stdout=StringIO(),
-        stderr=StringIO(),
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO(""), stdout=StringIO(), stderr=StringIO()),
     )
 
     assert exit_code == 0
@@ -255,10 +242,7 @@ def test_commit_command_interrupted_input_exits_nonzero_without_commit() -> None
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        workflow=workflow,
-        stdin=InterruptingInput(),
-        stdout=StringIO(),
-        stderr=stderr,
+        harness=CommitCommandHarness(workflow=workflow, stdin=InterruptingInput(), stdout=StringIO(), stderr=stderr),
     )
 
     assert exit_code == EXPECTED_INTERRUPTED_EXIT_CODE
@@ -284,10 +268,7 @@ def test_commit_command_generation_failure_skips_prompt_and_commit() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        workflow=workflow,
-        stdin=StringIO("yes\n"),
-        stdout=stdout,
-        stderr=stderr,
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO("yes\n"), stdout=stdout, stderr=stderr),
     )
 
     assert exit_code == EXPECTED_CONFIGURATION_ERROR_EXIT_CODE
@@ -316,10 +297,7 @@ def test_commit_command_pre_commit_stop_skips_prompt_and_commit() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        workflow=workflow,
-        stdin=StringIO("yes\n"),
-        stdout=stdout,
-        stderr=stderr,
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO("yes\n"), stdout=stdout, stderr=stderr),
     )
 
     assert exit_code == EXPECTED_CONFIGURATION_ERROR_EXIT_CODE
@@ -339,11 +317,13 @@ def test_commit_command_appends_evidence_on_rejection() -> None:
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        workflow=workflow,
-        global_options=GlobalOptions(print_usage=True),
-        stdin=StringIO("no\n"),
-        stdout=stdout,
-        stderr=StringIO(),
+        harness=CommitCommandHarness(
+            workflow=workflow,
+            global_options=GlobalOptions(print_usage=True),
+            stdin=StringIO("no\n"),
+            stdout=stdout,
+            stderr=StringIO(),
+        ),
     )
 
     assert exit_code == 0
@@ -374,11 +354,13 @@ def test_commit_command_reports_commit_failure_without_reprinting_recommendation
 
     exit_code = run_feature_cli_command(
         CliCommitCommand(),
-        workflow=workflow,
-        global_options=GlobalOptions(print_usage=True),
-        stdin=StringIO("y\n"),
-        stdout=stdout,
-        stderr=stderr,
+        harness=CommitCommandHarness(
+            workflow=workflow,
+            global_options=GlobalOptions(print_usage=True),
+            stdin=StringIO("y\n"),
+            stdout=stdout,
+            stderr=stderr,
+        ),
     )
 
     assert exit_code == EXPECTED_CONFIGURATION_ERROR_EXIT_CODE

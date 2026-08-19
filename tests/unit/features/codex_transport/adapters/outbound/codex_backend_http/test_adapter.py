@@ -12,6 +12,7 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexTransportStatus,
     CodexUsageProbeCommand,
 )
+from tests.synthetic_values import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
 
 
 def test_complete_posts_built_request_and_maps_success_response() -> None:
@@ -27,8 +28,8 @@ def test_complete_posts_built_request_and_maps_success_response() -> None:
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
         credentials=CodexCredentials(
-            access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-            account_id="synthetic-account",
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
         ),
     )
 
@@ -37,7 +38,7 @@ def test_complete_posts_built_request_and_maps_success_response() -> None:
     assert captured_request is not None
     assert captured_request.method == "POST"
     assert str(captured_request.url) == "https://chatgpt.com/backend-api/codex/responses"
-    assert captured_request.headers["Authorization"] == "Bearer synthetic-access-token"
+    assert captured_request.headers["Authorization"] == f"Bearer {CODEX_BEARER_VALUE}"
     assert captured_request.headers["ChatGPT-Account-ID"] == "synthetic-account"
 
 
@@ -61,8 +62,8 @@ def test_complete_allows_timeout_and_request_setting_overrides() -> None:
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="synthetic prompt"),
         credentials=CodexCredentials(
-            access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-            account_id="synthetic-account",
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
         ),
     )
 
@@ -84,14 +85,14 @@ def test_complete_maps_backend_error_response_without_leaking_request_secrets() 
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="synthetic prompt"),
         credentials=CodexCredentials(
-            access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-            account_id="synthetic-account",
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
         ),
     )
 
     assert result.status is CodexTransportStatus.AUTHENTICATION_FAILED
-    assert "synthetic-access-token" not in str(result.observations)
-    assert "synthetic-account" not in str(result.observations)
+    assert CODEX_BEARER_VALUE not in str(result.observations)
+    assert CODEX_ACCOUNT_ID not in str(result.observations)
     assert "synthetic auth failure" not in str(result.observations)
 
 
@@ -103,8 +104,8 @@ def test_complete_maps_non_json_success_to_backend_shape_mismatch() -> None:
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="synthetic prompt"),
         credentials=CodexCredentials(
-            access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-            account_id="synthetic-account",
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
         ),
     )
 
@@ -132,8 +133,8 @@ def test_complete_maps_event_stream_success_response() -> None:
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="synthetic prompt"),
         credentials=CodexCredentials(
-            access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-            account_id="synthetic-account",
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
         ),
     )
 
@@ -151,8 +152,8 @@ def test_complete_maps_httpx_transport_error_without_error_message() -> None:
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="synthetic prompt"),
         credentials=CodexCredentials(
-            access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-            account_id="synthetic-account",
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
         ),
     )
 
@@ -174,8 +175,8 @@ def test_fetch_usage_gets_usage_endpoint_and_maps_success_response() -> None:
     result = adapter.fetch_usage(
         command=CodexUsageProbeCommand(),
         credentials=CodexCredentials(
-            access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-            account_id="synthetic-account",
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
         ),
     )
 
@@ -185,7 +186,7 @@ def test_fetch_usage_gets_usage_endpoint_and_maps_success_response() -> None:
     assert captured_request is not None
     assert captured_request.method == "GET"
     assert str(captured_request.url) == "https://chatgpt.com/backend-api/api/codex/usage"
-    assert captured_request.headers["Authorization"] == "Bearer synthetic-access-token"
+    assert captured_request.headers["Authorization"] == f"Bearer {CODEX_BEARER_VALUE}"
     assert captured_request.headers["ChatGPT-Account-ID"] == "synthetic-account"
 
 
@@ -199,8 +200,8 @@ def test_fetch_usage_maps_httpx_transport_error_without_error_message() -> None:
     result = adapter.fetch_usage(
         command=CodexUsageProbeCommand(),
         credentials=CodexCredentials(
-            access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-            account_id="synthetic-account",
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
         ),
     )
 

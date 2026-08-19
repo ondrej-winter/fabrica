@@ -9,13 +9,14 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexTransportStatus,
     CodexUsageProbeCommand,
 )
+from tests.synthetic_values import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
 
 
 def test_codex_backend_http_adapter_executes_probe_with_mock_transport() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
         assert str(request.url) == "https://chatgpt.com/backend-api/codex/responses"
-        assert request.headers["Authorization"] == "Bearer synthetic-access-token"
+        assert request.headers["Authorization"] == f"Bearer {CODEX_BEARER_VALUE}"
         return httpx.Response(200, json={"output": [{"content": [{"type": "output_text", "text": "pong"}]}]})
 
     adapter = CodexBackendHttpAdapter(client=httpx.Client(transport=httpx.MockTransport(handler)))
@@ -23,22 +24,22 @@ def test_codex_backend_http_adapter_executes_probe_with_mock_transport() -> None
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
         credentials=CodexCredentials(
-            access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-            account_id="synthetic-account",
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
         ),
     )
 
     assert result.status is CodexTransportStatus.SUCCESS
     assert result.output_text == "pong"
-    assert "synthetic-access-token" not in str(result.observations)
-    assert "synthetic-account" not in str(result.observations)
+    assert CODEX_BEARER_VALUE not in str(result.observations)
+    assert CODEX_ACCOUNT_ID not in str(result.observations)
 
 
 def test_codex_backend_http_adapter_fetches_usage_with_mock_transport() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "GET"
         assert str(request.url) == "https://chatgpt.com/backend-api/api/codex/usage"
-        assert request.headers["Authorization"] == "Bearer synthetic-access-token"
+        assert request.headers["Authorization"] == f"Bearer {CODEX_BEARER_VALUE}"
         return httpx.Response(
             200,
             headers={"x-codex-ratelimit-remaining": "42"},
@@ -50,8 +51,8 @@ def test_codex_backend_http_adapter_fetches_usage_with_mock_transport() -> None:
     result = adapter.fetch_usage(
         command=CodexUsageProbeCommand(),
         credentials=CodexCredentials(
-            access_token="synthetic-access-token",  # noqa: S106 - synthetic test value, not a secret.
-            account_id="synthetic-account",
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
         ),
     )
 
@@ -63,5 +64,5 @@ def test_codex_backend_http_adapter_fetches_usage_with_mock_transport() -> None:
         "rate_limit_header_count": 1,
         "rate_limit_header_names": "x-codex-ratelimit-remaining",
     }
-    assert "synthetic-access-token" not in str(result.observations)
-    assert "synthetic-account" not in str(result.observations)
+    assert CODEX_BEARER_VALUE not in str(result.observations)
+    assert CODEX_ACCOUNT_ID not in str(result.observations)

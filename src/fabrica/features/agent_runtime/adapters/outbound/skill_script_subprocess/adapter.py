@@ -44,6 +44,18 @@ class SkillScriptSubprocessExecutionSettings:
     verbose_diagnostics: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class _ExecutionResultDetails:
+    status: SkillScriptExecutionStatus
+    message: str
+    category: str
+    stdout: SkillScriptExecutionOutput | None = None
+    stderr: SkillScriptExecutionOutput | None = None
+    exit_code: int | None = None
+    duration_seconds: float | None = None
+    metadata: Mapping[str, SafeRuntimeMetadataValue] | None = None
+
+
 class SkillScriptSubprocessExecutor:
     """Execute approved selected local Agent Skill scripts with conservative defaults.
 
@@ -78,9 +90,11 @@ class SkillScriptSubprocessExecutor:
             return self._result(
                 command,
                 approved_binding,
-                SkillScriptExecutionStatus.ADAPTER_ERROR,
-                _BINDING_MISMATCH_MESSAGE,
-                category="binding_mismatch",
+                _ExecutionResultDetails(
+                    status=SkillScriptExecutionStatus.ADAPTER_ERROR,
+                    message=_BINDING_MISMATCH_MESSAGE,
+                    category="binding_mismatch",
+                ),
             )
 
         interpreter = self._interpreter_for_binding(snapshot.binding)
@@ -88,17 +102,21 @@ class SkillScriptSubprocessExecutor:
             return self._result(
                 command,
                 approved_binding,
-                SkillScriptExecutionStatus.UNSUPPORTED,
-                _UNSUPPORTED_SCRIPT_TYPE_MESSAGE,
-                category="unsupported_script_type",
+                _ExecutionResultDetails(
+                    status=SkillScriptExecutionStatus.UNSUPPORTED,
+                    message=_UNSUPPORTED_SCRIPT_TYPE_MESSAGE,
+                    category="unsupported_script_type",
+                ),
             )
         if not Path(interpreter).is_file():
             return self._result(
                 command,
                 approved_binding,
-                SkillScriptExecutionStatus.UNSUPPORTED,
-                _MISSING_INTERPRETER_MESSAGE,
-                category="missing_interpreter",
+                _ExecutionResultDetails(
+                    status=SkillScriptExecutionStatus.UNSUPPORTED,
+                    message=_MISSING_INTERPRETER_MESSAGE,
+                    category="missing_interpreter",
+                ),
             )
 
         started = monotonic()
@@ -123,12 +141,14 @@ class SkillScriptSubprocessExecutor:
                 return self._result(
                     command,
                     approved_binding,
-                    SkillScriptExecutionStatus.TIMED_OUT,
-                    "selected script execution timed out",
-                    category="timed_out",
-                    stdout=self._output(err.stdout, command.sandbox_policy.max_stdout_chars),
-                    stderr=self._output(err.stderr, command.sandbox_policy.max_stderr_chars),
-                    duration_seconds=duration,
+                    _ExecutionResultDetails(
+                        status=SkillScriptExecutionStatus.TIMED_OUT,
+                        message="selected script execution timed out",
+                        category="timed_out",
+                        stdout=self._output(err.stdout, command.sandbox_policy.max_stdout_chars),
+                        stderr=self._output(err.stderr, command.sandbox_policy.max_stderr_chars),
+                        duration_seconds=duration,
+                    ),
                 )
             except OSError as err:
                 msg = _SUBPROCESS_OS_ERROR_MESSAGE
@@ -153,13 +173,15 @@ class SkillScriptSubprocessExecutor:
         return self._result(
             command,
             approved_binding,
-            status,
-            message,
-            category=category,
-            stdout=self._output(completed.stdout, command.sandbox_policy.max_stdout_chars),
-            stderr=self._output(completed.stderr, command.sandbox_policy.max_stderr_chars),
-            exit_code=completed.returncode,
-            duration_seconds=duration,
+            _ExecutionResultDetails(
+                status=status,
+                message=message,
+                category=category,
+                stdout=self._output(completed.stdout, command.sandbox_policy.max_stdout_chars),
+                stderr=self._output(completed.stderr, command.sandbox_policy.max_stderr_chars),
+                exit_code=completed.returncode,
+                duration_seconds=duration,
+            ),
         )
 
     def _interpreter_for_binding(self, binding: SkillScriptApprovalBinding) -> str | None:
@@ -202,37 +224,29 @@ class SkillScriptSubprocessExecutor:
         )
 
     @staticmethod
-    def _result(  # noqa: PLR0913
+    def _result(
         command: SkillScriptExecutionCommand,
         binding: SkillScriptApprovalBinding,
-        status: SkillScriptExecutionStatus,
-        message: str,
-        *,
-        category: str,
-        stdout: SkillScriptExecutionOutput | None = None,
-        stderr: SkillScriptExecutionOutput | None = None,
-        exit_code: int | None = None,
-        duration_seconds: float | None = None,
-        metadata: Mapping[str, SafeRuntimeMetadataValue] | None = None,
+        details: _ExecutionResultDetails,
     ) -> SkillScriptExecutionResult:
         observation_metadata: dict[str, SafeRuntimeMetadataValue] = {
             "skill_id": command.selection.skill_id,
             "script_id": command.selection.script_id,
-            "category": category,
+            "category": details.category,
         }
-        if metadata is not None:
-            observation_metadata.update(metadata)
+        if details.metadata is not None:
+            observation_metadata.update(details.metadata)
         return SkillScriptExecutionResult(
-            status=status,
+            status=details.status,
             selection=command.selection,
             binding=binding,
-            stdout=stdout or SkillScriptExecutionOutput(max_chars=command.sandbox_policy.max_stdout_chars),
-            stderr=stderr or SkillScriptExecutionOutput(max_chars=command.sandbox_policy.max_stderr_chars),
-            exit_code=exit_code,
-            duration_seconds=duration_seconds,
+            stdout=details.stdout or SkillScriptExecutionOutput(max_chars=command.sandbox_policy.max_stdout_chars),
+            stderr=details.stderr or SkillScriptExecutionOutput(max_chars=command.sandbox_policy.max_stderr_chars),
+            exit_code=details.exit_code,
+            duration_seconds=details.duration_seconds,
             observations=(
                 SkillScriptExecutionObservation(
-                    message=message,
+                    message=details.message,
                     metadata=observation_metadata,
                 ),
             ),

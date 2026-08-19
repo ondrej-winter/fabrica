@@ -30,6 +30,7 @@ class GitCommandRunner(Protocol):
 
 def run_git_command(argv: Sequence[str], *, cwd: Path | None, timeout_seconds: float) -> GitCommandResult:
     """Run a git command and return captured process output."""
+    # Intentional adapter boundary: argv is constructed by Git command value objects, with no shell interpolation.
     completed = subprocess.run(  # noqa: S603
         list(argv),
         check=False,
