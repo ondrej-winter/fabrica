@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+from fabrica.adapters.inbound.cli.rendering import write_line, write_text
 from fabrica.features.developer_workflow.adapters.inbound.cli.output import (
     format_commit_message_recommendation,
     write_confirmed_commit_result,
@@ -89,9 +90,9 @@ def run_confirmed_commit_cli_command(
     commit_result = workflow.commit(generation_result.recommendation)
     if commit_result.succeeded and commit_result.commit_result is not None:
         if commit_result.commit_result.short_hash is not None:
-            streams.stdout.write(f"Committed as {commit_result.commit_result.short_hash}.\n")
+            write_line(streams.stdout, f"Committed as {commit_result.commit_result.short_hash}.")
         else:
-            streams.stdout.write("Committed.\n")
+            write_line(streams.stdout, "Committed.")
     return _write_confirmed_commit_result(
         commit_result,
         options=options,
@@ -110,9 +111,7 @@ def _prompt_for_commit_confirmation(
     if output_text is None and generation_result.recommendation is not None:
         output_text = format_commit_message_recommendation(generation_result.recommendation)
     if output_text:
-        streams.stdout.write(output_text)
-        if not output_text.endswith("\n"):
-            streams.stdout.write("\n")
+        write_text(streams.stdout, output_text)
     streams.stdout.write("Commit with this message? [y/N] ")
     streams.stdout.flush()
 
@@ -156,7 +155,7 @@ def _write_cancelled_confirmation_result(
     streams: DeveloperWorkflowCliStreams,
     evidence_writer: EvidenceWriter,
 ) -> int:
-    streams.stdout.write("Commit cancelled; no commit created.\n")
+    write_line(streams.stdout, "Commit cancelled; no commit created.")
     evidence_writer(
         generation_result,
         include_usage=options.print_usage,

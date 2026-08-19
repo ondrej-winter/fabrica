@@ -138,7 +138,7 @@ class FakeSelectedContextRuntime:
         return self.result
 
 
-def test_run_command_maps_prompt_and_model_to_runtime_command() -> None:
+def test_run_command_maps_prompt_to_runtime_command() -> None:
     runtime = FakeRuntime(
         result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="pong"),
     )
@@ -146,7 +146,7 @@ def test_run_command_maps_prompt_and_model_to_runtime_command() -> None:
     stderr = StringIO()
 
     exit_code = run_feature_cli_command(
-        CliRunCommand(prompt="Reply with pong", model_hint="codex-compatible"),
+        CliRunCommand(prompt="Reply with pong"),
         runtime=runtime,
         stdout=stdout,
         stderr=stderr,
@@ -155,7 +155,7 @@ def test_run_command_maps_prompt_and_model_to_runtime_command() -> None:
     assert exit_code == 0
     assert stdout.getvalue() == "pong\n"
     assert stderr.getvalue() == ""
-    assert runtime.calls == [LocalAgentRunCommand(prompt="Reply with pong", model_hint="codex-compatible")]
+    assert runtime.calls == [LocalAgentRunCommand(prompt="Reply with pong")]
 
 
 def test_run_command_writes_success_output_without_cli_line_truncation() -> None:

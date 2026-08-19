@@ -10,7 +10,6 @@ from typing import TextIO
 
 from fabrica.bootstrap.cli import run_cli
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
-    CliScriptApprovalOptions,
     CliScriptExecuteCommand,
 )
 from fabrica.features.agent_runtime.adapters.inbound.cli.contracts import AgentRuntimeCliStreams
@@ -227,12 +226,6 @@ def _command(
     return CliScriptExecuteCommand(
         skill_id="python-testing",
         script_id=script_id,
-        approval_options=CliScriptApprovalOptions(
-            script_type=SkillScriptType.PYTHON,
-            suffix=".py",
-            byte_size=approval_byte_size,
-            content_digest=approval_content_digest,
-        ),
         approval_binding=SkillScriptApprovalBinding(
             skill_id="python-testing",
             script_id=script_id,

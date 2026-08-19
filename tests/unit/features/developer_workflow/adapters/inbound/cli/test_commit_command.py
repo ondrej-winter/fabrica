@@ -139,6 +139,83 @@ def test_commit_command_prints_recommendation_prompts_and_commits_on_approval(co
     assert workflow.commit_calls == [recommendation]
 
 
+def test_commit_command_escapes_terminal_controls_before_prompting() -> None:
+    recommendation = CommitMessageRecommendation(
+        summary="Adds \x1b[31mred\x1b[0m output.",
+        rationale="The staged evidence includes \x07 controls.",
+        commit_message="feat: add output",
+    )
+    workflow = FakeConfirmedCommitWorkflow(generation_result=_generation_success(recommendation))
+    stdout = StringIO()
+
+    exit_code = run_feature_cli_command(
+        CliCommitCommand(),
+        workflow=workflow,
+        stdin=StringIO("n\n"),
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert exit_code == 0
+    assert "\x1b" not in stdout.getvalue()
+    assert "\x07" not in stdout.getvalue()
+    assert r"\x1b[31mred\x1b[0m" in stdout.getvalue()
+    assert r"\x07" in stdout.getvalue()
+    assert workflow.commit_calls == []
+
+
+def test_commit_command_escapes_output_text_before_prompting() -> None:
+    workflow = FakeConfirmedCommitWorkflow(
+        generation_result=ConfirmedCommitWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
+            recommendation=_recommendation(),
+            output_text="Generated \x1b[31mred\x1b[0m output.\x07",
+        ),
+    )
+    stdout = StringIO()
+
+    exit_code = run_feature_cli_command(
+        CliCommitCommand(),
+        workflow=workflow,
+        stdin=StringIO("n\n"),
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert exit_code == 0
+    assert "\x1b" not in stdout.getvalue()
+    assert "\x07" not in stdout.getvalue()
+    assert r"Generated \x1b[31mred\x1b[0m output.\x07" in stdout.getvalue()
+    assert "Commit with this message? [y/N] " in stdout.getvalue()
+    assert workflow.commit_calls == []
+
+
+def test_commit_command_escapes_reported_commit_hash() -> None:
+    recommendation = _recommendation()
+    workflow = FakeConfirmedCommitWorkflow(
+        generation_result=_generation_success(recommendation),
+        commit_result=ConfirmedCommitWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
+            recommendation=recommendation,
+            commit_result=GitCommitResult(short_hash="abc1234\x1b[2J"),
+            commit_attempted=True,
+        ),
+    )
+    stdout = StringIO()
+
+    exit_code = run_feature_cli_command(
+        CliCommitCommand(),
+        workflow=workflow,
+        stdin=StringIO("y\n"),
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert exit_code == 0
+    assert "\x1b" not in stdout.getvalue()
+    assert r"Committed as abc1234\x1b[2J." in stdout.getvalue()
+
+
 def test_commit_command_rejects_no_without_invoking_commit() -> None:
     recommendation = _recommendation()
     workflow = FakeConfirmedCommitWorkflow(generation_result=_generation_success(recommendation))

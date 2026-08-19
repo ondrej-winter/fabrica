@@ -237,7 +237,18 @@ def _validate_required_text(value: str, *, field_name: str) -> str:
     if not stripped:
         msg = f"{field_name} must not be empty"
         raise ValueError(msg)
+    if field_name == "skill_id":
+        _validate_safe_skill_id(stripped)
     return stripped
+
+
+def _validate_safe_skill_id(value: str) -> None:
+    if value.startswith("/") or "//" in value:
+        msg = "skill_id must be a relative identifier"
+        raise ValueError(msg)
+    if any(part in {"", ".", ".."} for part in value.split("/")):
+        msg = "skill_id must not contain traversal segments"
+        raise ValueError(msg)
 
 
 def _validate_optional_text(value: str, *, field_name: str) -> str:

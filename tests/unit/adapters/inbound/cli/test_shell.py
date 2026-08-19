@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from dataclasses import FrozenInstanceError, dataclass
 from io import StringIO
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO, cast, get_type_hints
 
 import pytest
@@ -29,26 +27,6 @@ from fabrica.adapters.inbound.cli import (
 )
 from fabrica.adapters.inbound.cli.registry import ArgparseCommandRegistry
 from fabrica.adapters.inbound.cli.runtime import command_name_from_namespace
-from fabrica.bootstrap.cli import create_cli_command_registrars
-from fabrica.bootstrap.cli import run_cli as run_bootstrap_cli
-from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
-    AgentRuntimeCliCompositionOptions,
-    CliRunCommand,
-    CliScriptApprovalOptions,
-    CliScriptExecuteCommand,
-    CliScriptPolicyCommand,
-    CliSelectedResource,
-)
-from fabrica.features.agent_runtime.adapters.inbound.cli.registration import register_agent_runtime_cli_commands
-from fabrica.features.agent_runtime.application.dtos import SkillScriptApprovalBinding, SkillScriptType
-from fabrica.features.developer_workflow.adapters.inbound.cli.command_models import (
-    CliCommitCommand,
-    CliCommitMessageCommand,
-    CliDeveloperWorkflowCompositionOptions,
-)
-from fabrica.features.developer_workflow.adapters.inbound.cli.registration import (
-    register_developer_workflow_cli_commands,
-)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -124,10 +102,10 @@ class RecordingHandlers:
 
     invocation: ParsedInvocation | None = None
 
-    def record_agent_runtime_command(
+    def record_command(
         self,
-        command: CliRunCommand | CliScriptPolicyCommand | CliScriptExecuteCommand,
-        composition_options: AgentRuntimeCliCompositionOptions,
+        command: object,
+        composition_options: object,
         context: CommandContext,
     ) -> int:
         self.invocation = ParsedInvocation(
@@ -136,52 +114,6 @@ class RecordingHandlers:
             composition_options=composition_options,
         )
         return 0
-
-    def record_developer_workflow_command(
-        self,
-        command: CliCommitMessageCommand | CliCommitCommand,
-        composition_options: CliDeveloperWorkflowCompositionOptions,
-        context: CommandContext,
-    ) -> int:
-        self.invocation = ParsedInvocation(
-            command=command,
-            global_options=context.global_options,
-            composition_options=composition_options,
-        )
-        return 0
-
-
-def parse_args(args: tuple[str, ...] | list[str]) -> ParsedInvocation:
-    handlers = RecordingHandlers()
-    exit_code = run_product_cli(
-        args,
-        command_registrars=_recording_command_registrars(handlers),
-        stdin=StringIO(),
-        stdout=sys.stdout,
-        stderr=sys.stderr,
-    )
-
-    if exit_code != 0:
-        raise SystemExit(exit_code)
-    assert exit_code == 0
-    assert handlers.invocation is not None
-    return handlers.invocation
-
-
-def _recording_command_registrars(handlers: RecordingHandlers) -> tuple[CommandRegistrar, ...]:
-    return (
-        lambda subparsers: register_agent_runtime_cli_commands(
-            subparsers,
-            run_command=handlers.record_agent_runtime_command,
-            script_policy_command=handlers.record_agent_runtime_command,
-            script_execute_command=handlers.record_agent_runtime_command,
-        ),
-        lambda subparsers: register_developer_workflow_cli_commands(
-            subparsers,
-            commit_message_command=handlers.record_developer_workflow_command,
-            commit_command=handlers.record_developer_workflow_command,
-        ),
-    )
 
 
 def test_run_cli_round_trips_bound_handler() -> None:
@@ -615,11 +547,16 @@ def test_run_cli_routes_help_to_injected_stdout_without_raising() -> None:
     stdout = StringIO()
     stderr = StringIO()
 
-    exit_code = run_bootstrap_cli(("--help",), stdout=stdout, stderr=stderr)
+    exit_code = run_product_cli(
+        ("--help",),
+        command_registrars=(_register_synthetic_command,),
+        stdin=StringIO(),
+        stdout=stdout,
+        stderr=stderr,
+    )
 
     assert exit_code == 0
-    assert "Run local Fabrica workflows." in stdout.getvalue()
-    assert "run" in stdout.getvalue()
+    assert "synthetic" in stdout.getvalue()
     assert stderr.getvalue() == ""
 
 
@@ -627,139 +564,59 @@ def test_run_cli_routes_usage_errors_to_injected_stderr_without_raising() -> Non
     stdout = StringIO()
     stderr = StringIO()
 
-    exit_code = run_bootstrap_cli(("run",), stdout=stdout, stderr=stderr)
+    def configure_required_parser(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--feature-value", required=True)
+
+    def register(commands: CommandRegistry) -> None:
+        commands.register(_synthetic_command_with_parser(configure_required_parser))
+
+    exit_code = run_product_cli(
+        ("synthetic",),
+        command_registrars=(register,),
+        stdin=StringIO(),
+        stdout=stdout,
+        stderr=stderr,
+    )
 
     assert exit_code == ARGPARSE_USAGE_ERROR
     assert stdout.getvalue() == ""
     assert "error:" in stderr.getvalue()
-    assert "--prompt" in stderr.getvalue()
+    assert "--feature-value" in stderr.getvalue()
 
 
 def test_run_cli_routes_unknown_command_to_injected_stderr_without_raising() -> None:
     stdout = StringIO()
     stderr = StringIO()
 
-    exit_code = run_bootstrap_cli(("unknown-command",), stdout=stdout, stderr=stderr)
+    exit_code = run_product_cli(
+        ("unknown-command",),
+        command_registrars=(_register_synthetic_command,),
+        stdin=StringIO(),
+        stdout=stdout,
+        stderr=stderr,
+    )
 
     assert exit_code == ARGPARSE_USAGE_ERROR
     assert stdout.getvalue() == ""
     assert "invalid choice: 'unknown-command'" in stderr.getvalue()
 
 
-def test_run_cli_renders_help_without_runtime_side_effects() -> None:
+@pytest.mark.parametrize("global_option", ["--print-usage", "--print-prices", "--verbose-diagnostics"])
+def test_run_cli_rejects_global_options_after_subcommand(global_option: str) -> None:
     stdout = StringIO()
     stderr = StringIO()
 
     exit_code = run_product_cli(
-        ("--help",),
-        command_registrars=create_cli_command_registrars(),
+        ("synthetic", global_option),
+        command_registrars=(_register_synthetic_command,),
         stdin=StringIO(),
         stdout=stdout,
         stderr=stderr,
     )
 
-    assert exit_code == 0
-    assert stderr.getvalue() == ""
-    assert "run" in stdout.getvalue()
-    assert "commit" in stdout.getvalue()
-    assert "commit-message" in stdout.getvalue()
-    assert "script-policy" in stdout.getvalue()
-    assert "script-execute" in stdout.getvalue()
-    assert "--print-usage" in stdout.getvalue()
-    assert "--print-prices" in stdout.getvalue()
-    assert "--verbose-diagnostics" in stdout.getvalue()
-
-
-def test_parse_run_command_supports_prompt_model_and_explicit_context() -> None:
-    invocation = parse_args(
-        [
-            "--print-usage",
-            "--print-prices",
-            "--verbose-diagnostics",
-            "run",
-            "--prompt",
-            "Reply with pong",
-            "--skill",
-            "python-testing",
-            "--skill",
-            "code-review",
-            "--resource",
-            "python-testing:references/example.md",
-            "--skill-root",
-            "./skills",
-        ],
-    )
-
-    assert invocation == ParsedInvocation(
-        command=CliRunCommand(
-            prompt="Reply with pong",
-            skill_ids=("python-testing", "code-review"),
-            resources=(CliSelectedResource(skill_id="python-testing", resource_id="references/example.md"),),
-        ),
-        global_options=GlobalOptions(print_usage=True, print_prices=True, verbose_diagnostics=True),
-        composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("./skills"),)),
-    )
-
-
-def test_parse_run_command_uses_empty_explicit_context_defaults() -> None:
-    invocation = parse_args(["run", "--prompt", "Reply with pong"])
-
-    assert invocation == ParsedInvocation(
-        command=CliRunCommand(prompt="Reply with pong"),
-        global_options=GlobalOptions(),
-        composition_options=AgentRuntimeCliCompositionOptions(),
-    )
-
-
-def test_parse_run_command_rejects_unsupported_model_override() -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        parse_args(["run", "--prompt", "Reply with pong", "--model", "codex-compatible"])
-
-    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
-
-
-def test_parse_commit_message_command_defaults_to_conventional_commits_skill() -> None:
-    invocation = parse_args(["commit-message"])
-
-    assert invocation == ParsedInvocation(
-        command=CliCommitMessageCommand(skill_id="conventional-commits"),
-        global_options=GlobalOptions(),
-        composition_options=CliDeveloperWorkflowCompositionOptions(),
-    )
-
-
-def test_parse_commit_message_command_supports_skill_root_and_diagnostics_overrides() -> None:
-    invocation = parse_args(
-        [
-            "--verbose-diagnostics",
-            "commit-message",
-            "--skill",
-            "team-style",
-            "--model",
-            "gpt-5.6-sol",
-            "--reasoning-effort",
-            "medium",
-            "--skill-root",
-            "./skills",
-        ],
-    )
-    assert invocation == ParsedInvocation(
-        command=CliCommitMessageCommand(skill_id="team-style"),
-        global_options=GlobalOptions(verbose_diagnostics=True),
-        composition_options=CliDeveloperWorkflowCompositionOptions(
-            model="gpt-5.6-sol",
-            reasoning_effort="medium",
-            skill_roots=(Path("./skills"),),
-        ),
-    )
-
-
-@pytest.mark.parametrize("global_option", ["--print-usage", "--print-prices", "--verbose-diagnostics"])
-def test_parse_command_rejects_global_options_after_subcommand(global_option: str) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        parse_args(["commit-message", global_option])
-
-    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
+    assert exit_code == ARGPARSE_USAGE_ERROR
+    assert stdout.getvalue() == ""
+    assert "unrecognized arguments" in stderr.getvalue()
 
 
 @pytest.mark.parametrize(
@@ -878,318 +735,8 @@ def test_cli_command_registration_rejects_invalid_values(
         )
 
 
-def test_parse_commit_message_command_supports_usage_and_price_reporting() -> None:
-    invocation = parse_args(["--print-usage", "--print-prices", "commit-message"])
-
-    assert invocation == ParsedInvocation(
-        command=CliCommitMessageCommand(skill_id="conventional-commits"),
-        global_options=GlobalOptions(print_usage=True, print_prices=True),
-        composition_options=CliDeveloperWorkflowCompositionOptions(),
-    )
-
-
-def test_parse_commit_message_command_rejects_unknown_reasoning_effort() -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        parse_args(["commit-message", "--reasoning-effort", "very-high"])
-
-    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
-
-
-@pytest.mark.parametrize(
-    ("args", "expected_message"),
-    [
-        (("commit-message", "--skill", ""), "skill_id must not be empty"),
-        (("commit", "--skill", "   "), "skill_id must not be empty"),
-    ],
-)
-def test_parse_developer_workflow_commands_reject_invalid_boundary_values(
-    args: tuple[str, ...],
-    expected_message: str,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        parse_args(args)
-
-    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
-    assert expected_message in capsys.readouterr().err
-
-
-def test_parse_commit_command_defaults_to_conventional_commits_skill() -> None:
-    invocation = parse_args(["commit"])
-
-    assert invocation == ParsedInvocation(
-        command=CliCommitCommand(skill_id="conventional-commits"),
-        global_options=GlobalOptions(),
-        composition_options=CliDeveloperWorkflowCompositionOptions(),
-    )
-
-
-def test_commit_command_help_documents_mutating_pre_commit_gate() -> None:
-    stdout = StringIO()
-    stderr = StringIO()
-
-    exit_code = run_product_cli(
-        ("commit", "--help"),
-        command_registrars=create_cli_command_registrars(),
-        stdin=StringIO(),
-        stdout=stdout,
-        stderr=stderr,
-    )
-
-    assert exit_code == 0
-    assert stderr.getvalue() == ""
-    assert "Run the staged pre-commit quality gate before message generation" in stdout.getvalue()
-    assert "create a git commit only after approval" in stdout.getvalue()
-
-
-def test_parse_commit_command_supports_commit_message_generation_options() -> None:
-    invocation = parse_args(
-        [
-            "--verbose-diagnostics",
-            "commit",
-            "--skill",
-            "team-style",
-            "--model",
-            "gpt-5.6-sol",
-            "--reasoning-effort",
-            "medium",
-            "--skill-root",
-            "./skills",
-        ],
-    )
-
-    assert invocation == ParsedInvocation(
-        command=CliCommitCommand(skill_id="team-style"),
-        global_options=GlobalOptions(verbose_diagnostics=True),
-        composition_options=CliDeveloperWorkflowCompositionOptions(
-            model="gpt-5.6-sol",
-            reasoning_effort="medium",
-            skill_roots=(Path("./skills"),),
-        ),
-    )
-
-
-def test_parse_commit_command_rejects_unknown_reasoning_effort() -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        parse_args(["commit", "--reasoning-effort", "very-high"])
-
-    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
-
-
-def test_parse_run_command_rejects_malformed_resource_selection() -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        parse_args(["run", "--prompt", "Reply with pong", "--resource", "python-testing"])
-
-    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
-
-
-@pytest.mark.parametrize(
-    ("args", "expected_message"),
-    [
-        (("run", "--prompt", ""), "prompt must not be empty"),
-        (("run", "--prompt", "pong", "--skill", "../unsafe"), "skill_id must not contain traversal segments"),
-        (
-            ("run", "--prompt", "pong", "--resource", "python-testing:../unsafe"),
-            "resource_id must not contain traversal segments",
-        ),
-        (
-            ("script-policy", "--skill-id", "python-testing", "--script-id", "../unsafe.py"),
-            "script_id must not contain traversal segments",
-        ),
-        (
-            (
-                "script-execute",
-                "--skill-id",
-                "python-testing",
-                "--script-id",
-                "scripts/check.py",
-                "--approve-script-type",
-                "python",
-                "--approve-suffix",
-                ".rb",
-                "--approve-byte-size",
-                "128",
-                "--approve-content-digest",
-                "sha256:abc123",
-            ),
-            "script suffix is not supported",
-        ),
-        (
-            (
-                "script-execute",
-                "--skill-id",
-                "python-testing",
-                "--script-id",
-                "scripts/check.py",
-                "--approve-script-type",
-                "python",
-                "--approve-suffix",
-                ".py",
-                "--approve-byte-size",
-                "128",
-                "--approve-content-digest",
-                "sha256:bad digest",
-            ),
-            "content_digest contains unsupported characters",
-        ),
-        (
-            (
-                "script-execute",
-                "--skill-id",
-                "python-testing",
-                "--script-id",
-                "scripts/check.py",
-                "--approve-script-type",
-                "python",
-                "--approve-suffix",
-                ".py",
-                "--approve-byte-size",
-                "not-an-int",
-                "--approve-content-digest",
-                "sha256:abc123",
-            ),
-            "invalid literal for int",
-        ),
-    ],
-)
-def test_parse_agent_runtime_commands_reject_invalid_boundary_values(
-    args: tuple[str, ...],
-    expected_message: str,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        parse_args(args)
-
-    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
-    assert expected_message in capsys.readouterr().err
-
-
-def test_parse_script_policy_command_supports_explicit_selected_script() -> None:
-    invocation = parse_args(
-        [
-            "--verbose-diagnostics",
-            "script-policy",
-            "--skill-id",
-            "python-testing",
-            "--script-id",
-            "scripts/check.py",
-            "--skill-root",
-            "./skills",
-        ],
-    )
-
-    assert invocation == ParsedInvocation(
-        command=CliScriptPolicyCommand(skill_id="python-testing", script_id="scripts/check.py"),
-        global_options=GlobalOptions(verbose_diagnostics=True),
-        composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("./skills"),)),
-    )
-
-
-def test_parse_script_execute_command_requires_metadata_bound_approval() -> None:
-    invocation = parse_args(
-        [
-            "--verbose-diagnostics",
-            "script-execute",
-            "--skill-id",
-            "python-testing",
-            "--script-id",
-            "scripts/check.py",
-            "--approve-script-type",
-            "python",
-            "--approve-suffix",
-            ".py",
-            "--approve-byte-size",
-            "128",
-            "--approve-content-digest",
-            "sha256:abc123",
-            "--skill-root",
-            "./skills",
-        ],
-    )
-
-    assert invocation == ParsedInvocation(
-        command=CliScriptExecuteCommand(
-            skill_id="python-testing",
-            script_id="scripts/check.py",
-            approval_options=CliScriptApprovalOptions(
-                script_type=SkillScriptType.PYTHON,
-                suffix=".py",
-                byte_size=128,
-                content_digest="sha256:abc123",
-            ),
-            approval_binding=SkillScriptApprovalBinding(
-                skill_id="python-testing",
-                script_id="scripts/check.py",
-                script_type=SkillScriptType.PYTHON,
-                suffix=".py",
-                byte_size=128,
-                content_digest="sha256:abc123",
-            ),
-        ),
-        global_options=GlobalOptions(verbose_diagnostics=True),
-        composition_options=AgentRuntimeCliCompositionOptions(skill_roots=(Path("./skills"),)),
-    )
-
-
-def test_parse_script_execute_command_rejects_missing_approval_metadata() -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        parse_args(["script-execute", "--skill-id", "python-testing", "--script-id", "scripts/check.py"])
-
-    assert exc_info.value.code == ARGPARSE_USAGE_ERROR
-
-
-def test_parsed_commands_are_immutable_boundary_values() -> None:
-    run_invocation = parse_args(["run", "--prompt", "Reply with pong"])
-    context_invocation = parse_args(
-        [
-            "run",
-            "--prompt",
-            "Reply with pong",
-            "--skill",
-            "python-testing",
-            "--resource",
-            "python-testing:references/example.md",
-            "--skill-root",
-            "./skills",
-        ],
-    )
-    policy_invocation = parse_args(
-        ["script-policy", "--skill-id", "python-testing", "--script-id", "scripts/check.py"],
-    )
-    execution_invocation = parse_args(
-        [
-            "script-execute",
-            "--skill-id",
-            "python-testing",
-            "--script-id",
-            "scripts/check.py",
-            "--approve-script-type",
-            "python",
-            "--approve-suffix",
-            ".py",
-            "--approve-byte-size",
-            "128",
-            "--approve-content-digest",
-            "sha256:abc123",
-        ],
-    )
-    commit_message_invocation = parse_args(["commit-message"])
-    commit_invocation = parse_args(["commit"])
+def test_synthetic_decoded_command_is_an_immutable_boundary_value() -> None:
+    command = SyntheticDecodedCommand(global_options=GlobalOptions(), feature_value="value")
 
     with pytest.raises(FrozenInstanceError):
-        setattr(run_invocation.command, "prompt", "changed")  # noqa: B010
-    assert isinstance(context_invocation.command, CliRunCommand)
-    assert isinstance(context_invocation.command.skill_ids, tuple)
-    assert isinstance(context_invocation.command.resources, tuple)
-    assert isinstance(context_invocation.composition_options, AgentRuntimeCliCompositionOptions)
-    assert isinstance(context_invocation.composition_options.skill_roots, tuple)
-    with pytest.raises(FrozenInstanceError):
-        setattr(context_invocation.composition_options, "skill_roots", ())  # noqa: B010
-    with pytest.raises(FrozenInstanceError):
-        setattr(policy_invocation.command, "script_id", "changed")  # noqa: B010
-    with pytest.raises(FrozenInstanceError):
-        setattr(execution_invocation.command, "script_id", "changed")  # noqa: B010
-    with pytest.raises(FrozenInstanceError):
-        setattr(commit_message_invocation.command, "skill_id", "changed")  # noqa: B010
-    with pytest.raises(FrozenInstanceError):
-        setattr(commit_invocation.command, "skill_id", "changed")  # noqa: B010
+        setattr(command, "feature_value", "changed")  # noqa: B010

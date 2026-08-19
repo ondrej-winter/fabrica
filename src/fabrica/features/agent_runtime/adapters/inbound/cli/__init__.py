@@ -3,7 +3,6 @@
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
-    CliScriptApprovalOptions,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
     CliSelectedResource,
@@ -32,7 +31,6 @@ __all__ = [
     "AgentRuntimeCliOptions",
     "AgentRuntimeCliStreams",
     "CliRunCommand",
-    "CliScriptApprovalOptions",
     "CliScriptExecuteCommand",
     "CliScriptPolicyCommand",
     "CliSelectedResource",

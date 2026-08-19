@@ -11,7 +11,6 @@ from fabrica.adapters.inbound.cli.command import Command
 from fabrica.features.agent_runtime.adapters.inbound.cli.command_models import (
     AgentRuntimeCliCompositionOptions,
     CliRunCommand,
-    CliScriptApprovalOptions,
     CliScriptExecuteCommand,
     CliScriptPolicyCommand,
     CliSelectedResource,
@@ -296,12 +295,6 @@ def _script_execute_command_from_namespace(namespace: argparse.Namespace) -> Cli
     return CliScriptExecuteCommand(
         skill_id=namespace.skill_id,
         script_id=namespace.script_id,
-        approval_options=CliScriptApprovalOptions(
-            script_type=approval_binding.script_type,
-            suffix=approval_binding.suffix,
-            byte_size=approval_binding.byte_size,
-            content_digest=approval_binding.content_digest,
-        ),
         approval_binding=approval_binding,
     )
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from fabrica.features.agent_runtime.application.dtos import SkillScriptApprovalBinding, SkillScriptType
+    from fabrica.features.agent_runtime.application.dtos import SkillScriptApprovalBinding
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,21 +30,10 @@ class AgentRuntimeCliCompositionOptions:
 
 
 @dataclass(frozen=True, slots=True)
-class CliScriptApprovalOptions:
-    """Adapter-local metadata-bound approval options for CLI script execution."""
-
-    script_type: SkillScriptType
-    suffix: str
-    byte_size: int
-    content_digest: str
-
-
-@dataclass(frozen=True, slots=True)
 class CliRunCommand:
     """Parsed CLI arguments for one local runtime prompt run."""
 
     prompt: str
-    model_hint: str | None = None
     skill_ids: tuple[str, ...] = field(default_factory=tuple)
     resources: tuple[CliSelectedResource, ...] = field(default_factory=tuple)
 
@@ -67,5 +56,4 @@ class CliScriptExecuteCommand:
 
     skill_id: str
     script_id: str
-    approval_options: CliScriptApprovalOptions
     approval_binding: SkillScriptApprovalBinding
