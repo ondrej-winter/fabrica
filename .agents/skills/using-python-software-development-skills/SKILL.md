@@ -2,7 +2,7 @@
 name: using-python-software-development-skills
 description: Discover and invoke Python software development skills. Use when starting Python work or deciding which Python-specific implementation, validation, testing, or documentation skill applies.
 metadata:
-  version: "2.0.1"
+  version: "2.1.0"
   dependencies:
     tools: []
     skills:
@@ -26,6 +26,9 @@ metadata:
         required: false
       - name: python-add-port
         purpose: Route technology-agnostic application port creation in Python hexagonal projects.
+        required: false
+      - name: python-build-extensible-cli
+        purpose: Route shared product CLI shell and multi-feature command contribution work.
         required: false
       - name: run-python-quality-gate
         purpose: Route the complete Python formatting, linting, type-checking, and test quality gate.
@@ -72,6 +75,7 @@ Python task arrives
 - Adding an end-to-end hexagonal feature: add-hexagonal-feature
 - Adding an application boundary: python-add-port
 - Adding infrastructure, HTTP, CLI, event, or persistence integration: python-add-adapter
+- Building or refactoring an extensible multi-feature product CLI: python-build-extensible-cli
 - Adding environment-backed configuration: python-add-env-settings-adapter
 - Splitting a growing Python module or package: split-python-module
 - Writing or refactoring Python tests: write-pytest-tests
@@ -88,6 +92,9 @@ Python task arrives
   adapters, and tests for one feature slice.
 - Use `python-add-port` before `python-add-adapter` when the application-layer
   boundary does not already exist.
+- Use `python-build-extensible-cli` when a shared product CLI shell needs
+  multiple feature-owned command contributions; use `python-add-adapter` for an
+  individual CLI adapter.
 - Use `python-add-env-settings-adapter` for configuration sourced from
   environment variables, `.env` files, or runtime settings objects.
 - Use `write-pytest-tests` for test design and structure, then
