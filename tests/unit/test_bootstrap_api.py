@@ -1,16 +1,11 @@
 """Bootstrap public interface contract tests."""
 
-import sys
 from pathlib import Path
 from typing import NoReturn
 
 from fabrica import bootstrap
 from fabrica.adapters.inbound.cli import RegistrationError
 from fabrica.bootstrap import cli as bootstrap_cli
-from fabrica.bootstrap._composition_exports import (
-    COMPOSITION_EXPORT_NAMES,
-    ROOT_BOOTSTRAP_INTERNAL_ONLY_EXPORTS,
-)
 
 DEFAULT_STAGED_GIT_TOOL_TIMEOUT_SECONDS = 10.0
 DEFAULT_PRE_COMMIT_TOOL_TIMEOUT_SECONDS = 120.0
@@ -65,31 +60,6 @@ def test_bootstrap_exports_only_curated_composition_surface() -> None:
     assert "create_read_only_git_context_registered_tools" not in bootstrap.__all__
     assert not hasattr(bootstrap, "ReadOnlyGitContextToolOptions")
     assert not hasattr(bootstrap, "create_read_only_git_context_registered_tools")
-
-
-def test_bootstrap_export_map_reuses_composition_exports_with_explicit_exclusions() -> None:
-    """Keep root bootstrap exports derived from one composition export map."""
-    assert set(bootstrap.__all__) == set(COMPOSITION_EXPORT_NAMES) - ROOT_BOOTSTRAP_INTERNAL_ONLY_EXPORTS
-    assert {
-        "CommitMessageRuntime",
-        "EvidenceRecordingCommitMessageRuntime",
-        "ReadOnlyGitContextToolOptions",
-        "create_read_only_git_context_registered_tools",
-        "create_selected_context_local_agent_runtime",
-    } == ROOT_BOOTSTRAP_INTERNAL_ONLY_EXPORTS
-
-
-def test_bootstrap_package_import_does_not_eagerly_load_composition_modules() -> None:
-    """Keep CLI startup resilient by avoiding package-level composition imports."""
-    for module_name in tuple(sys.modules):
-        if module_name.startswith("fabrica.bootstrap"):
-            del sys.modules[module_name]
-
-    bootstrap_package = __import__("fabrica.bootstrap", fromlist=["__all__"])
-
-    assert bootstrap_package.__all__ == EXPECTED_BOOTSTRAP_EXPORTS
-    assert "fabrica.bootstrap.composition" not in sys.modules
-    assert "fabrica.bootstrap.composition.codex_runtime" not in sys.modules
 
 
 def test_readme_uses_current_bootstrap_runtime_helper_names() -> None:

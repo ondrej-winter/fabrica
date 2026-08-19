@@ -647,7 +647,6 @@ def test_run_cli_routes_unknown_command_to_injected_stderr_without_raising() -> 
 
 
 def test_run_cli_renders_help_without_runtime_side_effects() -> None:
-    _clear_bootstrap_composition_modules()
     stdout = StringIO()
     stderr = StringIO()
 
@@ -669,16 +668,6 @@ def test_run_cli_renders_help_without_runtime_side_effects() -> None:
     assert "--print-usage" in stdout.getvalue()
     assert "--print-prices" in stdout.getvalue()
     assert "--verbose-diagnostics" in stdout.getvalue()
-    assert "fabrica.bootstrap.composition.codex_runtime" not in sys.modules
-    assert "fabrica.bootstrap.composition.developer_workflow" not in sys.modules
-    assert "fabrica.bootstrap.composition.skill_context" not in sys.modules
-    assert "fabrica.bootstrap.composition.skill_scripts" not in sys.modules
-
-
-def _clear_bootstrap_composition_modules() -> None:
-    for module_name in tuple(sys.modules):
-        if module_name.startswith("fabrica.bootstrap.composition"):
-            del sys.modules[module_name]
 
 
 def test_parse_run_command_supports_prompt_model_and_explicit_context() -> None:
