@@ -1,6 +1,7 @@
 # Retry and resilience audit
 
-Status: audit note only; no implementation has been started.
+Status: partially implemented for Codex HTTP transport retries; remaining
+findings are still audit notes.
 
 ## Context
 
@@ -28,8 +29,11 @@ scenarios.
 
 Key points:
 
-- Codex HTTP calls are single-attempt. They do not yet apply backoff, jitter,
-  `Retry-After`, retry budgets, or retry diagnostics.
+- Codex HTTP calls now use adapter-owned retry policies with backoff, jitter,
+  bounded `Retry-After`, elapsed retry budgets, and secret-safe retry diagnostics.
+  Usage `GET` requests use the shared retry defaults. Completion `POST` requests
+  intentionally retry only HTTP 429 by default because replay safety for other
+  outcomes is not yet proven.
 - Automatic retries are not universally safe. Mutating or potentially
   side-effecting operations such as `git commit`, `pre-commit`, and skill-script
   execution should not be retried without explicit idempotency guarantees.
@@ -41,7 +45,7 @@ Key points:
 
 ## Findings
 
-### High: Codex HTTP transport has no retry policy
+### Implemented: Codex HTTP transport retry policy
 
 Affected code:
 
@@ -54,21 +58,27 @@ Affected code:
 
 Current behavior:
 
-- One HTTP request is attempted.
+- `fetch_usage()` retries configured retryable HTTPX transport failures and
+  retryable statuses with bounded backoff, jitter, `Retry-After`, and elapsed
+  budget handling.
+- `complete()` uses a cautious default retry policy: HTTP 429 can be retried, but
+  transport exceptions and backend 5xx responses are not replayed by default.
 - `httpx.HTTPError` is mapped to `TRANSPORT_ERROR`.
 - HTTP 429 and rate-limit-like headers are normalized as `RATE_LIMITED`.
 - Authentication, quota, backend-shape, and transport errors are kept
   secret-safe.
+- Retry observations record `attempt_count`, `retry_count`, `last_retry_reason`,
+  `last_http_status`, `last_error_type`, `elapsed_seconds`, and
+  `budget_exhausted` without including credentials, raw headers, request bodies,
+  or response bodies.
 
-Risk:
+Remaining risk:
 
-- Transient connection failures, read timeouts, temporary 5xx responses, and
-  rate-limit responses surface immediately to callers even when a short retry
-  could recover.
-- The spec already names `retry count` as desirable operational context, but no
-  retry count is currently recorded.
+- Completion `POST` replay safety is still not proven for transport failures,
+  backend 5xx responses, or ambiguous partial stream outcomes. Keep those
+  single-attempt unless an idempotency or pre-acceptance guarantee is established.
 
-Recommended direction:
+Implemented direction:
 
 - Add an adapter-owned retry policy DTO/settings object in the Codex HTTP adapter
   package, not in the application core unless retry configuration becomes a
@@ -86,7 +96,7 @@ Recommended direction:
 - Add secret-safe observations such as `attempt_count`, `retry_count`,
   `retry_reason`, `last_http_status`, and `elapsed_seconds`.
 
-Regression tests to add before implementation:
+Regression tests added:
 
 - `fetch_usage()` retries a transient `httpx.ConnectError` and then succeeds.
 - `fetch_usage()` honors a bounded `Retry-After` on 429.

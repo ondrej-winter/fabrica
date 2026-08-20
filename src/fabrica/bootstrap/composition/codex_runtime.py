@@ -38,20 +38,20 @@ def create_codex_runtime(
     credentials or call the live backend during construction. Credential loading
     and HTTP I/O happen only when the returned runtime use case is executed.
     """
-    backend = (
-        CodexBackendHttpAdapter(
+    if timeout is not None:
+        backend = CodexBackendHttpAdapter(
             request_settings=request_settings,
             usage_request_settings=usage_request_settings,
-            timeout=timeout,
+            completion_timeout=timeout,
+            usage_timeout=timeout,
             client=http_client,
         )
-        if timeout is not None
-        else CodexBackendHttpAdapter(
+    else:
+        backend = CodexBackendHttpAdapter(
             request_settings=request_settings,
             usage_request_settings=usage_request_settings,
             client=http_client,
         )
-    )
 
     transport = CompleteWithCodexTransport(
         credential_store=CodexAuthFileCredentialStore(auth_file_path or DEFAULT_CODEX_AUTH_FILE),
@@ -87,18 +87,14 @@ def create_codex_pydantic_ai_runtime(
     Construction only wires dependencies. Credential loading and HTTP I/O happen
     when the returned runtime is executed.
     """
-    backend = (
-        CodexBackendHttpAdapter(
+    if timeout is not None:
+        backend = CodexBackendHttpAdapter(
             request_settings=request_settings,
-            timeout=timeout,
+            completion_timeout=timeout,
             client=http_client,
         )
-        if timeout is not None
-        else CodexBackendHttpAdapter(
-            request_settings=request_settings,
-            client=http_client,
-        )
-    )
+    else:
+        backend = CodexBackendHttpAdapter(request_settings=request_settings, client=http_client)
     transport = CompleteWithCodexTransport(
         credential_store=CodexAuthFileCredentialStore(auth_file_path or DEFAULT_CODEX_AUTH_FILE),
         backend=backend,

@@ -75,8 +75,16 @@ Codex transport support should:
 - return a normalized result that distinguishes successful responses,
   authentication failures, rate-limit or quota failures, backend shape
   mismatches, and transport errors;
+- retry Codex HTTP transport calls only through adapter-owned policies with
+  bounded backoff, jitter, `Retry-After`, and elapsed budgets;
+- keep completion `POST` replay conservative by default: HTTP 429 may be retried,
+  but transport exceptions, backend 5xx responses, and ambiguous partial stream
+  outcomes must remain single-attempt until replay safety is proven;
 - capture observed request requirements, response shapes, error shapes, and
   rate-limit or quota signals with all credentials and sensitive values redacted;
+- record retry diagnostics as secret-safe scalar observations including attempt
+  count, retry count, final retry reason, final HTTP status or HTTPX error type,
+  elapsed seconds, and budget exhaustion status;
 - keep the Codex backend isolated as a volatile outbound adapter from the start;
 - expose an application API that the runtime can reuse without depending on
   private Codex backend schemas.

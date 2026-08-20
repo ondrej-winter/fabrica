@@ -2,6 +2,7 @@
 
 import httpx
 
+from fabrica.adapters.outbound.httpx_client import HttpxRetryExecutor, RetryPolicy
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http import (
     CodexBackendHttpAdapter,
     CodexBackendRequestSettings,
@@ -13,6 +14,26 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexUsageProbeCommand,
 )
 from tests.synthetic_values import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
+
+EXPECTED_ATTEMPT_COUNT = 2
+EXPECTED_RETRY_COUNT = 1
+EXPECTED_FIRST_JITTERED_DELAY = 0.25
+SUCCESS_STATUS = 200
+RETRYABLE_STATUS = 503
+SYNTHETIC_ERROR_MESSAGE = "synthetic secret url"
+
+
+class MonotonicClock:
+    def __init__(self) -> None:
+        self.current = 0.0
+        self.sleeps: list[float] = []
+
+    def monotonic(self) -> float:
+        return self.current
+
+    def sleep(self, delay: float) -> None:
+        self.sleeps.append(delay)
+        self.current += delay
 
 
 def test_complete_posts_built_request_and_maps_success_response() -> None:
@@ -56,7 +77,7 @@ def test_complete_allows_timeout_and_request_setting_overrides() -> None:
             model="synthetic-model",
             product_sku="synthetic-sku",
         ),
-        timeout=3.0,
+        completion_timeout=3.0,
     )
 
     result = adapter.complete(
@@ -68,6 +89,73 @@ def test_complete_allows_timeout_and_request_setting_overrides() -> None:
     )
 
     assert result.status is CodexTransportStatus.SUCCESS
+
+
+def test_complete_retries_transient_post_failure_and_records_summary() -> None:
+    clock = MonotonicClock()
+    calls = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(RETRYABLE_STATUS)
+        return httpx.Response(SUCCESS_STATUS, json={"output_text": "pong"})
+
+    adapter = CodexBackendHttpAdapter(
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        retry_executor=HttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=lambda: 0.5),
+        completion_retry_policy=RetryPolicy(total_budget_seconds=10.0),
+    )
+
+    result = adapter.complete(
+        command=CodexCompletionCommand(prompt="synthetic prompt"),
+        credentials=CodexCredentials(
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
+        ),
+    )
+
+    assert result.status is CodexTransportStatus.SUCCESS
+    assert result.output_text == "pong"
+    assert calls == EXPECTED_ATTEMPT_COUNT
+    assert clock.sleeps == [EXPECTED_FIRST_JITTERED_DELAY]
+    retry_observation = result.observations[-1]
+    assert retry_observation.message == "HTTP retry policy completed"
+    assert retry_observation.metadata["attempt_count"] == EXPECTED_ATTEMPT_COUNT
+    assert retry_observation.metadata["retry_count"] == EXPECTED_RETRY_COUNT
+    assert retry_observation.metadata["last_retry_reason"] == "http_status"
+    assert retry_observation.metadata["last_http_status"] == SUCCESS_STATUS
+    assert CODEX_BEARER_VALUE not in str(retry_observation)
+    assert CODEX_ACCOUNT_ID not in str(retry_observation)
+
+
+def test_complete_default_retry_policy_does_not_replay_backend_5xx() -> None:
+    calls = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(RETRYABLE_STATUS)
+        return httpx.Response(SUCCESS_STATUS, json={"output_text": "pong"})
+
+    adapter = CodexBackendHttpAdapter(client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+    result = adapter.complete(
+        command=CodexCompletionCommand(prompt="synthetic prompt"),
+        credentials=CodexCredentials(
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
+        ),
+    )
+
+    assert result.status is CodexTransportStatus.TRANSPORT_ERROR
+    assert calls == 1
+    retry_observation = result.observations[-1]
+    assert retry_observation.metadata["attempt_count"] == 1
+    assert retry_observation.metadata["retry_count"] == 0
+    assert retry_observation.metadata["last_http_status"] == RETRYABLE_STATUS
 
 
 def test_complete_maps_backend_error_response_without_leaking_request_secrets() -> None:
@@ -188,6 +276,43 @@ def test_fetch_usage_gets_usage_endpoint_and_maps_success_response() -> None:
     assert str(captured_request.url) == "https://chatgpt.com/backend-api/api/codex/usage"
     assert captured_request.headers["Authorization"] == f"Bearer {CODEX_BEARER_VALUE}"
     assert captured_request.headers["ChatGPT-Account-ID"] == "synthetic-account"
+
+
+def test_fetch_usage_retries_connect_error_and_records_summary() -> None:
+    clock = MonotonicClock()
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise httpx.ConnectError(SYNTHETIC_ERROR_MESSAGE, request=request)
+        return httpx.Response(SUCCESS_STATUS, json={"plan_type": "synthetic-pro", "usage_percent": 10})
+
+    adapter = CodexBackendHttpAdapter(
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        retry_executor=HttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=lambda: 0.5),
+        usage_retry_policy=RetryPolicy(total_budget_seconds=10.0),
+    )
+
+    result = adapter.fetch_usage(
+        command=CodexUsageProbeCommand(),
+        credentials=CodexCredentials(
+            access_token=CODEX_BEARER_VALUE,
+            account_id=CODEX_ACCOUNT_ID,
+        ),
+    )
+
+    assert result.status is CodexTransportStatus.SUCCESS
+    assert calls == EXPECTED_ATTEMPT_COUNT
+    assert clock.sleeps == [EXPECTED_FIRST_JITTERED_DELAY]
+    retry_observation = result.observations[-1]
+    assert retry_observation.metadata["attempt_count"] == EXPECTED_ATTEMPT_COUNT
+    assert retry_observation.metadata["retry_count"] == EXPECTED_RETRY_COUNT
+    assert retry_observation.metadata["last_retry_reason"] == "exception"
+    assert retry_observation.metadata["last_error_type"] == "ConnectError"
+    assert "example.invalid" not in str(result.observations)
+    assert CODEX_BEARER_VALUE not in str(result.observations)
 
 
 def test_fetch_usage_maps_httpx_transport_error_without_error_message() -> None:
