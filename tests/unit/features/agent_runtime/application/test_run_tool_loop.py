@@ -105,6 +105,99 @@ def test_run_tool_loop_executes_tool_and_returns_result_to_model() -> None:
     assert model.calls == [(command, (tool,), ()), (command, (tool,), (tool_result,))]
 
 
+def test_run_tool_loop_executes_all_calls_at_per_turn_limit() -> None:
+    command = LocalAgentRunCommand(prompt="Use two tools")
+    first_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note")
+    second_call = ToolCallRequest(call_id="call-2", tool_name="lookup_note")
+    first_result = ToolCallResult(call_id="call-1", tool_name="lookup_note", status=ToolCallResultStatus.SUCCESS)
+    second_result = ToolCallResult(call_id="call-2", tool_name="lookup_note", status=ToolCallResultStatus.SUCCESS)
+    model = FakeToolAwareModel(
+        responses=[
+            ToolAwareModelResponse(tool_calls=(first_call, second_call)),
+            ToolAwareModelResponse(output_text="done"),
+        ],
+    )
+    executor = FakeToolExecutor(results_by_call_id={"call-1": first_result, "call-2": second_result})
+    limits = ToolLoopLimits(max_tool_iterations=2, max_tool_calls_per_turn=2, max_tool_result_chars=100)
+
+    result = RunToolLoop(model=model, tool_executor=executor).run(command, limits=limits)
+
+    assert result.status is ToolLoopRunStatus.SUCCESS
+    assert result.tool_results == (first_result, second_result)
+    assert executor.calls == [(first_call, limits), (second_call, limits)]
+
+
+def test_run_tool_loop_rejects_excessive_tool_calls_before_execution() -> None:
+    command = LocalAgentRunCommand(prompt="Use too many tools")
+    first_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note")
+    second_call = ToolCallRequest(call_id="call-2", tool_name="lookup_note")
+    model = FakeToolAwareModel(responses=[ToolAwareModelResponse(tool_calls=(first_call, second_call))])
+    executor = FakeToolExecutor()
+
+    result = RunToolLoop(model=model, tool_executor=executor).run(
+        command,
+        limits=ToolLoopLimits(max_tool_iterations=1, max_tool_calls_per_turn=1, max_tool_result_chars=100),
+    )
+
+    assert result.status is ToolLoopRunStatus.TOOL_LIMIT_EXCEEDED
+    assert result.tool_results == ()
+    assert executor.calls == []
+    assert result.observations == (
+        RuntimeObservation(
+            message="tool loop rejected excessive tool calls",
+            metadata={"tool_call_count": 2, "max_tool_calls_per_turn": 1},
+        ),
+    )
+
+
+def test_run_tool_loop_rejects_duplicate_call_ids_in_one_turn_before_execution() -> None:
+    command = LocalAgentRunCommand(prompt="Use duplicate calls")
+    first_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note")
+    second_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note")
+    model = FakeToolAwareModel(responses=[ToolAwareModelResponse(tool_calls=(first_call, second_call))])
+    executor = FakeToolExecutor()
+
+    result = RunToolLoop(model=model, tool_executor=executor).run(command)
+
+    assert result.status is ToolLoopRunStatus.INVALID_TOOL_REQUEST
+    assert result.tool_results == ()
+    assert executor.calls == []
+    assert result.observations == (
+        RuntimeObservation(
+            message="tool loop rejected duplicate tool call id",
+            metadata={"tool_call_id": "call-1", "duplicate_scope": "turn"},
+        ),
+    )
+
+
+def test_run_tool_loop_rejects_reused_call_id_across_run_before_reexecution() -> None:
+    command = LocalAgentRunCommand(prompt="Reuse a call id")
+    first_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note")
+    reused_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note")
+    first_result = ToolCallResult(call_id="call-1", tool_name="lookup_note", status=ToolCallResultStatus.SUCCESS)
+    model = FakeToolAwareModel(
+        responses=[ToolAwareModelResponse(tool_calls=(first_call,)), ToolAwareModelResponse(tool_calls=(reused_call,))],
+    )
+    executor = FakeToolExecutor(results_by_call_id={"call-1": first_result})
+
+    result = RunToolLoop(model=model, tool_executor=executor).run(
+        command,
+        limits=ToolLoopLimits(max_tool_iterations=2, max_tool_calls_per_turn=1, max_tool_result_chars=100),
+    )
+
+    assert result.status is ToolLoopRunStatus.INVALID_TOOL_REQUEST
+    assert result.tool_results == (first_result,)
+    assert executor.calls == [
+        (first_call, ToolLoopLimits(max_tool_iterations=2, max_tool_calls_per_turn=1, max_tool_result_chars=100))
+    ]
+    assert result.observations == (
+        RuntimeObservation(
+            message="tool loop rejected duplicate tool call id",
+            metadata={"tool_call_id": "call-1", "duplicate_scope": "run"},
+        ),
+    )
+
+
 def test_run_tool_loop_stops_on_unknown_tool() -> None:
     result = _run_single_tool_result(ToolCallResultStatus.UNKNOWN_TOOL)
 

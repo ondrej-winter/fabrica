@@ -7,6 +7,7 @@ from typing import cast
 import pytest
 
 from fabrica.features.agent_runtime.application.dtos import (
+    DEFAULT_MAX_TOOL_CALLS_PER_TURN,
     MAX_TOOL_CALL_ID_CHARS,
     MAX_TOOL_DESCRIPTION_CHARS,
     MAX_TOOL_ERROR_MESSAGE_CHARS,
@@ -93,9 +94,12 @@ def test_tool_loop_limits_are_conservative_and_bounded() -> None:
     )
 
     assert limits.max_tool_iterations == EXPECTED_MAX_TOOL_ITERATIONS
+    assert limits.max_tool_calls_per_turn == DEFAULT_MAX_TOOL_CALLS_PER_TURN
     assert limits.max_tool_result_chars == EXPECTED_MAX_TOOL_RESULT_CHARS
     with pytest.raises(ValueError, match="max_tool_iterations must be at least 1"):
         ToolLoopLimits(max_tool_iterations=0)
+    with pytest.raises(ValueError, match="max_tool_calls_per_turn must be at least 1"):
+        ToolLoopLimits(max_tool_calls_per_turn=0)
     with pytest.raises(ValueError, match="max_tool_result_chars must be at least 1"):
         ToolLoopLimits(max_tool_result_chars=0)
     with pytest.raises(ValueError, match="context block bound"):

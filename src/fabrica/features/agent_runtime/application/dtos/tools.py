@@ -12,6 +12,7 @@ from fabrica.features.agent_runtime.application.dtos.runtime import (
 )
 
 DEFAULT_MAX_TOOL_ITERATIONS = 4
+DEFAULT_MAX_TOOL_CALLS_PER_TURN = 8
 DEFAULT_MAX_TOOL_RESULT_CHARS = 4_000
 MAX_TOOL_NAME_CHARS = 80
 MAX_TOOL_CALL_ID_CHARS = 120
@@ -55,11 +56,15 @@ class ToolLoopLimits:
     """Bounds applied to one application-owned tool loop."""
 
     max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS
+    max_tool_calls_per_turn: int = DEFAULT_MAX_TOOL_CALLS_PER_TURN
     max_tool_result_chars: int = DEFAULT_MAX_TOOL_RESULT_CHARS
 
     def __post_init__(self) -> None:
         if self.max_tool_iterations < 1:
             msg = "max_tool_iterations must be at least 1"
+            raise ValueError(msg)
+        if self.max_tool_calls_per_turn < 1:
+            msg = "max_tool_calls_per_turn must be at least 1"
             raise ValueError(msg)
         if self.max_tool_result_chars < 1:
             msg = "max_tool_result_chars must be at least 1"

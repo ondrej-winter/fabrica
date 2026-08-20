@@ -1,5 +1,7 @@
 """Use case for running a bounded application-owned tool loop."""
 
+from dataclasses import dataclass
+
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     RuntimeObservation,
@@ -37,6 +39,7 @@ class RunToolLoop:
         active_limits = limits or ToolLoopLimits()
         tool_results: tuple[ToolCallResult, ...] = ()
         observations: tuple[RuntimeObservation, ...] = ()
+        accepted_call_ids: set[str] = set()
 
         for iteration in range(active_limits.max_tool_iterations + 1):
             try:
@@ -76,9 +79,22 @@ class RunToolLoop:
                     ),
                 )
 
+            validation_failure = _validate_tool_call_batch(
+                model_response.tool_calls,
+                limits=active_limits,
+                accepted_call_ids=accepted_call_ids,
+            )
+            if validation_failure is not None:
+                return ToolLoopRunResult(
+                    status=validation_failure.status,
+                    tool_results=tool_results,
+                    observations=(*observations, validation_failure.observation),
+                )
+
             turn_results = tuple(
                 self._execute_tool_call(tool_call, active_limits) for tool_call in model_response.tool_calls
             )
+            accepted_call_ids.update(tool_call.call_id for tool_call in model_response.tool_calls)
             tool_results = (*tool_results, *turn_results)
             observations = (
                 *observations,
@@ -106,6 +122,51 @@ class RunToolLoop:
                     ),
                 ),
             )
+
+
+@dataclass(frozen=True, slots=True)
+class _ToolCallBatchValidationFailure:
+    status: ToolLoopRunStatus
+    observation: RuntimeObservation
+
+
+def _validate_tool_call_batch(
+    tool_calls: tuple[ToolCallRequest, ...],
+    *,
+    limits: ToolLoopLimits,
+    accepted_call_ids: set[str],
+) -> _ToolCallBatchValidationFailure | None:
+    if len(tool_calls) > limits.max_tool_calls_per_turn:
+        return _ToolCallBatchValidationFailure(
+            status=ToolLoopRunStatus.TOOL_LIMIT_EXCEEDED,
+            observation=RuntimeObservation(
+                message="tool loop rejected excessive tool calls",
+                metadata={
+                    "tool_call_count": len(tool_calls),
+                    "max_tool_calls_per_turn": limits.max_tool_calls_per_turn,
+                },
+            ),
+        )
+
+    seen_call_ids: set[str] = set()
+    for tool_call in tool_calls:
+        if tool_call.call_id in seen_call_ids:
+            return _duplicate_call_id_failure(tool_call.call_id, duplicate_scope="turn")
+        if tool_call.call_id in accepted_call_ids:
+            return _duplicate_call_id_failure(tool_call.call_id, duplicate_scope="run")
+        seen_call_ids.add(tool_call.call_id)
+
+    return None
+
+
+def _duplicate_call_id_failure(call_id: str, *, duplicate_scope: str) -> _ToolCallBatchValidationFailure:
+    return _ToolCallBatchValidationFailure(
+        status=ToolLoopRunStatus.INVALID_TOOL_REQUEST,
+        observation=RuntimeObservation(
+            message="tool loop rejected duplicate tool call id",
+            metadata={"tool_call_id": call_id, "duplicate_scope": duplicate_scope},
+        ),
+    )
 
 
 def _first_stop_status(results: tuple[ToolCallResult, ...]) -> ToolLoopRunStatus | None:

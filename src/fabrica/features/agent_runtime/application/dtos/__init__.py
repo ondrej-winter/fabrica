@@ -61,6 +61,7 @@ from fabrica.features.agent_runtime.application.dtos.skills import (
     SkillResourceContextBounds,
 )
 from fabrica.features.agent_runtime.application.dtos.tools import (
+    DEFAULT_MAX_TOOL_CALLS_PER_TURN,
     DEFAULT_MAX_TOOL_ITERATIONS,
     DEFAULT_MAX_TOOL_RESULT_CHARS,
     MAX_TOOL_CALL_ID_CHARS,
@@ -109,6 +110,7 @@ __all__ = [
     "DEFAULT_MAX_SKILL_SCRIPT_OBSERVATION_MESSAGE_CHARS",
     "DEFAULT_MAX_SKILL_SCRIPT_OUTPUT_CHARS",
     "DEFAULT_MAX_SKILL_TOOL_REASON_CHARS",
+    "DEFAULT_MAX_TOOL_CALLS_PER_TURN",
     "DEFAULT_MAX_TOOL_ITERATIONS",
     "DEFAULT_MAX_TOOL_RESULT_CHARS",
     "DEFAULT_MAX_TOTAL_SKILL_CONTEXT_CHARS",
