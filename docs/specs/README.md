@@ -21,6 +21,12 @@ ownership, validation expectations, and preserved historical decisions.
 - `commit-workflows.md` defines developer-facing commit workflows, including the
   read-only `fabrica commit-message` preview and the explicitly confirmed
   mutating `fabrica commit` flow.
+- `read-files-tool.md` defines the read-only workspace file inspection primitive
+  for model-callable coding-agent workflows.
+- `search-codebase-tool.md` defines the read-only textual regex discovery
+  primitive for locating relevant workspace file contents before reading files.
+- `apply-patch-tool.md` defines the context-based workspace file mutation
+  primitive for model-callable coding-agent workflows.
 
 ## Placement guidance
 
