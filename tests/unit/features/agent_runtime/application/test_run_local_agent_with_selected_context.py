@@ -1,5 +1,6 @@
 """Tests for selected-context local agent runtime orchestration."""
 
+import asyncio
 from dataclasses import dataclass, field
 
 import pytest
@@ -29,7 +30,7 @@ class FakeRuntime:
     result: LocalAgentRunResult
     calls: list[LocalAgentRunCommand] = field(default_factory=list)
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         self.calls.append(command)
         return self.result
 
@@ -90,10 +91,14 @@ def test_selected_context_runtime_loads_context_before_running_local_agent() -> 
         ),
     )
 
-    result = use_case.run(
-        LocalAgentRunCommand(prompt="Use context"),
-        skill_selections=(SelectedSkill(skill_id="python-testing"),),
-        resource_selections=(SelectedSkillResource(skill_id="python-testing", resource_id="references/example.md"),),
+    result = asyncio.run(
+        use_case.run(
+            LocalAgentRunCommand(prompt="Use context"),
+            skill_selections=(SelectedSkill(skill_id="python-testing"),),
+            resource_selections=(
+                SelectedSkillResource(skill_id="python-testing", resource_id="references/example.md"),
+            ),
+        )
     )
 
     assert result.succeeded
@@ -127,7 +132,9 @@ def test_selected_context_runtime_requires_loader_for_selected_skills() -> None:
     )
 
     with pytest.raises(RuntimeError, match="selected skill context loader is not configured"):
-        use_case.run(
-            LocalAgentRunCommand(prompt="Use context"),
-            skill_selections=(SelectedSkill(skill_id="python-testing"),),
+        asyncio.run(
+            use_case.run(
+                LocalAgentRunCommand(prompt="Use context"),
+                skill_selections=(SelectedSkill(skill_id="python-testing"),),
+            )
         )

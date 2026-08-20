@@ -1,5 +1,6 @@
 """Tests for confirmed commit pre-commit gate orchestration."""
 
+import asyncio
 from dataclasses import dataclass, field
 
 import pytest
@@ -55,7 +56,7 @@ class FakeGenerator:
     result: GenerateCommitMessageResult | Exception
     skill_ids: list[str] = field(default_factory=list)
 
-    async def generate_async(self, *, skill_id: str) -> GenerateCommitMessageResult:
+    async def generate(self, *, skill_id: str) -> GenerateCommitMessageResult:
         """Record the selected skill and return a deterministic recommendation."""
         self.skill_ids.append(skill_id)
         if isinstance(self.result, Exception):
@@ -80,11 +81,13 @@ def test_confirmed_commit_runs_pre_commit_before_recommendation_generation() -> 
     generator = FakeGenerator(_generate_result(_recommendation()))
     committer = FakeCommitter()
 
-    result = ConfirmedCommitWorkflow(
-        generator=generator,
-        committer=committer,
-        pre_commit_runner=pre_commit,
-    ).generate(skill_id="team-style")
+    result = asyncio.run(
+        ConfirmedCommitWorkflow(
+            generator=generator,
+            committer=committer,
+            pre_commit_runner=pre_commit,
+        ).generate(skill_id="team-style")
+    )
 
     assert result.succeeded
     assert result.recommendation == _recommendation()
@@ -99,11 +102,13 @@ def test_confirmed_commit_continues_when_pre_commit_is_not_configured() -> None:
     generator = FakeGenerator(_generate_result(_recommendation()))
     committer = FakeCommitter()
 
-    result = ConfirmedCommitWorkflow(
-        generator=generator,
-        committer=committer,
-        pre_commit_runner=pre_commit,
-    ).generate(skill_id="team-style")
+    result = asyncio.run(
+        ConfirmedCommitWorkflow(
+            generator=generator,
+            committer=committer,
+            pre_commit_runner=pre_commit,
+        ).generate(skill_id="team-style")
+    )
 
     assert result.succeeded
     assert result.recommendation == _recommendation()
@@ -117,11 +122,13 @@ def test_confirmed_commit_pre_commit_failure_skips_generation_and_commit() -> No
     generator = FakeGenerator(_generate_result(_recommendation()))
     committer = FakeCommitter()
 
-    result = ConfirmedCommitWorkflow(
-        generator=generator,
-        committer=committer,
-        pre_commit_runner=pre_commit,
-    ).generate()
+    result = asyncio.run(
+        ConfirmedCommitWorkflow(
+            generator=generator,
+            committer=committer,
+            pre_commit_runner=pre_commit,
+        ).generate()
+    )
 
     assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is None
@@ -142,11 +149,13 @@ def test_confirmed_commit_modified_files_skips_generation_and_reports_review_req
     generator = FakeGenerator(_generate_result(_recommendation()))
     committer = FakeCommitter()
 
-    result = ConfirmedCommitWorkflow(
-        generator=generator,
-        committer=committer,
-        pre_commit_runner=pre_commit,
-    ).generate()
+    result = asyncio.run(
+        ConfirmedCommitWorkflow(
+            generator=generator,
+            committer=committer,
+            pre_commit_runner=pre_commit,
+        ).generate()
+    )
 
     assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is None
@@ -170,11 +179,13 @@ def test_confirmed_commit_pre_commit_error_skips_generation_and_commit() -> None
     generator = FakeGenerator(_generate_result(_recommendation()))
     committer = FakeCommitter()
 
-    result = ConfirmedCommitWorkflow(
-        generator=generator,
-        committer=committer,
-        pre_commit_runner=pre_commit,
-    ).generate()
+    result = asyncio.run(
+        ConfirmedCommitWorkflow(
+            generator=generator,
+            committer=committer,
+            pre_commit_runner=pre_commit,
+        ).generate()
+    )
 
     assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is None
@@ -228,11 +239,13 @@ def test_confirmed_commit_generation_errors_skip_commit(
     generator = FakeGenerator(error)
     committer = FakeCommitter()
 
-    result = ConfirmedCommitWorkflow(
-        generator=generator,
-        committer=committer,
-        pre_commit_runner=pre_commit,
-    ).generate(skill_id="team-style")
+    result = asyncio.run(
+        ConfirmedCommitWorkflow(
+            generator=generator,
+            committer=committer,
+            pre_commit_runner=pre_commit,
+        ).generate(skill_id="team-style")
+    )
 
     assert result.status is expected_status
     assert result.recommendation is None

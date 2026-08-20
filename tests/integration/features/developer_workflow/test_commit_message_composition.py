@@ -1,5 +1,6 @@
 """Offline integration tests for commit-message workflow composition."""
 
+import asyncio
 import json
 import subprocess
 from dataclasses import dataclass, field
@@ -40,12 +41,9 @@ class FakeRuntime:
     results: list[LocalAgentRunResult]
     calls: list[LocalAgentRunCommand] = field(default_factory=list)
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         self.calls.append(command)
         return self.results.pop(0)
-
-    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        return self.run(command)
 
 
 def test_commit_message_workflow_runs_per_file_analysis_then_final_synthesis(tmp_path: Path) -> None:
@@ -62,7 +60,7 @@ def test_commit_message_workflow_runs_per_file_analysis_then_final_synthesis(tmp
         options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
     )
 
-    result = workflow.run(skill_id="conventional-commits")
+    result = asyncio.run(workflow.run(skill_id="conventional-commits"))
 
     assert result.succeeded
     assert result.recommendation == CommitMessageRecommendation(
@@ -124,7 +122,7 @@ def test_commit_message_workflow_propagates_model_evidence_from_all_runtime_call
         options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
     )
 
-    result = workflow.run(skill_id="conventional-commits")
+    result = asyncio.run(workflow.run(skill_id="conventional-commits"))
 
     assert result.succeeded
     assert result.usage_evidence == (analysis_usage, synthesis_usage)
@@ -143,7 +141,7 @@ def test_commit_message_workflow_stops_before_runtime_when_staged_discovery_fail
         ),
     )
 
-    result = workflow.run()
+    result = asyncio.run(workflow.run())
 
     assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.observations[0].metadata["category"] == GitStagedChangesFailureCategory.NO_STAGED_CHANGES
@@ -170,7 +168,7 @@ def test_codex_commit_message_workflow_uses_spark_low_defaults_with_mock_transpo
         ),
     )
 
-    result = workflow.run()
+    result = asyncio.run(workflow.run())
 
     assert result.succeeded
     assert len(observed_payloads) == EXPECTED_ONE_FILE_MODEL_CALLS
@@ -202,7 +200,7 @@ def test_codex_commit_message_workflow_allows_model_and_effort_overrides(tmp_pat
         ),
     )
 
-    result = workflow.run()
+    result = asyncio.run(workflow.run())
 
     assert result.succeeded
     assert len(observed_payloads) == EXPECTED_ONE_FILE_MODEL_CALLS

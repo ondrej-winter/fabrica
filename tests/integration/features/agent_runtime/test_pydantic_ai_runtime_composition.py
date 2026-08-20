@@ -1,5 +1,6 @@
 """Offline integration tests for PydanticAI runtime composition."""
 
+import asyncio
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,7 +36,7 @@ def test_pydantic_ai_runtime_composition_runs_with_fake_completion() -> None:
     completion = FakeCompletion(output_text="pong")
     runtime = create_pydantic_ai_runtime(completion=completion)
 
-    result = runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong"))
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong")))
 
     assert result.status is LocalAgentRunStatus.SUCCESS
     assert result.succeeded is True
@@ -50,7 +51,7 @@ def test_pydantic_ai_runtime_factory_does_not_call_completion_during_constructio
 
     assert completion.calls == []
 
-    runtime.run(LocalAgentRunCommand(prompt="ping"))
+    asyncio.run(runtime.run(LocalAgentRunCommand(prompt="ping")))
 
     assert len(completion.calls) == 1
 
@@ -59,11 +60,13 @@ def test_pydantic_ai_runtime_composition_preserves_context_mapping() -> None:
     completion = FakeCompletion()
     runtime = create_pydantic_ai_runtime(completion=completion, model_name="codex-compatible")
 
-    result = runtime.run(
-        LocalAgentRunCommand(
-            prompt="Answer from context only",
-            context=(LocalAgentContextBlock(text="The answer is pong.", label="note"),),
-        ),
+    result = asyncio.run(
+        runtime.run(
+            LocalAgentRunCommand(
+                prompt="Answer from context only",
+                context=(LocalAgentContextBlock(text="The answer is pong.", label="note"),),
+            ),
+        )
     )
 
     assert result.status is LocalAgentRunStatus.SUCCESS
@@ -85,7 +88,7 @@ def test_pydantic_ai_runtime_accepts_skill_augmented_command_without_pydanticai_
         ),
     )
 
-    result = runtime.run(command)
+    result = asyncio.run(runtime.run(command))
 
     assert result.status is LocalAgentRunStatus.SUCCESS
     assert "# Python Testing" in completion.calls[0].prompt
@@ -120,7 +123,7 @@ def test_codex_pydantic_ai_runtime_composition_runs_with_mock_transport(tmp_path
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
-    result = runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong"))
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong")))
 
     assert result.status is LocalAgentRunStatus.SUCCESS
     assert result.output_text == "pong"
@@ -134,7 +137,7 @@ def test_codex_pydantic_ai_runtime_factory_does_not_read_credentials_during_cons
 ) -> None:
     runtime = create_codex_pydantic_ai_runtime(auth_file_path=tmp_path / "missing-auth.json")
 
-    result = runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong"))
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong")))
 
     assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
     assert result.output_text is None

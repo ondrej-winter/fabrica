@@ -20,14 +20,9 @@ class AgentRuntimeCommitMessageSynthesizer:
     def __init__(self, runtime: CommitMessageAgentRuntime) -> None:
         self._runtime = runtime
 
-    def synthesize(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
-        """Return a parsed recommendation from one final agent-runtime response."""
-        runtime_result = self._runtime.run(to_synthesis_runtime_command(command))
-        return _parse_synthesis_runtime_result(runtime_result)
-
-    async def synthesize_async(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
+    async def synthesize(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
         """Return a parsed recommendation from one async final agent-runtime response."""
-        runtime_result = await self._runtime.run_async(to_synthesis_runtime_command(command))
+        runtime_result = await self._runtime.run(to_synthesis_runtime_command(command))
         return _parse_synthesis_runtime_result(runtime_result)
 
 

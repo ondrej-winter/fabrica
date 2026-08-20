@@ -1,6 +1,5 @@
 """Use cases for evidence-first commit-message and commit workflows."""
 
-import asyncio
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Protocol
@@ -27,17 +26,17 @@ from fabrica.features.developer_workflow.application.dtos import (
     SynthesizeCommitMessageCommand,
 )
 from fabrica.features.developer_workflow.application.ports import (
-    AsyncCommitMessageSynthesizer,
     AsyncGitStagedChangesLoader,
-    AsyncStagedFileCommitMessageAnalyzer,
     CommitMessageAnalysisError,
     CommitMessageSkillContextLoadError,
     CommitMessageSynthesisError,
+    CommitMessageSynthesizer,
     GitCommitCreator,
     GitCommitError,
     GitStagedChangesLoadError,
     PreCommitRunError,
     PreCommitRunner,
+    StagedFileCommitMessageAnalyzer,
 )
 from fabrica.features.query_execution.application.ports import AsyncQueryFanoutExecutor
 from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence
@@ -94,8 +93,8 @@ class GenerateCommitMessage:
         self,
         *,
         staged_changes_loader: AsyncGitStagedChangesLoader,
-        analyzer: AsyncStagedFileCommitMessageAnalyzer,
-        synthesizer: AsyncCommitMessageSynthesizer,
+        analyzer: StagedFileCommitMessageAnalyzer,
+        synthesizer: CommitMessageSynthesizer,
         query_executor: AsyncQueryFanoutExecutor,
         options: GenerateCommitMessageOptions | None = None,
     ) -> None:
@@ -106,11 +105,7 @@ class GenerateCommitMessage:
         self._query_executor = query_executor
         self._options = workflow_options
 
-    def generate(self, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID) -> GenerateCommitMessageResult:
-        """Run async-first staged-file analysis from a synchronous caller."""
-        return asyncio.run(self.generate_async(skill_id=skill_id))
-
-    async def generate_async(self, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID) -> GenerateCommitMessageResult:
+    async def generate(self, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID) -> GenerateCommitMessageResult:
         """Run bounded parallel staged-file analysis and synthesize a recommendation."""
         staged_files = await self._staged_changes_loader.list_files_async()
         staged_file_count = len(staged_files.files)
@@ -136,7 +131,7 @@ class GenerateCommitMessage:
                         category=err.category,
                         metadata={**err.metadata, "path": staged_file.path},
                     ) from err
-                return await self._analyzer.analyze_async(
+                return await self._analyzer.analyze(
                     AnalyzeStagedFileForCommitMessageCommand(
                         staged_file=staged_file,
                         diff=diff,
@@ -160,7 +155,7 @@ class GenerateCommitMessage:
                 metadata={"evidence_count": len(evidence)},
             ) from err
 
-        recommendation = await self._synthesizer.synthesize_async(
+        recommendation = await self._synthesizer.synthesize(
             SynthesizeCommitMessageCommand(evidence_bundle=evidence_bundle, skill_id=skill_id),
         )
         return GenerateCommitMessageResult(recommendation=recommendation, evidence_bundle=evidence_bundle)
@@ -169,7 +164,7 @@ class GenerateCommitMessage:
 class CommitMessageGenerator(Protocol):
     """Generator protocol consumed by composed commit workflows."""
 
-    async def generate_async(self, *, skill_id: str) -> GenerateCommitMessageResult:
+    async def generate(self, *, skill_id: str) -> GenerateCommitMessageResult:
         """Generate one commit-message recommendation result."""
 
 
@@ -187,16 +182,7 @@ class CommitMessageWorkflow:
     generator: CommitMessageGenerator
     evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
 
-    def run(
-        self,
-        command: GenerateCommitMessageCommand | None = None,
-        *,
-        skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID,
-    ) -> CommitMessageWorkflowResult:
-        """Generate a recommendation from a synchronous caller."""
-        return asyncio.run(self.run_async(command, skill_id=skill_id))
-
-    async def run_async(
+    async def run(
         self,
         command: GenerateCommitMessageCommand | None = None,
         *,
@@ -207,7 +193,7 @@ class CommitMessageWorkflow:
         if self.evidence_recorder is not None:
             self.evidence_recorder.reset()
         try:
-            result = await self.generator.generate_async(skill_id=active_command.skill_id)
+            result = await self.generator.generate(skill_id=active_command.skill_id)
         except GitStagedChangesLoadError as err:
             return CommitMessageWorkflowResult(
                 status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
@@ -279,23 +265,11 @@ class ConfirmedCommitWorkflow:
     pre_commit_runner: PreCommitRunner
     evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
 
-    def run(
-        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
-    ) -> ConfirmedCommitWorkflowResult:
-        """Generate a recommendation and create a commit for pre-approved callers."""
-        return asyncio.run(self.run_async(command, skill_id=skill_id))
-
-    def generate(
-        self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
-    ) -> ConfirmedCommitWorkflowResult:
-        """Generate a recommendation without creating a git commit."""
-        return asyncio.run(self.generate_async(command, skill_id=skill_id))
-
-    async def run_async(
+    async def run(
         self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
     ) -> ConfirmedCommitWorkflowResult:
         """Generate a recommendation asynchronously and commit for pre-approved callers."""
-        generation_result = await self.generate_async(command, skill_id=skill_id)
+        generation_result = await self.generate(command, skill_id=skill_id)
         if not generation_result.succeeded or generation_result.recommendation is None:
             return generation_result
         return self.commit(
@@ -305,7 +279,7 @@ class ConfirmedCommitWorkflow:
             cost_evidence=generation_result.cost_evidence,
         )
 
-    async def generate_async(
+    async def generate(
         self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID
     ) -> ConfirmedCommitWorkflowResult:
         """Run pre-commit, then generate a recommendation without creating a commit."""
@@ -316,7 +290,7 @@ class ConfirmedCommitWorkflow:
         if pre_commit_result is not None:
             return pre_commit_result
         try:
-            result = await self.generator.generate_async(skill_id=selected_skill_id)
+            result = await self.generator.generate(skill_id=selected_skill_id)
         except GitStagedChangesLoadError as err:
             return self._failure_result(
                 DeveloperWorkflowStatus.CONFIGURATION_ERROR,

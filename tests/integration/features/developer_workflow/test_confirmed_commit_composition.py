@@ -1,5 +1,6 @@
 """Offline integration tests for confirmed commit workflow composition."""
 
+import asyncio
 import json
 import shutil
 import subprocess
@@ -48,19 +49,16 @@ class FakeRuntime:
     results: list[LocalAgentRunResult]
     calls: list[LocalAgentRunCommand] = field(default_factory=list)
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         self.calls.append(command)
         return self.results.pop(0)
-
-    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        return self.run(command)
 
 
 @dataclass
 class FakeGenerator:
     result: GenerateCommitMessageResult
 
-    async def generate_async(self, *, skill_id: str) -> GenerateCommitMessageResult:
+    async def generate(self, *, skill_id: str) -> GenerateCommitMessageResult:
         _ = skill_id
         return self.result
 
@@ -113,7 +111,7 @@ def test_confirmed_commit_workflow_creates_commit_from_parsed_recommendation_mes
         options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
     )
 
-    result = workflow.run(skill_id="conventional-commits")
+    result = asyncio.run(workflow.run(skill_id="conventional-commits"))
 
     assert result.succeeded
     assert result.commit_attempted is True
@@ -147,7 +145,7 @@ def test_confirmed_commit_workflow_allows_repository_without_pre_commit_config(t
         options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
     )
 
-    result = workflow.run(skill_id="conventional-commits")
+    result = asyncio.run(workflow.run(skill_id="conventional-commits"))
 
     assert result.succeeded
     assert result.commit_attempted is True
@@ -189,7 +187,7 @@ def test_confirmed_commit_workflow_preserves_model_evidence(tmp_path: Path) -> N
         options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
     )
 
-    result = workflow.run(skill_id="conventional-commits")
+    result = asyncio.run(workflow.run(skill_id="conventional-commits"))
 
     assert result.succeeded
     assert result.usage_evidence == (analysis_usage, synthesis_usage)
@@ -207,7 +205,7 @@ def test_confirmed_commit_workflow_stops_before_commit_when_staged_discovery_fai
         options=CommitMessageWorkflowOptions(git_working_directory=git_repository),
     )
 
-    result = workflow.run()
+    result = asyncio.run(workflow.run())
 
     assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.commit_attempted is False
@@ -228,7 +226,7 @@ def test_confirmed_commit_workflow_stops_before_runtime_when_pre_commit_fails(tm
         options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
     )
 
-    result = workflow.run(skill_id="conventional-commits")
+    result = asyncio.run(workflow.run(skill_id="conventional-commits"))
 
     assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is None
@@ -251,7 +249,7 @@ def test_confirmed_commit_workflow_stops_before_runtime_when_pre_commit_modifies
         options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
     )
 
-    result = workflow.run(skill_id="conventional-commits")
+    result = asyncio.run(workflow.run(skill_id="conventional-commits"))
 
     assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is None
@@ -285,7 +283,7 @@ def test_confirmed_commit_workflow_reports_git_failure_without_creating_commit(t
         options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
     )
 
-    result = workflow.run(skill_id="conventional-commits")
+    result = asyncio.run(workflow.run(skill_id="conventional-commits"))
 
     assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.commit_attempted is True
@@ -315,7 +313,7 @@ def test_confirmed_commit_workflow_maps_commit_error_after_preserving_recommenda
         evidence_recorder=recorder,
     )
 
-    result = workflow.run()
+    result = asyncio.run(workflow.run())
 
     assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
     assert result.recommendation is recommendation

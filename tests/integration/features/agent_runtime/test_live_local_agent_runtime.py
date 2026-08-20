@@ -1,5 +1,6 @@
 """Opt-in live integration test for the Codex-backed local agent runtime."""
 
+import asyncio
 import os
 from pathlib import Path
 
@@ -32,7 +33,7 @@ def test_live_codex_backed_runtime_returns_pong_when_explicitly_enabled() -> Non
         ),
     )
 
-    result = runtime.run(LocalAgentRunCommand(prompt=_PONG_PROMPT))
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt=_PONG_PROMPT)))
 
     if result.status is not LocalAgentRunStatus.SUCCESS:
         pytest.fail(f"live Codex-backed runtime failed with redacted observations: {result.observations}")

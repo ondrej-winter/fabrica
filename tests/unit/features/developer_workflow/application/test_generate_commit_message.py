@@ -1,5 +1,6 @@
 """Tests for evidence-first commit-message orchestration."""
 
+import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 
@@ -74,16 +75,13 @@ class FakeAnalyzer:
     summary_by_path: dict[str, str] = field(default_factory=dict)
     calls: list[AnalyzeStagedFileForCommitMessageCommand] = field(default_factory=list)
 
-    def analyze(self, command: AnalyzeStagedFileForCommitMessageCommand) -> StagedFileCommitEvidence:
+    async def analyze(self, command: AnalyzeStagedFileForCommitMessageCommand) -> StagedFileCommitEvidence:
         self.calls.append(command)
         path = command.staged_file.path
         self.events.append(f"analyze:{path}")
         if path in self.error_by_path:
             raise self.error_by_path[path]
         return _evidence(command.staged_file, summary=self.summary_by_path.get(path, f"Analyzed {path}."))
-
-    async def analyze_async(self, command: AnalyzeStagedFileForCommitMessageCommand) -> StagedFileCommitEvidence:
-        return self.analyze(command)
 
 
 @dataclass
@@ -92,7 +90,7 @@ class FakeSynthesizer:
     error: CommitMessageSynthesisError | None = None
     calls: list[SynthesizeCommitMessageCommand] = field(default_factory=list)
 
-    def synthesize(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
+    async def synthesize(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
         self.calls.append(command)
         self.events.append("synthesize")
         if self.error is not None:
@@ -102,9 +100,6 @@ class FakeSynthesizer:
             rationale="The staged evidence is collected per file before final synthesis.",
             commit_message="feat(developer-workflow): generate commit messages from per-file evidence",
         )
-
-    async def synthesize_async(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
-        return self.synthesize(command)
 
 
 @dataclass
@@ -130,7 +125,7 @@ class FakeCommitMessageGenerator:
     result: GenerateCommitMessageResult | Exception
     skill_ids: list[str] = field(default_factory=list)
 
-    async def generate_async(self, *, skill_id: str) -> GenerateCommitMessageResult:
+    async def generate(self, *, skill_id: str) -> GenerateCommitMessageResult:
         self.skill_ids.append(skill_id)
         if isinstance(self.result, Exception):
             raise self.result
@@ -165,12 +160,14 @@ def test_generate_commit_message_lists_files_before_loading_and_preserves_eviden
     analyzer = FakeAnalyzer(events=events)
     synthesizer = FakeSynthesizer(events=events)
 
-    result = GenerateCommitMessage(
-        staged_changes_loader=loader,
-        analyzer=analyzer,
-        synthesizer=synthesizer,
-        query_executor=RecordingQueryExecutor(),
-    ).generate(skill_id="team-commit-style")
+    result = asyncio.run(
+        GenerateCommitMessage(
+            staged_changes_loader=loader,
+            analyzer=analyzer,
+            synthesizer=synthesizer,
+            query_executor=RecordingQueryExecutor(),
+        ).generate(skill_id="team-commit-style")
+    )
 
     assert events == [
         "list_files",
@@ -197,8 +194,10 @@ def test_commit_message_workflow_maps_success_and_resets_evidence() -> None:
     generator = FakeCommitMessageGenerator(_result_for(recommendation))
     recorder = FakeEvidenceRecorder()
 
-    result = CommitMessageWorkflow(generator=generator, evidence_recorder=recorder).run(
-        GenerateCommitMessageCommand(skill_id="team-style"),
+    result = asyncio.run(
+        CommitMessageWorkflow(generator=generator, evidence_recorder=recorder).run(
+            GenerateCommitMessageCommand(skill_id="team-style"),
+        )
     )
 
     assert result == CommitMessageWorkflowResult(
@@ -239,7 +238,7 @@ def test_commit_message_workflow_maps_application_errors_to_results(
     expected_status: DeveloperWorkflowStatus,
     expected_category: object,
 ) -> None:
-    result = CommitMessageWorkflow(generator=FakeCommitMessageGenerator(error)).run(skill_id="team-style")
+    result = asyncio.run(CommitMessageWorkflow(generator=FakeCommitMessageGenerator(error)).run(skill_id="team-style"))
 
     assert result.status is expected_status
     assert result.output_text is None
@@ -261,12 +260,14 @@ def test_generate_commit_message_uses_default_bounded_parallel_analysis_and_orde
     )
     query_executor = RecordingQueryExecutor()
 
-    result = GenerateCommitMessage(
-        staged_changes_loader=loader,
-        analyzer=FakeAnalyzer(events=events),
-        synthesizer=FakeSynthesizer(events=events),
-        query_executor=query_executor,
-    ).generate()
+    result = asyncio.run(
+        GenerateCommitMessage(
+            staged_changes_loader=loader,
+            analyzer=FakeAnalyzer(events=events),
+            synthesizer=FakeSynthesizer(events=events),
+            query_executor=query_executor,
+        ).generate()
+    )
 
     assert query_executor.max_concurrency_values == [4]
     assert query_executor.execution_order == [1, 0]
@@ -281,13 +282,15 @@ def test_generate_commit_message_uses_configured_bounded_parallel_analysis() -> 
     staged_file = GitStagedFile(path="src/file.py", status=GitStagedFileStatus.MODIFIED)
     query_executor = RecordingQueryExecutor()
 
-    GenerateCommitMessage(
-        staged_changes_loader=_loader_for(staged_file, events=events),
-        analyzer=FakeAnalyzer(events=events),
-        synthesizer=FakeSynthesizer(events=events),
-        query_executor=query_executor,
-        options=GenerateCommitMessageOptions(max_parallel_analysis=2),
-    ).generate()
+    asyncio.run(
+        GenerateCommitMessage(
+            staged_changes_loader=_loader_for(staged_file, events=events),
+            analyzer=FakeAnalyzer(events=events),
+            synthesizer=FakeSynthesizer(events=events),
+            query_executor=query_executor,
+            options=GenerateCommitMessageOptions(max_parallel_analysis=2),
+        ).generate()
+    )
 
     assert query_executor.max_concurrency_values == [2]
 
@@ -300,13 +303,15 @@ def test_generate_commit_message_fails_before_analysis_when_staged_file_bound_is
     synthesizer = FakeSynthesizer(events=events)
 
     with pytest.raises(GenerateCommitMessageError, match="too many staged files") as error_info:
-        GenerateCommitMessage(
-            staged_changes_loader=loader,
-            analyzer=analyzer,
-            synthesizer=synthesizer,
-            query_executor=RecordingQueryExecutor(),
-            options=GenerateCommitMessageOptions(max_staged_files=2),
-        ).generate()
+        asyncio.run(
+            GenerateCommitMessage(
+                staged_changes_loader=loader,
+                analyzer=analyzer,
+                synthesizer=synthesizer,
+                query_executor=RecordingQueryExecutor(),
+                options=GenerateCommitMessageOptions(max_staged_files=2),
+            ).generate()
+        )
 
     assert error_info.value.metadata == {"staged_file_count": 3, "max_staged_files": 2}
     assert events == ["list_files"]
@@ -332,12 +337,14 @@ def test_generate_commit_message_stops_before_synthesis_when_file_diff_loading_f
     synthesizer = FakeSynthesizer(events=events)
 
     with pytest.raises(GitStagedChangesLoadError) as error_info:
-        GenerateCommitMessage(
-            staged_changes_loader=loader,
-            analyzer=FakeAnalyzer(events=events),
-            synthesizer=synthesizer,
-            query_executor=RecordingQueryExecutor(),
-        ).generate()
+        asyncio.run(
+            GenerateCommitMessage(
+                staged_changes_loader=loader,
+                analyzer=FakeAnalyzer(events=events),
+                synthesizer=synthesizer,
+                query_executor=RecordingQueryExecutor(),
+            ).generate()
+        )
 
     assert error_info.value.metadata == {"category": "git_failed", "path": "src/file.py"}
     assert events == ["list_files", "load_file_diff:src/file.py"]
@@ -357,12 +364,14 @@ def test_generate_commit_message_stops_before_synthesis_when_analysis_fails() ->
     synthesizer = FakeSynthesizer(events=events)
 
     with pytest.raises(CommitMessageAnalysisError):
-        GenerateCommitMessage(
-            staged_changes_loader=loader,
-            analyzer=analyzer,
-            synthesizer=synthesizer,
-            query_executor=RecordingQueryExecutor(),
-        ).generate()
+        asyncio.run(
+            GenerateCommitMessage(
+                staged_changes_loader=loader,
+                analyzer=analyzer,
+                synthesizer=synthesizer,
+                query_executor=RecordingQueryExecutor(),
+            ).generate()
+        )
 
     assert events == ["list_files", "load_file_diff:src/file.py", "analyze:src/file.py"]
     assert synthesizer.calls == []
@@ -376,12 +385,14 @@ def test_generate_commit_message_translates_invalid_evidence_bundle_before_synth
     synthesizer = FakeSynthesizer(events=events)
 
     with pytest.raises(GenerateCommitMessageError, match="evidence is invalid") as error_info:
-        GenerateCommitMessage(
-            staged_changes_loader=loader,
-            analyzer=analyzer,
-            synthesizer=synthesizer,
-            query_executor=RecordingQueryExecutor(),
-        ).generate()
+        asyncio.run(
+            GenerateCommitMessage(
+                staged_changes_loader=loader,
+                analyzer=analyzer,
+                synthesizer=synthesizer,
+                query_executor=RecordingQueryExecutor(),
+            ).generate()
+        )
 
     assert error_info.value.metadata == {"evidence_count": 1}
     assert events == ["list_files", "load_file_diff:src/file.py", "analyze:src/file.py"]
@@ -395,12 +406,14 @@ def test_generate_commit_message_propagates_synthesis_failure_after_complete_evi
     synthesizer = FakeSynthesizer(events=events, error=CommitMessageSynthesisError("synthesis failed"))
 
     with pytest.raises(CommitMessageSynthesisError):
-        GenerateCommitMessage(
-            staged_changes_loader=loader,
-            analyzer=FakeAnalyzer(events=events),
-            synthesizer=synthesizer,
-            query_executor=RecordingQueryExecutor(),
-        ).generate()
+        asyncio.run(
+            GenerateCommitMessage(
+                staged_changes_loader=loader,
+                analyzer=FakeAnalyzer(events=events),
+                synthesizer=synthesizer,
+                query_executor=RecordingQueryExecutor(),
+            ).generate()
+        )
 
     assert events == ["list_files", "load_file_diff:src/file.py", "analyze:src/file.py", "synthesize"]
     assert len(synthesizer.calls[0].evidence_bundle.evidence) == 1

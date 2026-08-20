@@ -1,5 +1,6 @@
 """Tests for the Codex transport-backed runtime model adapter."""
 
+import asyncio
 from dataclasses import dataclass, field
 
 import pytest
@@ -63,7 +64,7 @@ def test_adapter_maps_successful_transport_result_to_runtime_result() -> None:
     )
     command = LocalAgentRunCommand(prompt="Reply with the single word: pong")
 
-    result = CodexTransportAgentModel(transport=transport).run(command)
+    result = asyncio.run(CodexTransportAgentModel(transport=transport).run(command))
 
     assert result.status is LocalAgentRunStatus.SUCCESS
     assert result.succeeded is True
@@ -85,7 +86,7 @@ def test_adapter_includes_runtime_context_as_bounded_prompt_text() -> None:
         context=(LocalAgentContextBlock(text="The answer is pong.", label="note"),),
     )
 
-    CodexTransportAgentModel(transport=transport).run(command)
+    asyncio.run(CodexTransportAgentModel(transport=transport).run(command))
 
     assert transport.calls == [
         CodexCompletionCommand(
@@ -116,7 +117,7 @@ def test_adapter_maps_credential_transport_failures_to_configuration_errors(
         ),
     )
 
-    result = CodexTransportAgentModel(transport=transport).run(LocalAgentRunCommand(prompt="ping"))
+    result = asyncio.run(CodexTransportAgentModel(transport=transport).run(LocalAgentRunCommand(prompt="ping")))
 
     assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
     assert result.succeeded is False
@@ -156,7 +157,7 @@ def test_adapter_maps_model_transport_failures_to_model_errors(
         ),
     )
 
-    result = CodexTransportAgentModel(transport=transport).run(LocalAgentRunCommand(prompt="ping"))
+    result = asyncio.run(CodexTransportAgentModel(transport=transport).run(LocalAgentRunCommand(prompt="ping")))
 
     assert result.status is LocalAgentRunStatus.MODEL_ERROR
     assert result.succeeded is False
@@ -191,7 +192,7 @@ def test_adapter_propagates_non_success_transport_evidence_without_fabricating_o
         ),
     )
 
-    result = CodexTransportAgentModel(transport=transport).run(LocalAgentRunCommand(prompt="ping"))
+    result = asyncio.run(CodexTransportAgentModel(transport=transport).run(LocalAgentRunCommand(prompt="ping")))
 
     assert result.status is LocalAgentRunStatus.MODEL_ERROR
     assert result.succeeded is False

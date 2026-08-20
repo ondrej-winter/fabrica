@@ -90,7 +90,7 @@ class FakeCommitMessageWorkflow:
     result: CommitMessageWorkflowResult
     calls: list[GenerateCommitMessageCommand] = field(default_factory=list)
 
-    def run(self, command: GenerateCommitMessageCommand) -> CommitMessageWorkflowResult:
+    async def run(self, command: GenerateCommitMessageCommand) -> CommitMessageWorkflowResult:
         self.calls.append(command)
         return self.result
 

@@ -1,5 +1,6 @@
 """Tests for the PydanticAI-backed runtime model adapter."""
 
+import asyncio
 from dataclasses import dataclass, field
 
 from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model import (
@@ -32,7 +33,7 @@ def test_adapter_maps_successful_pydanticai_result_to_runtime_result() -> None:
     completion = FakeCompletion(output_text="pong")
     command = LocalAgentRunCommand(prompt="Reply with the single word: pong")
 
-    result = PydanticAIAgentModel(completion=completion).run(command)
+    result = asyncio.run(PydanticAIAgentModel(completion=completion).run(command))
 
     assert result.status is LocalAgentRunStatus.SUCCESS
     assert result.succeeded is True
@@ -57,7 +58,7 @@ def test_adapter_includes_runtime_context_as_bounded_prompt_text() -> None:
         context=(LocalAgentContextBlock(text="The answer is pong.", label="note"),),
     )
 
-    PydanticAIAgentModel(completion=completion).run(command)
+    asyncio.run(PydanticAIAgentModel(completion=completion).run(command))
 
     assert completion.calls[0].prompt == "Context:\n[note]\nThe answer is pong.\n\nPrompt:\nAnswer from context only"
 
@@ -66,7 +67,7 @@ def test_adapter_passes_model_hint_to_completion_and_pydanticai_model_name() -> 
     completion = FakeCompletion()
     command = LocalAgentRunCommand(prompt="ping", model_hint="codex-max")
 
-    result = PydanticAIAgentModel(completion=completion).run(command)
+    result = asyncio.run(PydanticAIAgentModel(completion=completion).run(command))
 
     assert completion.calls[0].model_hint == "codex-max"
     assert result.observations == (
@@ -83,7 +84,7 @@ def test_adapter_passes_model_hint_to_completion_and_pydanticai_model_name() -> 
 def test_adapter_exposes_pydanticai_rendered_messages_to_synthetic_completion() -> None:
     completion = FakeCompletion()
 
-    PydanticAIAgentModel(completion=completion).run(LocalAgentRunCommand(prompt="ping"))
+    asyncio.run(PydanticAIAgentModel(completion=completion).run(LocalAgentRunCommand(prompt="ping")))
 
     assert completion.calls[0].messages
     assert "ping" in completion.calls[0].messages[0]
@@ -99,7 +100,7 @@ def test_adapter_maps_completion_dependency_failure_to_safe_runtime_result() -> 
         ),
     )
 
-    result = PydanticAIAgentModel(completion=completion).run(LocalAgentRunCommand(prompt="ping"))
+    result = asyncio.run(PydanticAIAgentModel(completion=completion).run(LocalAgentRunCommand(prompt="ping")))
 
     assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
     assert result.succeeded is False

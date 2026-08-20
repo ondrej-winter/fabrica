@@ -1,5 +1,6 @@
 """Tests for local agent runtime orchestration."""
 
+import asyncio
 from dataclasses import dataclass, field
 
 from fabrica.features.agent_runtime.application.dtos import (
@@ -18,7 +19,7 @@ class FakeAgentModel:
     error: AgentModelError | None = None
     calls: list[LocalAgentRunCommand] = field(default_factory=list)
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         self.calls.append(command)
         if self.error is not None:
             raise self.error
@@ -26,9 +27,6 @@ class FakeAgentModel:
             msg = "test fake requires a result or error"
             raise AssertionError(msg)
         return self.result
-
-    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        return self.run(command)
 
 
 def test_run_local_agent_delegates_to_model_port() -> None:
@@ -40,7 +38,7 @@ def test_run_local_agent_delegates_to_model_port() -> None:
     )
     model = FakeAgentModel(result=model_result)
 
-    result = RunLocalAgent(model=model).run(command)
+    result = asyncio.run(RunLocalAgent(model=model).run(command))
 
     assert result == model_result
     assert model.calls == [command]
@@ -56,7 +54,7 @@ def test_run_local_agent_normalizes_model_port_failures() -> None:
         ),
     )
 
-    result = RunLocalAgent(model=model).run(command)
+    result = asyncio.run(RunLocalAgent(model=model).run(command))
 
     assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR
     assert result.succeeded is False

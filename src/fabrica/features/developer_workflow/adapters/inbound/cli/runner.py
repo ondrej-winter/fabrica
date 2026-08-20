@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
@@ -44,7 +45,7 @@ def run_commit_message_cli_command(
     evidence_writer: EvidenceWriter,
 ) -> int:
     """Run a read-only commit-message preview command."""
-    result = workflow.run(_generate_commit_message_command(command))
+    result = asyncio.run(workflow.run(_generate_commit_message_command(command)))
     return _write_runtime_result(
         result,
         options=options,
@@ -62,7 +63,7 @@ def run_confirmed_commit_cli_command(
     evidence_writer: EvidenceWriter,
 ) -> int:
     """Run an interactive confirmed commit command."""
-    generation_result = workflow.generate(_generate_commit_message_command(command))
+    generation_result = asyncio.run(workflow.generate(_generate_commit_message_command(command)))
     if not generation_result.succeeded or generation_result.recommendation is None:
         return _write_confirmed_commit_result(
             generation_result,

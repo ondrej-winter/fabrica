@@ -1,8 +1,6 @@
 """Application-owned ports for developer workflow use cases."""
 
 from fabrica.features.developer_workflow.application.ports.commit_message import (
-    AsyncCommitMessageSynthesizer,
-    AsyncStagedFileCommitMessageAnalyzer,
     CommitMessageAnalysisError,
     CommitMessageSkillContextLoadError,
     CommitMessageSynthesisError,
@@ -29,9 +27,7 @@ from fabrica.features.developer_workflow.application.ports.inbound import (
 )
 
 __all__ = [
-    "AsyncCommitMessageSynthesizer",
     "AsyncGitStagedChangesLoader",
-    "AsyncStagedFileCommitMessageAnalyzer",
     "CommitMessageAnalysisError",
     "CommitMessageSkillContextLoadError",
     "CommitMessageSynthesisError",

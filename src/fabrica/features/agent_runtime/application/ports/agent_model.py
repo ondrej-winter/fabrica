@@ -29,10 +29,6 @@ class AgentModelError(Exception):
 class AgentModel(Protocol):
     """Outbound port for completing one local agent runtime command."""
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run the model/session dependency for one local agent command."""
-        ...
-
-    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         """Run the model/session dependency for one local agent command."""
         ...

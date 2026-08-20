@@ -42,12 +42,9 @@ class FakeRuntime:
     result: LocalAgentRunResult
     calls: list[LocalAgentRunCommand] = field(default_factory=list)
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         self.calls.append(command)
         return self.result
-
-    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        return self.run(command)
 
 
 @dataclass
@@ -55,7 +52,7 @@ class RecordingSynthesizer:
     recommendation: CommitMessageRecommendation
     calls: list[SynthesizeCommitMessageCommand] = field(default_factory=list)
 
-    async def synthesize_async(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
+    async def synthesize(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
         self.calls.append(command)
         return self.recommendation
 
@@ -77,11 +74,13 @@ def test_analyzer_sends_one_file_diff_and_parses_strict_json_evidence() -> None:
     runtime = FakeRuntime(result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text=_analysis_json()))
     staged_file = GitStagedFile(path="src/file.py", status=GitStagedFileStatus.MODIFIED)
 
-    evidence = AgentRuntimeStagedFileCommitMessageAnalyzer(runtime).analyze(
-        AnalyzeStagedFileForCommitMessageCommand(
-            staged_file=staged_file,
-            diff=GitStagedDiff(text="diff --git a/src/file.py b/src/file.py\n+change\n"),
-        ),
+    evidence = asyncio.run(
+        AgentRuntimeStagedFileCommitMessageAnalyzer(runtime).analyze(
+            AnalyzeStagedFileForCommitMessageCommand(
+                staged_file=staged_file,
+                diff=GitStagedDiff(text="diff --git a/src/file.py b/src/file.py\n+change\n"),
+            ),
+        )
     )
 
     assert evidence == StagedFileCommitEvidence(
@@ -121,7 +120,7 @@ def test_analyzer_rejects_invalid_structured_output_safely(
     )
 
     with pytest.raises(CommitMessageAnalysisError, match=match) as error_info:
-        AgentRuntimeStagedFileCommitMessageAnalyzer(runtime).analyze(command)
+        asyncio.run(AgentRuntimeStagedFileCommitMessageAnalyzer(runtime).analyze(command))
 
     assert error_info.value.metadata["path"] == "src/file.py"
 
@@ -152,7 +151,7 @@ def test_analyzer_maps_runtime_failure_without_exposing_output_text() -> None:
     )
 
     with pytest.raises(CommitMessageAnalysisError) as error_info:
-        AgentRuntimeStagedFileCommitMessageAnalyzer(runtime).analyze(command)
+        asyncio.run(AgentRuntimeStagedFileCommitMessageAnalyzer(runtime).analyze(command))
 
     assert error_info.value.metadata == {
         "path": "src/file.py",
@@ -180,8 +179,12 @@ def test_synthesizer_sends_structured_evidence_and_skill_context_then_parses_lab
     )
     bundle = CommitMessageEvidenceBundle(evidence=(_evidence(),))
 
-    recommendation = AgentRuntimeCommitMessageSynthesizer(runtime).synthesize(
-        SynthesizeCommitMessageCommand(evidence_bundle=bundle, skill_markdown="# Conventional Commits\nUse feat.\n"),
+    recommendation = asyncio.run(
+        AgentRuntimeCommitMessageSynthesizer(runtime).synthesize(
+            SynthesizeCommitMessageCommand(
+                evidence_bundle=bundle, skill_markdown="# Conventional Commits\nUse feat.\n"
+            ),
+        )
     )
 
     assert recommendation.commit_message == "feat(developer-workflow): add commit message runtime adapters"
@@ -201,8 +204,10 @@ def test_synthesizer_rejects_missing_required_labels() -> None:
     )
 
     with pytest.raises(CommitMessageSynthesisError, match="empty required section"):
-        AgentRuntimeCommitMessageSynthesizer(runtime).synthesize(
-            SynthesizeCommitMessageCommand(evidence_bundle=CommitMessageEvidenceBundle(evidence=(_evidence(),))),
+        asyncio.run(
+            AgentRuntimeCommitMessageSynthesizer(runtime).synthesize(
+                SynthesizeCommitMessageCommand(evidence_bundle=CommitMessageEvidenceBundle(evidence=(_evidence(),))),
+            )
         )
 
 
@@ -228,8 +233,10 @@ def test_synthesizer_maps_runtime_failure_without_exposing_output_text() -> None
     )
 
     with pytest.raises(CommitMessageSynthesisError) as error_info:
-        AgentRuntimeCommitMessageSynthesizer(runtime).synthesize(
-            SynthesizeCommitMessageCommand(evidence_bundle=CommitMessageEvidenceBundle(evidence=(_evidence(),))),
+        asyncio.run(
+            AgentRuntimeCommitMessageSynthesizer(runtime).synthesize(
+                SynthesizeCommitMessageCommand(evidence_bundle=CommitMessageEvidenceBundle(evidence=(_evidence(),))),
+            )
         )
 
     assert error_info.value.metadata == {
@@ -265,7 +272,7 @@ def test_skill_context_synthesizer_loads_selected_skill_markdown_before_synthesi
         SkillContextCommitMessageSynthesizer(
             synthesizer=synthesizer,
             skill_context_loader=loader,
-        ).synthesize_async(SynthesizeCommitMessageCommand(evidence_bundle=bundle, skill_id="team-style"))
+        ).synthesize(SynthesizeCommitMessageCommand(evidence_bundle=bundle, skill_id="team-style"))
     )
 
     assert result is recommendation
@@ -301,7 +308,7 @@ def test_skill_context_synthesizer_translates_agent_runtime_context_errors() -> 
             SkillContextCommitMessageSynthesizer(
                 synthesizer=synthesizer,
                 skill_context_loader=loader,
-            ).synthesize_async(
+            ).synthesize(
                 SynthesizeCommitMessageCommand(evidence_bundle=CommitMessageEvidenceBundle(evidence=(_evidence(),)))
             )
         )

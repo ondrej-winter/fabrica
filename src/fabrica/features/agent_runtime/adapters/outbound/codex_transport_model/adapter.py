@@ -32,8 +32,12 @@ class CodexTransportAgentModel:
     def __init__(self, transport: _CodexTransportCompletion) -> None:
         self._transport = transport
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run one local agent command through the Codex transport API."""
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        """Run one local agent command through the Codex transport API without blocking the event loop."""
+        return await asyncio.to_thread(self._run_blocking, command)
+
+    def _run_blocking(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        """Run one local agent command through the synchronous Codex transport API."""
         transport_result = self._transport.complete(
             CodexCompletionCommand(prompt=_build_transport_prompt(command)),
         )
@@ -45,10 +49,6 @@ class CodexTransportAgentModel:
             usage_evidence=transport_result.usage_evidence,
             cost_evidence=transport_result.cost_evidence,
         )
-
-    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run one local agent command without blocking the event loop."""
-        return await asyncio.to_thread(self.run, command)
 
 
 def _build_transport_prompt(command: LocalAgentRunCommand) -> str:

@@ -1,5 +1,6 @@
 """Offline integration tests for local Codex-backed runtime composition."""
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -36,7 +37,7 @@ def test_codex_runtime_composition_runs_with_mock_transport(tmp_path: Path) -> N
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
 
-    result = runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong"))
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong")))
 
     assert result.status is LocalAgentRunStatus.SUCCESS
     assert result.succeeded is True
@@ -50,6 +51,6 @@ def test_codex_runtime_factory_does_not_read_credentials_during_construction(tmp
 
     runtime = create_codex_runtime(auth_file_path=missing_auth_file_path)
 
-    result = runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong"))
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong")))
 
     assert result.status is LocalAgentRunStatus.CONFIGURATION_ERROR

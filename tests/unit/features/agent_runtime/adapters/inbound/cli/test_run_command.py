@@ -112,7 +112,7 @@ class FakeRuntime:
     result: LocalAgentRunResult
     calls: list[LocalAgentRunCommand] = field(default_factory=list)
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         self.calls.append(command)
         return self.result
 
@@ -132,7 +132,7 @@ class FakeSelectedContextRuntime:
         default_factory=lambda: LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="context-ok"),
     )
 
-    def run(
+    async def run(
         self,
         command: LocalAgentRunCommand,
         *,

@@ -8,10 +8,6 @@ from fabrica.features.agent_runtime.application.dtos import LocalAgentRunCommand
 class CommitMessageAgentRuntime(Protocol):
     """Runtime protocol required by commit-message agent-runtime adapters."""
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run one local agent command."""
-        ...
-
-    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         """Run one local agent command asynchronously."""
         ...

@@ -27,8 +27,12 @@ class PydanticAIAgentModel:
         self._completion = completion
         self._model_name = model_name
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run one local agent command through an adapter-local PydanticAI agent."""
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        """Run one local agent command through an adapter-local PydanticAI agent without blocking the event loop."""
+        return await asyncio.to_thread(self._run_blocking, command)
+
+    def _run_blocking(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+        """Run one local agent command through the synchronous PydanticAI API."""
         model = CompletionModel(
             completion=self._completion,
             source_command=command,
@@ -63,7 +67,3 @@ class PydanticAIAgentModel:
                 ),
             ),
         )
-
-    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run one local agent command without blocking the event loop."""
-        return await asyncio.to_thread(self.run, command)

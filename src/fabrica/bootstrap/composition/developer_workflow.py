@@ -124,10 +124,7 @@ class PreCommitToolOptions:
 class CommitMessageRuntime(Protocol):
     """Runtime protocol consumed by the composed commit-message workflow."""
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run one prepared local agent command."""
-
-    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         """Run one prepared local agent command asynchronously."""
 
 
@@ -154,15 +151,9 @@ class EvidenceRecordingCommitMessageRuntime:
         self._usage_evidence.clear()
         self._cost_evidence.clear()
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run the wrapped runtime and record any returned model evidence."""
-        result = self._runtime.run(command)
-        self._record(result)
-        return result
-
-    async def run_async(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         """Run the wrapped runtime asynchronously and record any returned model evidence."""
-        result = await self._runtime.run_async(command)
+        result = await self._runtime.run(command)
         self._record(result)
         return result
 

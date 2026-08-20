@@ -25,7 +25,7 @@ class RunLocalAgentWithSelectedContext:
         self._skill_context_loader = skill_context_loader
         self._skill_resource_context_loader = skill_resource_context_loader
 
-    def run(
+    async def run(
         self,
         command: LocalAgentRunCommand,
         *,
@@ -40,7 +40,7 @@ class RunLocalAgentWithSelectedContext:
         if resource_selections:
             skill_resource_context_loader = self._require_skill_resource_context_loader()
             augmented = skill_resource_context_loader.augment_command(augmented, resource_selections)
-        return self._runtime.run(augmented)
+        return await self._runtime.run(augmented)
 
     def _require_skill_context_loader(self) -> LoadSkillContext:
         if self._skill_context_loader is None:

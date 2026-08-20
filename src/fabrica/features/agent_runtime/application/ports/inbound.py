@@ -20,14 +20,14 @@ if TYPE_CHECKING:
 class LocalAgentRuntime(Protocol):
     """Inbound port for running one local agent command."""
 
-    def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
+    async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
         """Run one local agent command."""
 
 
 class SelectedContextLocalAgentRuntime(Protocol):
     """Inbound port for running a local agent with explicitly selected context."""
 
-    def run(
+    async def run(
         self,
         command: LocalAgentRunCommand,
         *,

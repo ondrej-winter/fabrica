@@ -93,7 +93,7 @@ class FakeConfirmedCommitWorkflow:
     generate_calls: list[GenerateCommitMessageCommand] = field(default_factory=list)
     commit_calls: list[CommitMessageRecommendation] = field(default_factory=list)
 
-    def generate(self, command: GenerateCommitMessageCommand) -> ConfirmedCommitWorkflowResult:
+    async def generate(self, command: GenerateCommitMessageCommand) -> ConfirmedCommitWorkflowResult:
         self.generate_calls.append(command)
         return self.generation_result
 

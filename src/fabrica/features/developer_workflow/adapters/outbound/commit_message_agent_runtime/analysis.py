@@ -20,14 +20,9 @@ class AgentRuntimeStagedFileCommitMessageAnalyzer:
     def __init__(self, runtime: CommitMessageAgentRuntime) -> None:
         self._runtime = runtime
 
-    def analyze(self, command: AnalyzeStagedFileForCommitMessageCommand) -> StagedFileCommitEvidence:
-        """Return structured evidence parsed from one agent-runtime response."""
-        runtime_result = self._runtime.run(to_analysis_runtime_command(command))
-        return _parse_analysis_runtime_result(runtime_result, command)
-
-    async def analyze_async(self, command: AnalyzeStagedFileForCommitMessageCommand) -> StagedFileCommitEvidence:
+    async def analyze(self, command: AnalyzeStagedFileForCommitMessageCommand) -> StagedFileCommitEvidence:
         """Return structured evidence parsed from one async agent-runtime response."""
-        runtime_result = await self._runtime.run_async(to_analysis_runtime_command(command))
+        runtime_result = await self._runtime.run(to_analysis_runtime_command(command))
         return _parse_analysis_runtime_result(runtime_result, command)
 
 

@@ -16,14 +16,14 @@ if TYPE_CHECKING:
 class CommitMessageWorkflowRunner(Protocol):
     """Inbound port for selected-skill commit-message generation."""
 
-    def run(self, command: GenerateCommitMessageCommand) -> CommitMessageWorkflowResult:
+    async def run(self, command: GenerateCommitMessageCommand) -> CommitMessageWorkflowResult:
         """Run selected-skill commit-message generation."""
 
 
 class ConfirmedCommitWorkflowRunner(Protocol):
     """Inbound port for externally approved git commit workflows."""
 
-    def generate(self, command: GenerateCommitMessageCommand) -> ConfirmedCommitWorkflowResult:
+    async def generate(self, command: GenerateCommitMessageCommand) -> ConfirmedCommitWorkflowResult:
         """Generate a commit-message recommendation without creating a commit."""
 
     def commit(self, recommendation: CommitMessageRecommendation) -> ConfirmedCommitWorkflowResult:

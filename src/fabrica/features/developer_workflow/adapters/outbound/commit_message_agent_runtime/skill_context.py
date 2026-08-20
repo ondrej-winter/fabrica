@@ -11,8 +11,8 @@ from fabrica.features.developer_workflow.application.dtos import (
     SynthesizeCommitMessageCommand,
 )
 from fabrica.features.developer_workflow.application.ports import (
-    AsyncCommitMessageSynthesizer,
     CommitMessageSkillContextLoadError,
+    CommitMessageSynthesizer,
 )
 
 
@@ -27,10 +27,10 @@ class CommitMessageSkillContextLoader(Protocol):
 class SkillContextCommitMessageSynthesizer:
     """Synthesizer decorator that loads selected skill markdown before synthesis."""
 
-    synthesizer: AsyncCommitMessageSynthesizer
+    synthesizer: CommitMessageSynthesizer
     skill_context_loader: CommitMessageSkillContextLoader
 
-    async def synthesize_async(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
+    async def synthesize(self, command: SynthesizeCommitMessageCommand) -> CommitMessageRecommendation:
         """Load selected skill context, translate failures, and delegate final synthesis."""
         try:
             skill_context = await asyncio.to_thread(
@@ -44,7 +44,7 @@ class SkillContextCommitMessageSynthesizer:
                 metadata=err.metadata,
             ) from err
         skill_markdown = skill_context[0].text if skill_context else None
-        return await self.synthesizer.synthesize_async(
+        return await self.synthesizer.synthesize(
             SynthesizeCommitMessageCommand(
                 evidence_bundle=command.evidence_bundle,
                 skill_id=command.skill_id,

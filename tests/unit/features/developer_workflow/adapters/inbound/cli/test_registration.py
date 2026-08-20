@@ -64,7 +64,7 @@ class RecordingHandlers:
 class RecordingCommitMessageWorkflow:
     calls: list[GenerateCommitMessageCommand] = field(default_factory=list)
 
-    def run(self, command: GenerateCommitMessageCommand) -> CommitMessageWorkflowResult:
+    async def run(self, command: GenerateCommitMessageCommand) -> CommitMessageWorkflowResult:
         self.calls.append(command)
         return CommitMessageWorkflowResult(status=DeveloperWorkflowStatus.SUCCESS)
 
@@ -74,7 +74,7 @@ class RecordingConfirmedCommitWorkflow:
     generate_calls: list[GenerateCommitMessageCommand] = field(default_factory=list)
     commit_calls: list[CommitMessageRecommendation] = field(default_factory=list)
 
-    def generate(self, command: GenerateCommitMessageCommand) -> ConfirmedCommitWorkflowResult:
+    async def generate(self, command: GenerateCommitMessageCommand) -> ConfirmedCommitWorkflowResult:
         self.generate_calls.append(command)
         return ConfirmedCommitWorkflowResult(status=DeveloperWorkflowStatus.SUCCESS)
 

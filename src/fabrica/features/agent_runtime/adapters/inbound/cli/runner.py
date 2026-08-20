@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from fabrica.features.agent_runtime.adapters.inbound.cli.output import (
@@ -47,7 +48,7 @@ def run_local_agent_cli_command(
 ) -> int:
     """Run one local runtime prompt command without selected context."""
     runtime_command = LocalAgentRunCommand(prompt=command.prompt)
-    result = runtime.run(runtime_command)
+    result = asyncio.run(runtime.run(runtime_command))
     exit_code = write_run_result(result, stdout=streams.stdout, stderr=streams.stderr)
     if options.print_usage or options.print_prices:
         evidence_writer(
@@ -68,10 +69,12 @@ def run_selected_context_agent_cli_command(
     evidence_writer: EvidenceWriter,
 ) -> int:
     """Run one local runtime prompt command with explicitly selected context."""
-    result = runtime.run(
-        LocalAgentRunCommand(prompt=command.prompt),
-        skill_selections=_skill_selections_from_command(command),
-        resource_selections=_resource_selections_from_command(command),
+    result = asyncio.run(
+        runtime.run(
+            LocalAgentRunCommand(prompt=command.prompt),
+            skill_selections=_skill_selections_from_command(command),
+            resource_selections=_resource_selections_from_command(command),
+        ),
     )
     exit_code = write_run_result(result, stdout=streams.stdout, stderr=streams.stderr)
     if options.print_usage or options.print_prices:
