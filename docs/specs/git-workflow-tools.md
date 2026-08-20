@@ -558,6 +558,8 @@ The adapter contract:
 - writes the approved message to a temporary commit-message file;
 - runs `git --no-pager commit --file <tempfile>` with an explicit argument list
   and `shell=False`;
+- starts the subprocess in a dedicated process group and, on timeout, terminates
+  that group with a bounded cleanup grace period before reporting timeout;
 - preserves subject, body, and Conventional Commits footers exactly;
 - uses the composition-owned working directory;
 - never stages files, amends commits, bypasses hooks, opens an editor, fetches,
@@ -613,6 +615,8 @@ The adapter contract:
 
 - runs `uv run pre-commit run` through an explicit argument list and
   `shell=False`;
+- starts the subprocess in a dedicated process group and, on timeout, terminates
+  that group with a bounded cleanup grace period before reporting timeout;
 - appends a validated `hook_id` only as a positional hook id;
 - appends `--all-files` only when `all_files` is true;
 - never accepts arbitrary pre-commit args, arbitrary executables, environment
@@ -674,6 +678,9 @@ private diagnostics, secrets, or raw file contents.
 
 - Always keep read-only git context tools read-only.
 - Always execute git with explicit argument lists and `shell=False`.
+- Always run subprocess commands in dedicated process groups when available, and
+  terminate the group with bounded cleanup on timeout so hooks or tool descendants
+  cannot continue after Fabrica reports the command as timed out.
 - Always disable git paging with `--no-pager`.
 - Always control the working directory through composition or application options,
   never through model arguments.

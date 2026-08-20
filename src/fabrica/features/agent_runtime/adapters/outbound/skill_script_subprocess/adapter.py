@@ -11,6 +11,7 @@ from pathlib import Path
 from time import monotonic
 from typing import TYPE_CHECKING
 
+from fabrica.adapters.outbound.process_group_subprocess import ProcessGroupCommandSettings, run_process_group_command
 from fabrica.features.agent_runtime.application.dtos import (
     SafeRuntimeMetadataValue,
     SkillScriptApprovalBinding,
@@ -125,16 +126,11 @@ class SkillScriptSubprocessExecutor:
             self._snapshot_script_file(snapshot) as script_file,
         ):
             try:
-                # Intentional constrained execution: verified snapshot bytes, explicit interpreter argv, no shell.
-                completed = subprocess.run(  # noqa: S603
+                completed = run_process_group_command(
                     [interpreter, str(script_file)],
-                    check=False,
-                    capture_output=True,
                     cwd=working_directory,
-                    env={},
-                    shell=False,
-                    text=True,
-                    timeout=command.sandbox_policy.timeout_seconds,
+                    timeout_seconds=command.sandbox_policy.timeout_seconds,
+                    settings=ProcessGroupCommandSettings(env={}, text=True),
                 )
             except subprocess.TimeoutExpired as err:
                 duration = monotonic() - started

@@ -59,6 +59,8 @@ Fabrica should expose a local Python agent runtime that can:
 - execute selected Agent Skill scripts only after policy approval, then run a
   private temporary snapshot of the approved bytes instead of reopening the
   selected script path;
+- run selected Agent Skill script subprocesses in dedicated process groups and
+  terminate the group with bounded cleanup on timeout;
 - keep all filesystem, process, network, credential, and framework I/O inside
   adapters or composition-root code;
 - keep default automated tests deterministic and offline.
@@ -120,6 +122,8 @@ Fabrica should expose a local Python agent runtime that can:
   loading returns immutable content plus the binding computed from that content,
   and subprocess execution targets a private temporary copy only after the binding
   matches the approved decision.
+- Keep selected script subprocess timeout handling descendant-aware by using a
+  dedicated process group and bounded group termination before reporting timeout.
 - Use explicit type annotations on public ports, DTOs, services, and adapter
   APIs.
 - Use layer-appropriate exceptions and preserve context with exception chaining.
@@ -135,6 +139,8 @@ Fabrica should expose a local Python agent runtime that can:
 - Unit-test Agent Skill script policy and execution boundaries with deterministic
   filesystem/subprocess fakes, including regression coverage that stale approved
   metadata cannot execute different bytes.
+- Unit-test subprocess timeout cleanup with deterministic process fakes rather
+  than relying on fragile real descendant-process behavior in the default suite.
 - Keep provider adapter tests in the provider-owning feature slice.
 - Keep live backend checks opt-in and isolated from the default `uv run pytest`
   suite.

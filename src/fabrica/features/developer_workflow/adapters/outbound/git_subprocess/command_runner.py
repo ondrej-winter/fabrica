@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import subprocess
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
+
+from fabrica.adapters.outbound.process_group_subprocess import run_process_group_command
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -30,17 +31,13 @@ class GitCommandRunner(Protocol):
 
 def run_git_command(argv: Sequence[str], *, cwd: Path | None, timeout_seconds: float) -> GitCommandResult:
     """Run a git command and return captured process output."""
-    # Intentional adapter boundary: argv is constructed by Git command value objects, with no shell interpolation.
-    completed = subprocess.run(  # noqa: S603
-        list(argv),
-        check=False,
-        capture_output=True,
+    result = run_process_group_command(
+        argv,
         cwd=cwd,
-        shell=False,
-        timeout=timeout_seconds,
+        timeout_seconds=timeout_seconds,
     )
     return GitCommandResult(
-        returncode=completed.returncode,
-        stdout=completed.stdout,
-        stderr=completed.stderr,
+        returncode=result.returncode,
+        stdout=result.stdout,
+        stderr=result.stderr,
     )
