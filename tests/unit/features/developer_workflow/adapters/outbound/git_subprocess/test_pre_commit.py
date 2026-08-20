@@ -94,6 +94,20 @@ def test_adapter_reports_generic_hook_failure_as_failed_status() -> None:
     assert result.stderr == "hook failed\n"
 
 
+def test_adapter_treats_pre_commit_missing_config_error_as_generic_failure_with_injected_runner() -> None:
+    runner = FakePreCommitRunner(
+        result=GitCommandResult(
+            returncode=1,
+            stdout=("An error has occurred: InvalidConfigError:\n=====> .pre-commit-config.yaml is not a file\n"),
+        )
+    )
+
+    result = PreCommitSubprocessRunner(runner=runner).run_pre_commit(PreCommitRunCommand())
+
+    assert result.status is PreCommitRunStatus.FAILED
+    assert result.returncode == 1
+
+
 def test_adapter_maps_not_repository_without_raw_stderr() -> None:
     runner = FakePreCommitRunner(result=GitCommandResult(returncode=1, stderr="fatal: not a git repository: secret"))
 

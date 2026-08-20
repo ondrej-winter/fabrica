@@ -94,6 +94,24 @@ def test_confirmed_commit_runs_pre_commit_before_recommendation_generation() -> 
     assert committer.calls == []
 
 
+def test_confirmed_commit_continues_when_pre_commit_is_not_configured() -> None:
+    pre_commit = FakePreCommitRunner(PreCommitRunResult(status=PreCommitRunStatus.SKIPPED))
+    generator = FakeGenerator(_generate_result(_recommendation()))
+    committer = FakeCommitter()
+
+    result = ConfirmedCommitWorkflow(
+        generator=generator,
+        committer=committer,
+        pre_commit_runner=pre_commit,
+    ).generate(skill_id="team-style")
+
+    assert result.succeeded
+    assert result.recommendation == _recommendation()
+    assert pre_commit.commands == [PreCommitRunCommand()]
+    assert generator.skill_ids == ["team-style"]
+    assert committer.calls == []
+
+
 def test_confirmed_commit_pre_commit_failure_skips_generation_and_commit() -> None:
     pre_commit = FakePreCommitRunner(PreCommitRunResult(status=PreCommitRunStatus.FAILED, stderr="hook failed\n"))
     generator = FakeGenerator(_generate_result(_recommendation()))

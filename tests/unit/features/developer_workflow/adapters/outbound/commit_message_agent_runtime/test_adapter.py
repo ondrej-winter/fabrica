@@ -11,6 +11,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     LocalAgentRunResult,
     LocalAgentRunStatus,
+    RuntimeObservation,
     SelectedSkill,
 )
 from fabrica.features.agent_runtime.application.ports import SkillContextLoadError
@@ -127,7 +128,23 @@ def test_analyzer_rejects_invalid_structured_output_safely(
 
 def test_analyzer_maps_runtime_failure_without_exposing_output_text() -> None:
     runtime = FakeRuntime(
-        result=LocalAgentRunResult(status=LocalAgentRunStatus.MODEL_ERROR, output_text="raw model failure details"),
+        result=LocalAgentRunResult(
+            status=LocalAgentRunStatus.MODEL_ERROR,
+            output_text="raw model failure details",
+            observations=(
+                RuntimeObservation(
+                    message="Codex backend request was rate limited",
+                    metadata={
+                        "transport_status": "rate_limited",
+                        "http_status": 429,
+                        "category": "rate_limit",
+                        "error_type": "usage_limit_reached",
+                        "response_shape": "error",
+                        "authorization": "Bearer synthetic-token",
+                    },
+                ),
+            ),
+        ),
     )
     command = AnalyzeStagedFileForCommitMessageCommand(
         staged_file=GitStagedFile(path="src/file.py", status=GitStagedFileStatus.MODIFIED),
@@ -141,7 +158,13 @@ def test_analyzer_maps_runtime_failure_without_exposing_output_text() -> None:
         "path": "src/file.py",
         "runtime_status": "model_error",
         "has_output_text": True,
+        "runtime_transport_status": "rate_limited",
+        "runtime_http_status": 429,
+        "runtime_category": "rate_limit",
+        "runtime_error_type": "usage_limit_reached",
+        "runtime_response_shape": "error",
     }
+    assert "synthetic-token" not in str(error_info.value.metadata)
 
 
 def test_synthesizer_sends_structured_evidence_and_skill_context_then_parses_labels() -> None:
@@ -185,7 +208,23 @@ def test_synthesizer_rejects_missing_required_labels() -> None:
 
 def test_synthesizer_maps_runtime_failure_without_exposing_output_text() -> None:
     runtime = FakeRuntime(
-        result=LocalAgentRunResult(status=LocalAgentRunStatus.MODEL_ERROR, output_text="raw model failure details"),
+        result=LocalAgentRunResult(
+            status=LocalAgentRunStatus.MODEL_ERROR,
+            output_text="raw model failure details",
+            observations=(
+                RuntimeObservation(
+                    message="Codex backend request was rate limited",
+                    metadata={
+                        "transport_status": "rate_limited",
+                        "http_status": 429,
+                        "category": "rate_limit",
+                        "error_type": "usage_limit_reached",
+                        "response_shape": "error",
+                        "authorization": "Bearer synthetic-token",
+                    },
+                ),
+            ),
+        ),
     )
 
     with pytest.raises(CommitMessageSynthesisError) as error_info:
@@ -193,7 +232,16 @@ def test_synthesizer_maps_runtime_failure_without_exposing_output_text() -> None
             SynthesizeCommitMessageCommand(evidence_bundle=CommitMessageEvidenceBundle(evidence=(_evidence(),))),
         )
 
-    assert error_info.value.metadata == {"runtime_status": "model_error", "has_output_text": True}
+    assert error_info.value.metadata == {
+        "runtime_status": "model_error",
+        "has_output_text": True,
+        "runtime_transport_status": "rate_limited",
+        "runtime_http_status": 429,
+        "runtime_category": "rate_limit",
+        "runtime_error_type": "usage_limit_reached",
+        "runtime_response_shape": "error",
+    }
+    assert "synthetic-token" not in str(error_info.value.metadata)
 
 
 def test_skill_context_synthesizer_loads_selected_skill_markdown_before_synthesis() -> None:

@@ -576,6 +576,10 @@ git subprocess adapter safety contract.
 Run explicitly selected pre-commit hooks through the project-managed
 `pre-commit` executable.
 
+When the composition-owned repository has no `.pre-commit-config.yaml`, the
+adapter must not invoke `pre-commit`; it returns a non-failure skipped result so
+callers can treat repositories without pre-commit configuration as valid.
+
 The tool is mutating because hooks may rewrite tracked files and may create or
 update pre-commit caches. It must be registered only when a workflow explicitly
 requests mutating developer quality tools.
@@ -614,6 +618,8 @@ The adapter contract:
 - never accepts arbitrary pre-commit args, arbitrary executables, environment
   overrides, repository paths, shell snippets, or model-provided flags;
 - uses the composition-owned working directory;
+- returns a skipped result without launching `pre-commit` when no
+  `.pre-commit-config.yaml` exists in the repository root;
 - bounds stdout and stderr before returning model-callable output;
 - reports whether hooks passed, failed, modified files, timed out, or could not
   start;

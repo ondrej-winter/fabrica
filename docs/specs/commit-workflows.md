@@ -49,7 +49,8 @@ stages files, edits files, or mutates repository state.
 
 It:
 
-1. runs the configured pre-commit quality check before message generation;
+1. runs the configured pre-commit quality check before message generation when
+   pre-commit configuration exists;
 2. stops before model invocation when pre-commit fails, times out, cannot run, or
    modifies files;
 3. generates the same staged-only evidence-first commit-message recommendation as
@@ -176,7 +177,10 @@ from a generated recommendation.
 
 Before generating a commit-message recommendation, `fabrica commit` runs the
 configured pre-commit quality check through the explicitly composed pre-commit
-adapter described in `docs/specs/git-workflow-tools.md`.
+adapter described in `docs/specs/git-workflow-tools.md` when the repository has a
+`.pre-commit-config.yaml` file. Repositories without pre-commit configuration are
+valid; the workflow treats the pre-commit gate as a successful skip and continues
+to recommendation generation.
 
 The workflow stops before model invocation and does not prompt or commit when
 pre-commit:
@@ -184,7 +188,7 @@ pre-commit:
 - fails;
 - times out;
 - cannot start;
-- reports invalid configuration;
+- reports invalid existing configuration;
 - modifies tracked files;
 - produces an application-safe failure result.
 
@@ -269,7 +273,9 @@ no commit is created after answering anything other than explicit yes.
   collected.
 - Always keep the final recommendation centered on the dominant change intent.
 - Always run the configured pre-commit quality check before message generation in
-  the mutating `fabrica commit` workflow.
+  the mutating `fabrica commit` workflow when pre-commit configuration exists.
+- Always allow repositories without pre-commit configuration to skip the
+  pre-commit gate and continue.
 - Always stop `fabrica commit` before model invocation when pre-commit fails,
   times out, cannot run, or modifies files.
 - Always require explicit interactive approval before running `git commit`.

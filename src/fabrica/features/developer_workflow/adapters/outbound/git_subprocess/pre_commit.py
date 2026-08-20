@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 from time import monotonic
 from typing import TYPE_CHECKING
 
@@ -13,6 +14,7 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.comman
 )
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.pre_commit_commands import (
     DEFAULT_PRE_COMMIT_TIMEOUT_SECONDS,
+    GIT_REV_PARSE_SHOW_TOPLEVEL_ARGV,
     pre_commit_run_argv,
 )
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.pre_commit_errors import (
@@ -34,9 +36,10 @@ from fabrica.features.developer_workflow.application.ports import PreCommitRunEr
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from pathlib import Path
 
 __all__ = ["PreCommitSubprocessRunner"]
+
+_MISSING_PRE_COMMIT_CONFIG_METADATA = "no_pre_commit_config"
 
 
 class PreCommitSubprocessRunner:
@@ -60,6 +63,9 @@ class PreCommitSubprocessRunner:
 
     def run_pre_commit(self, command: PreCommitRunCommand) -> PreCommitRunResult:
         """Run one narrow pre-commit invocation."""
+        missing_config_result = self._missing_config_result()
+        if missing_config_result is not None:
+            return missing_config_result
         result, duration_seconds = self._run(pre_commit_run_argv(command))
         stdout = self._decode(result.stdout)
         stderr = self._decode(result.stderr)
@@ -102,6 +108,40 @@ class PreCommitSubprocessRunner:
                 category=PreCommitFailureCategory.EXECUTION_FAILED,
             ) from err
         return result, monotonic() - started
+
+    def _missing_config_result(self) -> PreCommitRunResult | None:
+        if self._runner is not run_git_command:
+            return None
+        repository_root = self._repository_root()
+        if not (repository_root / ".pre-commit-config.yaml").is_file():
+            return PreCommitRunResult(
+                status=PreCommitRunStatus.SKIPPED,
+                metadata={
+                    "configuration": _MISSING_PRE_COMMIT_CONFIG_METADATA,
+                    "side_effects": "pre-commit was not run because no configuration file was found",
+                },
+            )
+        return None
+
+    def _repository_root(self) -> Path:
+        result, duration_seconds = self._run(GIT_REV_PARSE_SHOW_TOPLEVEL_ARGV)
+        stdout = self._decode(result.stdout).strip()
+        stderr = self._decode(result.stderr)
+        if result.returncode != 0:
+            if "not a git repository" in stderr.lower():
+                raise self._error(
+                    NOT_REPOSITORY_MESSAGE,
+                    category=PreCommitFailureCategory.NOT_A_REPOSITORY,
+                    returncode=result.returncode,
+                    duration_seconds=duration_seconds,
+                )
+            raise self._error(
+                PRE_COMMIT_START_FAILED_MESSAGE,
+                category=PreCommitFailureCategory.EXECUTION_FAILED,
+                returncode=result.returncode,
+                duration_seconds=duration_seconds,
+            )
+        return Path(stdout)
 
     def _decode(self, value: str | bytes) -> str:
         if isinstance(value, str):

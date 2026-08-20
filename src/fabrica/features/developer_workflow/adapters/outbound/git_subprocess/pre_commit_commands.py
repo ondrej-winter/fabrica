@@ -3,6 +3,7 @@
 from fabrica.features.developer_workflow.application.dtos import PreCommitRunCommand
 
 DEFAULT_PRE_COMMIT_TIMEOUT_SECONDS = 120.0
+GIT_REV_PARSE_SHOW_TOPLEVEL_ARGV = ("git", "--no-pager", "rev-parse", "--show-toplevel")
 PRE_COMMIT_RUN_ARGV_PREFIX = ("uv", "run", "pre-commit", "run")
 
 

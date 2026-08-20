@@ -192,6 +192,7 @@ class PreCommitRunStatus(StrEnum):
     """Normalized pre-commit execution outcomes."""
 
     PASSED = "passed"
+    SKIPPED = "skipped"
     FAILED = "failed"
     MODIFIED_FILES = "modified_files"
 

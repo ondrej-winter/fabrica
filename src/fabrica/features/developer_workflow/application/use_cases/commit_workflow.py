@@ -437,7 +437,7 @@ class ConfirmedCommitWorkflow:
                     metadata={"category": err.category, **err.metadata},
                 ),
             )
-        if result.status is PreCommitRunStatus.PASSED:
+        if result.status in {PreCommitRunStatus.PASSED, PreCommitRunStatus.SKIPPED}:
             return None
         if result.status is PreCommitRunStatus.MODIFIED_FILES:
             return self._pre_commit_failure_result(

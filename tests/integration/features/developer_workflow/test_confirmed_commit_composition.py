@@ -129,6 +129,34 @@ def test_confirmed_commit_workflow_creates_commit_from_parsed_recommendation_mes
     assert _git_log_message(git_repository) == commit_message
 
 
+def test_confirmed_commit_workflow_allows_repository_without_pre_commit_config(tmp_path: Path) -> None:
+    runtime = FakeRuntime(
+        results=[
+            LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text=_analysis_json()),
+            LocalAgentRunResult(
+                status=LocalAgentRunStatus.SUCCESS,
+                output_text=_synthesis_text(commit_message="chore: add example file"),
+            ),
+        ],
+    )
+    git_repository = _create_repository_with_staged_diff(tmp_path)
+    _configure_git_identity(git_repository)
+    skill_root = _write_commit_message_skill(tmp_path)
+    workflow = create_confirmed_commit_workflow(
+        runtime=runtime,
+        options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
+    )
+
+    result = workflow.run(skill_id="conventional-commits")
+
+    assert result.succeeded
+    assert result.commit_attempted is True
+    assert result.commit_result is not None
+    assert result.commit_result.short_hash
+    assert _git_commit_count(git_repository) == 1
+    assert _git_log_message(git_repository) == "chore: add example file"
+
+
 def test_confirmed_commit_workflow_preserves_model_evidence(tmp_path: Path) -> None:
     analysis_usage = _usage_evidence(input_tokens=10, output_tokens=5)
     synthesis_usage = _usage_evidence(input_tokens=20, output_tokens=8)

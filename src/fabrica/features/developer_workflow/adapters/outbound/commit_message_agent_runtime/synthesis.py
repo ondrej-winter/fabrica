@@ -38,7 +38,11 @@ def _parse_synthesis_runtime_result(runtime_result: LocalAgentRunResult) -> Comm
         raise CommitMessageSynthesisError(
             msg,
             status=_developer_workflow_status_from_runtime(runtime_result.status),
-            metadata=safe_runtime_metadata(runtime_result.status.value, runtime_result.output_text),
+            metadata=safe_runtime_metadata(
+                runtime_result.status.value,
+                runtime_result.output_text,
+                runtime_result.observations,
+            ),
         )
     return parse_synthesis_output(runtime_result.output_text)
 

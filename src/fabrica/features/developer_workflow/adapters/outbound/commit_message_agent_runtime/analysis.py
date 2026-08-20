@@ -43,7 +43,11 @@ def _parse_analysis_runtime_result(
             status=_developer_workflow_status_from_runtime(runtime_result.status),
             metadata={
                 "path": command.staged_file.path,
-                **safe_runtime_metadata(runtime_result.status.value, runtime_result.output_text),
+                **safe_runtime_metadata(
+                    runtime_result.status.value,
+                    runtime_result.output_text,
+                    runtime_result.observations,
+                ),
             },
         )
     return parse_analysis_output(runtime_result.output_text, command)
