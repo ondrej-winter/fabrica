@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import signal
 import subprocess
@@ -45,6 +46,7 @@ class _ProcessFactory(Protocol):
         self,
         argv: Sequence[str],
         *,
+        stdin: int,
         stdout: int,
         stderr: int,
         cwd: Path | None,
@@ -60,6 +62,7 @@ class _ProcessFactory(Protocol):
 def _open_process(  # noqa: PLR0913 - mirrors the subprocess.Popen keyword surface used by this adapter.
     argv: Sequence[str],
     *,
+    stdin: int,
     stdout: int,
     stderr: int,
     cwd: Path | None,
@@ -71,6 +74,7 @@ def _open_process(  # noqa: PLR0913 - mirrors the subprocess.Popen keyword surfa
     # Intentional adapter boundary: callers provide explicit argv sequences and shell remains false.
     return subprocess.Popen(  # noqa: S603
         argv,
+        stdin=stdin,
         stdout=stdout,
         stderr=stderr,
         cwd=cwd,
@@ -89,7 +93,6 @@ class ProcessGroupCommandSettings:
     text: bool = False
     termination_grace_seconds: float = DEFAULT_TERMINATION_GRACE_SECONDS
     process_factory: _ProcessFactory = _open_process
-    process_group_id_loader: Callable[[int], int] = os.getpgid
     group_signal_sender: Callable[[int, signal.Signals], None] = os.killpg
 
 
@@ -102,16 +105,16 @@ def run_process_group_command(
 ) -> ProcessGroupCommandResult:
     """Run an explicit argv command and terminate its process group on timeout."""
     command_settings = settings or ProcessGroupCommandSettings()
-    if timeout_seconds <= 0:
-        msg = "timeout_seconds must be positive"
-        raise ValueError(msg)
-    if command_settings.termination_grace_seconds <= 0:
-        msg = "termination_grace_seconds must be positive"
-        raise ValueError(msg)
+    _ensure_positive_finite_duration(timeout_seconds, field_name="timeout_seconds")
+    _ensure_positive_finite_duration(
+        command_settings.termination_grace_seconds,
+        field_name="termination_grace_seconds",
+    )
 
-    argv_list = list(argv)
+    argv_list = _validated_argv(argv)
     process = command_settings.process_factory(
         argv_list,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         cwd=cwd,
@@ -120,13 +123,14 @@ def run_process_group_command(
         text=command_settings.text,
         start_new_session=True,
     )
+    process_group_id = _process_group_id_from_started_process(process)
     try:
         stdout, stderr = process.communicate(timeout=timeout_seconds)
     except subprocess.TimeoutExpired as err:
         stdout, stderr = _terminate_process_group(
-            process,
+            process=process,
+            process_group_id=process_group_id,
             termination_grace_seconds=command_settings.termination_grace_seconds,
-            process_group_id_loader=command_settings.process_group_id_loader,
             group_signal_sender=command_settings.group_signal_sender,
         )
         raise subprocess.TimeoutExpired(
@@ -135,27 +139,103 @@ def run_process_group_command(
             output=stdout,
             stderr=stderr,
         ) from err
+    except BaseException:
+        _cleanup_process_group_after_wait_failure(
+            process=process,
+            process_group_id=process_group_id,
+            termination_grace_seconds=command_settings.termination_grace_seconds,
+            group_signal_sender=command_settings.group_signal_sender,
+        )
+        raise
+    if process.returncode is None:
+        msg = "process completed without a return code"
+        raise RuntimeError(msg)
     return ProcessGroupCommandResult(
-        returncode=process.returncode or 0,
+        returncode=process.returncode,
         stdout=stdout,
         stderr=stderr,
     )
 
 
+def _validated_argv(argv: Sequence[str]) -> list[str]:
+    if isinstance(argv, str):
+        msg = "argv must be a sequence of arguments, not a string"
+        raise TypeError(msg)
+    argv_list = list(argv)
+    if not argv_list:
+        msg = "argv must include an executable"
+        raise ValueError(msg)
+    for index, argument in enumerate(argv_list):
+        if not isinstance(argument, str):
+            msg = f"argv[{index}] must be a string"
+            raise TypeError(msg)
+        if "\x00" in argument:
+            msg = f"argv[{index}] must not contain NUL bytes"
+            raise ValueError(msg)
+    if not argv_list[0]:
+        msg = "argv executable must not be empty"
+        raise ValueError(msg)
+    return argv_list
+
+
+def _ensure_positive_finite_duration(value: float, *, field_name: str) -> None:
+    if value <= 0 or not math.isfinite(value):
+        msg = f"{field_name} must be positive and finite"
+        raise ValueError(msg)
+
+
+def _process_group_id_from_started_process(process: _Process) -> int:
+    if process.pid <= 0:
+        msg = "process pid must be positive"
+        raise RuntimeError(msg)
+    return process.pid
+
+
 def _terminate_process_group(
-    process: _Process,
     *,
+    process: _Process,
+    process_group_id: int,
     termination_grace_seconds: float,
-    process_group_id_loader: Callable[[int], int],
     group_signal_sender: Callable[[int, signal.Signals], None],
-) -> tuple[ProcessOutput, ProcessOutput]:
-    process_group_id = process_group_id_loader(process.pid)
+) -> tuple[ProcessOutput | None, ProcessOutput | None]:
     _send_group_signal(group_signal_sender, process_group_id, signal.SIGTERM)
     try:
         return process.communicate(timeout=termination_grace_seconds)
     except subprocess.TimeoutExpired:
         _send_group_signal(group_signal_sender, process_group_id, signal.SIGKILL)
-        return process.communicate()
+        return _bounded_final_communicate(
+            process,
+            timeout_seconds=termination_grace_seconds,
+        )
+
+
+def _cleanup_process_group_after_wait_failure(
+    *,
+    process: _Process,
+    process_group_id: int,
+    termination_grace_seconds: float,
+    group_signal_sender: Callable[[int, signal.Signals], None],
+) -> None:
+    try:
+        _terminate_process_group(
+            process=process,
+            process_group_id=process_group_id,
+            termination_grace_seconds=termination_grace_seconds,
+            group_signal_sender=group_signal_sender,
+        )
+    except subprocess.TimeoutExpired:
+        return
+
+
+def _bounded_final_communicate(
+    process: _Process,
+    *,
+    timeout_seconds: float,
+) -> tuple[ProcessOutput | None, ProcessOutput | None]:
+    try:
+        return process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as err:
+        return err.output, err.stderr
 
 
 def _send_group_signal(
