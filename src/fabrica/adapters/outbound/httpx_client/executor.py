@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-import random
+import random as random_module
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -51,13 +51,19 @@ class RetryDelay:
     retry_after: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
 class HttpxRetryExecutor:
     """Execute synchronous HTTPX requests with explicit opt-in retry policies."""
 
-    monotonic: Callable[[], float] = time.monotonic
-    sleep: Callable[[float], None] = time.sleep
-    random: Callable[[], float] = random.random
+    def __init__(
+        self,
+        *,
+        monotonic: Callable[[], float] | None = None,
+        sleep: Callable[[float], None] | None = None,
+        random: Callable[[], float] | None = None,
+    ) -> None:
+        self._monotonic = monotonic if monotonic is not None else time.monotonic
+        self._sleep = sleep if sleep is not None else time.sleep
+        self._random = random if random is not None else random_module.random
 
     def request(
         self,
@@ -66,7 +72,7 @@ class HttpxRetryExecutor:
         request: HttpxRetryRequest,
     ) -> HttpxRetryResult:
         """Execute one request according to the supplied retry policy."""
-        start_time = self.monotonic()
+        start_time = self._monotonic()
         attempt = 0
         last_reason: str | None = None
         last_status: int | None = None
@@ -165,11 +171,11 @@ class HttpxRetryExecutor:
             },
         )
         if delay_seconds > 0:
-            self.sleep(delay_seconds)
+            self._sleep(delay_seconds)
 
     def _jittered_backoff(self, attempt: int, policy: RetryPolicy) -> float:
         base_delay = min(policy.initial_delay_seconds * (2 ** max(attempt - 1, 0)), policy.max_delay_seconds)
-        return self.random() * base_delay
+        return self._random() * base_delay
 
     def _retry_after_delay(self, *, retry_after: str | None, policy: RetryPolicy) -> float | None:
         if retry_after is None:
@@ -195,10 +201,10 @@ class HttpxRetryExecutor:
         return (parsed - datetime.now(UTC)).total_seconds()
 
     def _remaining_budget(self, *, policy: RetryPolicy, start_time: float) -> float:
-        return max(policy.total_budget_seconds - (self.monotonic() - start_time), 0.0)
+        return max(policy.total_budget_seconds - (self._monotonic() - start_time), 0.0)
 
     def _diagnostics(self, *, state: RetryState, policy: RetryPolicy) -> RetryDiagnostics:
-        elapsed_seconds = self.monotonic() - state.start_time
+        elapsed_seconds = self._monotonic() - state.start_time
         return RetryDiagnostics(
             attempt_count=state.attempt,
             retry_count=max(state.attempt - 1, 0),
