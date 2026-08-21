@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-import httpx
-
+from fabrica.adapters.outbound.httpx_client import HttpTimeout, HttpxRetryClient
 from fabrica.bootstrap.composition.codex_runtime import (
     DEFAULT_COMMIT_MESSAGE_CODEX_MODEL,
     DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT,
@@ -64,8 +63,8 @@ class CommitMessageWorkflowOptions:
     codex_model: str | None = None
     codex_reasoning_effort: str | None = None
     codex_auth_file_path: Path | None = None
-    codex_http_client: httpx.Client | None = None
-    codex_timeout: float | httpx.Timeout | None = None
+    codex_http_client: HttpxRetryClient | None = None
+    codex_timeout: float | HttpTimeout | None = None
     skill_roots: tuple[Path, ...] | None = None
     staged_diff_bounds: GitStagedDiffBounds | None = None
     skill_bounds: SkillContextBounds | None = None

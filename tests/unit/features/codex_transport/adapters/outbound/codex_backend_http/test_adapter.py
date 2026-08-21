@@ -1,8 +1,10 @@
 """Tests for the Codex backend HTTP adapter."""
 
+from collections.abc import Callable
+
 import httpx
 
-from fabrica.adapters.outbound.httpx_client import HttpxRetryExecutor, RetryPolicy
+from fabrica.adapters.outbound.httpx_client import HttpxRetryClient, HttpxRetryExecutor, RetryPolicy
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http import (
     CodexBackendHttpAdapter,
     CodexBackendRequestSettings,
@@ -44,7 +46,7 @@ def test_complete_posts_built_request_and_maps_success_response() -> None:
         captured_request = request
         return httpx.Response(200, json={"output_text": "pong"})
 
-    adapter = CodexBackendHttpAdapter(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
 
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
@@ -70,7 +72,7 @@ def test_complete_allows_timeout_and_request_setting_overrides() -> None:
         return httpx.Response(200, json={"output_text": "pong"})
 
     adapter = CodexBackendHttpAdapter(
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        http_client=_http_client(handler),
         request_settings=CodexBackendRequestSettings(
             base_url="https://example.invalid/backend-api",
             path="custom-responses",
@@ -103,8 +105,7 @@ def test_complete_retries_transient_post_failure_and_records_summary() -> None:
         return httpx.Response(SUCCESS_STATUS, json={"output_text": "pong"})
 
     adapter = CodexBackendHttpAdapter(
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
-        retry_executor=HttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=lambda: 0.5),
+        http_client=_http_client(handler, clock=clock),
         completion_retry_policy=RetryPolicy(total_budget_seconds=10.0),
     )
 
@@ -140,7 +141,7 @@ def test_complete_default_retry_policy_does_not_replay_backend_5xx() -> None:
             return httpx.Response(RETRYABLE_STATUS)
         return httpx.Response(SUCCESS_STATUS, json={"output_text": "pong"})
 
-    adapter = CodexBackendHttpAdapter(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
 
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="synthetic prompt"),
@@ -160,12 +161,10 @@ def test_complete_default_retry_policy_does_not_replay_backend_5xx() -> None:
 
 def test_complete_maps_backend_error_response_without_leaking_request_secrets() -> None:
     adapter = CodexBackendHttpAdapter(
-        client=httpx.Client(
-            transport=httpx.MockTransport(
-                lambda _request: httpx.Response(
-                    401,
-                    json={"error": {"type": "invalid_token", "message": "synthetic auth failure"}},
-                )
+        http_client=_http_client(
+            lambda _request: httpx.Response(
+                401,
+                json={"error": {"type": "invalid_token", "message": "synthetic auth failure"}},
             )
         )
     )
@@ -185,9 +184,7 @@ def test_complete_maps_backend_error_response_without_leaking_request_secrets() 
 
 
 def test_complete_maps_non_json_success_to_backend_shape_mismatch() -> None:
-    adapter = CodexBackendHttpAdapter(
-        client=httpx.Client(transport=httpx.MockTransport(lambda _request: httpx.Response(200, text="not json")))
-    )
+    adapter = CodexBackendHttpAdapter(http_client=_http_client(lambda _request: httpx.Response(200, text="not json")))
 
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="synthetic prompt"),
@@ -202,18 +199,16 @@ def test_complete_maps_non_json_success_to_backend_shape_mismatch() -> None:
 
 def test_complete_maps_event_stream_success_response() -> None:
     adapter = CodexBackendHttpAdapter(
-        client=httpx.Client(
-            transport=httpx.MockTransport(
-                lambda _request: httpx.Response(
-                    200,
-                    headers={"content-type": "text/event-stream"},
-                    text=(
-                        "event: response.output_text.delta\n"
-                        'data: {"type":"response.output_text.delta","delta":"pong"}\n\n'
-                        "event: response.completed\n"
-                        'data: {"type":"response.completed"}\n\n'
-                    ),
-                )
+        http_client=_http_client(
+            lambda _request: httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                text=(
+                    "event: response.output_text.delta\n"
+                    'data: {"type":"response.output_text.delta","delta":"pong"}\n\n'
+                    "event: response.completed\n"
+                    'data: {"type":"response.completed"}\n\n'
+                ),
             )
         )
     )
@@ -235,7 +230,7 @@ def test_complete_maps_httpx_transport_error_without_error_message() -> None:
         message = "synthetic failure for https://example.invalid"
         raise httpx.ConnectError(message, request=request)
 
-    adapter = CodexBackendHttpAdapter(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
 
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="synthetic prompt"),
@@ -258,7 +253,7 @@ def test_fetch_usage_gets_usage_endpoint_and_maps_success_response() -> None:
         captured_request = request
         return httpx.Response(200, json={"plan_type": "synthetic-pro", "usage_percent": 10})
 
-    adapter = CodexBackendHttpAdapter(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
 
     result = adapter.fetch_usage(
         command=CodexUsageProbeCommand(),
@@ -290,8 +285,7 @@ def test_fetch_usage_retries_connect_error_and_records_summary() -> None:
         return httpx.Response(SUCCESS_STATUS, json={"plan_type": "synthetic-pro", "usage_percent": 10})
 
     adapter = CodexBackendHttpAdapter(
-        client=httpx.Client(transport=httpx.MockTransport(handler)),
-        retry_executor=HttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=lambda: 0.5),
+        http_client=_http_client(handler, clock=clock),
         usage_retry_policy=RetryPolicy(total_budget_seconds=10.0),
     )
 
@@ -320,7 +314,7 @@ def test_fetch_usage_maps_httpx_transport_error_without_error_message() -> None:
         message = "synthetic failure for https://example.invalid"
         raise httpx.ConnectError(message, request=request)
 
-    adapter = CodexBackendHttpAdapter(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
 
     result = adapter.fetch_usage(
         command=CodexUsageProbeCommand(),
@@ -333,3 +327,17 @@ def test_fetch_usage_maps_httpx_transport_error_without_error_message() -> None:
     assert result.status is CodexTransportStatus.TRANSPORT_ERROR
     assert result.observations[0].metadata == {"category": "client_error", "error_type": "ConnectError"}
     assert "example.invalid" not in str(result.observations)
+
+
+def _http_client(
+    handler: Callable[[httpx.Request], httpx.Response], clock: MonotonicClock | None = None
+) -> HttpxRetryClient:
+    executor = (
+        HttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=lambda: 0.5)
+        if clock is not None
+        else HttpxRetryExecutor()
+    )
+    return HttpxRetryClient(
+        client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler)),
+        executor=executor,
+    )

@@ -9,7 +9,13 @@ from typing import cast
 import httpx
 import pytest
 
-from fabrica.adapters.outbound.httpx_client import HttpxRequest, HttpxRetryExecutor, RetryPolicy
+from fabrica.adapters.outbound.httpx_client import (
+    HttpTimeout,
+    HttpxRetryError,
+    HttpxRetryExecutor,
+    HttpxRetryRequest,
+    RetryPolicy,
+)
 
 SUCCESS_STATUS = 200
 RETRYABLE_STATUS = 503
@@ -50,13 +56,14 @@ def test_retries_transport_error_then_returns_success() -> None:
 
     outcome = _executor(clock).request(
         client=httpx.Client(transport=httpx.MockTransport(handler)),
-        request=HttpxRequest(method="GET", url="https://example.invalid/resource"),
-        policy=RetryPolicy(total_budget_seconds=10.0),
+        request=HttpxRetryRequest(
+            method="GET",
+            url="https://example.invalid/resource",
+            policy=RetryPolicy(total_budget_seconds=10.0),
+        ),
     )
 
-    assert outcome.response is not None
     assert outcome.response.status_code == SUCCESS_STATUS
-    assert outcome.exception is None
     assert calls == EXPECTED_ATTEMPT_COUNT
     assert clock.sleeps == [EXPECTED_FIRST_JITTERED_DELAY]
     assert outcome.diagnostics.attempt_count == EXPECTED_ATTEMPT_COUNT
@@ -76,11 +83,13 @@ def test_honors_bounded_retry_after_delta_seconds() -> None:
 
     outcome = _executor(clock).request(
         client=httpx.Client(transport=httpx.MockTransport(lambda _request: next(responses))),
-        request=HttpxRequest(method="GET", url="https://example.invalid/resource"),
-        policy=RetryPolicy(total_budget_seconds=40.0, retry_after_cap_seconds=30.0),
+        request=HttpxRetryRequest(
+            method="GET",
+            url="https://example.invalid/resource",
+            policy=RetryPolicy(total_budget_seconds=40.0, retry_after_cap_seconds=30.0),
+        ),
     )
 
-    assert outcome.response is not None
     assert outcome.response.status_code == SUCCESS_STATUS
     assert clock.sleeps == [RETRY_AFTER_CAP_SECONDS]
     assert outcome.diagnostics.last_http_status == SUCCESS_STATUS
@@ -99,11 +108,13 @@ def test_honors_retry_after_http_date() -> None:
 
     outcome = _executor(clock).request(
         client=httpx.Client(transport=httpx.MockTransport(lambda _request: next(responses))),
-        request=HttpxRequest(method="GET", url="https://example.invalid/resource"),
-        policy=RetryPolicy(total_budget_seconds=40.0, retry_after_cap_seconds=30.0),
+        request=HttpxRetryRequest(
+            method="GET",
+            url="https://example.invalid/resource",
+            policy=RetryPolicy(total_budget_seconds=40.0, retry_after_cap_seconds=30.0),
+        ),
     )
 
-    assert outcome.response is not None
     assert outcome.response.status_code == SUCCESS_STATUS
     assert 0 < clock.sleeps[0] <= HTTP_DATE_DELAY_SECONDS
 
@@ -119,11 +130,13 @@ def test_preserves_zero_retry_after_without_falling_back_to_jitter() -> None:
 
     outcome = _executor(clock).request(
         client=httpx.Client(transport=httpx.MockTransport(lambda _request: next(responses))),
-        request=HttpxRequest(method="GET", url="https://example.invalid/resource"),
-        policy=RetryPolicy(total_budget_seconds=40.0),
+        request=HttpxRetryRequest(
+            method="GET",
+            url="https://example.invalid/resource",
+            policy=RetryPolicy(total_budget_seconds=40.0),
+        ),
     )
 
-    assert outcome.response is not None
     assert outcome.response.status_code == SUCCESS_STATUS
     assert clock.sleeps == []
 
@@ -140,15 +153,14 @@ def test_bounds_per_attempt_timeout_to_remaining_retry_budget() -> None:
 
     outcome = _executor(clock).request(
         client=httpx.Client(transport=httpx.MockTransport(handler)),
-        request=HttpxRequest(
+        request=HttpxRetryRequest(
             method="GET",
             url="https://example.invalid/resource",
-            timeout=httpx.Timeout(connect=10.0, read=10.0, write=10.0, pool=10.0),
+            policy=RetryPolicy(max_attempts=2, initial_delay_seconds=0.0, total_budget_seconds=10.0),
+            timeout=HttpTimeout(connect_seconds=10.0, read_seconds=10.0, write_seconds=10.0, pool_seconds=10.0),
         ),
-        policy=RetryPolicy(max_attempts=2, initial_delay_seconds=0.0, total_budget_seconds=10.0),
     )
 
-    assert outcome.response is not None
     assert outcome.response.status_code == RETRYABLE_STATUS
     assert [timeout.read for timeout in observed_timeouts] == [10.0, 0.5]
     assert outcome.diagnostics.budget_exhausted is True
@@ -161,21 +173,76 @@ def test_rejects_non_http_retry_exception_types() -> None:
         RetryPolicy(retryable_exception_types=(invalid_exception_type,))
 
 
+def test_rejects_zero_retry_budget() -> None:
+    with pytest.raises(ValueError, match="total_budget_seconds"):
+        RetryPolicy(total_budget_seconds=0.0)
+
+
 def test_stops_when_attempt_budget_is_exhausted() -> None:
     clock = MonotonicClock()
 
     outcome = _executor(clock).request(
         client=httpx.Client(transport=httpx.MockTransport(lambda _request: httpx.Response(RETRYABLE_STATUS))),
-        request=HttpxRequest(method="GET", url="https://example.invalid/resource"),
-        policy=RetryPolicy(max_attempts=2, total_budget_seconds=10.0),
+        request=HttpxRetryRequest(
+            method="GET",
+            url="https://example.invalid/resource",
+            policy=RetryPolicy(max_attempts=2, total_budget_seconds=10.0),
+        ),
     )
 
-    assert outcome.response is not None
     assert outcome.response.status_code == RETRYABLE_STATUS
     assert outcome.diagnostics.attempt_count == EXPECTED_ATTEMPT_COUNT
     assert outcome.diagnostics.retry_count == EXPECTED_RETRY_COUNT
     assert outcome.diagnostics.last_retry_reason == "http_status"
     assert outcome.diagnostics.last_http_status == RETRYABLE_STATUS
+
+
+def test_raises_retry_error_with_diagnostics_after_exhausting_transport_errors() -> None:
+    clock = MonotonicClock()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError(SYNTHETIC_ERROR_MESSAGE, request=request)
+
+    with pytest.raises(HttpxRetryError) as error_info:
+        _executor(clock).request(
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            request=HttpxRetryRequest(
+                method="GET",
+                url="https://example.invalid/resource",
+                policy=RetryPolicy(max_attempts=2, total_budget_seconds=10.0),
+            ),
+        )
+
+    error = error_info.value
+    assert error.error_type == "ConnectError"
+    assert error.diagnostics.attempt_count == EXPECTED_ATTEMPT_COUNT
+    assert error.diagnostics.retry_count == EXPECTED_RETRY_COUNT
+    assert error.diagnostics.last_retry_reason == "exception"
+    assert error.diagnostics.last_error_type == "ConnectError"
+
+
+def test_raises_retry_error_without_retrying_non_retryable_httpx_errors() -> None:
+    clock = MonotonicClock()
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        message = "synthetic decoding error"
+        raise httpx.DecodingError(message)
+
+    with pytest.raises(HttpxRetryError) as error_info:
+        _executor(clock).request(
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            request=HttpxRetryRequest(
+                method="GET",
+                url="https://example.invalid/resource",
+                policy=RetryPolicy(total_budget_seconds=10.0),
+            ),
+        )
+
+    error = error_info.value
+    assert error.error_type == "DecodingError"
+    assert error.diagnostics.attempt_count == 1
+    assert error.diagnostics.retry_count == 0
+    assert error.diagnostics.last_error_type == "DecodingError"
 
 
 def _executor(clock: MonotonicClock) -> HttpxRetryExecutor:

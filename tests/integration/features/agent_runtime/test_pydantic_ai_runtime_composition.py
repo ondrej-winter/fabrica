@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 
+from fabrica.adapters.outbound.httpx_client import HttpxRetryClient
 from fabrica.bootstrap import (
     SkillContextAugmentationOptions,
     create_codex_pydantic_ai_runtime,
@@ -120,7 +121,7 @@ def test_codex_pydantic_ai_runtime_composition_runs_with_mock_transport(tmp_path
 
     runtime = create_codex_pydantic_ai_runtime(
         auth_file_path=auth_file_path,
-        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+        http_client=HttpxRetryClient(client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler))),
     )
 
     result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong")))

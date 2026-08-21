@@ -4,15 +4,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 
-import httpx
-
 from fabrica.adapters.outbound.httpx_client import (
-    HttpxRequest,
-    HttpxRetryExecutor,
+    HttpResponse,
+    HttpTimeout,
+    HttpxRetryClient,
+    HttpxRetryError,
+    HttpxRetryRequest,
+    HttpxRetryResult,
     RetryDiagnostics,
-    RetryOutcome,
     RetryPolicy,
-    diagnostics_metadata,
 )
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.response_mapping import (
     CodexBackendResponse,
@@ -37,26 +37,24 @@ DEFAULT_CODEX_BACKEND_PATH = "codex/responses"
 DEFAULT_CODEX_USAGE_PATH = "api/codex/usage"
 DEFAULT_CODEX_MODEL = "gpt-5.6-sol"
 DEFAULT_CODEX_PRODUCT_SKU = "codex"
-DEFAULT_CODEX_COMPLETION_TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0)
-DEFAULT_CODEX_USAGE_TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
+DEFAULT_CODEX_COMPLETION_TIMEOUT = HttpTimeout(
+    connect_seconds=10.0,
+    read_seconds=120.0,
+    write_seconds=30.0,
+    pool_seconds=10.0,
+)
+DEFAULT_CODEX_USAGE_TIMEOUT = HttpTimeout(
+    connect_seconds=10.0,
+    read_seconds=30.0,
+    write_seconds=10.0,
+    pool_seconds=10.0,
+)
 DEFAULT_CODEX_COMPLETION_RETRY_POLICY = RetryPolicy(
     retryable_status_codes=frozenset({429}),
     retryable_exception_types=(),
     total_budget_seconds=180.0,
 )
 DEFAULT_CODEX_USAGE_RETRY_POLICY = RetryPolicy(total_budget_seconds=30.0)
-
-
-@dataclass(frozen=True, slots=True)
-class CodexHttpRequestExecution:
-    """Parameters needed to execute one Codex HTTP request."""
-
-    method: str
-    url: str
-    headers: Mapping[str, str]
-    json_payload: Mapping[str, object] | None
-    timeout: float | httpx.Timeout
-    policy: RetryPolicy
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,12 +208,11 @@ class CodexBackendHttpAdapter:
 
     request_settings: CodexBackendRequestSettings | None = None
     usage_request_settings: CodexUsageRequestSettings | None = None
-    completion_timeout: float | httpx.Timeout = field(default_factory=lambda: DEFAULT_CODEX_COMPLETION_TIMEOUT)
-    usage_timeout: float | httpx.Timeout = field(default_factory=lambda: DEFAULT_CODEX_USAGE_TIMEOUT)
+    completion_timeout: float | HttpTimeout = field(default_factory=lambda: DEFAULT_CODEX_COMPLETION_TIMEOUT)
+    usage_timeout: float | HttpTimeout = field(default_factory=lambda: DEFAULT_CODEX_USAGE_TIMEOUT)
     completion_retry_policy: RetryPolicy = DEFAULT_CODEX_COMPLETION_RETRY_POLICY
     usage_retry_policy: RetryPolicy = DEFAULT_CODEX_USAGE_RETRY_POLICY
-    retry_executor: HttpxRetryExecutor = field(default_factory=HttpxRetryExecutor)
-    client: httpx.Client | None = None
+    http_client: HttpxRetryClient = field(default_factory=HttpxRetryClient)
 
     def complete(
         self,
@@ -229,85 +226,46 @@ class CodexBackendHttpAdapter:
             settings=self.request_settings,
         )
         try:
-            outcome = self._post(request)
-        except httpx.HTTPError as err:
-            return map_codex_backend_transport_error(err)
-        if outcome.exception is not None:
+            result = self._post(request)
+        except HttpxRetryError as err:
             return _with_retry_observation(
-                map_codex_backend_transport_error(outcome.exception),
-                outcome.diagnostics,
-            )
-        response = outcome.response
-        if response is None:
-            return _with_retry_observation(
-                map_codex_backend_transport_error(httpx.TransportError("HTTP request failed without a response")),
-                outcome.diagnostics,
+                map_codex_backend_transport_error(err.error_type),
+                err.diagnostics,
             )
 
         return _with_retry_observation(
             map_codex_backend_response(
                 CodexBackendResponse(
-                    status_code=response.status_code,
-                    headers=dict(response.headers),
-                    json_body=_safe_json_body(response),
+                    status_code=result.response.status_code,
+                    headers=dict(result.response.headers),
+                    json_body=_safe_json_body(result.response),
                 )
             ),
-            outcome.diagnostics,
+            result.diagnostics,
         )
 
-    def _post(self, request: CodexBackendRequest) -> RetryOutcome:
-        return self._request(
-            execution=CodexHttpRequestExecution(
+    def _post(self, request: CodexBackendRequest) -> HttpxRetryResult:
+        return self.http_client.request(
+            HttpxRetryRequest(
                 method="POST",
                 url=request.url,
-                headers=request.headers,
-                json_payload=request.json_payload,
-                timeout=self.completion_timeout,
                 policy=self.completion_retry_policy,
-            ),
+                headers=request.headers,
+                json=request.json_payload,
+                timeout=self.completion_timeout,
+            )
         )
 
-    def _get(self, request: CodexUsageRequest) -> RetryOutcome:
-        return self._request(
-            execution=CodexHttpRequestExecution(
+    def _get(self, request: CodexUsageRequest) -> HttpxRetryResult:
+        return self.http_client.request(
+            HttpxRetryRequest(
                 method="GET",
                 url=request.url,
-                headers=request.headers,
-                json_payload=None,
-                timeout=self.usage_timeout,
                 policy=self.usage_retry_policy,
-            ),
+                headers=request.headers,
+                timeout=self.usage_timeout,
+            )
         )
-
-    def _request(
-        self,
-        *,
-        execution: CodexHttpRequestExecution,
-    ) -> RetryOutcome:
-        if self.client is not None:
-            return self.retry_executor.request(
-                client=self.client,
-                request=HttpxRequest(
-                    method=execution.method,
-                    url=execution.url,
-                    headers=execution.headers,
-                    json=execution.json_payload,
-                    timeout=execution.timeout,
-                ),
-                policy=execution.policy,
-            )
-        with httpx.Client() as client:
-            return self.retry_executor.request(
-                client=client,
-                request=HttpxRequest(
-                    method=execution.method,
-                    url=execution.url,
-                    headers=execution.headers,
-                    json=execution.json_payload,
-                    timeout=execution.timeout,
-                ),
-                policy=execution.policy,
-            )
 
     def fetch_usage(
         self,
@@ -321,29 +279,21 @@ class CodexBackendHttpAdapter:
             command=command,
         )
         try:
-            outcome = self._get(request)
-        except httpx.HTTPError as err:
-            return map_codex_usage_transport_error(err)
-        if outcome.exception is not None:
+            result = self._get(request)
+        except HttpxRetryError as err:
             return _with_usage_retry_observation(
-                map_codex_usage_transport_error(outcome.exception),
-                outcome.diagnostics,
-            )
-        response = outcome.response
-        if response is None:
-            return _with_usage_retry_observation(
-                map_codex_usage_transport_error(httpx.TransportError("HTTP request failed without a response")),
-                outcome.diagnostics,
+                map_codex_usage_transport_error(err.error_type),
+                err.diagnostics,
             )
         return _with_usage_retry_observation(
             map_codex_usage_response(
                 CodexUsageResponse(
-                    status_code=response.status_code,
-                    headers=dict(response.headers),
-                    json_body=_safe_json_body(response),
+                    status_code=result.response.status_code,
+                    headers=dict(result.response.headers),
+                    json_body=_safe_json_body(result.response),
                 )
             ),
-            outcome.diagnostics,
+            result.diagnostics,
         )
 
 
@@ -370,11 +320,11 @@ def _with_usage_retry_observation(
 def _retry_observation(diagnostics: RetryDiagnostics) -> CodexTransportObservation:
     return CodexTransportObservation(
         message="HTTP retry policy completed",
-        metadata=diagnostics_metadata(diagnostics),
+        metadata=diagnostics.as_metadata(),
     )
 
 
-def _safe_json_body(response: httpx.Response) -> object:
+def _safe_json_body(response: HttpResponse) -> object:
     content_type = response.headers.get("content-type", "")
     if "text/event-stream" in content_type:
         return response.text

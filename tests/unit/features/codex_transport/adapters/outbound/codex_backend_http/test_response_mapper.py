@@ -358,9 +358,7 @@ def test_map_other_unsuccessful_status_to_transport_error() -> None:
 
 
 def test_map_transport_exception_to_transport_error_without_error_message() -> None:
-    err = TimeoutError("synthetic timeout containing https://example.invalid/path")
-
-    result = map_codex_backend_transport_error(err)
+    result = map_codex_backend_transport_error("TimeoutError")
 
     assert result.status is CodexTransportStatus.TRANSPORT_ERROR
     assert result.output_text is None
@@ -456,9 +454,7 @@ def test_map_usage_unexpected_success_shape_to_backend_shape_mismatch() -> None:
 
 
 def test_map_usage_transport_exception_to_transport_error_without_error_message() -> None:
-    err = TimeoutError("synthetic timeout containing https://example.invalid/path")
-
-    result = map_codex_usage_transport_error(err)
+    result = map_codex_usage_transport_error("TimeoutError")
 
     assert result.status is CodexTransportStatus.TRANSPORT_ERROR
     assert result.evidence is None

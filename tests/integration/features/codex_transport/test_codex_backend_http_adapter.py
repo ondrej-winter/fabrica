@@ -2,6 +2,7 @@
 
 import httpx
 
+from fabrica.adapters.outbound.httpx_client import HttpxRetryClient
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http import CodexBackendHttpAdapter
 from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
@@ -19,7 +20,9 @@ def test_codex_backend_http_adapter_executes_probe_with_mock_transport() -> None
         assert request.headers["Authorization"] == f"Bearer {CODEX_BEARER_VALUE}"
         return httpx.Response(200, json={"output": [{"content": [{"type": "output_text", "text": "pong"}]}]})
 
-    adapter = CodexBackendHttpAdapter(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    adapter = CodexBackendHttpAdapter(
+        http_client=HttpxRetryClient(client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler)))
+    )
 
     result = adapter.complete(
         command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
@@ -46,7 +49,9 @@ def test_codex_backend_http_adapter_fetches_usage_with_mock_transport() -> None:
             json={"plan_type": "synthetic-pro", "usage_percent": 20},
         )
 
-    adapter = CodexBackendHttpAdapter(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    adapter = CodexBackendHttpAdapter(
+        http_client=HttpxRetryClient(client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler)))
+    )
 
     result = adapter.fetch_usage(
         command=CodexUsageProbeCommand(),

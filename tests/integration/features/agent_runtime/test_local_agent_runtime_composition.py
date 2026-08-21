@@ -6,6 +6,7 @@ from pathlib import Path
 
 import httpx
 
+from fabrica.adapters.outbound.httpx_client import HttpxRetryClient
 from fabrica.bootstrap import create_codex_runtime
 from fabrica.features.agent_runtime.application.dtos import LocalAgentRunCommand, LocalAgentRunStatus
 
@@ -34,7 +35,7 @@ def test_codex_runtime_composition_runs_with_mock_transport(tmp_path: Path) -> N
 
     runtime = create_codex_runtime(
         auth_file_path=auth_file_path,
-        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+        http_client=HttpxRetryClient(client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler))),
     )
 
     result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong")))

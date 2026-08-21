@@ -87,7 +87,7 @@ def map_codex_backend_response(response: CodexBackendResponse) -> CodexTransport
     )
 
 
-def map_codex_backend_transport_error(err: BaseException) -> CodexTransportResult:
+def map_codex_backend_transport_error(error_type: str) -> CodexTransportResult:
     """Map a client/network exception into a secret-safe transport error result."""
     return CodexTransportResult(
         status=CodexTransportStatus.TRANSPORT_ERROR,
@@ -96,7 +96,7 @@ def map_codex_backend_transport_error(err: BaseException) -> CodexTransportResul
                 message="Codex backend request failed before a response was received",
                 metadata={
                     "category": "client_error",
-                    "error_type": _bounded(type(err).__name__, MAX_ERROR_TYPE_LENGTH),
+                    "error_type": _bounded(error_type, MAX_ERROR_TYPE_LENGTH),
                 },
             ),
         ),
@@ -143,7 +143,7 @@ def map_codex_usage_response(response: CodexUsageResponse) -> CodexUsageResult:
     )
 
 
-def map_codex_usage_transport_error(err: BaseException) -> CodexUsageResult:
+def map_codex_usage_transport_error(error_type: str) -> CodexUsageResult:
     """Map a usage client/network exception into a secret-safe result."""
     return CodexUsageResult(
         status=CodexTransportStatus.TRANSPORT_ERROR,
@@ -152,7 +152,7 @@ def map_codex_usage_transport_error(err: BaseException) -> CodexUsageResult:
                 message="Codex usage request failed before a response was received",
                 metadata={
                     "category": "client_error",
-                    "error_type": _bounded(type(err).__name__, MAX_ERROR_TYPE_LENGTH),
+                    "error_type": _bounded(error_type, MAX_ERROR_TYPE_LENGTH),
                 },
             ),
         ),

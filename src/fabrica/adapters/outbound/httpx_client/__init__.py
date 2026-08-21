@@ -2,20 +2,26 @@
 
 from fabrica.adapters.outbound.httpx_client.adapter import (
     DEFAULT_RETRY_POLICY,
-    HttpxRequest,
+    HttpResponse,
+    HttpTimeout,
+    HttpxRetryClient,
+    HttpxRetryError,
     HttpxRetryExecutor,
+    HttpxRetryRequest,
+    HttpxRetryResult,
     RetryDiagnostics,
-    RetryOutcome,
     RetryPolicy,
-    diagnostics_metadata,
 )
 
 __all__ = [
     "DEFAULT_RETRY_POLICY",
-    "HttpxRequest",
+    "HttpResponse",
+    "HttpTimeout",
+    "HttpxRetryClient",
+    "HttpxRetryError",
     "HttpxRetryExecutor",
+    "HttpxRetryRequest",
+    "HttpxRetryResult",
     "RetryDiagnostics",
-    "RetryOutcome",
     "RetryPolicy",
-    "diagnostics_metadata",
 ]
