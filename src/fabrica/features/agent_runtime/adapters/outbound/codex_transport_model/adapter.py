@@ -1,6 +1,5 @@
 """Runtime model adapter backed by the Codex transport application API."""
 
-import asyncio
 from typing import Protocol
 
 from fabrica.features.agent_runtime.application.dtos import (
@@ -21,7 +20,7 @@ from fabrica.features.codex_transport.application.dtos import (
 class _CodexTransportCompletion(Protocol):
     """Published Codex transport completion API required by this adapter."""
 
-    def complete(self, command: CodexCompletionCommand) -> CodexTransportResult:
+    async def complete(self, command: CodexCompletionCommand) -> CodexTransportResult:
         """Run one Codex transport completion."""
         ...
 
@@ -33,12 +32,8 @@ class CodexTransportAgentModel:
         self._transport = transport
 
     async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run one local agent command through the Codex transport API without blocking the event loop."""
-        return await asyncio.to_thread(self._run_blocking, command)
-
-    def _run_blocking(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run one local agent command through the synchronous Codex transport API."""
-        transport_result = self._transport.complete(
+        """Run one local agent command through the asynchronous Codex transport API."""
+        transport_result = await self._transport.complete(
             CodexCompletionCommand(prompt=_build_transport_prompt(command)),
         )
         runtime_status = _map_status(transport_result.status)

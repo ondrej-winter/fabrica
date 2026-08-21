@@ -1,8 +1,10 @@
 """Offline integration tests for the Codex backend HTTP adapter."""
 
+import asyncio
+
 import httpx
 
-from fabrica.adapters.outbound.httpx_client import SyncHttpxRetryClient
+from fabrica.adapters.outbound.httpx_client import AsyncHttpxRetryClient
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http import CodexBackendHttpAdapter
 from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
@@ -21,15 +23,19 @@ def test_codex_backend_http_adapter_executes_probe_with_mock_transport() -> None
         return httpx.Response(200, json={"output": [{"content": [{"type": "output_text", "text": "pong"}]}]})
 
     adapter = CodexBackendHttpAdapter(
-        http_client=SyncHttpxRetryClient(client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler)))
+        http_client=AsyncHttpxRetryClient(
+            client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        )
     )
 
-    result = adapter.complete(
-        command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.complete(
+            command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.SUCCESS
@@ -50,15 +56,19 @@ def test_codex_backend_http_adapter_fetches_usage_with_mock_transport() -> None:
         )
 
     adapter = CodexBackendHttpAdapter(
-        http_client=SyncHttpxRetryClient(client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler)))
+        http_client=AsyncHttpxRetryClient(
+            client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        )
     )
 
-    result = adapter.fetch_usage(
-        command=CodexUsageProbeCommand(),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.fetch_usage(
+            command=CodexUsageProbeCommand(),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.SUCCESS

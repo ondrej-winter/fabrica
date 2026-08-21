@@ -72,6 +72,8 @@ Codex transport support should:
 - keep credential values in memory only;
 - send direct streaming requests to the current Codex backend using the observed
   required shape;
+- execute Codex HTTP requests with `httpx.AsyncClient` through the reusable async
+  retry client;
 - return a normalized result that distinguishes successful responses,
   authentication failures, rate-limit or quota failures, backend shape
   mismatches, and transport errors;

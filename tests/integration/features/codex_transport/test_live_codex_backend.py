@@ -1,5 +1,6 @@
 """Opt-in live integration test for the Codex backend transport path."""
 
+import asyncio
 import os
 from pathlib import Path
 
@@ -38,7 +39,7 @@ def test_live_codex_backend_completion_returns_pong_when_explicitly_enabled() ->
         ),
     )
 
-    result = use_case.complete(CodexCompletionCommand(prompt=_PONG_PROMPT))
+    result = asyncio.run(use_case.complete(CodexCompletionCommand(prompt=_PONG_PROMPT)))
 
     assert isinstance(result.status, CodexTransportStatus)
     if result.status is not CodexTransportStatus.SUCCESS:

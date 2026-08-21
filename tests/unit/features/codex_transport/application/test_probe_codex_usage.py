@@ -1,5 +1,6 @@
 """Tests for Codex usage evidence probe orchestration."""
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import cast
 
@@ -42,7 +43,7 @@ class FakeUsageBackend:
     result: CodexUsageResult
     calls: list[tuple[CodexUsageProbeCommand, CodexCredentials]] = field(default_factory=list)
 
-    def fetch_usage(
+    async def fetch_usage(
         self,
         command: CodexUsageProbeCommand,
         credentials: CodexCredentials,
@@ -65,7 +66,7 @@ def test_probe_loads_credentials_and_fetches_usage_evidence() -> None:
     credential_store = FakeCredentialStore(credentials=credentials)
     backend = FakeUsageBackend(result=backend_result)
 
-    result = ProbeCodexUsage(credential_store=credential_store, backend=backend).probe(command)
+    result = asyncio.run(ProbeCodexUsage(credential_store=credential_store, backend=backend).probe(command))
 
     assert result == backend_result
     assert credential_store.load_count == 1
@@ -76,7 +77,9 @@ def test_probe_returns_credential_error_when_credentials_cannot_be_loaded() -> N
     credential_store = FakeCredentialStore(error=CodexCredentialUnavailableError("synthetic missing auth file"))
     backend = FakeUsageBackend(result=CodexUsageResult(status=CodexTransportStatus.TRANSPORT_ERROR))
 
-    result = ProbeCodexUsage(credential_store=credential_store, backend=backend).probe(CodexUsageProbeCommand())
+    result = asyncio.run(
+        ProbeCodexUsage(credential_store=credential_store, backend=backend).probe(CodexUsageProbeCommand())
+    )
 
     assert result.status is CodexTransportStatus.CREDENTIAL_ERROR
     assert result.succeeded is False
@@ -94,7 +97,9 @@ def test_probe_returns_authentication_failed_for_credential_authentication_failu
     credential_store = FakeCredentialStore(error=CodexCredentialAuthenticationError("synthetic unsupported auth mode"))
     backend = FakeUsageBackend(result=CodexUsageResult(status=CodexTransportStatus.TRANSPORT_ERROR))
 
-    result = ProbeCodexUsage(credential_store=credential_store, backend=backend).probe(CodexUsageProbeCommand())
+    result = asyncio.run(
+        ProbeCodexUsage(credential_store=credential_store, backend=backend).probe(CodexUsageProbeCommand())
+    )
 
     assert result.status is CodexTransportStatus.AUTHENTICATION_FAILED
     assert result.observations == (

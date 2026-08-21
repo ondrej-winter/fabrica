@@ -26,7 +26,7 @@ class CompleteWithCodexTransport:
         self._credential_store = credential_store
         self._backend = backend
 
-    def complete(self, command: CodexCompletionCommand) -> CodexTransportResult:
+    async def complete(self, command: CodexCompletionCommand) -> CodexTransportResult:
         """Run one Codex completion through the configured backend."""
         try:
             credentials = self._credential_store.load()
@@ -43,7 +43,7 @@ class CompleteWithCodexTransport:
                 err=err,
             )
 
-        return self._backend.complete(command=command, credentials=credentials)
+        return await self._backend.complete(command=command, credentials=credentials)
 
 
 class ProbeCodexUsage:
@@ -53,7 +53,7 @@ class ProbeCodexUsage:
         self._credential_store = credential_store
         self._backend = backend
 
-    def probe(self, command: CodexUsageProbeCommand) -> CodexUsageResult:
+    async def probe(self, command: CodexUsageProbeCommand) -> CodexUsageResult:
         """Run one Codex usage evidence probe."""
         try:
             credentials = self._credential_store.load()
@@ -70,7 +70,7 @@ class ProbeCodexUsage:
                 err=err,
             )
 
-        return self._backend.fetch_usage(command=command, credentials=credentials)
+        return await self._backend.fetch_usage(command=command, credentials=credentials)
 
 
 def _credential_transport_failure_result(

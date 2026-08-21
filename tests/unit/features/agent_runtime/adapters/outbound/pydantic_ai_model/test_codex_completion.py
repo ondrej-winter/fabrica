@@ -1,5 +1,6 @@
 """Tests for the Codex-backed PydanticAI completion bridge."""
 
+import asyncio
 from dataclasses import dataclass, field
 
 import pytest
@@ -23,7 +24,7 @@ class FakeCodexCompletionTransport:
     result: CodexTransportResult
     calls: list[CodexCompletionCommand] = field(default_factory=list)
 
-    def complete(self, command: CodexCompletionCommand) -> CodexTransportResult:
+    async def complete(self, command: CodexCompletionCommand) -> CodexTransportResult:
         self.calls.append(command)
         return self.result
 
@@ -41,7 +42,7 @@ def test_codex_completion_returns_successful_transport_output() -> None:
         messages=("synthetic pydanticai message",),
     )
 
-    output_text = CodexTransportPydanticAICompletion(transport=transport).complete(request)
+    output_text = asyncio.run(CodexTransportPydanticAICompletion(transport=transport).complete(request))
 
     assert output_text == "pong"
     assert transport.calls == [CodexCompletionCommand(prompt="Reply with pong")]
@@ -61,7 +62,7 @@ def test_codex_completion_maps_credential_failures_to_configuration_error() -> N
     )
 
     with pytest.raises(PydanticAICompletionError) as error_info:
-        CodexTransportPydanticAICompletion(transport=transport).complete(_request())
+        asyncio.run(CodexTransportPydanticAICompletion(transport=transport).complete(_request()))
 
     assert error_info.value.status is LocalAgentRunStatus.CONFIGURATION_ERROR
     assert error_info.value.metadata == {
@@ -91,7 +92,7 @@ def test_codex_completion_maps_backend_failures_to_model_error_without_raw_paylo
     )
 
     with pytest.raises(PydanticAICompletionError) as error_info:
-        CodexTransportPydanticAICompletion(transport=transport).complete(_request())
+        asyncio.run(CodexTransportPydanticAICompletion(transport=transport).complete(_request()))
 
     assert error_info.value.status is LocalAgentRunStatus.MODEL_ERROR
     assert error_info.value.metadata == {

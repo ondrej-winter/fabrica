@@ -33,7 +33,7 @@ class FakeCodexTransportCompletion:
     result: CodexTransportResult
     calls: list[CodexCompletionCommand] = field(default_factory=list)
 
-    def complete(self, command: CodexCompletionCommand) -> CodexTransportResult:
+    async def complete(self, command: CodexCompletionCommand) -> CodexTransportResult:
         self.calls.append(command)
         return self.result
 

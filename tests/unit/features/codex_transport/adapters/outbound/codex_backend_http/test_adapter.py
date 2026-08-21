@@ -1,10 +1,11 @@
 """Tests for the Codex backend HTTP adapter."""
 
+import asyncio
 from collections.abc import Callable
 
 import httpx
 
-from fabrica.adapters.outbound.httpx_client import RetryPolicy, SyncHttpxRetryClient, SyncHttpxRetryExecutor
+from fabrica.adapters.outbound.httpx_client import AsyncHttpxRetryClient, AsyncHttpxRetryExecutor, RetryPolicy
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http import (
     CodexBackendHttpAdapter,
     CodexBackendRequestSettings,
@@ -33,7 +34,7 @@ class MonotonicClock:
     def monotonic(self) -> float:
         return self.current
 
-    def sleep(self, delay: float) -> None:
+    async def sleep(self, delay: float) -> None:
         self.sleeps.append(delay)
         self.current += delay
 
@@ -48,12 +49,14 @@ def test_complete_posts_built_request_and_maps_success_response() -> None:
 
     adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
 
-    result = adapter.complete(
-        command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.complete(
+            command=CodexCompletionCommand(prompt="Reply with the single word: pong"),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.SUCCESS
@@ -82,12 +85,14 @@ def test_complete_allows_timeout_and_request_setting_overrides() -> None:
         completion_timeout=3.0,
     )
 
-    result = adapter.complete(
-        command=CodexCompletionCommand(prompt="synthetic prompt"),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.complete(
+            command=CodexCompletionCommand(prompt="synthetic prompt"),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.SUCCESS
@@ -109,12 +114,14 @@ def test_complete_retries_transient_post_failure_and_records_summary() -> None:
         completion_retry_policy=RetryPolicy(total_budget_seconds=10.0),
     )
 
-    result = adapter.complete(
-        command=CodexCompletionCommand(prompt="synthetic prompt"),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.complete(
+            command=CodexCompletionCommand(prompt="synthetic prompt"),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.SUCCESS
@@ -143,12 +150,14 @@ def test_complete_default_retry_policy_does_not_replay_backend_5xx() -> None:
 
     adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
 
-    result = adapter.complete(
-        command=CodexCompletionCommand(prompt="synthetic prompt"),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.complete(
+            command=CodexCompletionCommand(prompt="synthetic prompt"),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.TRANSPORT_ERROR
@@ -169,12 +178,14 @@ def test_complete_maps_backend_error_response_without_leaking_request_secrets() 
         )
     )
 
-    result = adapter.complete(
-        command=CodexCompletionCommand(prompt="synthetic prompt"),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.complete(
+            command=CodexCompletionCommand(prompt="synthetic prompt"),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.AUTHENTICATION_FAILED
@@ -186,12 +197,14 @@ def test_complete_maps_backend_error_response_without_leaking_request_secrets() 
 def test_complete_maps_non_json_success_to_backend_shape_mismatch() -> None:
     adapter = CodexBackendHttpAdapter(http_client=_http_client(lambda _request: httpx.Response(200, text="not json")))
 
-    result = adapter.complete(
-        command=CodexCompletionCommand(prompt="synthetic prompt"),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.complete(
+            command=CodexCompletionCommand(prompt="synthetic prompt"),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.BACKEND_SHAPE_MISMATCH
@@ -213,12 +226,14 @@ def test_complete_maps_event_stream_success_response() -> None:
         )
     )
 
-    result = adapter.complete(
-        command=CodexCompletionCommand(prompt="synthetic prompt"),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.complete(
+            command=CodexCompletionCommand(prompt="synthetic prompt"),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.SUCCESS
@@ -232,12 +247,14 @@ def test_complete_maps_httpx_transport_error_without_error_message() -> None:
 
     adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
 
-    result = adapter.complete(
-        command=CodexCompletionCommand(prompt="synthetic prompt"),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.complete(
+            command=CodexCompletionCommand(prompt="synthetic prompt"),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.TRANSPORT_ERROR
@@ -255,12 +272,14 @@ def test_fetch_usage_gets_usage_endpoint_and_maps_success_response() -> None:
 
     adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
 
-    result = adapter.fetch_usage(
-        command=CodexUsageProbeCommand(),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.fetch_usage(
+            command=CodexUsageProbeCommand(),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.SUCCESS
@@ -289,12 +308,14 @@ def test_fetch_usage_retries_connect_error_and_records_summary() -> None:
         usage_retry_policy=RetryPolicy(total_budget_seconds=10.0),
     )
 
-    result = adapter.fetch_usage(
-        command=CodexUsageProbeCommand(),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.fetch_usage(
+            command=CodexUsageProbeCommand(),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.SUCCESS
@@ -316,12 +337,14 @@ def test_fetch_usage_maps_httpx_transport_error_without_error_message() -> None:
 
     adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
 
-    result = adapter.fetch_usage(
-        command=CodexUsageProbeCommand(),
-        credentials=CodexCredentials(
-            access_token=CODEX_BEARER_VALUE,
-            account_id=CODEX_ACCOUNT_ID,
-        ),
+    result = asyncio.run(
+        adapter.fetch_usage(
+            command=CodexUsageProbeCommand(),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
     )
 
     assert result.status is CodexTransportStatus.TRANSPORT_ERROR
@@ -331,13 +354,13 @@ def test_fetch_usage_maps_httpx_transport_error_without_error_message() -> None:
 
 def _http_client(
     handler: Callable[[httpx.Request], httpx.Response], clock: MonotonicClock | None = None
-) -> SyncHttpxRetryClient:
+) -> AsyncHttpxRetryClient:
     executor = (
-        SyncHttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=lambda: 0.5)
+        AsyncHttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=lambda: 0.5)
         if clock is not None
-        else SyncHttpxRetryExecutor()
+        else AsyncHttpxRetryExecutor()
     )
-    return SyncHttpxRetryClient(
-        client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler)),
+    return AsyncHttpxRetryClient(
+        client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)),
         executor=executor,
     )

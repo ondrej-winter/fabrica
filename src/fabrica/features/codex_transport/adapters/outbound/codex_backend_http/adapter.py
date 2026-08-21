@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 
 from fabrica.adapters.outbound.httpx_client import (
+    AsyncHttpxRetryClient,
     HttpResponse,
     HttpTimeout,
     HttpxRetryError,
@@ -12,7 +13,6 @@ from fabrica.adapters.outbound.httpx_client import (
     HttpxRetryResult,
     RetryDiagnostics,
     RetryPolicy,
-    SyncHttpxRetryClient,
 )
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.response_mapping import (
     CodexBackendResponse,
@@ -212,9 +212,9 @@ class CodexBackendHttpAdapter:
     usage_timeout: float | HttpTimeout = field(default_factory=lambda: DEFAULT_CODEX_USAGE_TIMEOUT)
     completion_retry_policy: RetryPolicy = DEFAULT_CODEX_COMPLETION_RETRY_POLICY
     usage_retry_policy: RetryPolicy = DEFAULT_CODEX_USAGE_RETRY_POLICY
-    http_client: SyncHttpxRetryClient = field(default_factory=SyncHttpxRetryClient)
+    http_client: AsyncHttpxRetryClient = field(default_factory=AsyncHttpxRetryClient)
 
-    def complete(
+    async def complete(
         self,
         command: CodexCompletionCommand,
         credentials: CodexCredentials,
@@ -226,7 +226,7 @@ class CodexBackendHttpAdapter:
             settings=self.request_settings,
         )
         try:
-            result = self._post(request)
+            result = await self._post(request)
         except HttpxRetryError as err:
             return _with_retry_observation(
                 map_codex_backend_transport_error(err.error_type),
@@ -244,8 +244,8 @@ class CodexBackendHttpAdapter:
             result.diagnostics,
         )
 
-    def _post(self, request: CodexBackendRequest) -> HttpxRetryResult:
-        return self.http_client.request(
+    async def _post(self, request: CodexBackendRequest) -> HttpxRetryResult:
+        return await self.http_client.request(
             HttpxRetryRequest(
                 method="POST",
                 url=request.url,
@@ -256,8 +256,8 @@ class CodexBackendHttpAdapter:
             )
         )
 
-    def _get(self, request: CodexUsageRequest) -> HttpxRetryResult:
-        return self.http_client.request(
+    async def _get(self, request: CodexUsageRequest) -> HttpxRetryResult:
+        return await self.http_client.request(
             HttpxRetryRequest(
                 method="GET",
                 url=request.url,
@@ -267,7 +267,7 @@ class CodexBackendHttpAdapter:
             )
         )
 
-    def fetch_usage(
+    async def fetch_usage(
         self,
         command: CodexUsageProbeCommand,
         credentials: CodexCredentials,
@@ -279,7 +279,7 @@ class CodexBackendHttpAdapter:
             command=command,
         )
         try:
-            result = self._get(request)
+            result = await self._get(request)
         except HttpxRetryError as err:
             return _with_usage_retry_observation(
                 map_codex_usage_transport_error(err.error_type),

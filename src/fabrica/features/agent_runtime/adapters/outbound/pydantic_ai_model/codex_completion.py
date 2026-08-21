@@ -18,7 +18,7 @@ from fabrica.features.codex_transport.application.dtos import (
 class _CodexTransportCompletion(Protocol):
     """Published Codex completion API required by the PydanticAI bridge."""
 
-    def complete(self, command: CodexCompletionCommand) -> CodexTransportResult:
+    async def complete(self, command: CodexCompletionCommand) -> CodexTransportResult:
         """Run one Codex transport completion."""
         ...
 
@@ -29,9 +29,9 @@ class CodexTransportPydanticAICompletion:
     def __init__(self, transport: _CodexTransportCompletion) -> None:
         self._transport = transport
 
-    def complete(self, request: PydanticAICompletionRequest) -> str:
+    async def complete(self, request: PydanticAICompletionRequest) -> str:
         """Return Codex completion text for one PydanticAI-rendered request."""
-        result = self._transport.complete(CodexCompletionCommand(prompt=request.prompt))
+        result = await self._transport.complete(CodexCompletionCommand(prompt=request.prompt))
         if result.status is CodexTransportStatus.SUCCESS and result.output_text is not None:
             return result.output_text
 

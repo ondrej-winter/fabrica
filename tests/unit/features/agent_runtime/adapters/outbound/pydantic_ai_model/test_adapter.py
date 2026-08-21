@@ -22,7 +22,7 @@ class FakeCompletion:
     error: PydanticAICompletionError | None = None
     calls: list[PydanticAICompletionRequest] = field(default_factory=list)
 
-    def complete(self, request: PydanticAICompletionRequest) -> str:
+    async def complete(self, request: PydanticAICompletionRequest) -> str:
         self.calls.append(request)
         if self.error is not None:
             raise self.error

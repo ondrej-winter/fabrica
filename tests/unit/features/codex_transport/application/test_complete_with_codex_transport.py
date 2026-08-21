@@ -1,5 +1,6 @@
 """Tests for Codex transport completion orchestration."""
 
+import asyncio
 from dataclasses import dataclass, field
 
 import pytest
@@ -39,7 +40,7 @@ class FakeCodexBackend:
     result: CodexTransportResult
     calls: list[tuple[CodexCompletionCommand, CodexCredentials]] = field(default_factory=list)
 
-    def complete(
+    async def complete(
         self,
         command: CodexCompletionCommand,
         credentials: CodexCredentials,
@@ -62,7 +63,9 @@ def test_complete_loads_credentials_and_executes_backend_completion() -> None:
     credential_store = FakeCredentialStore(credentials=credentials)
     backend = FakeCodexBackend(result=backend_result)
 
-    result = CompleteWithCodexTransport(credential_store=credential_store, backend=backend).complete(command)
+    result = asyncio.run(
+        CompleteWithCodexTransport(credential_store=credential_store, backend=backend).complete(command)
+    )
 
     assert result == backend_result
     assert credential_store.load_count == 1
@@ -74,7 +77,9 @@ def test_complete_returns_credential_error_when_credentials_cannot_be_loaded() -
     credential_store = FakeCredentialStore(error=CodexCredentialUnavailableError("synthetic missing auth file"))
     backend = FakeCodexBackend(result=CodexTransportResult(status=CodexTransportStatus.TRANSPORT_ERROR))
 
-    result = CompleteWithCodexTransport(credential_store=credential_store, backend=backend).complete(command)
+    result = asyncio.run(
+        CompleteWithCodexTransport(credential_store=credential_store, backend=backend).complete(command)
+    )
 
     assert result.status is CodexTransportStatus.CREDENTIAL_ERROR
     assert result.succeeded is False
@@ -93,7 +98,9 @@ def test_complete_returns_authentication_failed_for_credential_authentication_fa
     credential_store = FakeCredentialStore(error=CodexCredentialAuthenticationError("synthetic unsupported auth mode"))
     backend = FakeCodexBackend(result=CodexTransportResult(status=CodexTransportStatus.TRANSPORT_ERROR))
 
-    result = CompleteWithCodexTransport(credential_store=credential_store, backend=backend).complete(command)
+    result = asyncio.run(
+        CompleteWithCodexTransport(credential_store=credential_store, backend=backend).complete(command)
+    )
 
     assert result.status is CodexTransportStatus.AUTHENTICATION_FAILED
     assert result.observations == (
@@ -116,9 +123,11 @@ def test_complete_passes_through_backend_failure_result() -> None:
         observations=(CodexTransportObservation(message="backend request failed", metadata={"category": "timeout"}),),
     )
 
-    result = CompleteWithCodexTransport(
-        credential_store=FakeCredentialStore(credentials=credentials),
-        backend=FakeCodexBackend(result=backend_result),
-    ).complete(command)
+    result = asyncio.run(
+        CompleteWithCodexTransport(
+            credential_store=FakeCredentialStore(credentials=credentials),
+            backend=FakeCodexBackend(result=backend_result),
+        ).complete(command)
+    )
 
     assert result == backend_result

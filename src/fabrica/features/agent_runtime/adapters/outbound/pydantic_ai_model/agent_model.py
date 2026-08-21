@@ -1,7 +1,5 @@
 """Runtime model adapter backed by PydanticAI custom model support."""
 
-import asyncio
-
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import UnexpectedModelBehavior, UserError
 
@@ -28,11 +26,7 @@ class PydanticAIAgentModel:
         self._model_name = model_name
 
     async def run(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run one local agent command through an adapter-local PydanticAI agent without blocking the event loop."""
-        return await asyncio.to_thread(self._run_blocking, command)
-
-    def _run_blocking(self, command: LocalAgentRunCommand) -> LocalAgentRunResult:
-        """Run one local agent command through the synchronous PydanticAI API."""
+        """Run one local agent command through an adapter-local PydanticAI agent."""
         model = CompletionModel(
             completion=self._completion,
             source_command=command,
@@ -41,7 +35,7 @@ class PydanticAIAgentModel:
         agent: Agent[None, str] = Agent(model=model, output_type=str, tools=())
 
         try:
-            result = agent.run_sync(build_user_prompt(command))
+            result = await agent.run(build_user_prompt(command))
         except PydanticAICompletionError as err:
             return failure_result(err.status, "pydanticai completion failed", err.metadata)
         except UserError as err:

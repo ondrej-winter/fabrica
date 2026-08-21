@@ -39,7 +39,7 @@ class CompletionModel(Model[None]):
         """Return a PydanticAI text response from the adapter-local completion dependency."""
         _ = (model_settings, model_request_parameters)
         prepared_messages = self.prepare_messages(messages)
-        output_text = self._completion.complete(
+        output_text = await self._completion.complete(
             PydanticAICompletionRequest(
                 prompt=build_user_prompt(self._source_command),
                 model_hint=self._source_command.model_hint,

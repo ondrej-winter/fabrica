@@ -37,6 +37,6 @@ class PydanticAICompletionError(Exception):
 class PydanticAICompletion(Protocol):
     """Adapter-local dependency used by the custom PydanticAI model proof."""
 
-    def complete(self, request: PydanticAICompletionRequest) -> str:
+    async def complete(self, request: PydanticAICompletionRequest) -> str:
         """Return text for one rendered PydanticAI request."""
         ...

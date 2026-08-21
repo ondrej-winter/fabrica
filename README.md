@@ -307,11 +307,13 @@ details, response mapping, and usage evidence remain isolated in
 Create the composed runtime from the composition root:
 
 ```python
+import asyncio
+
 from fabrica.bootstrap import create_codex_runtime
 from fabrica.features.agent_runtime.application.dtos import LocalAgentRunCommand
 
 runtime = create_codex_runtime()
-result = runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong"))
+result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong")))
 
 if result.succeeded:
     print(result.output_text)
@@ -370,6 +372,7 @@ requires an explicit completion dependency, so construction does not read Codex
 credentials, call a backend, load skill roots, or execute scripts.
 
 ```python
+import asyncio
 from dataclasses import dataclass
 
 from fabrica.bootstrap import create_pydantic_ai_runtime
@@ -381,12 +384,12 @@ from fabrica.features.agent_runtime.application.dtos import LocalAgentRunCommand
 
 @dataclass
 class SyntheticCompletion:
-    def complete(self, request: PydanticAICompletionRequest) -> str:
+    async def complete(self, request: PydanticAICompletionRequest) -> str:
         return f"received: {request.prompt}"
 
 
 runtime = create_pydantic_ai_runtime(completion=SyntheticCompletion())
-result = runtime.run(LocalAgentRunCommand(prompt="Reply with pong"))
+result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Reply with pong")))
 ```
 
 This proof uses `pydantic-ai-slim` and an adapter-local custom PydanticAI model
@@ -399,11 +402,13 @@ skill discovery, or sandboxing.
 For a Codex-backed PydanticAI composition experiment, use the dedicated helper:
 
 ```python
+import asyncio
+
 from fabrica.bootstrap import create_codex_pydantic_ai_runtime
 from fabrica.features.agent_runtime.application.dtos import LocalAgentRunCommand
 
 runtime = create_codex_pydantic_ai_runtime()
-result = runtime.run(LocalAgentRunCommand(prompt="Reply with pong"))
+result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Reply with pong")))
 ```
 
 This helper still uses the existing `codex_transport` completion boundary for

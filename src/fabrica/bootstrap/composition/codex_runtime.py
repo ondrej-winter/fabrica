@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from fabrica.adapters.outbound.httpx_client import HttpTimeout, SyncHttpxRetryClient
+from fabrica.adapters.outbound.httpx_client import AsyncHttpxRetryClient, HttpTimeout
 from fabrica.features.agent_runtime.adapters.outbound.codex_transport_model import CodexTransportAgentModel
 from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model import (
     CodexTransportPydanticAICompletion,
@@ -26,7 +26,7 @@ DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT = "low"
 def create_codex_runtime(
     *,
     auth_file_path: Path | None = None,
-    http_client: SyncHttpxRetryClient | None = None,
+    http_client: AsyncHttpxRetryClient | None = None,
     timeout: float | HttpTimeout | None = None,
     request_settings: CodexBackendRequestSettings | None = None,
     usage_request_settings: CodexUsageRequestSettings | None = None,
@@ -43,13 +43,13 @@ def create_codex_runtime(
             usage_request_settings=usage_request_settings,
             completion_timeout=timeout,
             usage_timeout=timeout,
-            http_client=http_client or SyncHttpxRetryClient(),
+            http_client=http_client or AsyncHttpxRetryClient(),
         )
     else:
         backend = CodexBackendHttpAdapter(
             request_settings=request_settings,
             usage_request_settings=usage_request_settings,
-            http_client=http_client or SyncHttpxRetryClient(),
+            http_client=http_client or AsyncHttpxRetryClient(),
         )
 
     transport = CompleteWithCodexTransport(
@@ -76,7 +76,7 @@ def create_pydantic_ai_runtime(
 def create_codex_pydantic_ai_runtime(
     *,
     auth_file_path: Path | None = None,
-    http_client: SyncHttpxRetryClient | None = None,
+    http_client: AsyncHttpxRetryClient | None = None,
     timeout: float | HttpTimeout | None = None,
     request_settings: CodexBackendRequestSettings | None = None,
     model_name: str = "codex-transport",
@@ -90,12 +90,12 @@ def create_codex_pydantic_ai_runtime(
         backend = CodexBackendHttpAdapter(
             request_settings=request_settings,
             completion_timeout=timeout,
-            http_client=http_client or SyncHttpxRetryClient(),
+            http_client=http_client or AsyncHttpxRetryClient(),
         )
     else:
         backend = CodexBackendHttpAdapter(
             request_settings=request_settings,
-            http_client=http_client or SyncHttpxRetryClient(),
+            http_client=http_client or AsyncHttpxRetryClient(),
         )
     transport = CompleteWithCodexTransport(
         credential_store=CodexAuthFileCredentialStore(auth_file_path or DEFAULT_CODEX_AUTH_FILE),

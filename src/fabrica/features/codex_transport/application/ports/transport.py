@@ -14,7 +14,7 @@ from fabrica.features.codex_transport.application.dtos import (
 class CodexBackend(Protocol):
     """Outbound port for Codex backend completions."""
 
-    def complete(
+    async def complete(
         self,
         command: CodexCompletionCommand,
         credentials: CodexCredentials,
@@ -26,7 +26,7 @@ class CodexBackend(Protocol):
 class CodexUsageBackend(Protocol):
     """Outbound port for retrieving Codex usage and quota evidence."""
 
-    def fetch_usage(
+    async def fetch_usage(
         self,
         command: CodexUsageProbeCommand,
         credentials: CodexCredentials,

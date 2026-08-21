@@ -7,7 +7,7 @@ from pathlib import Path
 
 import httpx
 
-from fabrica.adapters.outbound.httpx_client import SyncHttpxRetryClient
+from fabrica.adapters.outbound.httpx_client import AsyncHttpxRetryClient
 from fabrica.bootstrap import (
     SkillContextAugmentationOptions,
     create_codex_pydantic_ai_runtime,
@@ -28,7 +28,7 @@ class FakeCompletion:
     output_text: str = "pong"
     calls: list[PydanticAICompletionRequest] = field(default_factory=list)
 
-    def complete(self, request: PydanticAICompletionRequest) -> str:
+    async def complete(self, request: PydanticAICompletionRequest) -> str:
         self.calls.append(request)
         return self.output_text
 
@@ -121,7 +121,9 @@ def test_codex_pydantic_ai_runtime_composition_runs_with_mock_transport(tmp_path
 
     runtime = create_codex_pydantic_ai_runtime(
         auth_file_path=auth_file_path,
-        http_client=SyncHttpxRetryClient(client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler))),
+        http_client=AsyncHttpxRetryClient(
+            client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        ),
     )
 
     result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Reply with the single word: pong")))
