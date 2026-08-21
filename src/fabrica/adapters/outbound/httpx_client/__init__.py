@@ -1,6 +1,8 @@
-"""Reusable synchronous HTTPX adapter infrastructure."""
+"""Reusable synchronous and asynchronous HTTPX adapter infrastructure."""
 
-from fabrica.adapters.outbound.httpx_client.client import HttpxRetryClient
+from fabrica.adapters.outbound.httpx_client.async_client import AsyncHttpxRetryClient
+from fabrica.adapters.outbound.httpx_client.async_executor import AsyncHttpxRetryExecutor
+from fabrica.adapters.outbound.httpx_client.client import SyncHttpxRetryClient
 from fabrica.adapters.outbound.httpx_client.contracts import (
     HttpResponse,
     HttpTimeout,
@@ -9,7 +11,7 @@ from fabrica.adapters.outbound.httpx_client.contracts import (
     RetryDiagnostics,
 )
 from fabrica.adapters.outbound.httpx_client.exceptions import HttpxRetryError
-from fabrica.adapters.outbound.httpx_client.executor import HttpxRetryExecutor
+from fabrica.adapters.outbound.httpx_client.executor import SyncHttpxRetryExecutor
 from fabrica.adapters.outbound.httpx_client.policy import (
     DEFAULT_RETRY_POLICY,
     RetryPolicy,
@@ -17,13 +19,15 @@ from fabrica.adapters.outbound.httpx_client.policy import (
 
 __all__ = [
     "DEFAULT_RETRY_POLICY",
+    "AsyncHttpxRetryClient",
+    "AsyncHttpxRetryExecutor",
     "HttpResponse",
     "HttpTimeout",
-    "HttpxRetryClient",
     "HttpxRetryError",
-    "HttpxRetryExecutor",
     "HttpxRetryRequest",
     "HttpxRetryResult",
     "RetryDiagnostics",
     "RetryPolicy",
+    "SyncHttpxRetryClient",
+    "SyncHttpxRetryExecutor",
 ]

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from fabrica.adapters.outbound.httpx_client.executor import HttpxRetryExecutor
+from fabrica.adapters.outbound.httpx_client.executor import SyncHttpxRetryExecutor
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -14,17 +14,17 @@ if TYPE_CHECKING:
     from fabrica.adapters.outbound.httpx_client.contracts import HttpxRetryRequest, HttpxRetryResult
 
 
-class HttpxRetryClient:
+class SyncHttpxRetryClient:
     """Create HTTPX clients, execute retry requests, and own client lifecycle."""
 
     def __init__(
         self,
         *,
         client_factory: Callable[[], httpx.Client] | None = None,
-        executor: HttpxRetryExecutor | None = None,
+        executor: SyncHttpxRetryExecutor | None = None,
     ) -> None:
         self._client_factory = client_factory if client_factory is not None else httpx.Client
-        self._executor = executor if executor is not None else HttpxRetryExecutor()
+        self._executor = executor if executor is not None else SyncHttpxRetryExecutor()
 
     def request(self, request: HttpxRetryRequest) -> HttpxRetryResult:
         """Execute one retry request using a short-lived HTTPX client."""

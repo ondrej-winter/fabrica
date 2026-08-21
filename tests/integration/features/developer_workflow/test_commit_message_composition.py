@@ -8,7 +8,7 @@ from pathlib import Path
 
 import httpx
 
-from fabrica.adapters.outbound.httpx_client import HttpxRetryClient
+from fabrica.adapters.outbound.httpx_client import SyncHttpxRetryClient
 from fabrica.bootstrap import (
     DEFAULT_COMMIT_MESSAGE_CODEX_MODEL,
     DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT,
@@ -163,7 +163,7 @@ def test_codex_commit_message_workflow_uses_spark_low_defaults_with_mock_transpo
     workflow = create_codex_commit_message_workflow(
         CommitMessageWorkflowOptions(
             codex_auth_file_path=auth_file_path,
-            codex_http_client=HttpxRetryClient(
+            codex_http_client=SyncHttpxRetryClient(
                 client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler))
             ),
             git_working_directory=git_repository,
@@ -197,7 +197,7 @@ def test_codex_commit_message_workflow_allows_model_and_effort_overrides(tmp_pat
             codex_model="gpt-5.6-sol",
             codex_reasoning_effort="medium",
             codex_auth_file_path=auth_file_path,
-            codex_http_client=HttpxRetryClient(
+            codex_http_client=SyncHttpxRetryClient(
                 client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler))
             ),
             git_working_directory=git_repository,

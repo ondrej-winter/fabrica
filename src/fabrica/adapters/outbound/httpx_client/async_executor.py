@@ -1,7 +1,8 @@
-"""Synchronous HTTPX retry execution."""
+"""Asynchronous HTTPX retry execution."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import random as random_module
 import time
@@ -22,7 +23,7 @@ from fabrica.adapters.outbound.httpx_client.contracts import (
 from fabrica.adapters.outbound.httpx_client.exceptions import HttpxRetryError
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
 
     from fabrica.adapters.outbound.httpx_client.policy import RetryPolicy
 
@@ -30,7 +31,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
-class RetryState:
+class AsyncRetryState:
     """Retry-loop facts passed between helper methods."""
 
     attempt: int
@@ -41,37 +42,37 @@ class RetryState:
 
 
 @dataclass(frozen=True, slots=True)
-class RetryDelay:
-    """Information needed to choose and log one retry delay."""
+class AsyncRetryDelay:
+    """Information needed to choose and log one async retry delay."""
 
-    state: RetryState
+    state: AsyncRetryState
     reason: str
     status: int | None
     error_type: str | None
     retry_after: str | None = None
 
 
-class SyncHttpxRetryExecutor:
-    """Execute synchronous HTTPX requests with explicit opt-in retry policies."""
+class AsyncHttpxRetryExecutor:
+    """Execute asynchronous HTTPX requests with explicit opt-in retry policies."""
 
     def __init__(
         self,
         *,
         monotonic: Callable[[], float] | None = None,
-        sleep: Callable[[float], None] | None = None,
+        sleep: Callable[[float], Awaitable[None]] | None = None,
         random: Callable[[], float] | None = None,
     ) -> None:
         self._monotonic = monotonic if monotonic is not None else time.monotonic
-        self._sleep = sleep if sleep is not None else time.sleep
+        self._sleep = sleep if sleep is not None else asyncio.sleep
         self._random = random if random is not None else random_module.random
 
-    def request(
+    async def request(
         self,
         *,
-        client: httpx.Client,
+        client: httpx.AsyncClient,
         request: HttpxRetryRequest,
     ) -> HttpxRetryResult:
-        """Execute one request according to the supplied retry policy."""
+        """Execute one async request according to the supplied retry policy."""
         start_time = self._monotonic()
         attempt = 0
         last_reason: str | None = None
@@ -85,7 +86,7 @@ class SyncHttpxRetryExecutor:
                 break
             attempt += 1
             try:
-                response = client.request(
+                response = await client.request(
                     request.method,
                     request.url,
                     headers=dict(request.headers or {}),
@@ -97,26 +98,26 @@ class SyncHttpxRetryExecutor:
                 last_reason = "exception"
                 last_status = None
                 last_error_type = type(err).__name__
-                state = RetryState(attempt, start_time, last_reason, last_status, last_error_type)
+                state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
                 if not self._should_retry(attempt=attempt, policy=request.policy, start_time=start_time):
                     raise HttpxRetryError(err, self._diagnostics(state=state, policy=request.policy)) from err
-                self._sleep_before_retry(
+                await self._sleep_before_retry(
                     policy=request.policy,
-                    delay=RetryDelay(state=state, reason=last_reason, status=None, error_type=last_error_type),
+                    delay=AsyncRetryDelay(state=state, reason=last_reason, status=None, error_type=last_error_type),
                 )
                 continue
             except httpx.HTTPError as err:
                 raise HttpxRetryError(
                     err,
                     self._diagnostics(
-                        state=RetryState(attempt, start_time, "exception", None, type(err).__name__),
+                        state=AsyncRetryState(attempt, start_time, "exception", None, type(err).__name__),
                         policy=request.policy,
                     ),
                 ) from err
 
             last_exception = None
             last_status = response.status_code
-            state = RetryState(attempt, start_time, last_reason, last_status, last_error_type)
+            state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
             if response.status_code not in request.policy.retryable_status_codes:
                 return HttpxRetryResult(
                     response=_to_http_response(response),
@@ -124,15 +125,15 @@ class SyncHttpxRetryExecutor:
                 )
 
             last_reason = "http_status"
-            state = RetryState(attempt, start_time, last_reason, last_status, last_error_type)
+            state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
             if not self._should_retry(attempt=attempt, policy=request.policy, start_time=start_time):
                 return HttpxRetryResult(
                     response=_to_http_response(response),
                     diagnostics=self._diagnostics(state=state, policy=request.policy),
                 )
-            self._sleep_before_retry(
+            await self._sleep_before_retry(
                 policy=request.policy,
-                delay=RetryDelay(
+                delay=AsyncRetryDelay(
                     state=state,
                     reason=last_reason,
                     status=response.status_code,
@@ -141,7 +142,7 @@ class SyncHttpxRetryExecutor:
                 ),
             )
 
-        state = RetryState(attempt, start_time, last_reason, last_status, last_error_type)
+        state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
         if last_exception is not None:
             raise HttpxRetryError(last_exception, self._diagnostics(state=state, policy=request.policy))
         raise HttpxRetryError(
@@ -152,7 +153,7 @@ class SyncHttpxRetryExecutor:
     def _should_retry(self, *, attempt: int, policy: RetryPolicy, start_time: float) -> bool:
         return attempt < policy.max_attempts and self._remaining_budget(policy=policy, start_time=start_time) > 0
 
-    def _sleep_before_retry(self, *, policy: RetryPolicy, delay: RetryDelay) -> None:
+    async def _sleep_before_retry(self, *, policy: RetryPolicy, delay: AsyncRetryDelay) -> None:
         remaining_budget = self._remaining_budget(policy=policy, start_time=delay.state.start_time)
         retry_after_delay = self._retry_after_delay(retry_after=delay.retry_after, policy=policy)
         requested_delay = (
@@ -171,7 +172,7 @@ class SyncHttpxRetryExecutor:
             },
         )
         if delay_seconds > 0:
-            self._sleep(delay_seconds)
+            await self._sleep(delay_seconds)
 
     def _jittered_backoff(self, attempt: int, policy: RetryPolicy) -> float:
         base_delay = min(policy.initial_delay_seconds * (2 ** max(attempt - 1, 0)), policy.max_delay_seconds)
@@ -203,7 +204,7 @@ class SyncHttpxRetryExecutor:
     def _remaining_budget(self, *, policy: RetryPolicy, start_time: float) -> float:
         return max(policy.total_budget_seconds - (self._monotonic() - start_time), 0.0)
 
-    def _diagnostics(self, *, state: RetryState, policy: RetryPolicy) -> RetryDiagnostics:
+    def _diagnostics(self, *, state: AsyncRetryState, policy: RetryPolicy) -> RetryDiagnostics:
         elapsed_seconds = self._monotonic() - state.start_time
         return RetryDiagnostics(
             attempt_count=state.attempt,

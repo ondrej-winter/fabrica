@@ -11,9 +11,9 @@ import pytest
 from fabrica.adapters.outbound.httpx_client import (
     HttpTimeout,
     HttpxRetryError,
-    HttpxRetryExecutor,
     HttpxRetryRequest,
     RetryPolicy,
+    SyncHttpxRetryExecutor,
 )
 
 SUCCESS_STATUS = 200
@@ -232,8 +232,8 @@ def test_raises_retry_error_without_retrying_non_retryable_httpx_errors() -> Non
     assert error.diagnostics.last_error_type == "DecodingError"
 
 
-def _executor(clock: MonotonicClock) -> HttpxRetryExecutor:
-    return HttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=_fixed_random)
+def _executor(clock: MonotonicClock) -> SyncHttpxRetryExecutor:
+    return SyncHttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=_fixed_random)
 
 
 def _fixed_random() -> float:

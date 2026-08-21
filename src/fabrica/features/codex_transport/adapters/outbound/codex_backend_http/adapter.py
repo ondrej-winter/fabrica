@@ -7,12 +7,12 @@ from types import MappingProxyType
 from fabrica.adapters.outbound.httpx_client import (
     HttpResponse,
     HttpTimeout,
-    HttpxRetryClient,
     HttpxRetryError,
     HttpxRetryRequest,
     HttpxRetryResult,
     RetryDiagnostics,
     RetryPolicy,
+    SyncHttpxRetryClient,
 )
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.response_mapping import (
     CodexBackendResponse,
@@ -212,7 +212,7 @@ class CodexBackendHttpAdapter:
     usage_timeout: float | HttpTimeout = field(default_factory=lambda: DEFAULT_CODEX_USAGE_TIMEOUT)
     completion_retry_policy: RetryPolicy = DEFAULT_CODEX_COMPLETION_RETRY_POLICY
     usage_retry_policy: RetryPolicy = DEFAULT_CODEX_USAGE_RETRY_POLICY
-    http_client: HttpxRetryClient = field(default_factory=HttpxRetryClient)
+    http_client: SyncHttpxRetryClient = field(default_factory=SyncHttpxRetryClient)
 
     def complete(
         self,

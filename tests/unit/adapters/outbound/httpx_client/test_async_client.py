@@ -1,31 +1,33 @@
-"""Tests for the HTTPX retry client lifecycle wrapper."""
+"""Tests for the async HTTPX retry client lifecycle wrapper."""
 
 from __future__ import annotations
+
+import asyncio
 
 import httpx
 
 from fabrica.adapters.outbound.httpx_client import (
+    AsyncHttpxRetryClient,
     HttpxRetryRequest,
     RetryPolicy,
-    SyncHttpxRetryClient,
 )
 
 SUCCESS_STATUS = 200
 
 
-def test_uses_client_factory_and_closes_client_after_request() -> None:
+def test_uses_async_client_factory_and_closes_client_after_request() -> None:
     observed_request: httpx.Request | None = None
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    async def handler(request: httpx.Request) -> httpx.Response:
         nonlocal observed_request
         observed_request = request
         return httpx.Response(SUCCESS_STATUS, json={"ok": True})
 
-    http_client = httpx.Client(transport=httpx.MockTransport(handler))
-    retry_client = SyncHttpxRetryClient(client_factory=lambda: http_client)
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    retry_client = AsyncHttpxRetryClient(client_factory=lambda: http_client)
     request = HttpxRetryRequest(method="GET", url="https://example.invalid/resource", policy=RetryPolicy())
 
-    result = retry_client.request(request)
+    result = asyncio.run(retry_client.request(request))
 
     assert result.response.status_code == SUCCESS_STATUS
     assert observed_request is not None

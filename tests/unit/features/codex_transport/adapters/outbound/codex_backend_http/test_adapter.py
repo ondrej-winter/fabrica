@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import httpx
 
-from fabrica.adapters.outbound.httpx_client import HttpxRetryClient, HttpxRetryExecutor, RetryPolicy
+from fabrica.adapters.outbound.httpx_client import RetryPolicy, SyncHttpxRetryClient, SyncHttpxRetryExecutor
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http import (
     CodexBackendHttpAdapter,
     CodexBackendRequestSettings,
@@ -331,13 +331,13 @@ def test_fetch_usage_maps_httpx_transport_error_without_error_message() -> None:
 
 def _http_client(
     handler: Callable[[httpx.Request], httpx.Response], clock: MonotonicClock | None = None
-) -> HttpxRetryClient:
+) -> SyncHttpxRetryClient:
     executor = (
-        HttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=lambda: 0.5)
+        SyncHttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=lambda: 0.5)
         if clock is not None
-        else HttpxRetryExecutor()
+        else SyncHttpxRetryExecutor()
     )
-    return HttpxRetryClient(
+    return SyncHttpxRetryClient(
         client_factory=lambda: httpx.Client(transport=httpx.MockTransport(handler)),
         executor=executor,
     )
