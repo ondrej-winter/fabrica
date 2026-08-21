@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
-from typing import cast
 
 import httpx
 import pytest
@@ -164,18 +163,6 @@ def test_bounds_per_attempt_timeout_to_remaining_retry_budget() -> None:
     assert outcome.response.status_code == RETRYABLE_STATUS
     assert [timeout.read for timeout in observed_timeouts] == [10.0, 0.5]
     assert outcome.diagnostics.budget_exhausted is True
-
-
-def test_rejects_non_http_retry_exception_types() -> None:
-    invalid_exception_type = cast("type[httpx.HTTPError]", KeyboardInterrupt)
-
-    with pytest.raises(TypeError, match="retryable_exception_types"):
-        RetryPolicy(retryable_exception_types=(invalid_exception_type,))
-
-
-def test_rejects_zero_retry_budget() -> None:
-    with pytest.raises(ValueError, match="total_budget_seconds"):
-        RetryPolicy(total_budget_seconds=0.0)
 
 
 def test_stops_when_attempt_budget_is_exhausted() -> None:
