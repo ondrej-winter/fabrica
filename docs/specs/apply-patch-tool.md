@@ -5,64 +5,68 @@
 Define the model-facing and host-facing specification for an `apply_patch`
 filesystem mutation tool.
 
-The tool is for autonomous coding agents that need a single preferred primitive
-for creating, modifying, deleting, and moving text files in a workspace. It must
-favor contextual, reviewable patches over line-number edits, shell text
-rewrites, or whole-file replacement.
+The tool is for autonomous coding agents that need one preferred model-facing
+primitive for creating, modifying, deleting, and moving UTF-8 text files in a
+configured workspace. It must favor contextual, reviewable patches over
+line-number edits, shell text rewrites, whole-file replacement, or multiple
+operation-specific mutation tools.
 
-The design goal is a reusable patch engine that can support CLI execution, IDE
-diff preview, approval workflows, autonomous mode, and tests without changing the
-patch grammar shown to the model.
+`apply_patch` is the sole public model-facing filesystem mutation tool in v1.
+Add, Update, Delete, and Move are protocol operations inside this one tool, not
+separately registered `create_file`, `delete_file`, `move_file`, or `mkdir`
+tools. Implementations may still use operation-specific internal components and
+DTOs as long as the model observes one immutable patch plan, one authorization
+decision, one workspace mutation lease, and one final result.
+
+Version 1 intentionally optimizes for safety and deterministic behavior over
+implementation simplicity and broad portability. Unsupported cases must fail
+before mutation rather than silently degrade to weaker guarantees.
 
 ## Current context
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
 - Runtime direction is owned by `docs/specs/agent-runtime.md`.
-- Developer workflow and local tool safety concerns are owned by related specs
-  such as `docs/specs/git-workflow-tools.md`.
+- Read-only file inspection is owned by `docs/specs/read-files-tool.md`.
+- Textual source discovery is owned by `docs/specs/search-codebase-tool.md`.
+- Command execution is owned by `docs/specs/run-commands-tool.md`.
 - This spec defines the desired `apply_patch` tool contract only. It does not
   implement the tool.
-- The requested design keeps selected Cline patch semantics while tightening
-  matching, workspace containment, target protection, and commit guarantees.
 
-## Assumptions
-
-- The primary caller is a model-driven coding agent operating inside a configured
-  workspace root.
-- The default implementation target will be Python and should follow Fabrica's
-  feature-slice and hexagonal architecture conventions when implementation work
-  begins.
-- Version 1 supports UTF-8 text files and rejects binary or unsupported-encoding
-  files.
-- The host can provide a canonical workspace root and can expose separate preview
-  and commit phases.
-- Documentation-only changes should be reviewed for clarity and consistency;
-  implementation changes will require tests and the project quality gate.
-
-## Desired behavior
+## Design principles
 
 `apply_patch` must allow a model to:
 
-- create text files;
-- modify existing text files with context-based hunks;
-- delete files;
-- move or rename files, optionally while modifying their contents;
+- create regular UTF-8 text files;
+- modify existing regular UTF-8 text files with context-based hunks;
+- delete regular files;
+- move or rename regular files, optionally while modifying their contents;
 - change multiple files in one tool call.
-
-The tool must be designed around contextual patches rather than line numbers or
-whole-file replacement. It must prefer minimal mutations, deterministic failure,
-workspace containment, reviewable change computation, and compatibility with
-GPT/Codex-style coding models.
 
 The implementation must separate:
 
 - parsing;
 - validation;
 - hunk matching;
-- change computation;
-- preview;
-- filesystem commit.
+- change planning;
+- derived effect planning;
+- authorization and approval;
+- staging;
+- filesystem commit;
+- result formatting.
+
+Operation-specific internal tools, use cases, DTOs, validators, and filesystem
+adapter methods are encouraged when they keep the implementation clear. They must
+compose into the single public `apply_patch` operation before authorization.
+
+Add and Move destination parent directories are created automatically when they
+are missing. These directory creations are derived planned effects, not separate
+model-authored actions. They must be validated, authorized, committed, reported,
+rolled back, and recovered with the same rigor as explicit file actions.
+
+All expected rejections must be structured and recoverable when no mutation
+occurred. Indeterminate or partial mutation outcomes must stop the agent loop and
+require inspection or recovery.
 
 ## Tool interface
 
@@ -76,11 +80,13 @@ Canonical model-facing JSON schema:
 
 ```json
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
     "input": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "maxLength": 262144
     }
   },
   "required": ["input"],
@@ -88,48 +94,52 @@ Canonical model-facing JSON schema:
 }
 ```
 
-The public tool schema should remain `{ "input": string }`. An implementation may
-internally tolerate a raw string input for provider compatibility.
+The public model-facing schema remains `{ "input": string }`. A compatibility
+adapter may accept provider-specific raw string input and normalize it before
+canonical validation, but the core parser receives a string from the canonical
+schema.
 
-Recommended default timeout:
+The operation is not automatically retried. Filesystem edits are stateful, and
+automatic retry after an indeterminate failure can duplicate or incorrectly
+reapply an operation. Duplicate model tool delivery is handled by the runtime
+call ledger described below, not by re-executing the patch engine.
 
-```text
-30 seconds
-```
-
-The operation must not be automatically retried. Filesystem edits are stateful,
-and automatic retry after an indeterminate failure could duplicate or incorrectly
-reapply an operation.
+No other v1 model-facing filesystem mutation tool may overlap with
+`apply_patch`. Hosts may expose lower-level internal commands only behind the
+workspace editing application boundary; they must not be registered as separate
+model-callable create, update, delete, move, or directory tools.
 
 ## Model-facing description
 
-The tool description should teach the model the patch syntax directly rather than
-asking it to invoke a shell command:
+Recommended concise tool description:
 
 ```text
-Apply context-based patches to files in the workspace.
+Apply context-based patches to UTF-8 text files in the workspace.
 
-Pass the patch directly in `input`.
+Pass the raw patch body directly in `input`.
 
 Supported operations:
 - *** Add File: <path>
 - *** Update File: <path>
 - *** Delete File: <path>
-- *** Move to: <new-path> after an Update File header
+- *** Move to: <new-path> immediately after an Update File header
 
-Use context lines together with - deleted lines and + inserted lines.
-Use @@ or @@ <anchor> to separate or disambiguate hunks.
-Do not use line numbers.
+Use context lines with one leading space, deleted lines with -, and inserted
+lines with +. Use @@ or @@ <anchor> to separate hunks. Use
+@@ before <anchor> or @@ after <anchor> for insertion-only hunks.
 
-The entire patch is validated before changes are committed.
-If any hunk cannot be matched safely, the patch fails and no intended
-changes are applied.
+Do not use line numbers. Prefer small, focused patches.
 
-Prefer small, focused patches over large whole-file replacements.
+Add File and Move destinations automatically create missing parent directories
+inside the workspace. Created directories are shown in the planned changes and
+approval preview.
+
+The full patch is planned and authorized before commit. If any hunk cannot be
+matched safely, the patch is rejected and no intended changes are applied.
 ```
 
-The model should be encouraged to use raw patch bodies, not shell wrappers such
-as `apply_patch <<"EOF"`.
+The model should use raw patch bodies, not shell wrappers such as
+`apply_patch <<"EOF"`.
 
 ## Patch protocol
 
@@ -143,7 +153,10 @@ Canonical patch form:
 *** End Patch
 ```
 
-A patch contains one or more file actions.
+Both sentinels are required by the core v1 parser. Sentinel-less bodies, legacy
+shell wrappers, and unprefixed context lines are compatibility forms only. A
+separate adapter may normalize them before invoking the core parser, but they are
+not v1 conformance.
 
 ### Add file
 
@@ -155,9 +168,21 @@ Syntax:
 +    return 42
 ```
 
-Every content line in an `Add File` block must begin with `+`. The leading `+` is
-syntax and is not written to the resulting file. `Add File` means create a new
-file only; it must never overwrite an existing file.
+Every content line in a non-empty `Add File` block must begin with `+`. The
+leading `+` is syntax and is not written to the resulting file. `Add File` means
+create a new file only; it must never overwrite an existing path.
+
+If the destination parent directory does not exist, the implementation creates
+the missing parent directory chain as derived planned effects. The nearest
+existing ancestor must be a real directory inside the workspace, and every new
+directory component must pass the same path, policy, alias, symlink, and
+filesystem capability validation as file paths.
+
+An `Add File` block with no content lines creates an explicit zero-byte file. A
+non-empty added file ends with a terminal newline by default. A zero-byte added
+file has no terminal newline. Added files are UTF-8 without BOM, use LF line
+endings, and receive base mode `0666` filtered by the configured workspace umask.
+The tool must not infer executable mode from filename, extension, or shebang.
 
 ### Delete file
 
@@ -167,7 +192,10 @@ Syntax:
 *** Delete File: src/obsolete.py
 ```
 
-The target must exist. Deletion does not require file contents in the patch.
+The target must exist and must be a regular file. Deletion does not include file
+contents in the patch. Preflight snapshots the exact file identity and content
+hash, authorization displays the deletion, and commit revalidates identity and
+hash before deletion.
 
 ### Update file
 
@@ -181,62 +209,19 @@ Syntax:
 +    return 42
 ```
 
-Update hunks contain context lines, deleted lines, and inserted lines. Canonical
-syntax should use one leading space for context lines. For model robustness, the
-parser may also accept unprefixed lines as context, but newly generated patches
-should use the canonical leading-space form.
+Update hunk bodies are ordered tagged lines. Each body line must start with one
+of:
 
-### Section anchors
+- one space for context;
+- `-` for deleted lines;
+- `+` for inserted lines.
 
-A hunk may begin with either:
+The parser removes exactly one syntax prefix. File content that literally begins
+with protocol-looking text, such as `*** End Patch`, remains unambiguous when it
+is prefixed as content. Unprefixed non-header lines inside an action are invalid.
 
-```text
-@@
-```
-
-or:
-
-```text
-@@ <anchor>
-```
-
-Example:
-
-```diff
-*** Update File: src/service.py
-@@ class UserService:
-     def load(self):
--        return old_loader()
-+        return new_loader()
-```
-
-`@@ <anchor>` is not a line number. It narrows the subsequent search to a region
-after a matching source line.
-
-If an explicit anchor is supplied and cannot be found, the hunk must fail. The
-implementation must not silently fall back to searching the whole remaining file.
-
-### End-of-file assertion
-
-Syntax:
-
-```text
-*** End of File
-```
-
-The marker may appear after a hunk:
-
-```diff
-*** Update File: config.txt
-@@
- old-last-line
-+new-last-line
-*** End of File
-```
-
-Semantics: the matched hunk must terminate at EOF. If it does not, the patch must
-fail with an EOF assertion error. EOF is a real assertion, not merely a search
-preference.
+An ordinary `Update File` without `Move to` must contain at least one effective
+hunk and must change the resulting bytes. No-op updates fail with `NO_OP_ACTION`.
 
 ### Move or rename
 
@@ -251,68 +236,91 @@ Syntax:
 ```
 
 The move directive must occur immediately after the corresponding `Update File`
-header.
-
-Move semantics are:
+header. A zero-hunk `Update File` with `Move to` is a valid pure rename when the
+source and destination paths differ. A move with hunks has these logical
+semantics:
 
 ```text
-read source
-→ apply update hunks
+read source snapshot
+→ apply update hunks to planned content
 → write resulting contents to destination
 → remove source
 ```
 
-The destination must remain inside the workspace, must not already exist, must
-not collide with another Add or Move destination in the same patch, and must not
-be the target of another incompatible operation. No implicit overwrite is
-permitted.
+The destination must be inside the workspace, must not exist, must not collide
+with another path in the patch, and must be on a filesystem that supports the
+same atomic rename and durability guarantees required by the commit protocol.
+Cross-device moves fail with `CROSS_DEVICE_MOVE_UNSUPPORTED`.
 
-### One action per source path
+If the destination parent directory does not exist, the implementation creates
+the missing parent directory chain as derived planned effects before writing the
+moved content. A Move may not create or replace its destination file implicitly;
+only missing destination parent directories are eligible for automatic creation.
 
-A patch must not contain multiple top-level actions for the same source path.
-Multiple hunks must appear inside a single `Update File` action.
+### Hunk headers and anchors
 
-Invalid:
-
-```text
-*** Update File: foo.py
-...
-
-*** Update File: foo.py
-...
-```
-
-## Sentinel compatibility
-
-Canonical emitted patches should contain both sentinels:
+A replacement hunk may begin with either:
 
 ```text
-*** Begin Patch
-...
-*** End Patch
+@@
 ```
 
-For compatibility, the parser may accept a patch body without sentinels and
-internally wrap it. If either Begin or End is present but the other is missing,
-the parser must fail with `INCOMPLETE_SENTINELS`.
-
-Legacy shell wrappers such as the following are not part of the canonical
-protocol:
+or:
 
 ```text
-%%bash
-apply_patch <<"EOF"
-...
-EOF
+@@ <anchor>
 ```
 
-A compatibility adapter may strip such wrappers if supporting older prompts, but
-the model-facing protocol should prefer the raw patch body.
+`@@ <anchor>` requires exactly one complete source line matching `<anchor>` in
+the allowed search region. Zero matches fail with `ANCHOR_NOT_FOUND`; multiple
+matches fail with `AMBIGUOUS_ANCHOR`. The anchor is not a line number and is not
+implicitly part of the old sequence. Ordinary anchored replacement searches after
+the anchor line unless the anchor line is repeated as a space-prefixed context
+line.
+
+Insertion-only hunks are valid only with explicit placement:
+
+```diff
+@@ before class UserService:
++# inserted before the anchor line
+```
+
+```diff
+@@ after class UserService:
++# inserted after the anchor line
+```
+
+The remainder after `before` or `after` is the exact unique anchor line. A plain
+`@@` hunk with only `+` lines is invalid because it has no safe source span.
+
+### End-of-file assertion
+
+Syntax:
+
+```text
+*** End of File
+```
+
+`*** End of File` is a strict postcondition and may appear only after the final
+hunk of an `Update File` action. After applying that final hunk, the hunk's
+resulting span must terminate at logical EOF. For `@@ after <anchor>` insertion,
+the assertion is valid only when the anchor is the final source line.
+
+### Terminal newline marker
+
+Update and move actions preserve the source file's terminal-newline state unless
+the final hunk explicitly changes it with:
+
+```text
+*** No Newline at End of File
+```
+
+The marker makes adding or removing the terminal newline intentional and
+testable. It is not inferred from the patch container's final newline.
 
 ## Parsing model
 
-The executor must parse the patch into an intermediate representation before any
-filesystem mutation occurs.
+Parsing is side-effect free and produces an ordered intermediate representation.
 
 Suggested representation:
 
@@ -322,28 +330,36 @@ Patch
 
 FileAction
   type: ADD | UPDATE | DELETE
-  source_path: Path
-  destination_path: Path | null
-  new_file_content: str | null
+  source_path: WorkspaceRelativePath
+  destination_path: WorkspaceRelativePath | null
+  new_file_lines: list[PatchContentLine] | null
   hunks: list[Hunk]
 
 Hunk
+  header: UNANCHORED | ANCHORED | INSERT_BEFORE | INSERT_AFTER
   anchor: str | null
-  old_context: list[str]
-  deletions: list[str]
-  insertions: list[str]
+  lines: list[HunkLine]
   eof_required: bool
+  terminal_newline_directive: PRESERVE | ENSURE_PRESENT | ENSURE_ABSENT
+
+HunkLine
+  type: CONTEXT | DELETE | INSERT
+  text: str
 ```
 
-Parsing must be side-effect free.
+Implementations may store ordered `old_lines` and `new_lines` in addition to the
+tagged body, but they must not lose the order of context, deletion, and insertion
+lines.
 
 ## Matching strategy
 
-The default matcher must be conservative and deterministic.
+Matching is over complete logical source lines, not substrings within a line.
+Every hunk is matched against the same immutable source snapshot for its file.
 
 ### Pass 1: exact match
 
-Match the complete old hunk context exactly.
+Match the complete ordered old sequence exactly. The old sequence consists of the
+hunk's `CONTEXT` and `DELETE` lines in order.
 
 ### Pass 2: trailing-whitespace tolerance
 
@@ -353,435 +369,597 @@ If exact matching fails, the matcher may accept a candidate where:
 rstrip(source_line) == rstrip(patch_line)
 ```
 
-The result must record `match_quality = trailing_whitespace`.
+for every old-sequence line. The result records
+`match_quality = "trailing_whitespace"`.
 
-### Optional indentation tolerance
+Trailing-whitespace tolerance must not rewrite untouched context. Only source
+spans identified by `DELETE` lines are replaced; unchanged context bytes come
+from the source snapshot. Inserted `+` lines are written exactly as supplied,
+apart from the file's EOL encoding.
 
-A compatibility mode may permit leading and trailing whitespace normalization. It
-must not be enabled by default.
+### No other fuzzy matching
 
-### No default approximate semantic matching
+Version 1 omits indentation-normalized, fuzzy, approximate, or semantic matching
+entirely. These modes are not merely disabled; they are outside v1.
 
-The default matcher must not apply a patch merely because a low-threshold fuzzy
-or semantic similarity check passes.
+### Uniqueness and ambiguity
 
-If approximate matching is introduced later, it must be explicitly configurable,
-require a high threshold, choose the unique best candidate, fail on ambiguity, and
-report the similarity score. The recommended minimum threshold is `0.90`.
+There is no fixed minimum number of context lines. A deletion/replacement-only
+hunk may be accepted if its complete ordered old sequence has exactly one match
+in the allowed region. Multiple candidate regions fail with `AMBIGUOUS_HUNK`.
 
-## Context ambiguity
+After all hunks match against the snapshot, their source spans must be strictly
+ordered and non-overlapping. Overlap, reversed order, or competing insertion
+positions fail before mutation.
 
-A hunk should identify its destination sufficiently precisely. If multiple
-candidate regions match equally and the patch does not provide enough information
-to distinguish them, the matcher must fail with `AMBIGUOUS_HUNK`.
+## Path and action validation
 
-The agent can then reread the file, provide more context or an `@@ anchor`, and
-retry. This is preferable to silently modifying the first similar block.
+A patch must not contain multiple top-level actions for the same source path.
+Multiple hunks for one file must appear inside a single `Update File` action.
+
+In v1, every canonical or aliased path mentioned anywhere in the patch must be
+globally disjoint, except for the source/destination pair belonging to the same
+move action. Move chains, swaps, delete-then-add replacement, and shared
+source/destination graph nodes fail preflight.
+
+The implementation must reject:
+
+- absolute paths;
+- empty paths;
+- parent-directory traversal;
+- paths outside the configured workspace;
+- any symlink or reparse-point component, including contained symlinks;
+- path aliases under host filesystem case or Unicode-normalization behavior;
+- case-only or normalization-only renames;
+- existing parent path components that are not directories;
+- missing parent directories for `Update` and `Delete` sources;
+- directories and non-regular files;
+- files with multiple hard links;
+- special files such as FIFOs, sockets, devices, and platform equivalents.
+
+Missing parent directories for `Add File` targets and `Move to` destinations are
+not rejected. Instead, the planner derives directory-creation effects from the
+destination path. It must find the nearest existing ancestor, validate that the
+ancestor is a real directory inside the workspace, validate that every missing
+component is absent and safe to create, and collapse shared parent directories so
+one patch creates each planned directory at most once.
+
+Read/search tools may be more permissive for workspace-contained symlinks because
+they do not mutate. `apply_patch` is stricter.
 
 ## File loading and snapshot phase
 
-Before parsing context-dependent operations, the implementation must:
+Before context-dependent operations, the implementation must acquire the
+workspace mutation lease and then:
 
-1. resolve every referenced path;
-2. validate workspace containment;
-3. read all `Update` and `Delete` source files;
-4. check all `Add` destinations;
-5. check all `Move` destinations;
-6. capture source metadata.
+1. resolve every referenced path through the mutating path resolver;
+2. validate workspace containment and no symlink/reparse components;
+3. validate globally disjoint source and destination path identities;
+4. read all `Update` and `Delete` source files;
+5. check all `Add` and `Move` destinations are absent;
+6. derive and validate missing parent directories for `Add` and `Move`
+   destinations;
+7. capture source, destination-parent, nearest-existing-ancestor, and planned
+   directory absence evidence;
+8. capture source metadata.
 
-A source snapshot should contain at least:
+A source snapshot contains at least:
 
-- path;
+- requested path;
+- canonical workspace-relative path;
+- parent-directory identity;
+- file identity;
 - content bytes;
-- encoding;
+- encoding and BOM state;
 - line-ending style;
-- file mode or permissions;
+- terminal-newline state;
+- portable permission/mode bits;
+- link count;
 - content hash.
 
-All matching and change computation must use the snapshot.
+For each planned directory creation, the plan records at least:
 
-## Preflight validation
+- requested destination path that required the directory;
+- canonical workspace-relative directory path;
+- nearest existing ancestor identity;
+- expected absence evidence before commit;
+- planned mode bits based on host policy and workspace umask;
+- creation order and rollback order.
 
-The implementation must validate the entire patch before any write occurs.
+All matching and change computation use the immutable snapshot.
 
-The following conditions must fail preflight:
+## Text, encoding, and line endings
 
-- `Add File` target already exists;
-- `Update File` source is missing;
-- `Delete File` source is missing;
-- `Move to` destination already exists;
-- duplicate source operation;
-- duplicate destination;
-- destination/source collision;
-- path escapes workspace;
-- malformed patch;
-- unmatched hunk;
-- ambiguous hunk;
-- invalid EOF assertion;
-- binary file;
-- unsupported encoding.
+Version 1 supports UTF-8 and UTF-8 with BOM only. Update and move preserve BOM
+state. Add emits UTF-8 without BOM. Other encodings fail with
+`UNSUPPORTED_ENCODING`.
 
-If preflight fails, intended filesystem mutations must be zero.
+Binary files fail, including NUL-containing files. The implementation must not
+silently decode arbitrary binary data as UTF-8 and rewrite it.
 
-## Workspace security
+Update and move preserve uniform LF or CRLF line endings. Mixed-EOL files fail
+with `MIXED_LINE_ENDINGS_UNSUPPORTED`. Add uses LF.
 
-All paths must be resolved relative to a configured workspace root.
+## Resource limits
 
-Defaults:
+Hosts may lower limits but must not exceed v1 hard ceilings without a protocol
+revision.
 
-- absolute paths are rejected;
-- `../` traversal is rejected;
-- symlink escape is rejected.
+| Resource                      |           Default |      Hard ceiling |
+| ----------------------------- | ----------------: | ----------------: |
+| Patch input                   |           256 KiB |           256 KiB |
+| File actions per patch        |                50 |               200 |
+| Total hunks per patch         |               500 |             2,000 |
+| Path length                   | 1,024 UTF-8 bytes | 4,096 UTF-8 bytes |
+| Source or resulting file size |            10 MiB |            50 MiB |
+| Aggregate source snapshots    |            50 MiB |           200 MiB |
+| Aggregate staged bytes        |           100 MiB |           400 MiB |
 
-Validation should use canonical filesystem paths, not merely lexical path
-normalization. For example, if `workspace/link -> /etc`, then this patch must be
-rejected:
+Limit failures are recoverable no-mutation rejections and must identify the
+exceeded limit without echoing large content.
 
-```text
-*** Update File: link/passwd
-```
+## Authorization and approval
 
-An autonomous coding tool must not inherit behavior that allows absolute paths as
-long as they are syntactically valid.
+The model-facing tool remains one call. Internally, every call builds an
+immutable `PatchPlan` before commit. The plan contains:
 
-## Existing-file protection
+- normalized actions and input order;
+- canonical paths and identity evidence;
+- source hashes and destination absence evidence;
+- derived directory creations and ancestor evidence;
+- resulting bytes and planned modes;
+- bounded preview diff;
+- deterministic commit schedule;
+- resource usage;
+- plan digest.
 
-`Add File` means create new file, not create-or-overwrite. If the target exists,
-preflight must fail with `ADD_TARGET_EXISTS`.
-
-The same rule applies to `Move to`: if the destination exists, preflight must fail
-with `MOVE_TARGET_EXISTS`.
-
-These checks must query the filesystem during preflight. They must not depend
-solely on an in-memory map of files loaded for other operations.
-
-## Line endings
-
-Matching may internally normalize line endings. Writing must preserve the
-original file's convention, including LF and CRLF. Newly added files default to LF
-unless workspace configuration specifies otherwise.
-
-The implementation must avoid unrelated whole-file EOL churn. Updating a CRLF
-file must not rewrite it as LF.
-
-## Encoding and binary files
-
-Version 1 should support UTF-8 text files. UTF-8 BOM preservation is optional but
-should be explicit if supported.
-
-The implementation must reject files that appear binary, including NUL-containing
-data. It must not silently decode arbitrary binary data as UTF-8 and rewrite it.
-
-## File metadata
-
-For updates, permissions must be preserved. For moves, source permissions should
-be preserved. For adds, normal workspace or default creation permissions apply.
-
-Where practical, moves should preserve executable bits and other basic mode
-metadata.
-
-## Change computation
-
-After matching all hunks, the implementation must compute an in-memory change set
-before writing.
-
-Suggested representation:
+The host-owned policy evaluator sees the immutable plan and returns:
 
 ```text
-ChangeSet
-  ADD:
-    path
-    new_content
-
-  UPDATE:
-    path
-    old_content
-    new_content
-
-  DELETE:
-    path
-    old_content
-
-  MOVE:
-    old_path
-    new_path
-    old_content
-    new_content
+ALLOW
+REQUIRE_APPROVAL
+DENY
 ```
 
-The change set should be reusable by CLI execution, IDE diff preview, approval
-UI, auditing, and tests.
+Default policy is `REQUIRE_APPROVAL`. Trusted autonomous workflows may opt into
+`ALLOW`. Protected paths such as `.git/**`, patch staging/journal directories,
+and paths outside the pinned workspace are denied by default host policy. The
+model cannot override policy.
 
-## Concurrent modification protection
+Approval preview shows a bounded full unified diff for Add, Update, and Move
+content plus explicit delete, rename, and created-directory summaries. Derived
+directory creations must be visible even though the model did not author separate
+directory actions. The preview is generated from the immutable plan. If the diff
+exceeds the approval-preview bound, the host must not approve from a truncated
+preview; it must require a narrower patch or an external full-diff viewer bound
+to the same plan digest.
 
-Immediately before commit, every snapshotted source must still have the same
-content hash. If a source changed after preflight, the implementation must fail
-with `STALE_SOURCE` and ask the agent to reread and retry.
+If approval was granted but source, destination, nearest-existing-ancestor,
+planned-directory absence, parent, policy, or plan state changes before commit,
+the operation fails with recoverable `STALE_PLAN`; staged artifacts are discarded
+and a new model call and approval decision are required.
 
-Add and Move destinations must also remain absent immediately before commit.
+## Concurrency and duplicate delivery
 
-## Commit semantics
+All `apply_patch` calls for one workspace are serialized by a host-owned
+exclusive mutation lease. The lease is acquired before snapshotting and held
+through approval, staging, commit, rollback, or cleanup. Waiting for the lease
+observes cancellation and the planning deadline. No plan snapshot is taken before
+the lease is acquired.
 
-Semantic validation must be all-or-nothing. The implementation should also make
-filesystem commit as transactional as practical.
+The runtime keeps a per-agent-run ledger keyed by model `call_id` plus a digest
+of normalized arguments. Exact duplicate delivery returns the recorded terminal
+result without re-execution. Reusing the same `call_id` with different arguments
+fails. After process restart or an indeterminate commit outcome, no replay occurs
+automatically; the agent must inspect and issue a new call.
 
-Recommended commit approach:
+## Deadlines and cancellation
 
-1. create temporary files in destination directories;
-2. write complete new contents;
-3. flush and close;
-4. preserve required permissions;
-5. verify all staging succeeded;
-6. rename staged files into place;
-7. perform deletions;
-8. clean temporary files.
+Hosts may lower deadlines but must not exceed v1 hard ceilings.
 
-If commit fails midway, the implementation should attempt rollback using the
-preflight snapshot. True cross-file atomicity is generally unavailable on ordinary
-filesystems, so the documented guarantee is:
+| Phase                                   |    Default | Hard ceiling |
+| --------------------------------------- | ---------: | -----------: |
+| Planning                                | 30 seconds |  120 seconds |
+| Approval wait                           |  5 minutes |   30 minutes |
+| Post-approval staging/revalidation      | 30 seconds |  120 seconds |
+| Non-cancellable commit/rollback cleanup | 10 seconds |   30 seconds |
+
+Cancellation applies during lease wait, parse, snapshot, matching, planning,
+approval wait, staging, and pre-commit revalidation. Immediately before the first
+visible rename/delete, the operation crosses an explicit commit point and enters
+a short non-cancellable section. After the commit point, the implementation must
+finish bounded commit or rollback and report the actual terminal state. The host
+must never return while background mutation can continue.
+
+Hitting the commit/rollback cleanup hard ceiling yields
+`INDETERMINATE_COMMIT_STATE`, stops the runtime loop, and requires inspection.
+
+## Staging and commit semantics
+
+Preflight, planning, authorization, and staging are all-or-nothing. The tool does
+not claim cross-file atomic commit. The documented guarantee is:
 
 ```text
-fully atomic preflight + best-effort transactional commit
+fully atomic preflight/staging + journaled best-effort commit with explicit final-state reporting
 ```
+
+After approval, the implementation:
+
+1. revalidates source identities, source hashes, nearest-existing-ancestor
+   identities, parent identities, destination absence, planned-directory absence,
+   policy, and plan digest;
+2. creates any planned parent directories shallowest-first through pinned
+   directory handles and records their resulting identities;
+3. creates host-managed same-filesystem staging artifacts through pinned
+   directory handles;
+4. writes and durably flushes complete staged file contents;
+5. applies required mode bits;
+6. durably records a metadata-only commit journal;
+7. revalidates again;
+8. crosses the explicit commit point;
+9. executes a deterministic planner-owned commit schedule;
+10. flushes affected file and parent-directory durability barriers;
+11. cleans up stage, journal, and rollback-eligible created-directory artifacts
+    when safe.
+
+Staging directories are hidden, host-managed, on the same filesystem as each
+affected destination parent, created/opened through pinned directory handles, and
+excluded from patch targets. Staged names are not model-controlled and use strict
+permissions such as `0600` or platform equivalents. Planned parent directories
+are ordinary workspace directories, but their creation identities are tracked so
+rollback and recovery can distinguish them from unrelated external work. The
+durable journal contains metadata only: plan digest, operation state, identities,
+hashes, planned directory creations, and stage/backup references. It must not
+contain file contents.
+
+Successful commit requires file-content durability barriers and parent-directory
+durability barriers where supported, including barriers for newly created parent
+directories and their ancestors. If required durability primitives are
+unavailable, the host fails the filesystem capability probe. If durability fails
+during commit, the operation enters rollback or reports the final state.
+
+Rollback must never overwrite or remove an independently changed path. Directory
+rollback removes only directories created by the current plan, deepest-first, and
+only when they are still empty and their identity matches the journaled creation
+evidence. If a created directory now contains external work, rollback must leave
+it in place and report it as retained. Terminal states must distinguish at least:
+
+- `COMMITTED`;
+- `REJECTED`;
+- `COMMIT_FAILED_ROLLED_BACK`;
+- `PARTIAL_COMMIT`;
+- `ROLLBACK_FAILED`;
+- `INDETERMINATE_COMMIT_STATE`.
+
+Every non-committed post-commit state must include per-path evidence sufficient
+for a user or recovery routine to understand what changed.
+
+Created-directory outcomes are reported separately from file outcomes so users
+can distinguish retained empty or externally populated directories from file edit
+failures.
+
+## Startup recovery
+
+When Fabrica starts and finds an incomplete patch journal, `apply_patch` must not
+be exposed for that workspace until recovery inspects the durable journal,
+planned-directory records, and stage/backup artifacts. Recovery may finish
+rollback automatically only when identity and hash preconditions prove it cannot
+overwrite or remove later external work. Created directories may be removed during
+recovery only when they are still empty and match the journaled identity;
+otherwise they are retained and reported. Otherwise the workspace is marked
+`RECOVERY_REQUIRED`, mutation remains blocked, and explicit operator resolution
+is required. Recovery must not silently resume forward commit or delete evidence.
+
+## Filesystem and platform scope
+
+Version 1 supports capability-probed macOS and Linux POSIX filesystems only. The
+filesystem adapter must verify required primitives before exposing mutation:
+
+- workspace-root and directory-handle-relative traversal;
+- no-follow and no-replace operations;
+- pinned file and directory identities;
+- link-count inspection;
+- mode-bit inspection and application;
+- file and parent-directory durability barriers;
+- regular-file and special-file classification.
+
+If these guarantees are unavailable for the platform or workspace filesystem, the
+tool fails before mutation with `UNSUPPORTED_FILESYSTEM_GUARANTEE`. Windows and
+filesystems that fail the probe are outside v1.
 
 ## Result contract
 
-The tool should return structured results rather than only human-readable prose.
+The patch engine returns typed feature DTOs. The current model-facing registered
+tool adapter serializes those DTOs as compact canonical JSON in the runtime text
+channel. Stable status and error fields must be preserved before optional detail
+when output is bounded.
 
 Success example:
 
 ```json
 {
+  "status": "committed",
   "success": true,
+  "plan_digest": "sha256:...",
   "changes": [
     {
+      "index": 0,
       "operation": "update",
       "path": "src/example.py",
       "hunks": 2,
       "match_quality": "exact"
     },
     {
+      "index": 1,
       "operation": "add",
       "path": "tests/test_example.py"
+    }
+  ],
+  "created_directories": [
+    {
+      "path": "tests",
+      "reason": "parent_for_add",
+      "final_state": "created"
     }
   ],
   "warnings": []
 }
 ```
 
-Failure example:
+Recoverable rejection example:
 
 ```json
 {
+  "status": "rejected",
   "success": false,
+  "mutation_guarantee": "no_mutation",
   "error": {
     "code": "HUNK_CONTEXT_NOT_FOUND",
+    "phase": "matching",
+    "retryable": true,
     "path": "src/example.py",
     "hunk": 2,
-    "message": "Hunk context does not match current file content.",
-    "context": "..."
+    "anchor": null,
+    "old_sequence_digest": "sha256:...",
+    "candidate_count": 0,
+    "excerpt": "...bounded sanitized excerpt..."
   }
 }
 ```
 
-Useful error codes include:
+Post-commit failure example:
+
+```json
+{
+  "status": "partial_commit",
+  "success": false,
+  "mutation_guarantee": "partial_or_uncertain_mutation",
+  "plan_digest": "sha256:...",
+  "error": {
+    "code": "ROLLBACK_FAILED",
+    "phase": "rollback",
+    "retryable": false
+  },
+  "directory_outcomes": [
+    {
+      "path": "src/generated",
+      "planned_effect": "create_directory",
+      "final_state": "retained_external_content"
+    }
+  ],
+  "path_outcomes": [
+    {
+      "path": "src/a.py",
+      "planned_operation": "update",
+      "final_state": "committed"
+    },
+    {
+      "path": "src/b.py",
+      "planned_operation": "update",
+      "final_state": "unknown"
+    }
+  ]
+}
+```
+
+Failed-hunk diagnostics must not echo arbitrary source blocks. They may include
+path, one-based hunk index, anchor, old-sequence digest, candidate count, and at
+most a sanitized three-line or 500-character excerpt when host policy permits.
+
+## Error codes
+
+The implementation must maintain an exhaustive error table. Each code must define
+phase, retryability, mutation guarantee, required metadata, and runtime mapping.
+
+Required v1 codes include:
 
 - `INVALID_PATCH`;
 - `INCOMPLETE_SENTINELS`;
 - `UNKNOWN_ACTION`;
+- `INVALID_HUNK`;
+- `NO_OP_ACTION`;
 - `DUPLICATE_ACTION`;
+- `PATH_ALIAS_COLLISION`;
 - `SOURCE_NOT_FOUND`;
 - `ADD_TARGET_EXISTS`;
 - `MOVE_TARGET_EXISTS`;
+- `DESTINATION_COLLISION`;
 - `PATH_OUTSIDE_WORKSPACE`;
+- `PROTECTED_PATH_DENIED`;
+- `SYMLINK_PATH_UNSUPPORTED`;
+- `NOT_A_REGULAR_FILE`;
+- `PARENT_PATH_NOT_DIRECTORY`;
+- `SPECIAL_FILE_UNSUPPORTED`;
+- `MULTIPLE_HARD_LINKS_UNSUPPORTED`;
+- `DIRECTORY_CREATION_UNSAFE`;
+- `CREATED_DIRECTORY_RETAINED`;
+- `CROSS_DEVICE_MOVE_UNSUPPORTED`;
+- `UNSUPPORTED_FILESYSTEM_GUARANTEE`;
 - `BINARY_FILE`;
+- `UNSUPPORTED_ENCODING`;
+- `MIXED_LINE_ENDINGS_UNSUPPORTED`;
+- `UNSUPPORTED_METADATA`;
+- `ANCHOR_NOT_FOUND`;
+- `AMBIGUOUS_ANCHOR`;
 - `HUNK_CONTEXT_NOT_FOUND`;
 - `AMBIGUOUS_HUNK`;
+- `HUNK_OVERLAP`;
+- `HUNK_ORDER_CONFLICT`;
 - `EOF_ASSERTION_FAILED`;
-- `STALE_SOURCE`;
+- `LIMIT_EXCEEDED`;
+- `APPROVAL_DENIED`;
+- `APPROVAL_TIMEOUT`;
+- `STALE_PLAN`;
 - `IO_ERROR`;
-- `TIMEOUT`.
+- `PLANNING_TIMEOUT`;
+- `STAGING_TIMEOUT`;
+- `COMMIT_FAILED_ROLLED_BACK`;
+- `PARTIAL_COMMIT`;
+- `ROLLBACK_FAILED`;
+- `INDETERMINATE_COMMIT_STATE`;
+- `RECOVERY_REQUIRED`.
 
-## Recommended agent workflow
+Recoverable no-mutation rejections map to the generic runtime status
+`REJECTED`. Successful commits map to `SUCCESS`. Internal adapter failures map to
+`TOOL_FAILURE` or `ADAPTER_ERROR`. Indeterminate or partial mutation outcomes are
+fatal to the runtime loop and must not be treated as recoverable model mistakes.
 
-System prompts should encourage this workflow:
+## Runtime integration
 
-```text
-read_files / search_codebase
-        ↓
-understand current source
-        ↓
-apply_patch
-        ↓
-read changed area if necessary
-        ↓
-run_commands: formatter / tests / type checker
-        ↓
-fix with another apply_patch if needed
-```
+Implementing `apply_patch` requires upgrading the generic registered-tool
+boundary from a synchronous `Callable[..., str]` style to an async,
+cancellation-aware contract. The handler context must carry cancellation,
+deadlines, call identity, and host policy hooks. Existing synchronous
+deterministic tools may be adapted through thin wrappers.
 
-System prompts should not encourage `sed`, `perl -pi`, Python one-liners that
-modify files, `cat > file`, or shell heredocs when `apply_patch` can represent
-the same mutation.
+The `workspace_editing` feature owns patch DTOs, parser, matcher, planner,
+application ports, and use cases. Filesystem mutation lives behind outbound
+ports/adapters in that slice. `agent_runtime` adapts the application port as a
+model-callable tool. Bootstrap wires workspace roots, capability probes, policy,
+approval UI, leases, and recovery.
 
 ## Architecture and project structure
 
-Implementation should consist of five independent components:
-
-```text
-PatchParser
-    ↓
-PatchValidator
-    ↓
-HunkMatcher
-    ↓
-ChangePlanner
-    ↓
-FilesystemCommitter
-```
-
-Host-facing orchestration API:
-
-```text
-parse_patch(text)
-    -> Patch
-
-compute_patch_changes(patch, workspace)
-    -> ChangeSet
-
-apply_patch_changes(change_set, workspace)
-    -> ApplyResult
-```
-
-The LLM tool itself should be a thin adapter:
-
-```text
-apply_patch(input)
-    = parse
-    + compute/preflight
-    + commit
-    + structured result
-```
-
-The patch grammar is the model protocol; filesystem mutation is an
-implementation detail.
-
-Likely future implementation ownership:
+Likely implementation ownership:
 
 - Spec: `docs/specs/apply-patch-tool.md`.
-- Runtime tool contracts and DTOs: under
-  `src/fabrica/features/agent_runtime/application/` if exposed as a model-callable
-  runtime tool.
-- Patch engine source: under an owning feature slice or a clearly documented
-  shared infrastructure package if multiple slices need the same engine.
-- Filesystem adapter and commit implementation: adapter or infrastructure code,
-  not domain or application core.
-- Unit tests: mirrored under `tests/unit/` for parser, validator, matcher, change
-  planner, and committer boundaries.
-- Integration tests: under `tests/integration/` for real filesystem behavior,
-  symlink containment, metadata preservation, and concurrency checks.
+- Patch capability source: `src/fabrica/features/workspace_editing/`.
+- Application DTOs: `src/fabrica/features/workspace_editing/application/dtos/`.
+- Application ports: `src/fabrica/features/workspace_editing/application/ports/`.
+- Use cases: `src/fabrica/features/workspace_editing/application/use_cases/`.
+- Filesystem adapter: `src/fabrica/features/workspace_editing/adapters/outbound/`.
+- Runtime registered-tool adapter: an adapter or composition component that
+  connects `workspace_editing` to `agent_runtime` without leaking filesystem
+  details into the runtime core.
+- Unit tests: mirrored under `tests/unit/features/workspace_editing/`.
+- Integration tests: mirrored under `tests/integration/features/workspace_editing/`
+  for real filesystem behavior, capability probing, durability, staging,
+  symlink rejection, and recovery.
 
 Implementation must preserve hexagonal boundaries: domain and application code
-must not perform filesystem I/O directly, and adapter-specific filesystem details
-must not leak into stable application ports or DTOs.
-
-## Differences from current Cline behavior
-
-Keep these Cline-compatible concepts:
-
-- Begin/End patch grammar;
-- Add, Update, and Delete actions;
-- `Move to` after an Update header;
-- context-based hunks;
-- `@@` anchors;
-- `*** End of File` marker;
-- multiple files per call;
-- multiple hunks per update;
-- precompute before write;
-- fail if any hunk is skipped;
-- no automatic tool retry;
-- previewable change-set architecture.
-
-Change these behaviors for this implementation:
-
-- reject absolute paths outside the workspace;
-- do not use low-threshold fuzzy matching;
-- do not silently ignore unresolved `@@` anchors;
-- do not treat EOF as a fallback preference;
-- do not let Add overwrite existing files;
-- do not let Move overwrite existing files;
-- do not rewrite CRLF files as LF;
-- do not allow unresolved destination collisions.
-
-Add these requirements beyond current Cline behavior:
-
-- ambiguity detection;
-- destination preflight;
-- symlink-safe workspace containment;
-- concurrent-modification detection;
-- EOL preservation;
-- file-mode preservation;
-- structured result and error codes;
-- staged transactional commit.
+must not perform filesystem I/O directly, and adapter-specific filesystem or UI
+approval details must not leak into stable application ports or DTOs.
 
 ## Testing strategy
 
-Required future acceptance tests include the following scenarios.
+Future acceptance tests must cover at least these scenarios.
 
 ### Basic operations
 
-- Add a new file.
+- Add a new non-empty file.
+- Add a zero-byte file.
 - Update one line.
 - Delete one file.
-- Move a file.
+- Pure move with zero hunks.
 - Move and modify simultaneously.
 - Apply a multi-file patch.
 - Apply multiple hunks in one file.
 
-### Validation
+### Grammar and matching
+
+- Missing Begin or End sentinel fails.
+- Unprefixed context line fails.
+- Protocol-looking file content is accepted when prefixed.
+- Exact context succeeds.
+- Trailing-whitespace tolerance succeeds and reports match quality.
+- Unchanged context whitespace is preserved from source.
+- Context not found fails with no mutation.
+- Ambiguous repeated context fails.
+- Duplicate anchor fails as `AMBIGUOUS_ANCHOR`.
+- Missing anchor fails as `ANCHOR_NOT_FOUND`.
+- `@@ before <anchor>` and `@@ after <anchor>` insertion-only hunks work.
+- Plain insertion-only `@@` fails.
+- Overlapping and out-of-order hunks fail.
+- EOF assertion succeeds only on the final hunk at EOF.
+- EOF assertion fails when the resulting span does not terminate at EOF.
+- Terminal-newline state is preserved or explicitly changed.
+
+### Validation and paths
 
 - Updating a missing file fails.
 - Deleting a missing file fails.
 - Adding an existing file fails.
 - Moving to an existing destination fails.
 - Duplicate source actions fail.
-- Destination collisions within the same patch fail.
-
-### Hunk matching
-
-- Exact context succeeds.
-- Trailing-whitespace tolerance succeeds and reports match quality.
-- Context not found fails the entire patch.
-- Ambiguous repeated context fails.
-- `@@ anchor` resolves repeated blocks.
-- Missing explicit anchor fails.
-- EOF assertion succeeds when the hunk terminates at EOF.
-- EOF assertion fails when the hunk does not terminate at EOF.
-
-### Atomicity
-
-A patch containing a valid update A and invalid update B must leave both A and B
-unchanged.
-
-### Security
-
-Reject:
-
-- `../outside.txt`;
-- `../../etc/passwd`;
-- absolute paths;
-- symlink escape.
+- Destination collisions fail.
+- Move chains and swaps fail.
+- `../outside.txt`, absolute paths, and paths outside the workspace fail.
+- Every symlink/reparse path component fails, including contained symlinks.
+- Directory, FIFO, socket, device, and other special files fail.
+- Multiple hard links fail.
+- Nested `Add File` creates missing parent directories.
+- Nested `Move to` creates missing destination parent directories.
+- Shared missing parent directories for multiple Add/Move destinations are
+  created once.
+- Existing parent path components that are regular files fail with
+  `PARENT_PATH_NOT_DIRECTORY`.
+- Stale planned-directory absence after approval fails with `STALE_PLAN`.
+- Case/normalization aliases fail.
+- Cross-device moves fail.
+- Protected paths such as `.git/**` are denied.
 
 ### Preservation
 
+- LF file remains LF.
 - CRLF file remains CRLF.
-- UTF-8 BOM is preserved if supported.
-- Executable permission remains executable after update and move.
+- Mixed-EOL file fails.
+- UTF-8 BOM is preserved on update and move.
+- Add emits UTF-8 without BOM.
+- Executable mode bit is preserved on update and move.
+- Add mode uses base `0666` filtered by configured workspace umask.
+- Unsupported security-relevant metadata fails when the adapter cannot preserve it.
 
-### Concurrency
+### Authorization and runtime behavior
 
-Modifying a source between preflight and commit must fail with `STALE_SOURCE` and
-must not commit any intended patch changes.
+- Default registered tool requires approval.
+- Trusted policy can allow without prompt.
+- Denied approval returns recoverable rejection.
+- Truncated approval diff cannot be approved.
+- Stale plan after approval fails and requires a new call.
+- Expected hunk/path validation rejection maps to runtime `REJECTED` and the loop
+  can continue.
+- Duplicate tool call with same `call_id` and argument digest replays recorded
+  result without re-execution.
+- Duplicate `call_id` with different arguments fails.
+
+### Commit, rollback, recovery, and deadlines
+
+- Valid update A plus invalid update B leaves both unchanged.
+- Source modified after planning fails with `STALE_PLAN`.
+- Commit uses deterministic schedule while reporting input order.
+- Commit creates planned parent directories shallowest-first before writing Add
+  and Move destination contents.
+- Commit failure with successful rollback reports `COMMIT_FAILED_ROLLED_BACK`.
+- Rollback removes created parent directories deepest-first only when still empty
+  and unchanged.
+- Rollback retains and reports created directories that contain external work.
+- Rollback failure reports per-path outcomes.
+- Indeterminate cleanup timeout reports `INDETERMINATE_COMMIT_STATE` and stops the
+  runtime loop.
+- Incomplete journal on startup blocks mutation until recovery.
+- Recovery rolls back only when identity/hash preconditions prove it safe.
+- Concurrent `apply_patch` calls are serialized per workspace.
+- Planning, approval, staging, and commit/rollback deadlines are enforced.
 
 ## Commands and validation
 
@@ -794,60 +972,66 @@ Implementation changes should use the project quality gate:
 - Type check: `uv run ty check src tests`
 - Test: `uv run pytest`
 
-Future implementation should start with focused parser, validator, matcher, and
-filesystem tests before adding a model-callable runtime adapter.
+Future implementation should start with focused parser, matcher, path validation,
+planner, authorization, result-contract, and runtime-status tests before adding a
+real filesystem committer. Filesystem integration tests should follow once the
+application contracts are stable.
 
 ## Boundaries
 
 - Always prefer context-based, minimal, reviewable patches over shell text
   rewrites.
-- Always validate the full patch before committing any intended filesystem
-  mutations.
-- Always keep workspace containment, existing-target checks, and stale-source
-  checks in preflight or immediately-before-commit validation.
-- Always reject ambiguous hunks rather than choosing the first matching block.
-- Always treat the filesystem commit as an adapter concern, not domain logic.
-- Ask before enabling fuzzy matching, indentation normalization by default,
-  non-UTF-8 encodings, absolute path support, or overwrite semantics.
-- Ask before exposing the tool as a mutating model-callable capability in a
-  runtime composition.
-- Never mutate files while parsing or matching.
+- Always validate and authorize the full immutable plan before committing.
+- Always reject unsupported filesystem, path, metadata, or matching cases before
+  mutation.
+- Always serialize `apply_patch` per workspace.
+- Always bind approval to exact resulting bytes and plan digest.
+- Always include derived parent-directory creations in planning, approval,
+  journaling, result reporting, rollback, and recovery.
+- Always treat filesystem commit as adapter-owned behavior.
 - Never allow Add or Move to overwrite existing files.
-- Never silently apply a patch when an explicit anchor or EOF assertion fails.
-- Never use approximate semantic matching by default.
-- Never allow paths to escape the configured workspace through absolute paths,
-  parent traversal, or symlinks.
+- Never expose separate model-facing filesystem mutation tools that overlap with
+  `apply_patch` in v1.
+- Never create, remove, or retain directories as an unreported side effect.
+- Never choose the first ambiguous hunk or anchor.
+- Never use fuzzy, semantic, or indentation-normalized matching in v1.
+- Never mutate through symlinks, reparse points, special files, or multiple hard
+  links in v1.
+- Never claim cross-file atomicity.
+- Never return while background mutation can continue.
+- Never collapse partial, rollback-failed, or indeterminate outcomes into generic
+  `IO_ERROR`.
 
 ## Success criteria
 
-- The spec defines `apply_patch` as the single preferred filesystem mutation
-  primitive for coding-agent workflows.
-- The public tool interface is the canonical `{ "input": string }` schema with a
-  30-second timeout and no automatic retries.
-- The patch grammar covers Add, Update, Delete, Move, anchors, EOF assertions,
-  sentinels, multi-file patches, and multiple hunks.
-- The matching strategy is deterministic, conservative, and rejects ambiguity.
-- The filesystem model includes snapshotting, preflight validation, workspace
-  containment, existing-file protection, line-ending and metadata preservation,
-  stale-source detection, and best-effort transactional commit.
-- The result contract includes structured success and failure payloads with stable
-  error codes.
-- The architecture separates parser, validator, matcher, change planner,
-  filesystem committer, and thin model-tool adapter responsibilities.
+- The spec defines `apply_patch` as the single preferred model-facing filesystem
+  mutation primitive for coding-agent workflows, while allowing operation-specific
+  internal implementation components.
+- The public model-facing interface is the canonical `{ "input": string }` schema.
+- The grammar covers Add, Update, Delete, Move, anchors, insertion-only placement,
+  EOF assertions, terminal-newline state, multi-file patches, and multiple hunks.
+- The hunk model preserves line order and the matching algorithm is deterministic.
+- The path model rejects symlinks, aliases, special files, non-directory parents,
+  missing source parents, multiple hard links, protected paths, cross-device
+  moves, and unsupported filesystems before mutation.
+- The directory model automatically creates missing Add/Move destination parents
+  as derived planned effects with approval visibility, journal evidence,
+  rollback, recovery, and result reporting.
+- The authorization model binds approval to an immutable exact-byte plan.
+- The runtime model includes async cancellation-aware handlers, recoverable
+  `REJECTED` outcomes, duplicate-delivery protection, and fatal indeterminate
+  mutation outcomes.
+- The filesystem model includes mutation leases, snapshotting, strong POSIX
+  capability probes, durable staging, explicit commit point, rollback journal,
+  startup recovery, stale-plan detection, EOL/BOM/mode preservation, and bounded
+  deadlines.
+- The result contract includes stable statuses, error codes, mutation guarantees,
+  retryability, and per-path evidence for post-commit failures.
 - Future acceptance tests are explicit enough to drive implementation.
 
 ## Open questions
 
-- Should Version 1 support UTF-8 BOM preservation, or should BOM files be rejected
-  until explicit support is implemented?
-- Should indentation normalization exist as a compatibility mode, and if so, who
-  is allowed to enable it?
-- Should approximate matching be omitted entirely from Version 1 rather than
-  implemented behind configuration?
-- What workspace configuration should control default line endings for newly added
-  files?
-- What exact rollback guarantees are feasible across the target filesystems used
-  by Fabrica users?
-- Should the patch engine live inside the `agent_runtime` slice, a dedicated
-  feature slice, or a shared infrastructure package once more than one workflow
-  needs it?
+None for v1. New behavior such as Windows support, fuzzy matching, non-UTF-8
+encodings, symlink mutation, standalone empty-directory operations, richer
+metadata preservation, executable-mode syntax, cross-device moves, or public
+two-step preview/commit tokens requires a new spec revision.
