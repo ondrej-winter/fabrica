@@ -96,9 +96,9 @@ After every completed task or meaningful change:
 
 ### Phase 3: POSIX Adapters and Transactional Behavior
 
-- [ ] Task 12: Implement the mutating resolver and snapshot adapter
-- [ ] Task 13: Implement mutation lease, policy, and approval adapters
-- [ ] Task 14: Implement durable journal and reversible pre-commit effects
+- [x] Task 12: Implement the mutating resolver and snapshot adapter
+- [x] Task 13: Implement mutation lease, policy, and approval adapters
+- [x] Task 14: Implement durable journal and reversible pre-commit effects
 - [ ] Task 15: Implement staging, revalidation, and commit scheduling
 - [ ] Task 16: Implement rollback and startup recovery
 
@@ -532,13 +532,13 @@ ownership remains part of the later journal/helper-process implementation.
 
 **Acceptance criteria:**
 
-- [ ] Recovery intent is durable before creating visible destination parent directories.
-- [ ] Directories are created shallowest-first through pinned handles and are reported/cleaned by identity.
-- [ ] Cancellation after directory creation performs bounded cleanup and reports retained/failed/uncertain effects truthfully.
+- [x] Recovery intent is durable before creating visible destination parent directories.
+- [x] Directories are created shallowest-first through pinned handles and are reported/cleaned by identity.
+- [x] Cancellation after directory creation performs bounded cleanup and reports retained/failed/uncertain effects truthfully.
 
 **Verification:**
 
-- [ ] Fault injection covers every directory and journal transition.
+- [x] Fault injection covers every directory and journal transition.
 
 **Dependencies:** Tasks 10, 12-13.
 
@@ -548,6 +548,15 @@ ownership remains part of the later journal/helper-process implementation.
 - Integration tests
 
 **Estimated scope:** Medium.
+
+**Implementation note:** Added a POSIX journal/preparation adapter under
+`workspace_editing.adapters.outbound.posix_filesystem`. It durably writes JSON
+journal records with file and directory fsync before visible preparation effects,
+transitions through the application-owned journal state machine, creates derived
+directories shallowest-first, records identity evidence, cleans up created
+directories deepest-first on preparation failure, and lists incomplete journals
+for later startup recovery. Focused macOS/Linux integration tests cover durable
+intent-before-effect ordering, failure rollback, and incomplete journal discovery.
 
 ### Task 15: Implement Staging, Revalidation, and Commit Scheduling
 

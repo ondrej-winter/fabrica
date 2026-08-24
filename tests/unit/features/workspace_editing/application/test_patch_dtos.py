@@ -8,7 +8,10 @@ import pytest
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
+    PatchApprovalPreview,
     PatchChangeSummary,
+    PatchCommitOperation,
+    PatchCommitStep,
     PatchDirectoryOutcome,
     PatchDirectoryOutcomeState,
     PatchDirectoryPlannedEffect,
@@ -19,6 +22,8 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchMatchQuality,
     PatchMutationGuarantee,
     PatchPathEvidence,
+    PatchPathOutcome,
+    PatchPathOutcomeState,
     PatchResult,
     PatchResultStatus,
     PatchRuntimeMapping,
@@ -291,4 +296,64 @@ def test_error_code_and_digest_validation_rejects_unsafe_values() -> None:
             status=PatchResultStatus.COMMITTED,
             mutation_guarantee=PatchMutationGuarantee.COMMITTED,
             plan_digest="bad",
+        )
+
+
+def test_patch_boundary_dtos_reject_invalid_indexes_paths_and_preview() -> None:
+    with pytest.raises(ValueError, match="action index"):
+        PatchAction(index=-1, kind=PatchActionKind.DELETE, path="src/example.py")
+    with pytest.raises(ValueError, match="action_index"):
+        PatchCommitStep(PatchCommitOperation.DELETE_FILE, path="src/example.py", action_index=-1)
+    with pytest.raises(ValueError, match="truncated"):
+        PatchApprovalPreview(text="too long", truncated=True)
+    with pytest.raises(ValueError, match="workspace-relative"):
+        PatchPathEvidence(path="../escape.py", exists=False)
+    with pytest.raises(ValueError, match="change index"):
+        PatchChangeSummary(index=-1, operation=PatchActionKind.UPDATE, path="src/example.py")
+    with pytest.raises(ValueError, match="hunks"):
+        PatchChangeSummary(index=0, operation=PatchActionKind.UPDATE, path="src/example.py", hunks=-1)
+
+
+def test_result_serialization_includes_path_outcomes_and_warnings() -> None:
+    result = PatchResult(
+        status=PatchResultStatus.COMMITTED,
+        mutation_guarantee=PatchMutationGuarantee.COMMITTED,
+        path_outcomes=(
+            PatchPathOutcome(
+                path="src/old.py",
+                planned_operation=PatchActionKind.MOVE,
+                final_state=PatchPathOutcomeState.COMMITTED,
+                destination_path="src/new.py",
+                evidence=PatchPathEvidence(path="src/new.py", exists=True, content_digest=SHA256_A),
+            ),
+        ),
+        warnings=("manual review recommended",),
+    )
+
+    serialized = result.to_bounded_json()
+
+    assert '"path_outcomes"' in serialized
+    assert '"destination_path":"src/new.py"' in serialized
+    assert '"content_digest":"sha256:' in serialized
+    assert '"warnings"' in serialized
+
+
+def test_committed_result_rejects_error_payload() -> None:
+    with pytest.raises(ValueError, match="committed results must not include"):
+        PatchResult(
+            status=PatchResultStatus.COMMITTED,
+            mutation_guarantee=PatchMutationGuarantee.COMMITTED,
+            error=patch_error("INVALID_PATCH"),
+        )
+
+
+def test_error_message_length_is_bounded() -> None:
+    with pytest.raises(ValueError, match="message exceeds"):
+        PatchError(
+            code="INVALID_PATCH",
+            phase=PatchErrorPhase.PARSING,
+            retryable=True,
+            mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
+            runtime_mapping=PatchRuntimeMapping.REJECTED,
+            message="x" * 1_001,
         )

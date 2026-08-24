@@ -1,7 +1,10 @@
-"""POSIX filesystem adapter for apply-patch snapshot evidence."""
+"""POSIX filesystem adapters for apply-patch workspace mutation."""
 
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.adapter import (
     PosixPatchWorkspaceSnapshotAdapter,
 )
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.journal import (
+    PosixPatchJournalAndPreparationAdapter,
+)
 
-__all__ = ["PosixPatchWorkspaceSnapshotAdapter"]
+__all__ = ["PosixPatchJournalAndPreparationAdapter", "PosixPatchWorkspaceSnapshotAdapter"]
