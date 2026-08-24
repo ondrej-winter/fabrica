@@ -86,6 +86,30 @@ def test_plan_patch_rejects_global_source_destination_collisions_without_mutatio
     assert planned.result.error.code == "DESTINATION_COLLISION"
 
 
+def test_plan_patch_rejects_duplicate_source_actions_without_mutation() -> None:
+    actions = (
+        PatchAction(index=0, kind=PatchActionKind.UPDATE, path="src/app.py"),
+        PatchAction(index=1, kind=PatchActionKind.DELETE, path="src/app.py"),
+    )
+
+    planned = PlanPatch().plan(actions, PatchPlanningSnapshot())
+
+    assert planned.plan is None
+    assert planned.result.error is not None
+    assert planned.result.error.code == "DUPLICATE_ACTION"
+
+
+def test_plan_patch_schedules_move_with_destination() -> None:
+    action = PatchAction(index=0, kind=PatchActionKind.MOVE, path="src/app.py", destination_path="generated/app.py")
+
+    planned = PlanPatch().plan((action,), PatchPlanningSnapshot(existing_directories=frozenset({"", "src"})))
+
+    assert planned.plan is not None
+    assert [directory.path for directory in planned.plan.created_directories] == ["generated"]
+    assert planned.plan.commit_steps[-1].operation is PatchCommitOperation.MOVE_FILE
+    assert planned.plan.commit_steps[-1].destination_path == "generated/app.py"
+
+
 def test_plan_patch_rejects_unapprovable_truncated_preview() -> None:
     actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="src/new.py"),)
 

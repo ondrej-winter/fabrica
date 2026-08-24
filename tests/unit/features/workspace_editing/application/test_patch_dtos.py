@@ -14,6 +14,7 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchDirectoryPlannedEffect,
     PatchError,
     PatchErrorPhase,
+    PatchHunk,
     PatchLimits,
     PatchMatchQuality,
     PatchMutationGuarantee,
@@ -124,6 +125,8 @@ def test_patch_limits_and_paths_reject_invalid_inputs() -> None:
     assert PatchLimits(max_input_chars=1, max_output_chars=1).max_input_chars == 1
     with pytest.raises(ValueError, match="max_input_chars must be at least 1"):
         PatchLimits(max_input_chars=0)
+    with pytest.raises(ValueError, match="max_output_chars must be at least 1"):
+        PatchLimits(max_output_chars=0)
     with pytest.raises(ValueError, match="workspace-relative"):
         PatchAction(index=0, kind=PatchActionKind.ADD, path="../outside.py")
     with pytest.raises(ValueError, match="move actions must include"):
@@ -135,6 +138,13 @@ def test_patch_limits_and_paths_reject_invalid_inputs() -> None:
             path="src/example.py",
             destination_path="src/new_example.py",
         )
+
+
+def test_patch_hunk_rejects_invalid_index_and_anchor_placement() -> None:
+    with pytest.raises(ValueError, match="hunk index must be one-based"):
+        PatchHunk(index=0)
+    with pytest.raises(ValueError, match="insert_relative_to_anchor"):
+        PatchHunk(index=1, insert_relative_to_anchor="around")
 
 
 def test_error_table_is_exhaustive_and_contains_required_runtime_mapping() -> None:

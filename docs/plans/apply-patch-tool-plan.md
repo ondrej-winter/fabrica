@@ -500,13 +500,13 @@ remain intentionally deferred to Tasks 14-16.
 
 **Acceptance criteria:**
 
-- [ ] One exclusive lease serializes all patch mutation for a workspace from before snapshot through cleanup.
-- [ ] Default policy requires approval; `.git/**`, stage, and journal paths are denied.
-- [ ] Approval is bound to the complete plan digest and cannot use a truncated preview.
+- [x] One exclusive lease serializes all patch mutation for a workspace from before snapshot through cleanup.
+- [x] Default policy requires approval; `.git/**`, stage, and journal paths are denied.
+- [x] Approval is bound to the complete plan digest and cannot use a truncated preview.
 
 **Verification:**
 
-- [ ] Deterministic concurrency, cancellation, denial, timeout, and stale-approval tests pass.
+- [x] Deterministic concurrency, cancellation, denial, timeout, and stale-approval tests pass.
 
 **Dependencies:** Tasks 10-12.
 
@@ -517,6 +517,14 @@ remain intentionally deferred to Tasks 14-16.
 - Tests
 
 **Estimated scope:** Medium.
+
+**Implementation note:** Added focused authorization adapters under
+`workspace_editing.adapters.outbound.authorization`: an in-process async lease
+manager, a protected-path policy evaluator, and a digest-bound approval requester
+with timeout, denial, stale-plan, and unsafe-preview rejection behavior. Focused
+authorization unit tests cover protected path denial, approval success and
+failure modes, and cancellation-safe lease release. Commit-capable durable lease
+ownership remains part of the later journal/helper-process implementation.
 
 ### Task 14: Implement Durable Journal and Reversible Pre-Commit Effects
 
