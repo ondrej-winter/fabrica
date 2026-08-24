@@ -1,5 +1,6 @@
 """Use case for running a bounded application-owned tool loop."""
 
+import asyncio
 from dataclasses import dataclass
 
 from fabrica.features.agent_runtime.application.dtos import (
@@ -8,10 +9,13 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolCallRequest,
     ToolCallResult,
     ToolCallResultStatus,
+    ToolCancellationSignal,
     ToolDefinition,
+    ToolExecutionRuntimeDisposition,
     ToolLoopLimits,
     ToolLoopRunResult,
     ToolLoopRunStatus,
+    canonical_tool_arguments_digest,
 )
 from fabrica.features.agent_runtime.application.ports import (
     ToolAwareAgentModel,
@@ -28,22 +32,29 @@ class RunToolLoop:
         self._model = model
         self._tool_executor = tool_executor
 
-    def run(
+    async def run(
         self,
         command: LocalAgentRunCommand,
         *,
         available_tools: tuple[ToolDefinition, ...] = (),
         limits: ToolLoopLimits | None = None,
+        cancellation: ToolCancellationSignal | None = None,
     ) -> ToolLoopRunResult:
         """Run model turns and requested tools until final output or a safe stop condition."""
         active_limits = limits or ToolLoopLimits()
+        active_cancellation = cancellation or _NeverCancelledToolCancellationSignal()
         tool_results: tuple[ToolCallResult, ...] = ()
         observations: tuple[RuntimeObservation, ...] = ()
-        accepted_call_ids: set[str] = set()
+        call_ledger: dict[str, _ToolCallLedgerEntry] = {}
 
         for iteration in range(active_limits.max_tool_iterations + 1):
             try:
-                model_response = self._model.run_turn(command, tuple(available_tools), tool_results)
+                model_response = await self._model.run_turn(
+                    command,
+                    tuple(available_tools),
+                    tool_results,
+                    active_cancellation,
+                )
             except ToolAwareAgentModelError as err:
                 return ToolLoopRunResult(
                     status=ToolLoopRunStatus.MODEL_ERROR,
@@ -82,7 +93,7 @@ class RunToolLoop:
             validation_failure = _validate_tool_call_batch(
                 model_response.tool_calls,
                 limits=active_limits,
-                accepted_call_ids=accepted_call_ids,
+                call_ledger=call_ledger,
             )
             if validation_failure is not None:
                 return ToolLoopRunResult(
@@ -92,9 +103,16 @@ class RunToolLoop:
                 )
 
             turn_results = tuple(
-                self._execute_tool_call(tool_call, active_limits) for tool_call in model_response.tool_calls
+                [
+                    await self._execute_or_replay_tool_call(
+                        tool_call,
+                        active_limits,
+                        active_cancellation,
+                        call_ledger,
+                    )
+                    for tool_call in model_response.tool_calls
+                ],
             )
-            accepted_call_ids.update(tool_call.call_id for tool_call in model_response.tool_calls)
             tool_results = (*tool_results, *turn_results)
             observations = (
                 *observations,
@@ -106,9 +124,14 @@ class RunToolLoop:
 
         return ToolLoopRunResult(status=ToolLoopRunStatus.MAX_ITERATIONS_EXCEEDED, tool_results=tool_results)
 
-    def _execute_tool_call(self, tool_call: ToolCallRequest, limits: ToolLoopLimits) -> ToolCallResult:
+    async def _execute_tool_call(
+        self,
+        tool_call: ToolCallRequest,
+        limits: ToolLoopLimits,
+        cancellation: ToolCancellationSignal,
+    ) -> ToolCallResult:
         try:
-            return self._tool_executor.execute_tool(tool_call, limits).bounded(limits)
+            return (await self._tool_executor.execute_tool(tool_call, limits, cancellation)).bounded(limits)
         except ToolExecutionError as err:
             return ToolCallResult(
                 call_id=tool_call.call_id,
@@ -123,6 +146,42 @@ class RunToolLoop:
                 ),
             )
 
+    async def _execute_or_replay_tool_call(
+        self,
+        tool_call: ToolCallRequest,
+        limits: ToolLoopLimits,
+        cancellation: ToolCancellationSignal,
+        call_ledger: dict[str, "_ToolCallLedgerEntry"],
+    ) -> ToolCallResult:
+        entry = call_ledger.get(tool_call.call_id)
+        if entry is not None:
+            return entry.result
+
+        result = await self._execute_tool_call(tool_call, limits, cancellation)
+        call_ledger[tool_call.call_id] = _ToolCallLedgerEntry(
+            argument_digest=canonical_tool_arguments_digest(tool_call.arguments),
+            tool_name=tool_call.tool_name,
+            result=result,
+        )
+        return result
+
+
+class _NeverCancelledToolCancellationSignal:
+    """Default cancellation signal for callers that do not supply one."""
+
+    @property
+    def is_cancelled(self) -> bool:
+        """Return whether cancellation has been requested."""
+        return False
+
+    async def wait_until_cancelled(self) -> None:
+        """Wait forever because this default signal is never cancelled."""
+        await _sleep_forever()
+
+
+async def _sleep_forever() -> None:
+    await asyncio.Event().wait()
+
 
 @dataclass(frozen=True, slots=True)
 class _ToolCallBatchValidationFailure:
@@ -130,11 +189,18 @@ class _ToolCallBatchValidationFailure:
     observation: RuntimeObservation
 
 
+@dataclass(frozen=True, slots=True)
+class _ToolCallLedgerEntry:
+    argument_digest: str
+    tool_name: str
+    result: ToolCallResult
+
+
 def _validate_tool_call_batch(
     tool_calls: tuple[ToolCallRequest, ...],
     *,
     limits: ToolLoopLimits,
-    accepted_call_ids: set[str],
+    call_ledger: dict[str, _ToolCallLedgerEntry],
 ) -> _ToolCallBatchValidationFailure | None:
     if len(tool_calls) > limits.max_tool_calls_per_turn:
         return _ToolCallBatchValidationFailure(
@@ -152,8 +218,11 @@ def _validate_tool_call_batch(
     for tool_call in tool_calls:
         if tool_call.call_id in seen_call_ids:
             return _duplicate_call_id_failure(tool_call.call_id, duplicate_scope="turn")
-        if tool_call.call_id in accepted_call_ids:
-            return _duplicate_call_id_failure(tool_call.call_id, duplicate_scope="run")
+        ledger_entry = call_ledger.get(tool_call.call_id)
+        if ledger_entry is not None:
+            argument_digest = canonical_tool_arguments_digest(tool_call.arguments)
+            if ledger_entry.argument_digest != argument_digest or ledger_entry.tool_name != tool_call.tool_name:
+                return _conflicting_duplicate_call_id_failure(tool_call.call_id)
         seen_call_ids.add(tool_call.call_id)
 
     return None
@@ -169,9 +238,21 @@ def _duplicate_call_id_failure(call_id: str, *, duplicate_scope: str) -> _ToolCa
     )
 
 
+def _conflicting_duplicate_call_id_failure(call_id: str) -> _ToolCallBatchValidationFailure:
+    return _ToolCallBatchValidationFailure(
+        status=ToolLoopRunStatus.INVALID_TOOL_REQUEST,
+        observation=RuntimeObservation(
+            message="tool loop rejected duplicate tool call id with conflicting request",
+            metadata={"tool_call_id": call_id},
+        ),
+    )
+
+
 def _first_stop_status(results: tuple[ToolCallResult, ...]) -> ToolLoopRunStatus | None:
     for result in results:
-        if result.status is ToolCallResultStatus.SUCCESS:
+        if result.runtime_disposition is ToolExecutionRuntimeDisposition.STOP_RUNTIME:
+            return _tool_result_status_to_loop_status(result.status)
+        if result.status in {ToolCallResultStatus.SUCCESS, ToolCallResultStatus.REJECTED}:
             continue
         return _tool_result_status_to_loop_status(result.status)
     return None

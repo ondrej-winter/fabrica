@@ -1,5 +1,6 @@
 """Tests for the staged git registered-tool bridge."""
 
+import asyncio
 from dataclasses import dataclass, field
 
 import pytest
@@ -189,7 +190,20 @@ def _execute(
     limits: ToolLoopLimits | None = None,
 ) -> ToolCallResult:
     executor = RegisteredToolExecutor(create_git_staged_changes_registered_tools(loader))
-    return executor.execute_tool(
-        ToolCallRequest(call_id="call-1", tool_name=tool_name, arguments=arguments or {}),
-        limits or ToolLoopLimits(),
+    return asyncio.run(
+        executor.execute_tool(
+            ToolCallRequest(call_id="call-1", tool_name=tool_name, arguments=arguments or {}),
+            limits or ToolLoopLimits(),
+            _NeverCancelledToolCancellationSignal(),
+        ),
     )
+
+
+class _NeverCancelledToolCancellationSignal:
+    @property
+    def is_cancelled(self) -> bool:
+        return False
+
+    async def wait_until_cancelled(self) -> None:
+        msg = "test signal is never cancelled"
+        raise AssertionError(msg)

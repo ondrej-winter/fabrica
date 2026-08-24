@@ -8,6 +8,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     SafeRuntimeMetadataValue,
     ToolAwareModelResponse,
     ToolCallResult,
+    ToolCancellationSignal,
     ToolDefinition,
 )
 
@@ -30,11 +31,12 @@ class ToolAwareAgentModelError(Exception):
 class ToolAwareAgentModel(Protocol):
     """Outbound port for one tool-aware model turn."""
 
-    def run_turn(
+    async def run_turn(
         self,
         command: LocalAgentRunCommand,
         available_tools: tuple[ToolDefinition, ...],
         tool_results: tuple[ToolCallResult, ...] = (),
+        cancellation: ToolCancellationSignal | None = None,
     ) -> ToolAwareModelResponse:
-        """Run one model turn with available tools and prior tool results."""
+        """Run one model turn with available tools, prior tool results, and cancellation."""
         ...

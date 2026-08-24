@@ -9,6 +9,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     ToolAwareModelResponse,
     ToolCallResult,
+    ToolCancellationSignal,
     ToolDefinition,
 )
 
@@ -16,14 +17,15 @@ from fabrica.features.agent_runtime.application.dtos import (
 class PreCommitToolAwareModel:
     """Fake model that records explicitly exposed pre-commit tools."""
 
-    def run_turn(
+    async def run_turn(
         self,
         command: LocalAgentRunCommand,
         available_tools: tuple[ToolDefinition, ...],
         tool_results: tuple[ToolCallResult, ...] = (),
+        cancellation: ToolCancellationSignal | None = None,
     ) -> ToolAwareModelResponse:
         """Return without requesting tools; composition exposure is asserted directly."""
-        del command, available_tools, tool_results
+        del command, available_tools, tool_results, cancellation
         return ToolAwareModelResponse(output_text="unused")
 
 

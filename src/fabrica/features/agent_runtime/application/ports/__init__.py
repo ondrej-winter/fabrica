@@ -7,7 +7,12 @@ from fabrica.features.agent_runtime.application.ports.inbound import (
     SkillScriptPolicyEvaluator,
     SkillScriptRunner,
 )
-from fabrica.features.agent_runtime.application.ports.registered_tool import RegisteredTool, RegisteredToolHandler
+from fabrica.features.agent_runtime.application.ports.registered_tool import (
+    AsyncRegisteredTool,
+    AsyncRegisteredToolHandler,
+    RegisteredTool,
+    RegisteredToolHandler,
+)
 from fabrica.features.agent_runtime.application.ports.skill_context import (
     SkillContextLoader,
     SkillContextLoadError,
@@ -34,6 +39,8 @@ from fabrica.features.agent_runtime.application.ports.tool_execution import Tool
 __all__ = [
     "AgentModel",
     "AgentModelError",
+    "AsyncRegisteredTool",
+    "AsyncRegisteredToolHandler",
     "LocalAgentRuntime",
     "RegisteredTool",
     "RegisteredToolHandler",

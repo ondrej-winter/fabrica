@@ -1,11 +1,20 @@
 """Registered in-process tool contracts for local agent runtimes."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 
-from fabrica.features.agent_runtime.application.dtos import SafeRuntimeMetadataValue, ToolDefinition
+from fabrica.features.agent_runtime.application.dtos import (
+    RegisteredToolOutcome,
+    SafeRuntimeMetadataValue,
+    ToolDefinition,
+    ToolExecutionContext,
+)
 
 RegisteredToolHandler = Callable[[Mapping[str, SafeRuntimeMetadataValue]], str]
+AsyncRegisteredToolHandler = Callable[
+    [Mapping[str, SafeRuntimeMetadataValue], ToolExecutionContext],
+    Awaitable[RegisteredToolOutcome],
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -14,3 +23,11 @@ class RegisteredTool:
 
     definition: ToolDefinition
     handler: RegisteredToolHandler
+
+
+@dataclass(frozen=True, slots=True)
+class AsyncRegisteredTool:
+    """Async registered tool contract for cancellation-aware typed outcomes."""
+
+    definition: ToolDefinition
+    handler: AsyncRegisteredToolHandler

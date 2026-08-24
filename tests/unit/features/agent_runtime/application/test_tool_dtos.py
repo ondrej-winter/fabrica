@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import FrozenInstanceError
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
 import pytest
@@ -13,15 +14,23 @@ from fabrica.features.agent_runtime.application.dtos import (
     MAX_TOOL_ERROR_MESSAGE_CHARS,
     MAX_TOOL_NAME_CHARS,
     MAX_TOOL_RESPONSE_TEXT_CHARS,
+    RegisteredToolOutcome,
     RuntimeObservation,
     ToolAwareModelResponse,
     ToolCallRequest,
     ToolCallResult,
     ToolCallResultStatus,
     ToolDefinition,
+    ToolExecutionContext,
+    ToolExecutionPhaseDeadline,
+    ToolExecutionRuntimeDisposition,
     ToolLoopLimits,
     ToolLoopRunResult,
     ToolLoopRunStatus,
+    ToolMutationGuarantee,
+    ToolOutcomeStatus,
+    canonical_tool_arguments_digest,
+    canonical_tool_arguments_json,
 )
 from fabrica.features.agent_runtime.application.dtos.runtime import MAX_CONTEXT_TEXT_CHARS
 
@@ -29,9 +38,19 @@ EXPECTED_MAX_TOOL_ITERATIONS = 2
 EXPECTED_MAX_TOOL_RESULT_CHARS = 20
 
 
+class NeverCancelledSignal:
+    @property
+    def is_cancelled(self) -> bool:
+        return False
+
+    async def wait_until_cancelled(self) -> None:
+        return None
+
+
 def test_tool_status_values_match_normalized_contracts() -> None:
     assert {status.value for status in ToolCallResultStatus} == {
         "success",
+        "rejected",
         "unknown_tool",
         "invalid_arguments",
         "tool_failure",
@@ -153,3 +172,85 @@ def test_tool_loop_result_exposes_success_helper_and_is_immutable() -> None:
     with pytest.raises(FrozenInstanceError):
         result.status = ToolLoopRunStatus.MODEL_ERROR  # ty: ignore[invalid-assignment]
     assert ToolLoopRunResult(status=ToolLoopRunStatus.MODEL_ERROR).succeeded is False
+
+
+def test_tool_execution_context_carries_digest_deadlines_and_cancellation() -> None:
+    digest = canonical_tool_arguments_digest({"path": "src/example.py", "limit": 3})
+    deadline = ToolExecutionPhaseDeadline(
+        phase="planning",
+        deadline_at=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(seconds=30),
+    )
+
+    context = ToolExecutionContext(
+        call_id="call-1",
+        argument_digest=digest,
+        cancellation=NeverCancelledSignal(),
+        phase_deadlines=(deadline,),
+    )
+
+    assert context.call_id == "call-1"
+    assert context.argument_digest.startswith("sha256:")
+    assert context.phase_deadline("planning") == deadline.deadline_at
+    assert context.cancellation.is_cancelled is False
+    with pytest.raises(FrozenInstanceError):
+        context.call_id = "changed"  # ty: ignore[invalid-assignment]
+    with pytest.raises(ValueError, match="timezone-aware"):
+        ToolExecutionPhaseDeadline(phase="planning", deadline_at=datetime(2026, 1, 1, tzinfo=UTC).replace(tzinfo=None))
+
+
+def test_tool_argument_digest_uses_canonical_json() -> None:
+    left = {"b": 2, "a": "safe"}
+    right = {"a": "safe", "b": 2}
+
+    assert canonical_tool_arguments_json(left) == '{"a":"safe","b":2}'
+    assert canonical_tool_arguments_digest(left) == canonical_tool_arguments_digest(right)
+    with pytest.raises(ValueError, match="finite"):
+        canonical_tool_arguments_json({"bad": float("inf")})
+
+
+def test_registered_tool_outcome_invariants_distinguish_runtime_disposition() -> None:
+    success = RegisteredToolOutcome.model_continue_success(
+        mutation_guarantee=ToolMutationGuarantee.NO_MUTATION,
+        result_text="ok",
+    )
+    rejection = RegisteredToolOutcome.recoverable_rejection(
+        error_code="HUNK_CONTEXT_NOT_FOUND",
+        error_message="context not found",
+    )
+    fatal = RegisteredToolOutcome.fatal_runtime_stop(
+        error_code="ROLLBACK_FAILED",
+        mutation_guarantee=ToolMutationGuarantee.PARTIAL_OR_UNCERTAIN_MUTATION,
+        error_message="rollback failed",
+    )
+
+    assert success.status is ToolOutcomeStatus.SUCCESS
+    assert success.runtime_disposition is ToolExecutionRuntimeDisposition.CONTINUE_MODEL
+    assert rejection.status is ToolOutcomeStatus.REJECTED
+    assert rejection.retryable is True
+    assert fatal.status is ToolOutcomeStatus.FATAL
+    assert fatal.runtime_disposition is ToolExecutionRuntimeDisposition.STOP_RUNTIME
+    with pytest.raises(ValueError, match="success outcomes must not include an error code"):
+        RegisteredToolOutcome(
+            status=ToolOutcomeStatus.SUCCESS,
+            mutation_guarantee=ToolMutationGuarantee.NO_MUTATION,
+            error_code="INVALID_PATCH",
+        )
+
+
+def test_registered_tool_outcome_bounding_preserves_required_fields() -> None:
+    outcome = RegisteredToolOutcome.recoverable_rejection(
+        error_code="INVALID_PATCH",
+        error_message="invalid patch",
+        details={"excerpt": "x" * 1_000},
+    )
+
+    serialized = outcome.to_bounded_json(max_chars=160)
+
+    assert '"status":"rejected"' in serialized
+    assert '"mutation_guarantee":"no_mutation"' in serialized
+    assert '"code":"INVALID_PATCH"' in serialized
+    assert '"retryable":true' in serialized
+    assert '"fatal":false' in serialized
+    assert "excerpt" not in serialized
+    with pytest.raises(ValueError, match="mandatory tool outcome fields"):
+        outcome.to_bounded_json(max_chars=10)

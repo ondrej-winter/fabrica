@@ -58,7 +58,9 @@ commit-message:
 commit:
 	uv run fabrica $(FABRICA_GLOBAL_OPTIONS) commit \
 	  --skill conventional-commits \
-	  --skill-root .agents/skills
+	  --skill-root .agents/skills \
+	  --model gpt-5.6-luna \
+	  --reasoning-effort low
 
 deps-tree:
 	uv tree --frozen

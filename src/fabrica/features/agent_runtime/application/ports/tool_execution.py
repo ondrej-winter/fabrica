@@ -7,6 +7,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     SafeRuntimeMetadataValue,
     ToolCallRequest,
     ToolCallResult,
+    ToolCancellationSignal,
     ToolLoopLimits,
 )
 
@@ -29,6 +30,11 @@ class ToolExecutionError(Exception):
 class ToolExecutor(Protocol):
     """Outbound port for invoking one explicitly registered tool."""
 
-    def execute_tool(self, request: ToolCallRequest, limits: ToolLoopLimits) -> ToolCallResult:
+    async def execute_tool(
+        self,
+        request: ToolCallRequest,
+        limits: ToolLoopLimits,
+        cancellation: ToolCancellationSignal,
+    ) -> ToolCallResult:
         """Execute one normalized tool request and return a bounded application result."""
         ...

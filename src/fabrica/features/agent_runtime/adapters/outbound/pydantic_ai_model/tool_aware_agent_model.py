@@ -23,6 +23,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolCallRequest,
     ToolCallResult,
     ToolCallResultStatus,
+    ToolCancellationSignal,
     ToolDefinition,
 )
 from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModelError
@@ -53,13 +54,15 @@ class PydanticAIToolAwareAgentModel:
     def __init__(self, turn_runner: PydanticAIToolAwareTurn) -> None:
         self._turn_runner = turn_runner
 
-    def run_turn(
+    async def run_turn(
         self,
         command: LocalAgentRunCommand,
         available_tools: tuple[ToolDefinition, ...],
         tool_results: tuple[ToolCallResult, ...] = (),
+        cancellation: ToolCancellationSignal | None = None,
     ) -> ToolAwareModelResponse:
         """Run one tool-aware model turn and normalize PydanticAI message parts."""
+        del cancellation
         prompt = build_user_prompt(command)
         messages = _build_messages(prompt, tool_results)
         try:

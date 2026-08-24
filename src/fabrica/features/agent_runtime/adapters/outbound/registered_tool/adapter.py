@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from fabrica.features.agent_runtime.application.dtos import (
     MAX_TOOL_RESPONSE_TEXT_CHARS,
+    RegisteredToolOutcome,
     RuntimeObservation,
     SafeRuntimeMetadataValue,
     SelectedSkillToolDeclaration,
@@ -14,10 +15,15 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolCallRequest,
     ToolCallResult,
     ToolCallResultStatus,
+    ToolCancellationSignal,
     ToolDefinition,
+    ToolExecutionContext,
+    ToolExecutionRuntimeDisposition,
     ToolLoopLimits,
+    ToolOutcomeStatus,
+    canonical_tool_arguments_digest,
 )
-from fabrica.features.agent_runtime.application.ports import RegisteredTool
+from fabrica.features.agent_runtime.application.ports import AsyncRegisteredTool, RegisteredTool
 
 _UNKNOWN_TOOL_MESSAGE = "requested tool is not registered"
 _INVALID_ARGUMENTS_MESSAGE = "registered tool rejected arguments"
@@ -73,7 +79,7 @@ class RegisteredToolExecutor:
     inspect Agent Skills, execute scripts, spawn subprocesses, or call shells.
     """
 
-    def __init__(self, tools: tuple[RegisteredTool, ...] = ()) -> None:
+    def __init__(self, tools: tuple[RegisteredTool | AsyncRegisteredTool, ...] = ()) -> None:
         tool_names = [tool.definition.name for tool in tools]
         if len(set(tool_names)) != len(tool_names):
             msg = "registered tool names must be unique"
@@ -85,7 +91,12 @@ class RegisteredToolExecutor:
         """Return application-safe definitions for registered tools."""
         return tuple(tool.definition for tool in self._tools.values())
 
-    def execute_tool(self, request: ToolCallRequest, limits: ToolLoopLimits) -> ToolCallResult:
+    async def execute_tool(
+        self,
+        request: ToolCallRequest,
+        limits: ToolLoopLimits,
+        cancellation: ToolCancellationSignal,
+    ) -> ToolCallResult:
         """Execute one explicitly registered tool request."""
         tool = self._tools.get(request.tool_name)
         if tool is None:
@@ -97,6 +108,16 @@ class RegisteredToolExecutor:
             )
 
         try:
+            if isinstance(tool, AsyncRegisteredTool):
+                outcome = await tool.handler(
+                    request.arguments,
+                    ToolExecutionContext(
+                        call_id=request.call_id,
+                        argument_digest=canonical_tool_arguments_digest(request.arguments),
+                        cancellation=cancellation,
+                    ),
+                )
+                return _outcome_result(request, outcome, limits)
             result_text = tool.handler(request.arguments)
         except (KeyError, TypeError, ValueError):
             return _failure_result(
@@ -121,6 +142,42 @@ class RegisteredToolExecutor:
             )
 
         return _success_result(request, result_text, limits)
+
+
+def _outcome_result(request: ToolCallRequest, outcome: RegisteredToolOutcome, limits: ToolLoopLimits) -> ToolCallResult:
+    result_text = outcome.to_bounded_json(max_chars=min(limits.max_tool_result_chars, MAX_TOOL_RESPONSE_TEXT_CHARS))
+    if outcome.status is ToolOutcomeStatus.SUCCESS:
+        status = ToolCallResultStatus.SUCCESS
+    elif outcome.status is ToolOutcomeStatus.REJECTED:
+        status = ToolCallResultStatus.REJECTED
+    else:
+        status = ToolCallResultStatus.TOOL_FAILURE
+
+    return ToolCallResult(
+        call_id=request.call_id,
+        tool_name=request.tool_name,
+        status=status,
+        runtime_disposition=outcome.runtime_disposition,
+        result_text=result_text,
+        error_message=outcome.error_message,
+        observations=_outcome_observations(request, outcome),
+    )
+
+
+def _outcome_observations(request: ToolCallRequest, outcome: RegisteredToolOutcome) -> tuple[RuntimeObservation, ...]:
+    if outcome.status is ToolOutcomeStatus.SUCCESS:
+        return ()
+    return (
+        RuntimeObservation(
+            message="registered tool returned typed non-success outcome",
+            metadata={
+                "tool_name": request.tool_name,
+                "status": outcome.status.value,
+                "mutation_guarantee": outcome.mutation_guarantee.value,
+                "fatal": outcome.runtime_disposition is ToolExecutionRuntimeDisposition.STOP_RUNTIME,
+            },
+        ),
+    )
 
 
 def _success_result(request: ToolCallRequest, result_text: str, limits: ToolLoopLimits) -> ToolCallResult:

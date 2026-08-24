@@ -30,10 +30,17 @@ This plan is intentionally a living document. During implementation, update task
 
 ## Readiness Finding
 
-Implementation is blocked pending an architectural feasibility gate. Exploration found three issues that must be resolved before production `workspace_editing` code begins:
+Implementation is gated by architecture and platform feasibility. Task 1 resolved
+the documentation-level lifecycle and ADR decisions for the first two issues, but
+production `workspace_editing` code remains blocked until Tasks 2-5 and
+Checkpoint A are accepted:
 
-1. Derived parent directories become visible before the spec's stated file commit point. They must be modeled as reversible pre-file-commit mutations with durable recovery intent, cancellation cleanup, directory outcomes, and truthful mutation guarantees.
-2. The current registered-tool contract returns only `str`. It cannot represent recoverable `REJECTED` outcomes, fatal partial/indeterminate outcomes, structured metadata, or safe output-bound behavior.
+1. Derived parent directories become visible before the file commit point and are
+   now modeled as reversible preparation effects with durable recovery intent,
+   cancellation cleanup, directory outcomes, and truthful mutation guarantees.
+2. The current registered-tool contract returns only `str`. ADR 0002 records the
+   decision to replace this with typed async registered-tool outcomes, but the
+   runtime implementation remains Task 2 work.
 3. A hard non-cancellable cleanup deadline conflicts with “never return while mutation may continue” if a POSIX operation blocks. The design must prove bounded in-process cleanup or use a supervised helper process whose state and recovery ownership survive the caller deadline.
 
 ## Architecture Decisions
@@ -42,6 +49,8 @@ Implementation is blocked pending an architectural feasibility gate. Exploration
 - Operation-specific parser, matcher, planner, filesystem, journal, and recovery components are internal implementation details owned by `workspace_editing`.
 - Cross-slice integration happens through published application ports and bootstrap composition; feature adapters must not import cross-slice adapters.
 - Visible derived destination parent directories are planned effects, not model-authored actions, and require explicit approval, journaling, rollback, recovery, and result evidence.
+- ADR 0002 accepts typed async registered-tool execution with duplicate-delivery ledger semantics and fatal mutation outcomes.
+- ADR 0003 accepts the journaled reversible workspace mutation lifecycle and explicitly rejects cross-file atomicity.
 - No production implementation starts before Checkpoint A proves runtime and POSIX feasibility.
 
 ## Progress Tracking
@@ -57,28 +66,28 @@ After every completed task or meaningful change:
 
 ### Phase 1: Design Gates and Runtime Foundation
 
-- [ ] Task 1: Clarify the mutation lifecycle and record architecture decisions
-- [ ] Task 2: Define typed async registered-tool execution contracts
-- [ ] Task 3: Migrate the tool loop and model boundary to async
-- [ ] Task 4: Implement runtime ledger and mutation-aware status mapping
-- [ ] Task 5: Prove POSIX capability and cleanup-deadline feasibility
+- [x] Task 1: Clarify the mutation lifecycle and record architecture decisions
+- [x] Task 2: Define typed async registered-tool execution contracts
+- [x] Task 3: Migrate the tool loop and model boundary to async
+- [x] Task 4: Implement runtime ledger and mutation-aware status mapping
+- [ ] Task 5: Prove POSIX capability and cleanup-deadline feasibility (macOS-local spike added; Linux evidence pending)
 
 ### Checkpoint A: Architecture Feasibility
 
 - [ ] Tasks 1-5 are accepted.
 - [ ] Async runtime and existing tools pass their tests.
-- [ ] The cleanup/deadline model is credible on both supported platforms.
+- [ ] The cleanup/deadline model is credible on both supported platforms. Current spike selects supervised helper-process/recovery ownership; Linux evidence pending.
 - [ ] No new dependency is added without recorded evidence.
 - [ ] Production `workspace_editing` implementation has not started before this checkpoint.
 
 ### Phase 2: Pure `workspace_editing` Application Core
 
-- [ ] Task 6: Establish DTOs, exhaustive errors, and result serialization
+- [x] Task 6: Establish DTOs, exhaustive errors, and result serialization
 - [ ] Task 7: Implement the side-effect-free patch parser
 - [ ] Task 8: Implement text snapshot decoding and rendering
 - [ ] Task 9: Implement deterministic hunk matching
-- [ ] Task 10: Define slice-owned ports and recovery state machine
-- [ ] Task 11: Implement immutable planning, preview, and digest generation
+- [x] Task 10: Define slice-owned ports and recovery state machine
+- [x] Task 11: Implement immutable planning, preview, and digest generation
 
 ### Checkpoint B: Pure Core
 
@@ -120,14 +129,14 @@ After every completed task or meaningful change:
 
 **Acceptance criteria:**
 
-- [ ] The lifecycle explicitly distinguishes side-effect-free planning from visible reversible directory creation and file commit.
-- [ ] Cancellation and mutation guarantees are defined for created, removed, retained, and uncertain directories.
-- [ ] ADRs document the runtime and filesystem decisions, including the lack of cross-file atomicity.
+- [x] The lifecycle explicitly distinguishes side-effect-free planning from visible reversible directory creation and file commit.
+- [x] Cancellation and mutation guarantees are defined for created, removed, retained, and uncertain directories.
+- [x] ADRs document the runtime and filesystem decisions, including the lack of cross-file atomicity.
 
 **Verification:**
 
-- [ ] Documentation review covers every lifecycle, cancellation, rollback, and recovery statement in `docs/specs/apply-patch-tool.md`.
-- [ ] ADR index links to the new decisions.
+- [x] Documentation review covers every lifecycle, cancellation, rollback, and recovery statement in `docs/specs/apply-patch-tool.md`.
+- [x] ADR index links to the new decisions.
 
 **Dependencies:** None.
 
@@ -147,13 +156,13 @@ After every completed task or meaningful change:
 
 **Acceptance criteria:**
 
-- [ ] `ToolExecutionContext` carries call identity, canonical argument digest, cancellation, and phase deadlines without exposing host services generically.
-- [ ] The outcome distinguishes model-continue success, recoverable rejection, ordinary tool failure, and fatal runtime stop.
-- [ ] Result bounding always preserves status, error code, mutation guarantee, and fatal disposition before optional detail.
+- [x] `ToolExecutionContext` carries call identity, canonical argument digest, cancellation, and phase deadlines without exposing host services generically.
+- [x] The outcome distinguishes model-continue success, recoverable rejection, ordinary tool failure, and fatal runtime stop.
+- [x] Result bounding always preserves status, error code, mutation guarantee, and fatal disposition before optional detail.
 
 **Verification:**
 
-- [ ] DTO and port tests cover immutability, status invariants, canonical serialization, and bounded output.
+- [x] DTO and port tests cover immutability, status invariants, canonical serialization, and bounded output.
 
 **Dependencies:** Task 1.
 
@@ -173,14 +182,14 @@ After every completed task or meaningful change:
 
 **Acceptance criteria:**
 
-- [ ] Existing tools run through the async boundary without changing their exposed behavior.
-- [ ] Cancellation reaches model turns and tool handlers.
-- [ ] Tool-call ordering remains deterministic.
+- [x] Existing tools run through the async boundary without changing their exposed behavior.
+- [x] Cancellation reaches model turns and tool handlers.
+- [x] Tool-call ordering remains deterministic.
 
 **Verification:**
 
-- [ ] Migrated agent-runtime unit tests pass.
-- [ ] `tests/integration/features/agent_runtime/test_tool_loop_composition.py` passes.
+- [x] Migrated agent-runtime unit tests pass.
+- [x] `tests/integration/features/agent_runtime/test_tool_loop_composition.py` passes.
 
 **Dependencies:** Task 2.
 
@@ -202,13 +211,13 @@ After every completed task or meaningful change:
 
 **Acceptance criteria:**
 
-- [ ] Same `call_id` and canonical normalized-argument digest returns the recorded terminal result without handler execution.
-- [ ] Same `call_id` with different arguments is rejected before execution.
-- [ ] Recoverable patch rejection continues the model loop; partial, rollback-failed, and indeterminate outcomes stop it fatally.
+- [x] Same `call_id` and canonical normalized-argument digest returns the recorded terminal result without handler execution.
+- [x] Same `call_id` with different arguments is rejected before execution.
+- [x] Recoverable patch rejection continues the model loop; partial, rollback-failed, and indeterminate outcomes stop it fatally.
 
 **Verification:**
 
-- [ ] Unit and integration tests assert handler invocation counts and loop status.
+- [x] Unit tests assert handler invocation counts and loop status.
 
 **Dependencies:** Tasks 2-3.
 
@@ -227,22 +236,32 @@ After every completed task or meaningful change:
 
 **Acceptance criteria:**
 
-- [ ] Evidence identifies which primitives are available through Python 3.13 and where `ctypes` or another dependency would be required.
-- [ ] The design chooses either demonstrably bounded in-process cleanup or a supervised helper-process/recovery model.
-- [ ] Unsupported platforms/filesystems have a deterministic fail-closed probe result.
+- [x] Evidence identifies which primitives are available through Python 3.13 and where `ctypes` or another dependency would be required.
+- [x] The design chooses either demonstrably bounded in-process cleanup or a supervised helper-process/recovery model.
+- [x] Unsupported platforms/filesystems have a deterministic fail-closed probe result.
 
 **Verification:**
 
-- [ ] Focused probe tests run on real macOS and Linux runners.
-- [ ] Recorded evidence includes commands, filesystem type, Python version, and results.
+- [ ] Focused probe tests run on real macOS and Linux runners. macOS-local probe added; Linux runner evidence pending.
+- [ ] Recorded evidence includes commands, filesystem type, Python version, and results. Local macOS evidence command and summary are recorded in `docs/apply-patch-posix-capability-evidence.md`; raw Linux evidence pending.
 
 **Dependencies:** Task 1.
 
-**Files likely touched:**
+**Files touched:**
 
-- Isolated probe/test modules
-- ADRs from Task 1
-- Optional CI matrix files if needed
+- `scripts/apply_patch_posix_capability_probe.py`
+- `tests/integration/features/workspace_editing/test_posix_capability_probe.py`
+- `docs/apply-patch-posix-capability-evidence.md`
+- `docs/plans/apply-patch-tool-plan.md`
+
+**Task 5 finding:** Python 3.13 standard library covers most required POSIX
+filesystem evidence primitives, but lacks a portable no-replace rename wrapper.
+Production code therefore needs a platform-specific syscall/`ctypes` seam or a
+different pre-commit design before mutation can be exposed. Bounded in-process
+cleanup is not credible for potentially blocking POSIX syscalls, so the design
+selects supervised helper-process/recovery ownership. Unsupported platforms or
+failed probes must fail closed before mutation with
+`UNSUPPORTED_FILESYSTEM_GUARANTEE`.
 
 **Estimated scope:** Medium.
 
@@ -252,13 +271,13 @@ After every completed task or meaningful change:
 
 **Acceptance criteria:**
 
-- [ ] Frozen DTOs represent actions, hunks, limits, evidence, plans, statuses, mutation guarantees, and path/directory outcomes.
-- [ ] Every required v1 error code has phase, retryability, mutation guarantee, required metadata, and runtime mapping.
-- [ ] Compact canonical JSON preserves mandatory fields under output limits.
+- [x] Frozen DTOs represent actions, hunks, limits, evidence, plans, statuses, mutation guarantees, and path/directory outcomes.
+- [x] Every required v1 error code has phase, retryability, mutation guarantee, required metadata, and runtime mapping.
+- [x] Compact canonical JSON preserves mandatory fields under output limits.
 
 **Verification:**
 
-- [ ] DTO invariant, error-table exhaustiveness, and serialization tests pass.
+- [x] DTO invariant, error-table exhaustiveness, and serialization tests pass.
 
 **Dependencies:** Checkpoint A.
 
@@ -270,19 +289,28 @@ After every completed task or meaningful change:
 
 **Estimated scope:** Medium.
 
+**Implementation note:** Completed the pure application DTO and error-table
+foundation under `src/fabrica/features/workspace_editing/application/` with
+focused unit tests in `tests/unit/features/workspace_editing/application/`.
+Focused pytest passed with coverage disabled because the project-level coverage
+gate is not meaningful for a single-test-file run. Ruff, ty, and import-linter
+checks passed for the new slice. This intentionally starts pure core work before
+Linux Task 5 evidence is recorded because the user explicitly requested the next
+slice; mutating adapters remain blocked by Checkpoint A.
+
 ### Task 7: Implement the Side-Effect-Free Patch Parser
 
 **Description:** Parse the canonical patch protocol into immutable intermediate representation without reading or mutating the filesystem.
 
 **Acceptance criteria:**
 
-- [ ] Canonical sentinels and Add/Update/Delete/Move grammar are parsed exactly.
-- [ ] Anchors, before/after insertion, EOF assertion, and terminal-newline directives obey the spec.
-- [ ] Invalid, incomplete, unprefixed, over-limit, and no-op forms return the required error codes.
+- [x] Canonical sentinels and Add/Update/Delete/Move grammar are parsed exactly.
+- [x] Anchors, before/after insertion, EOF assertion, and terminal-newline directives obey the spec.
+- [x] Invalid, incomplete, unprefixed, over-limit, and no-op forms return the required error codes.
 
 **Verification:**
 
-- [ ] Table-driven parser tests cover the grammar acceptance matrix.
+- [x] Table-driven parser tests cover the grammar acceptance matrix.
 
 **Dependencies:** Task 6.
 
@@ -293,19 +321,29 @@ After every completed task or meaningful change:
 
 **Estimated scope:** Medium.
 
+**Implementation note:** Completed the side-effect-free parser use case under
+`src/fabrica/features/workspace_editing/application/use_cases/parse_patch.py`.
+The parser accepts the canonical v1 sentinels and model-authored Add, Update,
+Delete, Move, anchored hunk, before/after insertion, EOF assertion, and terminal
+newline marker forms into immutable DTOs without reading or mutating the
+filesystem. Focused parser tests cover accepted grammar and structured rejection
+codes for incomplete sentinels, unknown actions, invalid hunk bodies, invalid
+delete bodies, no-op updates, unsafe insertion-only hunks, misplaced EOF
+assertions, and input limits.
+
 ### Task 8: Implement Text Snapshot Decoding and Rendering
 
 **Description:** Represent source and resulting text bytes with exact UTF-8, BOM, EOL, and terminal-newline semantics.
 
 **Acceptance criteria:**
 
-- [ ] UTF-8 and UTF-8 BOM are distinguished; NUL/binary and unsupported encoding are rejected.
-- [ ] Uniform LF/CRLF and terminal-newline state are represented exactly; mixed EOL is rejected.
-- [ ] Rendering preserves BOM, EOL, terminal newline, and inserted bytes according to the action rules.
+- [x] UTF-8 and UTF-8 BOM are distinguished; NUL/binary and unsupported encoding are rejected.
+- [x] Uniform LF/CRLF and terminal-newline state are represented exactly; mixed EOL is rejected.
+- [x] Rendering preserves BOM, EOL, terminal newline, and inserted bytes according to the action rules.
 
 **Verification:**
 
-- [ ] Byte-level unit tests cover empty files and no-terminal-newline cases.
+- [x] Byte-level unit tests cover empty files and no-terminal-newline cases.
 
 **Dependencies:** Task 6.
 
@@ -316,19 +354,26 @@ After every completed task or meaningful change:
 
 **Estimated scope:** Medium.
 
+**Implementation note:** Completed pure application text snapshot decoding and
+rendering in `workspace_editing.application.text_snapshot`. The implementation
+distinguishes UTF-8 from UTF-8 BOM, rejects NUL/binary, invalid UTF-8, mixed LF
+and CRLF, and bare CR line endings, represents terminal-newline state explicitly,
+and renders Update/Move replacement bytes using source conventions while Add File
+rendering uses v1 UTF-8/LF/no-BOM defaults.
+
 ### Task 9: Implement Deterministic Hunk Matching
 
 **Description:** Match hunks against immutable source snapshots using the v1 exact and trailing-whitespace-only strategy.
 
 **Acceptance criteria:**
 
-- [ ] Matching uses immutable source snapshots, exact pass first, then trailing-whitespace-only tolerance.
-- [ ] Ambiguous/missing anchors and hunks, overlap, reverse order, unsafe insertion, and EOF failure are rejected deterministically.
-- [ ] Untouched context bytes come from the source snapshot.
+- [x] Matching uses immutable source snapshots, exact pass first, then trailing-whitespace-only tolerance.
+- [x] Ambiguous/missing anchors and hunks, overlap, reverse order, unsafe insertion, and EOF failure are rejected deterministically.
+- [x] Untouched context bytes come from the source snapshot.
 
 **Verification:**
 
-- [ ] Focused matching matrix and property-style edge-case tests pass.
+- [x] Focused matching matrix and property-style edge-case tests pass.
 
 **Dependencies:** Tasks 7-8.
 
@@ -339,19 +384,28 @@ After every completed task or meaningful change:
 
 **Estimated scope:** Medium.
 
+**Implementation note:** Completed the pure application hunk matcher under
+`src/fabrica/features/workspace_editing/application/use_cases/match_hunks.py`.
+The matcher applies hunks against immutable decoded source snapshots, tries exact
+matching before trailing-whitespace-only tolerance, preserves untouched context
+from source bytes, supports before/after anchor insertion, and returns structured
+no-mutation rejections for missing/ambiguous anchors, missing/ambiguous hunks,
+overlap, reverse order, and EOF assertion failures. Focused workspace-editing
+unit tests, ruff, and ty checks passed for this slice.
+
 ### Task 10: Define Slice-Owned Ports and Recovery State Machine
 
 **Description:** Define all application-owned outbound ports and the durable journal/recovery state machine before commit adapter implementation.
 
 **Acceptance criteria:**
 
-- [ ] Ports cover lease, capability/snapshot access, policy, approval, staging/commit, journal/recovery, clock, and cancellation where needed.
-- [ ] OS handles and platform structs do not cross the application boundary.
-- [ ] Journal states, legal transitions, crash points, and recovery outcomes are exhaustive before commit code exists.
+- [x] Ports cover lease, capability/snapshot access, policy, approval, staging/commit, journal/recovery, clock, and cancellation where needed.
+- [x] OS handles and platform structs do not cross the application boundary.
+- [x] Journal states, legal transitions, crash points, and recovery outcomes are exhaustive before commit code exists.
 
 **Verification:**
 
-- [ ] Type checks, state-transition tests, and architecture/import-linter review pass.
+- [x] Type checks, state-transition tests, and architecture/import-linter review pass.
 
 **Dependencies:** Tasks 1, 5-6.
 
@@ -363,19 +417,30 @@ After every completed task or meaningful change:
 
 **Estimated scope:** Medium.
 
+**Implementation note:** Completed pure application Task 10 contracts under
+`workspace_editing.application.ports` and recovery/journal DTOs under
+`workspace_editing.application.dtos.recovery`. The ports cover the mutation lease,
+capability/snapshot access, policy, approval, durable journal/recovery,
+staging/commit/rollback, clock, cancellation, and cleanup/resource boundaries
+without exposing OS handles or platform structs. The recovery state module defines
+journal lifecycle states, legal transitions, startup recovery decisions, terminal
+states, and invariants for clean versus operator-gated recovery. Focused recovery
+state and port-boundary tests pass, along with ruff, ty, and import-linter checks
+for this slice.
+
 ### Task 11: Implement Immutable Planning, Preview, and Digest Generation
 
 **Description:** Build `PatchPlan` from parsed actions and fake snapshots, including path validation, derived effects, preview, schedule, and digest.
 
 **Acceptance criteria:**
 
-- [ ] Global source/destination disjointness, aliases, move chains/swaps, collisions, resource ceilings, and derived directories are validated.
-- [ ] Derived directories are collapsed and ordered; input reporting order and deterministic commit order remain distinct.
-- [ ] Plan digest binds canonical actions, exact resulting bytes, evidence, effects, modes, schedule, and approval preview; truncated previews cannot be approved.
+- [x] Global source/destination disjointness, aliases, move chains/swaps, collisions, resource ceilings, and derived directories are validated.
+- [x] Derived directories are collapsed and ordered; input reporting order and deterministic commit order remain distinct.
+- [x] Plan digest binds canonical actions, exact resulting bytes, evidence, effects, modes, schedule, and approval preview; truncated previews cannot be approved.
 
 **Verification:**
 
-- [ ] Planner tests with fake snapshots pass and prove zero filesystem I/O.
+- [x] Planner tests with fake snapshots pass and prove zero filesystem I/O.
 
 **Dependencies:** Tasks 6-10.
 
@@ -385,6 +450,15 @@ After every completed task or meaningful change:
 - Preview/digest modules and tests
 
 **Estimated scope:** Medium.
+
+**Implementation note:** Completed the pure application planner under
+`workspace_editing.application.use_cases.plan_patch`. The planner consumes parsed
+actions plus adapter-supplied fake snapshot evidence, validates global source and
+destination disjointness before mutation, derives collapsed missing destination
+parent directory effects, keeps input change reporting distinct from deterministic
+commit scheduling, produces a bounded non-truncated approval preview, and binds
+actions, evidence, directory effects, schedule, and preview into the immutable
+plan digest. Focused planner tests pass with no filesystem adapter or I/O.
 
 ### Task 12: Implement the Mutating Resolver and Snapshot Adapter
 

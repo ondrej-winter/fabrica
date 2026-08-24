@@ -1,5 +1,6 @@
 """Tests for bounded tool-loop orchestration."""
 
+import asyncio
 from dataclasses import dataclass, field
 
 from fabrica.features.agent_runtime.application.dtos import (
@@ -9,7 +10,9 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolCallRequest,
     ToolCallResult,
     ToolCallResultStatus,
+    ToolCancellationSignal,
     ToolDefinition,
+    ToolExecutionRuntimeDisposition,
     ToolLoopLimits,
     ToolLoopRunResult,
     ToolLoopRunStatus,
@@ -26,12 +29,14 @@ class FakeToolAwareModel:
         default_factory=list,
     )
 
-    def run_turn(
+    async def run_turn(
         self,
         command: LocalAgentRunCommand,
         available_tools: tuple[ToolDefinition, ...],
         tool_results: tuple[ToolCallResult, ...] = (),
+        cancellation: ToolCancellationSignal | None = None,
     ) -> ToolAwareModelResponse:
+        del cancellation
         self.calls.append((command, available_tools, tool_results))
         if self.error is not None:
             raise self.error
@@ -47,7 +52,13 @@ class FakeToolExecutor:
     error: ToolExecutionError | None = None
     calls: list[tuple[ToolCallRequest, ToolLoopLimits]] = field(default_factory=list)
 
-    def execute_tool(self, request: ToolCallRequest, limits: ToolLoopLimits) -> ToolCallResult:
+    async def execute_tool(
+        self,
+        request: ToolCallRequest,
+        limits: ToolLoopLimits,
+        cancellation: ToolCancellationSignal,
+    ) -> ToolCallResult:
+        del cancellation
         self.calls.append((request, limits))
         if self.error is not None:
             raise self.error
@@ -67,7 +78,7 @@ def test_run_tool_loop_returns_final_model_output_without_tools() -> None:
         ),
     )
 
-    result = RunToolLoop(model=model, tool_executor=FakeToolExecutor()).run(command)
+    result = asyncio.run(RunToolLoop(model=model, tool_executor=FakeToolExecutor()).run(command))
 
     assert result.status is ToolLoopRunStatus.SUCCESS
     assert result.succeeded is True
@@ -96,7 +107,9 @@ def test_run_tool_loop_executes_tool_and_returns_result_to_model() -> None:
     executor = FakeToolExecutor(results_by_call_id={"call-1": tool_result})
     limits = ToolLoopLimits(max_tool_iterations=2, max_tool_result_chars=100)
 
-    result = RunToolLoop(model=model, tool_executor=executor).run(command, available_tools=(tool,), limits=limits)
+    result = asyncio.run(
+        RunToolLoop(model=model, tool_executor=executor).run(command, available_tools=(tool,), limits=limits)
+    )
 
     assert result.status is ToolLoopRunStatus.SUCCESS
     assert result.output_text == "note contents"
@@ -120,7 +133,7 @@ def test_run_tool_loop_executes_all_calls_at_per_turn_limit() -> None:
     executor = FakeToolExecutor(results_by_call_id={"call-1": first_result, "call-2": second_result})
     limits = ToolLoopLimits(max_tool_iterations=2, max_tool_calls_per_turn=2, max_tool_result_chars=100)
 
-    result = RunToolLoop(model=model, tool_executor=executor).run(command, limits=limits)
+    result = asyncio.run(RunToolLoop(model=model, tool_executor=executor).run(command, limits=limits))
 
     assert result.status is ToolLoopRunStatus.SUCCESS
     assert result.tool_results == (first_result, second_result)
@@ -134,9 +147,11 @@ def test_run_tool_loop_rejects_excessive_tool_calls_before_execution() -> None:
     model = FakeToolAwareModel(responses=[ToolAwareModelResponse(tool_calls=(first_call, second_call))])
     executor = FakeToolExecutor()
 
-    result = RunToolLoop(model=model, tool_executor=executor).run(
-        command,
-        limits=ToolLoopLimits(max_tool_iterations=1, max_tool_calls_per_turn=1, max_tool_result_chars=100),
+    result = asyncio.run(
+        RunToolLoop(model=model, tool_executor=executor).run(
+            command,
+            limits=ToolLoopLimits(max_tool_iterations=1, max_tool_calls_per_turn=1, max_tool_result_chars=100),
+        ),
     )
 
     assert result.status is ToolLoopRunStatus.TOOL_LIMIT_EXCEEDED
@@ -157,7 +172,7 @@ def test_run_tool_loop_rejects_duplicate_call_ids_in_one_turn_before_execution()
     model = FakeToolAwareModel(responses=[ToolAwareModelResponse(tool_calls=(first_call, second_call))])
     executor = FakeToolExecutor()
 
-    result = RunToolLoop(model=model, tool_executor=executor).run(command)
+    result = asyncio.run(RunToolLoop(model=model, tool_executor=executor).run(command))
 
     assert result.status is ToolLoopRunStatus.INVALID_TOOL_REQUEST
     assert result.tool_results == ()
@@ -170,19 +185,50 @@ def test_run_tool_loop_rejects_duplicate_call_ids_in_one_turn_before_execution()
     )
 
 
-def test_run_tool_loop_rejects_reused_call_id_across_run_before_reexecution() -> None:
+def test_run_tool_loop_replays_exact_duplicate_call_id_across_run_without_reexecution() -> None:
     command = LocalAgentRunCommand(prompt="Reuse a call id")
     first_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note")
     reused_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note")
+    first_result = ToolCallResult(call_id="call-1", tool_name="lookup_note", status=ToolCallResultStatus.SUCCESS)
+    model = FakeToolAwareModel(
+        responses=[
+            ToolAwareModelResponse(tool_calls=(first_call,)),
+            ToolAwareModelResponse(tool_calls=(reused_call,)),
+            ToolAwareModelResponse(output_text="done"),
+        ],
+    )
+    executor = FakeToolExecutor(results_by_call_id={"call-1": first_result})
+
+    result = asyncio.run(
+        RunToolLoop(model=model, tool_executor=executor).run(
+            command,
+            limits=ToolLoopLimits(max_tool_iterations=2, max_tool_calls_per_turn=1, max_tool_result_chars=100),
+        ),
+    )
+
+    assert result.status is ToolLoopRunStatus.SUCCESS
+    assert result.output_text == "done"
+    assert result.tool_results == (first_result, first_result)
+    assert executor.calls == [
+        (first_call, ToolLoopLimits(max_tool_iterations=2, max_tool_calls_per_turn=1, max_tool_result_chars=100))
+    ]
+
+
+def test_run_tool_loop_rejects_reused_call_id_with_different_arguments_before_execution() -> None:
+    command = LocalAgentRunCommand(prompt="Reuse a call id")
+    first_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note", arguments={"value": "one"})
+    reused_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note", arguments={"value": "two"})
     first_result = ToolCallResult(call_id="call-1", tool_name="lookup_note", status=ToolCallResultStatus.SUCCESS)
     model = FakeToolAwareModel(
         responses=[ToolAwareModelResponse(tool_calls=(first_call,)), ToolAwareModelResponse(tool_calls=(reused_call,))],
     )
     executor = FakeToolExecutor(results_by_call_id={"call-1": first_result})
 
-    result = RunToolLoop(model=model, tool_executor=executor).run(
-        command,
-        limits=ToolLoopLimits(max_tool_iterations=2, max_tool_calls_per_turn=1, max_tool_result_chars=100),
+    result = asyncio.run(
+        RunToolLoop(model=model, tool_executor=executor).run(
+            command,
+            limits=ToolLoopLimits(max_tool_iterations=2, max_tool_calls_per_turn=1, max_tool_result_chars=100),
+        ),
     )
 
     assert result.status is ToolLoopRunStatus.INVALID_TOOL_REQUEST
@@ -192,10 +238,41 @@ def test_run_tool_loop_rejects_reused_call_id_across_run_before_reexecution() ->
     ]
     assert result.observations == (
         RuntimeObservation(
-            message="tool loop rejected duplicate tool call id",
-            metadata={"tool_call_id": "call-1", "duplicate_scope": "run"},
+            message="tool loop rejected duplicate tool call id with conflicting request",
+            metadata={"tool_call_id": "call-1"},
         ),
     )
+
+
+def test_run_tool_loop_continues_after_recoverable_tool_rejection() -> None:
+    command = LocalAgentRunCommand(prompt="Use a tool")
+    tool_call = ToolCallRequest(call_id="call-1", tool_name="apply_patch")
+    rejection = ToolCallResult(
+        call_id="call-1",
+        tool_name="apply_patch",
+        status=ToolCallResultStatus.REJECTED,
+        result_text='{"status":"rejected"}',
+        error_message="patch rejected",
+    )
+    model = FakeToolAwareModel(
+        responses=[ToolAwareModelResponse(tool_calls=(tool_call,)), ToolAwareModelResponse(output_text="try again")],
+    )
+    executor = FakeToolExecutor(results_by_call_id={"call-1": rejection})
+
+    result = asyncio.run(RunToolLoop(model=model, tool_executor=executor).run(command))
+
+    assert result.status is ToolLoopRunStatus.SUCCESS
+    assert result.output_text == "try again"
+    assert model.calls[-1][2] == (rejection,)
+
+
+def test_run_tool_loop_stops_on_fatal_tool_disposition() -> None:
+    result = _run_single_tool_result(
+        ToolCallResultStatus.TOOL_FAILURE,
+        runtime_disposition=ToolExecutionRuntimeDisposition.STOP_RUNTIME,
+    )
+
+    assert result.status is ToolLoopRunStatus.TOOL_FAILURE
 
 
 def test_run_tool_loop_stops_on_unknown_tool() -> None:
@@ -226,7 +303,7 @@ def test_run_tool_loop_normalizes_model_failure() -> None:
     command = LocalAgentRunCommand(prompt="Use a tool")
     model = FakeToolAwareModel(error=ToolAwareAgentModelError("unavailable", category="configuration"))
 
-    result = RunToolLoop(model=model, tool_executor=FakeToolExecutor()).run(command)
+    result = asyncio.run(RunToolLoop(model=model, tool_executor=FakeToolExecutor()).run(command))
 
     assert result.status is ToolLoopRunStatus.MODEL_ERROR
     assert result.observations == (
@@ -240,7 +317,7 @@ def test_run_tool_loop_normalizes_tool_adapter_error() -> None:
     model = FakeToolAwareModel(responses=[ToolAwareModelResponse(tool_calls=(tool_call,))])
     executor = FakeToolExecutor(error=ToolExecutionError("boom", category="synthetic"))
 
-    result = RunToolLoop(model=model, tool_executor=executor).run(command)
+    result = asyncio.run(RunToolLoop(model=model, tool_executor=executor).run(command))
 
     assert result.status is ToolLoopRunStatus.TOOL_ADAPTER_ERROR
     assert result.tool_results == (
@@ -276,9 +353,11 @@ def test_run_tool_loop_truncates_tool_result_before_returning_to_model() -> None
         },
     )
 
-    result = RunToolLoop(model=model, tool_executor=executor).run(
-        command,
-        limits=ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=3),
+    result = asyncio.run(
+        RunToolLoop(model=model, tool_executor=executor).run(
+            command,
+            limits=ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=3),
+        ),
     )
 
     truncated_result = ToolCallResult(
@@ -309,9 +388,11 @@ def test_run_tool_loop_stops_at_max_iterations() -> None:
         },
     )
 
-    result = RunToolLoop(model=model, tool_executor=executor).run(
-        command,
-        limits=ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=100),
+    result = asyncio.run(
+        RunToolLoop(model=model, tool_executor=executor).run(
+            command,
+            limits=ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=100),
+        ),
     )
 
     assert result.status is ToolLoopRunStatus.MAX_ITERATIONS_EXCEEDED
@@ -322,16 +403,21 @@ def test_run_tool_loop_stops_at_max_iterations() -> None:
     )
 
 
-def _run_single_tool_result(status: ToolCallResultStatus) -> ToolLoopRunResult:
+def _run_single_tool_result(
+    status: ToolCallResultStatus,
+    *,
+    runtime_disposition: ToolExecutionRuntimeDisposition = ToolExecutionRuntimeDisposition.CONTINUE_MODEL,
+) -> ToolLoopRunResult:
     command = LocalAgentRunCommand(prompt="Use a tool")
     tool_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note")
     tool_result = ToolCallResult(
         call_id="call-1",
         tool_name="lookup_note",
         status=status,
+        runtime_disposition=runtime_disposition,
         error_message="synthetic failure" if status is not ToolCallResultStatus.SUCCESS else None,
     )
     model = FakeToolAwareModel(responses=[ToolAwareModelResponse(tool_calls=(tool_call,))])
     executor = FakeToolExecutor(results_by_call_id={"call-1": tool_result})
 
-    return RunToolLoop(model=model, tool_executor=executor).run(command)
+    return asyncio.run(RunToolLoop(model=model, tool_executor=executor).run(command))

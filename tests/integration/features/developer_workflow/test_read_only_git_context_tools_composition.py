@@ -1,5 +1,6 @@
 """Offline integration tests for optional read-only git context tool composition."""
 
+import asyncio
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,6 +15,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolAwareModelResponse,
     ToolCallRequest,
     ToolCallResult,
+    ToolCancellationSignal,
     ToolDefinition,
     ToolLoopLimits,
     ToolLoopRunStatus,
@@ -47,13 +49,15 @@ class ReadOnlyGitContextToolAwareModel:
         default_factory=list,
     )
 
-    def run_turn(
+    async def run_turn(
         self,
         command: LocalAgentRunCommand,
         available_tools: tuple[ToolDefinition, ...],
         tool_results: tuple[ToolCallResult, ...] = (),
+        cancellation: ToolCancellationSignal | None = None,
     ) -> ToolAwareModelResponse:
         """Request one configured tool, then return the tool result."""
+        del cancellation
         self.calls.append((command, available_tools, tool_results))
         if self.requested_tool_name is not None and not tool_results:
             return ToolAwareModelResponse(
@@ -105,7 +109,7 @@ def test_explicitly_composed_read_only_git_context_tool_runs_through_tool_loop(t
         limits=ToolLoopLimits(max_tool_iterations=2, max_tool_result_chars=200),
     )
 
-    result = runtime.run(LocalAgentRunCommand(prompt="Inspect unstaged files."))
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Inspect unstaged files.")))
 
     assert result.status is ToolLoopRunStatus.SUCCESS
     assert result.output_text == "final:M\texample.txt"

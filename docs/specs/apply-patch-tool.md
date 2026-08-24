@@ -61,12 +61,45 @@ compose into the single public `apply_patch` operation before authorization.
 
 Add and Move destination parent directories are created automatically when they
 are missing. These directory creations are derived planned effects, not separate
-model-authored actions. They must be validated, authorized, committed, reported,
-rolled back, and recovered with the same rigor as explicit file actions.
+model-authored actions. They must be validated, authorized, journaled before they
+become visible, reported, rolled back, and recovered with the same rigor as
+explicit file actions.
 
-All expected rejections must be structured and recoverable when no mutation
-occurred. Indeterminate or partial mutation outcomes must stop the agent loop and
-require inspection or recovery.
+All expected rejections must be structured and recoverable when no mutation, or
+only successfully removed reversible preparation effects, occurred. Indeterminate,
+partial, or retained visible mutation outcomes must stop the agent loop and
+require inspection or recovery unless the result contract explicitly marks them as
+safe to continue.
+
+## Mutation lifecycle
+
+Every `apply_patch` call follows one ordered lifecycle. The implementation must
+not blur these phases when reporting cancellation, rollback, or recovery results.
+
+1. **Side-effect-free planning** acquires the workspace mutation lease, parses the
+   patch, snapshots sources and destination evidence, matches hunks, derives
+   directory effects, builds the immutable plan, evaluates policy, and obtains any
+   required approval. No filesystem mutation occurs in this phase.
+2. **Reversible preparation** begins only after approval and revalidation. Before
+   the first planned parent directory is created, the implementation must durably
+   record recovery intent for that directory effect. Planned directories are then
+   created shallowest-first through pinned handles and their identities are
+   recorded. Staging artifacts may be created and populated in the same phase.
+   These are visible or recoverable effects, but they are still before the file
+   commit point.
+3. **File commit** begins immediately before the first visible file rename,
+   replacement, or deletion. This is the explicit commit point for file actions.
+   From this point forward, the operation must complete bounded commit or
+   rollback and report the actual terminal state.
+4. **Cleanup and recovery** removes stage artifacts and rollback-eligible created
+   directories when safe. While the process is active, the operation owns cleanup.
+   After interruption or restart, the durable journal and startup recovery own the
+   remaining cleanup or operator-facing recovery decision.
+
+The host must never return while unmanaged mutation can continue in the
+background. If cleanup cannot prove that all visible preparation effects were
+removed, the final result must report each created directory as retained, failed
+to remove, or uncertain rather than claiming a clean no-mutation outcome.
 
 ## Tool interface
 
@@ -550,8 +583,10 @@ the lease is acquired.
 The runtime keeps a per-agent-run ledger keyed by model `call_id` plus a digest
 of normalized arguments. Exact duplicate delivery returns the recorded terminal
 result without re-execution. Reusing the same `call_id` with different arguments
-fails. After process restart or an indeterminate commit outcome, no replay occurs
-automatically; the agent must inspect and issue a new call.
+fails before handler execution. Only completed terminal outcomes are replayable.
+After process restart, incomplete journal discovery, or an indeterminate commit
+outcome, no replay occurs automatically; mutation remains recovery-gated and the
+agent must inspect or wait for operator recovery before issuing a new call.
 
 ## Deadlines and cancellation
 
@@ -565,9 +600,18 @@ Hosts may lower deadlines but must not exceed v1 hard ceilings.
 | Non-cancellable commit/rollback cleanup | 10 seconds |   30 seconds |
 
 Cancellation applies during lease wait, parse, snapshot, matching, planning,
-approval wait, staging, and pre-commit revalidation. Immediately before the first
-visible rename/delete, the operation crosses an explicit commit point and enters
-a short non-cancellable section. After the commit point, the implementation must
+approval wait, and pre-visible-effect revalidation. Cancellation before any
+visible reversible preparation effect returns a no-mutation outcome. Once a
+planned parent directory has been created, cancellation requests are observed by
+entering bounded cleanup instead of abandoning the operation. If cleanup removes
+all plan-created directories and stage artifacts with matching identity evidence,
+the result may report `mutation_guarantee = "no_mutation"`. If any directory is
+retained, failed to remove, or uncertain, the result must report the directory
+outcome and must not claim no mutation.
+
+Immediately before the first visible file rename, replacement, or deletion, the
+operation crosses the explicit file commit point and enters a short
+non-cancellable section. After the file commit point, the implementation must
 finish bounded commit or rollback and report the actual terminal state. The host
 must never return while background mutation can continue.
 
@@ -576,11 +620,15 @@ Hitting the commit/rollback cleanup hard ceiling yields
 
 ## Staging and commit semantics
 
-Preflight, planning, authorization, and staging are all-or-nothing. The tool does
-not claim cross-file atomic commit. The documented guarantee is:
+Preflight, planning, and authorization are side-effect-free and all-or-nothing.
+Reversible preparation is journaled before visible effects, but visible directory
+creation can still require cleanup or recovery. The tool does not claim
+cross-file atomic commit. The documented guarantee is:
 
 ```text
-fully atomic preflight/staging + journaled best-effort commit with explicit final-state reporting
+side-effect-free planning
++ journaled reversible preparation
++ best-effort file commit with explicit final-state reporting
 ```
 
 After approval, the implementation:
@@ -588,18 +636,21 @@ After approval, the implementation:
 1. revalidates source identities, source hashes, nearest-existing-ancestor
    identities, parent identities, destination absence, planned-directory absence,
    policy, and plan digest;
-2. creates any planned parent directories shallowest-first through pinned
-   directory handles and records their resulting identities;
-3. creates host-managed same-filesystem staging artifacts through pinned
+2. durably records metadata-only recovery intent for planned directory creations,
+   stage artifacts, and the approved plan digest before any derived directory is
+   created;
+3. creates any planned parent directories shallowest-first through pinned
+   directory handles and records their resulting identities durably;
+4. creates host-managed same-filesystem staging artifacts through pinned
    directory handles;
-4. writes and durably flushes complete staged file contents;
-5. applies required mode bits;
-6. durably records a metadata-only commit journal;
-7. revalidates again;
-8. crosses the explicit commit point;
-9. executes a deterministic planner-owned commit schedule;
-10. flushes affected file and parent-directory durability barriers;
-11. cleans up stage, journal, and rollback-eligible created-directory artifacts
+5. writes and durably flushes complete staged file contents;
+6. applies required mode bits;
+7. durably records the prepared commit journal;
+8. revalidates again;
+9. crosses the explicit file commit point;
+10. executes a deterministic planner-owned commit schedule;
+11. flushes affected file and parent-directory durability barriers;
+12. cleans up stage, journal, and rollback-eligible created-directory artifacts
     when safe.
 
 Staging directories are hidden, host-managed, on the same filesystem as each
@@ -622,7 +673,10 @@ Rollback must never overwrite or remove an independently changed path. Directory
 rollback removes only directories created by the current plan, deepest-first, and
 only when they are still empty and their identity matches the journaled creation
 evidence. If a created directory now contains external work, rollback must leave
-it in place and report it as retained. Terminal states must distinguish at least:
+it in place and report it as retained. If directory identity or removal status
+cannot be proven, rollback must report it as uncertain and treat the overall
+mutation guarantee as partial or uncertain. Terminal states must distinguish at
+least:
 
 - `COMMITTED`;
 - `REJECTED`;
@@ -631,8 +685,9 @@ it in place and report it as retained. Terminal states must distinguish at least
 - `ROLLBACK_FAILED`;
 - `INDETERMINATE_COMMIT_STATE`.
 
-Every non-committed post-commit state must include per-path evidence sufficient
-for a user or recovery routine to understand what changed.
+Every non-committed post-visible-effect state must include per-path and
+per-directory evidence sufficient for a user or recovery routine to understand
+what changed.
 
 Created-directory outcomes are reported separately from file outcomes so users
 can distinguish retained empty or externally populated directories from file edit
@@ -646,9 +701,11 @@ planned-directory records, and stage/backup artifacts. Recovery may finish
 rollback automatically only when identity and hash preconditions prove it cannot
 overwrite or remove later external work. Created directories may be removed during
 recovery only when they are still empty and match the journaled identity;
-otherwise they are retained and reported. Otherwise the workspace is marked
-`RECOVERY_REQUIRED`, mutation remains blocked, and explicit operator resolution
-is required. Recovery must not silently resume forward commit or delete evidence.
+otherwise they are retained and reported. If the journal proves that all visible
+preparation effects were removed, recovery may mark the interrupted call as
+no-mutation. Otherwise the workspace is marked `RECOVERY_REQUIRED`, mutation
+remains blocked, and explicit operator resolution is required. Recovery must not
+silently resume forward commit or delete evidence.
 
 ## Filesystem and platform scope
 
@@ -674,12 +731,22 @@ tool adapter serializes those DTOs as compact canonical JSON in the runtime text
 channel. Stable status and error fields must be preserved before optional detail
 when output is bounded.
 
+Every result includes a mutation guarantee. `no_mutation` is valid only when no
+visible effect occurred or all visible reversible preparation effects were proven
+removed. `reversible_effects_retained` means no file action crossed the file
+commit point, but one or more plan-created directories remain and are reported
+with identity evidence. `partial_or_uncertain_mutation` covers any crossed file
+commit point, failed rollback, uncertain directory cleanup, or indeterminate
+state. Results with retained or uncertain visible effects are fatal to the runtime
+loop unless a future spec explicitly defines a safe continuation status.
+
 Success example:
 
 ```json
 {
   "status": "committed",
   "success": true,
+  "mutation_guarantee": "committed",
   "plan_digest": "sha256:...",
   "changes": [
     {
@@ -724,6 +791,28 @@ Recoverable rejection example:
     "candidate_count": 0,
     "excerpt": "...bounded sanitized excerpt..."
   }
+}
+```
+
+Cancelled preparation with a retained directory example:
+
+```json
+{
+  "status": "rejected",
+  "success": false,
+  "mutation_guarantee": "reversible_effects_retained",
+  "error": {
+    "code": "CREATED_DIRECTORY_RETAINED",
+    "phase": "cleanup",
+    "retryable": false
+  },
+  "directory_outcomes": [
+    {
+      "path": "src/generated",
+      "planned_effect": "create_directory",
+      "final_state": "retained_external_content"
+    }
+  ]
 }
 ```
 
@@ -793,6 +882,7 @@ Required v1 codes include:
 - `MULTIPLE_HARD_LINKS_UNSUPPORTED`;
 - `DIRECTORY_CREATION_UNSAFE`;
 - `CREATED_DIRECTORY_RETAINED`;
+- `CREATED_DIRECTORY_REMOVAL_UNCERTAIN`;
 - `CROSS_DEVICE_MOVE_UNSUPPORTED`;
 - `UNSUPPORTED_FILESYSTEM_GUARANTEE`;
 - `BINARY_FILE`;
@@ -821,8 +911,9 @@ Required v1 codes include:
 
 Recoverable no-mutation rejections map to the generic runtime status
 `REJECTED`. Successful commits map to `SUCCESS`. Internal adapter failures map to
-`TOOL_FAILURE` or `ADAPTER_ERROR`. Indeterminate or partial mutation outcomes are
-fatal to the runtime loop and must not be treated as recoverable model mistakes.
+`TOOL_FAILURE` or `ADAPTER_ERROR`. Retained reversible effects, indeterminate
+cleanup, or partial mutation outcomes are fatal to the runtime loop and must not
+be treated as recoverable model mistakes.
 
 ## Runtime integration
 
@@ -958,6 +1049,8 @@ Future acceptance tests must cover at least these scenarios.
   runtime loop.
 - Incomplete journal on startup blocks mutation until recovery.
 - Recovery rolls back only when identity/hash preconditions prove it safe.
+- Cancellation after derived directory creation either proves cleanup or reports
+  retained, failed, or uncertain directory outcomes.
 - Concurrent `apply_patch` calls are serialized per workspace.
 - Planning, approval, staging, and commit/rollback deadlines are enforced.
 
@@ -988,6 +1081,8 @@ application contracts are stable.
 - Always bind approval to exact resulting bytes and plan digest.
 - Always include derived parent-directory creations in planning, approval,
   journaling, result reporting, rollback, and recovery.
+- Always durably record recovery intent before a derived parent directory becomes
+  visible.
 - Always treat filesystem commit as adapter-owned behavior.
 - Never allow Add or Move to overwrite existing files.
 - Never expose separate model-facing filesystem mutation tools that overlap with
@@ -999,6 +1094,8 @@ application contracts are stable.
   links in v1.
 - Never claim cross-file atomicity.
 - Never return while background mutation can continue.
+- Never report no mutation while plan-created directories are retained, failed to
+  remove, or uncertain.
 - Never collapse partial, rollback-failed, or indeterminate outcomes into generic
   `IO_ERROR`.
 
@@ -1017,6 +1114,8 @@ application contracts are stable.
 - The directory model automatically creates missing Add/Move destination parents
   as derived planned effects with approval visibility, journal evidence,
   rollback, recovery, and result reporting.
+- The lifecycle model distinguishes side-effect-free planning, reversible
+  preparation, the explicit file commit point, and startup recovery ownership.
 - The authorization model binds approval to an immutable exact-byte plan.
 - The runtime model includes async cancellation-aware handlers, recoverable
   `REJECTED` outcomes, duplicate-delivery protection, and fatal indeterminate

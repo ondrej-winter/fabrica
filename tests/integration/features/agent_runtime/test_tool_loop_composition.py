@@ -1,5 +1,6 @@
 """Offline integration tests for registered tool-loop composition."""
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
@@ -14,6 +15,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolAwareModelResponse,
     ToolCallRequest,
     ToolCallResult,
+    ToolCancellationSignal,
     ToolDefinition,
     ToolLoopLimits,
     ToolLoopRunStatus,
@@ -30,12 +32,14 @@ class SyntheticToolAwareModel:
         default_factory=list,
     )
 
-    def run_turn(
+    async def run_turn(
         self,
         command: LocalAgentRunCommand,
         available_tools: tuple[ToolDefinition, ...],
         tool_results: tuple[ToolCallResult, ...] = (),
+        cancellation: ToolCancellationSignal | None = None,
     ) -> ToolAwareModelResponse:
+        del cancellation
         self.calls.append((command, available_tools, tool_results))
         if not tool_results:
             return ToolAwareModelResponse(
@@ -72,7 +76,7 @@ def test_registered_tool_loop_composition_runs_synthetic_tool_to_final_output() 
         tools=(tool,),
         limits=ToolLoopLimits(max_tool_iterations=2, max_tool_result_chars=100),
     )
-    result = runtime.run(command)
+    result = asyncio.run(runtime.run(command))
 
     assert result.status is ToolLoopRunStatus.SUCCESS
     assert result.output_text == "final:note:abc"
@@ -88,7 +92,7 @@ def test_registered_tool_loop_composition_fails_closed_for_unknown_tool() -> Non
         limits=ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=100),
     )
 
-    result = runtime.run(LocalAgentRunCommand(prompt="Use the lookup tool"))
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Use the lookup tool")))
 
     assert result.status is ToolLoopRunStatus.UNKNOWN_TOOL
     assert result.tool_results[0].error_message == "requested tool is not registered"
@@ -131,7 +135,7 @@ def test_pydantic_ai_tool_loop_composition_runs_synthetic_tool_to_final_output()
         tools=(tool,),
         limits=ToolLoopLimits(max_tool_iterations=2, max_tool_result_chars=100),
     )
-    result = runtime.run(command)
+    result = asyncio.run(runtime.run(command))
 
     assert result.status is ToolLoopRunStatus.SUCCESS
     assert result.output_text == "final:note:abc"

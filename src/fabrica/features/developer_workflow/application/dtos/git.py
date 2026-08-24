@@ -9,7 +9,7 @@ from types import MappingProxyType
 DEFAULT_MAX_STAGED_DIFF_CHARS = 500_000
 STAGED_DIFF_CONTEXT_LABEL = "Git staged diff"
 SafeGitStagedChangesMetadataValue = str | int | float | bool | None
-DEFAULT_MAX_PRE_COMMIT_OUTPUT_CHARS = 50_000
+DEFAULT_MAX_PRE_COMMIT_OUTPUT_CHARS = 500_000
 SafePreCommitMetadataValue = str | int | float | bool | None
 
 

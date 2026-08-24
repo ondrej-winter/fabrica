@@ -1,5 +1,6 @@
 """Offline integration tests for model-driven selected Agent Skills composition."""
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,6 +29,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolAwareModelResponse,
     ToolCallRequest,
     ToolCallResult,
+    ToolCancellationSignal,
     ToolDefinition,
     ToolLoopLimits,
     ToolLoopRunStatus,
@@ -44,12 +46,14 @@ class SyntheticSkillToolAwareModel:
         default_factory=list,
     )
 
-    def run_turn(
+    async def run_turn(
         self,
         command: LocalAgentRunCommand,
         available_tools: tuple[ToolDefinition, ...],
         tool_results: tuple[ToolCallResult, ...] = (),
+        cancellation: ToolCancellationSignal | None = None,
     ) -> ToolAwareModelResponse:
+        del cancellation
         self.calls.append((command, available_tools, tool_results))
         assert [block.metadata["source"] for block in command.context] == ["agent_skill", "agent_skill_resource"]
         if not tool_results:
@@ -101,7 +105,7 @@ def test_model_driven_skill_runtime_combines_selected_context_and_explicit_skill
         ),
     )
 
-    result = runtime.run(LocalAgentRunCommand(prompt="Use selected skills and tools."))
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Use selected skills and tools.")))
 
     assert result.status is ToolLoopRunStatus.SUCCESS
     assert result.output_text == "final:note:abc"
@@ -137,7 +141,9 @@ def test_pydantic_ai_model_driven_skill_runtime_uses_selected_context_and_tool(t
         ),
     )
 
-    result = runtime.run(LocalAgentRunCommand(prompt="Use selected skills and tools.", model_hint="synthetic-codex"))
+    result = asyncio.run(
+        runtime.run(LocalAgentRunCommand(prompt="Use selected skills and tools.", model_hint="synthetic-codex")),
+    )
 
     assert result.status is ToolLoopRunStatus.SUCCESS
     assert result.output_text == "final:note:abc"

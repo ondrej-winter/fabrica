@@ -1,5 +1,6 @@
 """Tests for the PydanticAI tool-aware runtime model adapter."""
 
+import asyncio
 from dataclasses import dataclass, field
 
 import pytest
@@ -45,7 +46,7 @@ def test_tool_aware_adapter_maps_text_response_to_final_output() -> None:
         model_hint="codex-max",
     )
 
-    result = PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(command, available_tools=())
+    result = asyncio.run(PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(command, available_tools=()))
 
     assert result.output_text == "done"
     assert result.tool_calls == ()
@@ -63,9 +64,11 @@ def test_tool_aware_adapter_maps_tool_call_response_to_application_request() -> 
         ),
     )
 
-    result = PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
-        LocalAgentRunCommand(prompt="Use a tool"),
-        available_tools=(tool,),
+    result = asyncio.run(
+        PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
+            LocalAgentRunCommand(prompt="Use a tool"),
+            available_tools=(tool,),
+        ),
     )
 
     assert result.output_text is None
@@ -85,10 +88,12 @@ def test_tool_aware_adapter_passes_prior_tool_results_as_pydanticai_tool_returns
         result_text="note contents",
     )
 
-    PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
-        LocalAgentRunCommand(prompt="Continue"),
-        available_tools=(),
-        tool_results=(tool_result,),
+    asyncio.run(
+        PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
+            LocalAgentRunCommand(prompt="Continue"),
+            available_tools=(),
+            tool_results=(tool_result,),
+        ),
     )
 
     tool_return = turn.calls[0].messages[1].parts[0]
@@ -109,10 +114,12 @@ def test_tool_aware_adapter_maps_failed_prior_tool_results_as_failed_returns() -
         error_message="synthetic failure",
     )
 
-    PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
-        LocalAgentRunCommand(prompt="Continue"),
-        available_tools=(),
-        tool_results=(tool_result,),
+    asyncio.run(
+        PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
+            LocalAgentRunCommand(prompt="Continue"),
+            available_tools=(),
+            tool_results=(tool_result,),
+        ),
     )
 
     tool_return = turn.calls[0].messages[1].parts[0]
@@ -130,9 +137,11 @@ def test_tool_aware_adapter_rejects_tool_call_with_unsupported_argument_value() 
     )
 
     with pytest.raises(ToolAwareAgentModelError) as error_info:
-        PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
-            LocalAgentRunCommand(prompt="Use a tool"),
-            available_tools=(),
+        asyncio.run(
+            PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
+                LocalAgentRunCommand(prompt="Use a tool"),
+                available_tools=(),
+            ),
         )
 
     assert error_info.value.category == "invalid_tool_arguments"
@@ -143,9 +152,11 @@ def test_tool_aware_adapter_normalizes_dependency_failure() -> None:
     turn = FakeToolAwareTurn(error=RuntimeError("do not leak details"))
 
     with pytest.raises(ToolAwareAgentModelError) as error_info:
-        PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
-            LocalAgentRunCommand(prompt="ping"),
-            available_tools=(),
+        asyncio.run(
+            PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
+                LocalAgentRunCommand(prompt="ping"),
+                available_tools=(),
+            ),
         )
 
     assert error_info.value.category == "pydanticai_tool_aware_error"

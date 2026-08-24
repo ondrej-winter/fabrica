@@ -1,10 +1,12 @@
 """Tests for the explicit registered in-process tool adapter."""
 
-from collections.abc import Mapping
+import asyncio
+from collections.abc import Awaitable, Callable, Mapping
 
 import pytest
 
 from fabrica.features.agent_runtime.adapters.outbound.registered_tool import (
+    AsyncRegisteredTool,
     RegisteredSkillToolPreparer,
     RegisteredTool,
     RegisteredToolExecutor,
@@ -12,6 +14,7 @@ from fabrica.features.agent_runtime.adapters.outbound.registered_tool import (
     SkillAssociatedRegisteredTool,
 )
 from fabrica.features.agent_runtime.application.dtos import (
+    RegisteredToolOutcome,
     RuntimeObservation,
     SafeRuntimeMetadataValue,
     SelectedSkill,
@@ -21,7 +24,9 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolCallResult,
     ToolCallResultStatus,
     ToolDefinition,
+    ToolExecutionContext,
     ToolLoopLimits,
+    ToolMutationGuarantee,
 )
 from fabrica.features.agent_runtime.application.use_cases import PrepareSkillTools
 
@@ -33,9 +38,12 @@ def test_registered_tool_executor_runs_explicit_synthetic_callable() -> None:
     )
     executor = RegisteredToolExecutor((tool,))
 
-    result = executor.execute_tool(
-        ToolCallRequest(call_id="call-1", tool_name="lookup_note", arguments={"note_id": "abc"}),
-        ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=100),
+    result = asyncio.run(
+        executor.execute_tool(
+            ToolCallRequest(call_id="call-1", tool_name="lookup_note", arguments={"note_id": "abc"}),
+            ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=100),
+            _NeverCancelledToolCancellationSignal(),
+        ),
     )
 
     assert result == ToolCallResult(
@@ -47,12 +55,114 @@ def test_registered_tool_executor_runs_explicit_synthetic_callable() -> None:
     assert executor.tool_definitions == (tool.definition,)
 
 
+def test_async_registered_tool_contract_keeps_typed_handler_without_execution() -> None:
+    called = False
+
+    async def synthetic_tool(
+        _arguments: Mapping[str, SafeRuntimeMetadataValue],
+        _context: ToolExecutionContext,
+    ) -> RegisteredToolOutcome:
+        nonlocal called
+        called = True
+        return RegisteredToolOutcome.model_continue_success(
+            mutation_guarantee=ToolMutationGuarantee.NO_MUTATION,
+            result_text="ok",
+        )
+
+    tool = AsyncRegisteredTool(
+        definition=ToolDefinition(name="async_lookup_note", description="Lookup a synthetic note asynchronously"),
+        handler=synthetic_tool,
+    )
+
+    assert tool.definition.name == "async_lookup_note"
+    assert called is False
+
+
+def test_registered_tool_executor_runs_async_typed_tool_with_execution_context() -> None:
+    contexts: list[ToolExecutionContext] = []
+
+    async def synthetic_tool(
+        _arguments: Mapping[str, SafeRuntimeMetadataValue],
+        context: ToolExecutionContext,
+    ) -> RegisteredToolOutcome:
+        contexts.append(context)
+        return RegisteredToolOutcome.model_continue_success(
+            mutation_guarantee=ToolMutationGuarantee.NO_MUTATION,
+            result_text="ok",
+        )
+
+    executor = RegisteredToolExecutor(
+        (
+            AsyncRegisteredTool(
+                definition=ToolDefinition(
+                    name="async_lookup_note", description="Lookup a synthetic note asynchronously"
+                ),
+                handler=synthetic_tool,
+            ),
+        ),
+    )
+
+    result = asyncio.run(
+        executor.execute_tool(
+            ToolCallRequest(call_id="call-1", tool_name="async_lookup_note", arguments={"note_id": "abc"}),
+            ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=100),
+            _NeverCancelledToolCancellationSignal(),
+        ),
+    )
+
+    assert result.status is ToolCallResultStatus.SUCCESS
+    assert result.result_text is not None
+    assert '"status":"success"' in result.result_text
+    assert contexts[0].call_id == "call-1"
+    assert contexts[0].argument_digest.startswith("sha256:")
+
+
+def test_registered_tool_executor_maps_async_rejection_to_recoverable_result() -> None:
+    async def reject_tool(
+        _arguments: Mapping[str, SafeRuntimeMetadataValue],
+        _context: ToolExecutionContext,
+    ) -> RegisteredToolOutcome:
+        return RegisteredToolOutcome.recoverable_rejection(
+            error_code="HUNK_CONTEXT_NOT_FOUND",
+            error_message="context not found",
+        )
+
+    result = _execute_async_tool_with_handler(reject_tool)
+
+    assert result.status is ToolCallResultStatus.REJECTED
+    assert result.result_text is not None
+    assert '"status":"rejected"' in result.result_text
+    assert '"mutation_guarantee":"no_mutation"' in result.result_text
+
+
+def test_registered_tool_executor_maps_async_fatal_outcome_to_stop_disposition() -> None:
+    async def fail_tool(
+        _arguments: Mapping[str, SafeRuntimeMetadataValue],
+        _context: ToolExecutionContext,
+    ) -> RegisteredToolOutcome:
+        return RegisteredToolOutcome.fatal_runtime_stop(
+            error_code="ROLLBACK_FAILED",
+            mutation_guarantee=ToolMutationGuarantee.PARTIAL_OR_UNCERTAIN_MUTATION,
+            error_message="rollback failed",
+        )
+
+    result = _execute_async_tool_with_handler(fail_tool)
+
+    assert result.status is ToolCallResultStatus.TOOL_FAILURE
+    assert result.runtime_disposition is not None
+    assert result.result_text is not None
+    assert '"fatal":true' in result.result_text
+
+
 def test_registered_tool_executor_fails_closed_for_unknown_tool() -> None:
     executor = RegisteredToolExecutor()
 
-    result = executor.execute_tool(
-        ToolCallRequest(call_id="call-1", tool_name="missing_tool"),
-        ToolLoopLimits(),
+    result = asyncio.run(
+        executor.execute_tool(
+            ToolCallRequest(call_id="call-1", tool_name="missing_tool"),
+            ToolLoopLimits(),
+            _NeverCancelledToolCancellationSignal(),
+        ),
     )
 
     assert result.status is ToolCallResultStatus.UNKNOWN_TOOL
@@ -299,7 +409,40 @@ def _execute_tool_with_handler(
             ),
         ),
     )
-    return executor.execute_tool(
-        ToolCallRequest(call_id="call-1", tool_name="lookup_note"),
-        limits or ToolLoopLimits(),
+    return asyncio.run(
+        executor.execute_tool(
+            ToolCallRequest(call_id="call-1", tool_name="lookup_note"),
+            limits or ToolLoopLimits(),
+            _NeverCancelledToolCancellationSignal(),
+        ),
     )
+
+
+def _execute_async_tool_with_handler(
+    handler: Callable[[Mapping[str, SafeRuntimeMetadataValue], ToolExecutionContext], Awaitable[RegisteredToolOutcome]],
+) -> ToolCallResult:
+    executor = RegisteredToolExecutor(
+        (
+            AsyncRegisteredTool(
+                definition=ToolDefinition(name="apply_patch", description="Apply a synthetic patch"),
+                handler=handler,
+            ),
+        ),
+    )
+    return asyncio.run(
+        executor.execute_tool(
+            ToolCallRequest(call_id="call-1", tool_name="apply_patch"),
+            ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=500),
+            _NeverCancelledToolCancellationSignal(),
+        ),
+    )
+
+
+class _NeverCancelledToolCancellationSignal:
+    @property
+    def is_cancelled(self) -> bool:
+        return False
+
+    async def wait_until_cancelled(self) -> None:
+        msg = "test signal is never cancelled"
+        raise AssertionError(msg)

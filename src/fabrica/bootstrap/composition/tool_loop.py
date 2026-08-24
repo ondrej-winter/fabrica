@@ -21,6 +21,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillToolExposureStatus,
     SkillToolPreparationCommand,
     SkillToolPreparationResult,
+    ToolCancellationSignal,
     ToolDefinition,
     ToolLoopLimits,
     ToolLoopRunResult,
@@ -53,9 +54,19 @@ class ToolLoopRuntime:
     available_tools: tuple[ToolDefinition, ...]
     limits: ToolLoopLimits | None = None
 
-    def run(self, command: LocalAgentRunCommand) -> ToolLoopRunResult:
+    async def run(
+        self,
+        command: LocalAgentRunCommand,
+        *,
+        cancellation: ToolCancellationSignal | None = None,
+    ) -> ToolLoopRunResult:
         """Run the composed tool loop with registered tool definitions."""
-        return self.runner.run(command, available_tools=self.available_tools, limits=self.limits)
+        return await self.runner.run(
+            command,
+            available_tools=self.available_tools,
+            limits=self.limits,
+            cancellation=cancellation,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,10 +84,20 @@ class ModelDrivenSkillRuntime:
         """Return model-callable tools exposed for selected skills."""
         return self.tool_preparation.tool_definitions
 
-    def run(self, command: LocalAgentRunCommand) -> ToolLoopRunResult:
+    async def run(
+        self,
+        command: LocalAgentRunCommand,
+        *,
+        cancellation: ToolCancellationSignal | None = None,
+    ) -> ToolLoopRunResult:
         """Load selected context and run the bounded model-tool loop."""
         augmented = create_skill_context_augmented_local_agent_command(command, self.context_options)
-        result = self.runner.run(augmented, available_tools=self.available_tools, limits=self.limits)
+        result = await self.runner.run(
+            augmented,
+            available_tools=self.available_tools,
+            limits=self.limits,
+            cancellation=cancellation,
+        )
         if not self.tool_preparation.observations:
             return result
         return ToolLoopRunResult(

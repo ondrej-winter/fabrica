@@ -1,5 +1,6 @@
 """Tests for the explicit pre-commit registered-tool bridge."""
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import cast
 
@@ -87,11 +88,24 @@ def test_handler_maps_port_failures_to_safe_tool_failure() -> None:
         )
     )[0]
 
-    result = RegisteredToolExecutor((tool,)).execute_tool(
-        ToolCallRequest(call_id="call-1", tool_name="run_pre_commit", arguments={}),
-        ToolLoopLimits(),
+    result = asyncio.run(
+        RegisteredToolExecutor((tool,)).execute_tool(
+            ToolCallRequest(call_id="call-1", tool_name="run_pre_commit", arguments={}),
+            ToolLoopLimits(),
+            _NeverCancelledToolCancellationSignal(),
+        ),
     )
 
     assert result.status is ToolCallResultStatus.TOOL_FAILURE
     assert result.error_message == "registered tool execution failed"
     assert "not surfaced" not in str(result)
+
+
+class _NeverCancelledToolCancellationSignal:
+    @property
+    def is_cancelled(self) -> bool:
+        return False
+
+    async def wait_until_cancelled(self) -> None:
+        msg = "test signal is never cancelled"
+        raise AssertionError(msg)
