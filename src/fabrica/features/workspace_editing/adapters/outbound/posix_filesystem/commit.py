@@ -1,6 +1,7 @@
 """POSIX staging and commit adapter for apply-patch file operations."""
 
 import os
+import stat
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -38,7 +39,7 @@ class PosixPatchCommitAdapter:
                 if action.kind in {PatchActionKind.ADD, PatchActionKind.UPDATE, PatchActionKind.MOVE}:
                     stage_path = _stage_path(stage_root, action)
                     stage_path.write_bytes(render_added_text(action.added_lines))
-                    stage_path.chmod(0o600)
+                    stage_path.chmod(_payload_mode(plan, action))
                     _fsync_file(stage_path)
             _fsync_directory(stage_root)
         except OSError as err:
@@ -137,7 +138,19 @@ def _revalidate_staging(stage_root: Path, plan: PatchPlan) -> PatchResult | None
             return _rejected("STALE_PLAN", f"staged payload missing before commit: {action.path}")
         if not stage_path.is_file() or path_stat.st_size != len(render_added_text(action.added_lines)):
             return _rejected("STALE_PLAN", f"staged payload changed before commit: {action.path}")
+        if stat.S_IMODE(path_stat.st_mode) != _payload_mode(plan, action):
+            return _rejected("STALE_PLAN", f"staged payload mode changed before commit: {action.path}")
     return None
+
+
+def _payload_mode(plan: PatchPlan, action: PatchAction) -> int:
+    if action.kind is PatchActionKind.ADD:
+        return 0o644
+    evidence = next(item for item in plan.path_evidence if item.path == action.path)
+    mode = evidence.metadata.get("mode")
+    if not isinstance(mode, int):
+        return 0o644
+    return stat.S_IMODE(mode)
 
 
 def _snapshot_path(root: Path, path: str) -> PatchPathEvidence:
@@ -156,7 +169,10 @@ def _snapshot_path(root: Path, path: str) -> PatchPathEvidence:
         exists=True,
         content_digest=_digest_bytes(content),
         identity_digest=_identity_digest(path_stat),
-        metadata={"ancestor_identity_digest": _ancestor_digest(root, path)},
+        metadata={
+            "ancestor_identity_digest": _ancestor_digest(root, path),
+            "mode": stat.S_IMODE(path_stat.st_mode),
+        },
     )
 
 

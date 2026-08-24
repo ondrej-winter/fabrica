@@ -3,6 +3,7 @@
 import sys
 from asyncio import run
 from pathlib import Path
+from stat import S_IMODE
 
 import pytest
 
@@ -20,6 +21,11 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchResultStatus,
 )
 from fabrica.features.workspace_editing.application.use_cases import PlanPatch
+
+DEFAULT_ADD_MODE = 0o644
+EXECUTABLE_UPDATE_MODE = 0o755
+OWNER_EXECUTABLE_MOVE_MODE = 0o700
+STALE_STAGE_MODE = 0o600
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
@@ -107,14 +113,7 @@ def test_posix_commit_adapter_rejects_missing_stage_payload_before_visible_file_
     plan, journal = _prepared_plan_and_journal(tmp_path, actions)
     adapter = PosixPatchCommitAdapter(tmp_path)
     assert run(adapter.prepare(plan, journal)) is None
-    stage_payload = (
-        tmp_path
-        / ".fabrica"
-        / "apply-patch"
-        / "stage"
-        / journal.journal_digest.removeprefix("sha256:")
-        / "000000.payload"
-    )
+    stage_payload = _stage_payload_path(tmp_path, journal, action_index=0)
     stage_payload.unlink()
 
     result = run(adapter.commit(plan, journal))
@@ -123,6 +122,60 @@ def test_posix_commit_adapter_rejects_missing_stage_payload_before_visible_file_
     assert result.error is not None
     assert result.error.code == "STALE_PLAN"
     assert not (tmp_path / "generated" / "add.py").exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_applies_modes_for_add_update_and_move(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    update_path = tmp_path / "src" / "update.sh"
+    move_path = tmp_path / "src" / "move.sh"
+    update_path.write_text("old update\n", encoding="utf-8")
+    move_path.write_text("old move\n", encoding="utf-8")
+    update_path.chmod(EXECUTABLE_UPDATE_MODE)
+    move_path.chmod(OWNER_EXECUTABLE_MOVE_MODE)
+    actions = (
+        PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),
+        PatchAction(index=1, kind=PatchActionKind.UPDATE, path="src/update.sh", added_lines=("updated",)),
+        PatchAction(
+            index=2,
+            kind=PatchActionKind.MOVE,
+            path="src/move.sh",
+            destination_path="generated/move.sh",
+            added_lines=("moved",),
+        ),
+    )
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+
+    assert run(adapter.prepare(plan, journal)) is None
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.COMMITTED
+    assert S_IMODE((tmp_path / "generated" / "add.py").stat().st_mode) == DEFAULT_ADD_MODE
+    assert S_IMODE(update_path.stat().st_mode) == EXECUTABLE_UPDATE_MODE
+    assert S_IMODE((tmp_path / "generated" / "move.sh").stat().st_mode) == OWNER_EXECUTABLE_MOVE_MODE
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rejects_changed_stage_payload_mode_before_visible_file_commit(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    update_path = tmp_path / "src" / "update.sh"
+    update_path.write_text("old update\n", encoding="utf-8")
+    update_path.chmod(EXECUTABLE_UPDATE_MODE)
+    actions = (PatchAction(index=0, kind=PatchActionKind.UPDATE, path="src/update.sh", added_lines=("updated",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+    stage_payload = _stage_payload_path(tmp_path, journal, action_index=0)
+    stage_payload.chmod(STALE_STAGE_MODE)
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert update_path.read_text(encoding="utf-8") == "old update\n"
+    assert S_IMODE(update_path.stat().st_mode) == EXECUTABLE_UPDATE_MODE
 
 
 def _prepared_plan_and_journal(tmp_path: Path, actions: tuple[PatchAction, ...]):
@@ -143,3 +196,14 @@ def _prepared_plan_and_journal(tmp_path: Path, actions: tuple[PatchAction, ...])
         created_directories=planned.plan.created_directories,
     )
     return planned.plan, prepared_journal
+
+
+def _stage_payload_path(tmp_path: Path, journal: PatchJournalRecord, *, action_index: int) -> Path:
+    return (
+        tmp_path
+        / ".fabrica"
+        / "apply-patch"
+        / "stage"
+        / journal.journal_digest.removeprefix("sha256:")
+        / f"{action_index:06d}.payload"
+    )

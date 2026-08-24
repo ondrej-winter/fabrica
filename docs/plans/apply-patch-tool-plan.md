@@ -608,6 +608,15 @@ any visible file operation, with focused integration coverage for the missing
 payload case. Remaining Task 15 work still includes full metadata/mode handling,
 policy revalidation, and broader pre-commit fault-injection coverage.
 
+**Incremental update:** Added POSIX staged payload mode handling for the current
+complete-payload adapter path. Update and Move payloads now preserve the planned
+source file mode, Add payloads use the adapter default `0644`, commit-time staging
+revalidation rejects changed payload modes before visible file mutation, and final
+path evidence reports resulting file mode. Focused integration coverage verifies
+Add/Update/Move modes and stale staged-mode rejection. Remaining Task 15 work
+still includes broader metadata handling beyond mode, policy revalidation, and
+pre-commit fault-injection coverage.
+
 ### Task 16: Implement Rollback and Startup Recovery
 
 **Description:** Implement safe rollback after commit failures and startup handling for incomplete journals.
