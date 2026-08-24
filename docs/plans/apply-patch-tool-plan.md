@@ -564,12 +564,15 @@ intent-before-effect ordering, failure rollback, and incomplete journal discover
 
 **Acceptance criteria:**
 
-- [ ] Same-filesystem staging uses host-controlled names and strict permissions, writes full contents, applies modes, and executes durability barriers.
+- [x] Same-filesystem staging uses host-controlled names and strict permissions, writes full contents, and executes durability barriers for the current complete-payload adapter path.
+- [ ] Applies modes for the full v1 metadata contract.
 - [ ] Source, parent, destination, directory absence, policy, and digest are revalidated at required boundaries.
-- [ ] The explicit file commit point and deterministic action schedule match the approved plan.
+- [x] Source identity/content digest revalidation rejects stale plans before visible file commit in the current adapter path.
+- [x] The explicit file commit point and deterministic action schedule match the approved plan for add, update, delete, and move complete-payload actions.
 
 **Verification:**
 
+- [x] Focused POSIX integration tests cover staging/commit for add, update, delete, move and stale-plan rejection before visible file commit.
 - [ ] Pre-commit fault tests prove either no visible effect or fully reported reversible directory effects.
 
 **Dependencies:** Task 14.
@@ -580,6 +583,15 @@ intent-before-effect ordering, failure rollback, and incomplete journal discover
 - Integration tests
 
 **Estimated scope:** Medium.
+
+**Implementation note:** Added `PosixPatchCommitAdapter` with same-workspace
+staging under `.fabrica/apply-patch/stage/<journal-digest>/`, strict staged
+payload permissions, file/directory durability barriers, source evidence
+revalidation, and deterministic commit execution for add/update/delete/move
+steps. Focused integration tests passed for successful mixed-operation commit and
+stale-plan rejection. Remaining Task 15 work: full metadata/mode handling,
+broader parent/destination/policy revalidation, and pre-commit fault-injection
+coverage.
 
 ### Task 16: Implement Rollback and Startup Recovery
 
