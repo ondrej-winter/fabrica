@@ -52,6 +52,10 @@ class PosixPatchCommitAdapter:
             return stale_result
 
         stage_root = self._stage_root(journal)
+        staging_result = _revalidate_staging(stage_root, plan)
+        if staging_result is not None:
+            return staging_result
+
         outcomes: list[PatchPathOutcome] = []
         try:
             for step in plan.commit_steps:
@@ -119,6 +123,20 @@ def _revalidate_plan(root: Path, plan: PatchPlan) -> PatchResult | None:
             return _rejected("STALE_PLAN", f"path content changed before commit: {evidence.path}")
         if evidence.exists and current.identity_digest != evidence.identity_digest:
             return _rejected("STALE_PLAN", f"path identity changed before commit: {evidence.path}")
+    return None
+
+
+def _revalidate_staging(stage_root: Path, plan: PatchPlan) -> PatchResult | None:
+    for action in plan.actions:
+        if action.kind not in {PatchActionKind.ADD, PatchActionKind.UPDATE, PatchActionKind.MOVE}:
+            continue
+        stage_path = _stage_path(stage_root, action)
+        try:
+            path_stat = stage_path.stat()
+        except FileNotFoundError:
+            return _rejected("STALE_PLAN", f"staged payload missing before commit: {action.path}")
+        if not stage_path.is_file() or path_stat.st_size != len(render_added_text(action.added_lines)):
+            return _rejected("STALE_PLAN", f"staged payload changed before commit: {action.path}")
     return None
 
 

@@ -602,6 +602,12 @@ Focused integration coverage rejects a replaced destination parent before visibl
 file commit. Remaining Task 15 work still includes full metadata/mode handling,
 policy revalidation, and broader pre-commit fault-injection coverage.
 
+**Incremental update:** Added commit-time staged-payload revalidation before the
+file commit loop. Missing or changed staged payloads now reject as stale before
+any visible file operation, with focused integration coverage for the missing
+payload case. Remaining Task 15 work still includes full metadata/mode handling,
+policy revalidation, and broader pre-commit fault-injection coverage.
+
 ### Task 16: Implement Rollback and Startup Recovery
 
 **Description:** Implement safe rollback after commit failures and startup handling for incomplete journals.

@@ -101,6 +101,30 @@ def test_posix_commit_adapter_rejects_replaced_destination_parent_before_visible
     assert not (tmp_path / "generated" / "add.py").exists()
 
 
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rejects_missing_stage_payload_before_visible_file_commit(tmp_path: Path) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+    stage_payload = (
+        tmp_path
+        / ".fabrica"
+        / "apply-patch"
+        / "stage"
+        / journal.journal_digest.removeprefix("sha256:")
+        / "000000.payload"
+    )
+    stage_payload.unlink()
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert not (tmp_path / "generated" / "add.py").exists()
+
+
 def _prepared_plan_and_journal(tmp_path: Path, actions: tuple[PatchAction, ...]):
     snapshot = PosixPatchWorkspaceSnapshotAdapter(
         tmp_path,
