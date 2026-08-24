@@ -108,6 +108,49 @@ def test_posix_commit_adapter_rejects_replaced_destination_parent_before_visible
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rejects_add_destination_created_before_visible_file_commit(tmp_path: Path) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+    (tmp_path / "generated" / "add.py").write_text("external file\n", encoding="utf-8")
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert (tmp_path / "generated" / "add.py").read_text(encoding="utf-8") == "external file\n"
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rejects_move_destination_created_before_visible_file_commit(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "move.py").write_text("old move\n", encoding="utf-8")
+    actions = (
+        PatchAction(
+            index=0,
+            kind=PatchActionKind.MOVE,
+            path="src/move.py",
+            destination_path="generated/move.py",
+            added_lines=("moved = True",),
+        ),
+    )
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+    (tmp_path / "generated" / "move.py").write_text("external destination\n", encoding="utf-8")
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert (tmp_path / "src" / "move.py").read_text(encoding="utf-8") == "old move\n"
+    assert (tmp_path / "generated" / "move.py").read_text(encoding="utf-8") == "external destination\n"
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
 def test_posix_commit_adapter_rejects_missing_stage_payload_before_visible_file_commit(tmp_path: Path) -> None:
     actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)
     plan, journal = _prepared_plan_and_journal(tmp_path, actions)

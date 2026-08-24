@@ -113,18 +113,62 @@ class PosixPatchCommitAdapter:
 def _revalidate_plan(root: Path, plan: PatchPlan) -> PatchResult | None:
     created_directory_paths = frozenset(directory.path for directory in plan.created_directories)
     for evidence in plan.path_evidence:
-        current = _snapshot_path(root, evidence.path)
-        if current.exists != evidence.exists:
-            return _rejected("STALE_PLAN", f"path existence changed before commit: {evidence.path}")
-        expected_ancestor_digest = evidence.metadata.get("ancestor_identity_digest")
-        current_ancestor_digest = _ancestor_digest(root, evidence.path, excluded_directories=created_directory_paths)
-        if expected_ancestor_digest is not None and current_ancestor_digest != expected_ancestor_digest:
-            return _rejected("STALE_PLAN", f"path ancestor changed before commit: {evidence.path}")
-        if evidence.exists and current.content_digest != evidence.content_digest:
-            return _rejected("STALE_PLAN", f"path content changed before commit: {evidence.path}")
-        if evidence.exists and current.identity_digest != evidence.identity_digest:
-            return _rejected("STALE_PLAN", f"path identity changed before commit: {evidence.path}")
+        source_result = _revalidate_path_evidence(root, evidence, created_directory_paths)
+        if source_result is not None:
+            return source_result
+    for action in plan.actions:
+        destination_result = _revalidate_destination_safety(root, plan, action, created_directory_paths)
+        if destination_result is not None:
+            return destination_result
     return None
+
+
+def _revalidate_path_evidence(
+    root: Path, evidence: PatchPathEvidence, created_directory_paths: frozenset[str]
+) -> PatchResult | None:
+    current = _snapshot_path(root, evidence.path)
+    if current.exists != evidence.exists:
+        return _rejected("STALE_PLAN", f"path existence changed before commit: {evidence.path}")
+    expected_ancestor_digest = evidence.metadata.get("ancestor_identity_digest")
+    current_ancestor_digest = _ancestor_digest(root, evidence.path, excluded_directories=created_directory_paths)
+    if expected_ancestor_digest is not None and current_ancestor_digest != expected_ancestor_digest:
+        return _rejected("STALE_PLAN", f"path ancestor changed before commit: {evidence.path}")
+    if evidence.exists and current.content_digest != evidence.content_digest:
+        return _rejected("STALE_PLAN", f"path content changed before commit: {evidence.path}")
+    if evidence.exists and current.identity_digest != evidence.identity_digest:
+        return _rejected("STALE_PLAN", f"path identity changed before commit: {evidence.path}")
+    return None
+
+
+def _revalidate_destination_safety(
+    root: Path, plan: PatchPlan, action: PatchAction, created_directory_paths: frozenset[str]
+) -> PatchResult | None:
+    destination_path = _destination_path(action)
+    if destination_path is None:
+        return None
+    destination_evidence = _evidence_for_path(plan, destination_path)
+    if destination_evidence is None:
+        return _rejected("STALE_PLAN", f"destination evidence missing before commit: {destination_path}")
+    current_destination = _snapshot_path(root, destination_path)
+    if current_destination.exists:
+        return _rejected("STALE_PLAN", f"destination appeared before commit: {destination_path}")
+    expected_ancestor_digest = destination_evidence.metadata.get("ancestor_identity_digest")
+    current_ancestor_digest = _ancestor_digest(root, destination_path, excluded_directories=created_directory_paths)
+    if expected_ancestor_digest is not None and current_ancestor_digest != expected_ancestor_digest:
+        return _rejected("STALE_PLAN", f"destination ancestor changed before commit: {destination_path}")
+    return None
+
+
+def _destination_path(action: PatchAction) -> str | None:
+    if action.kind is PatchActionKind.ADD:
+        return action.path
+    if action.kind is PatchActionKind.MOVE:
+        return action.destination_path
+    return None
+
+
+def _evidence_for_path(plan: PatchPlan, path: str) -> PatchPathEvidence | None:
+    return next((item for item in plan.path_evidence if item.path == path), None)
 
 
 def _revalidate_staging(stage_root: Path, plan: PatchPlan) -> PatchResult | None:
@@ -146,7 +190,9 @@ def _revalidate_staging(stage_root: Path, plan: PatchPlan) -> PatchResult | None
 def _payload_mode(plan: PatchPlan, action: PatchAction) -> int:
     if action.kind is PatchActionKind.ADD:
         return 0o644
-    evidence = next(item for item in plan.path_evidence if item.path == action.path)
+    evidence = _evidence_for_path(plan, action.path)
+    if evidence is None:
+        return 0o644
     mode = evidence.metadata.get("mode")
     if not isinstance(mode, int):
         return 0o644

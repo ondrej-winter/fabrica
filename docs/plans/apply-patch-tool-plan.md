@@ -566,7 +566,7 @@ intent-before-effect ordering, failure rollback, and incomplete journal discover
 
 - [x] Same-filesystem staging uses host-controlled names and strict permissions, writes full contents, and executes durability barriers for the current complete-payload adapter path.
 - [ ] Applies modes for the full v1 metadata contract.
-- [ ] Source, parent, destination, directory absence, policy, and digest are revalidated at required boundaries.
+- [ ] Source, parent, destination, directory absence, policy, and digest are revalidated at required boundaries. Source identity/content, destination absence, and destination parent identity are covered in the current adapter path; remaining policy and full digest-bound revalidation stay open.
 - [x] Source identity/content digest revalidation rejects stale plans before visible file commit in the current adapter path.
 - [x] The explicit file commit point and deterministic action schedule match the approved plan for add, update, delete, and move complete-payload actions.
 
@@ -598,6 +598,9 @@ planned paths, including absent add/move destinations whose derived parent
 directories may have been created during preparation. Directory ancestor evidence
 now uses stable device/inode/mode identity rather than link-count-sensitive file
 identity so planned child directory creation does not make a valid plan stale.
+The adapter now explicitly rejects add/move destination appearance before the
+visible file commit point and verifies destination parent identity against the
+approved plan evidence.
 Focused integration coverage rejects a replaced destination parent before visible
 file commit. Remaining Task 15 work still includes full metadata/mode handling,
 policy revalidation, and broader pre-commit fault-injection coverage.

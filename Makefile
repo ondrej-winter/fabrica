@@ -1,7 +1,7 @@
 .PHONY: help format lint type import-lint test quality pre-commit test-live-codex test-live-runtime run-live-cli commit-message commit deps-tree deps-outdated deps-audit
 
 PROMPT ?= Reply with the single word: pong
-FABRICA_GLOBAL_OPTIONS ?=
+FABRICA_GLOBAL_OPTIONS ?= --verbose-diagnostics
 
 help:
 	@echo "Available targets:"
