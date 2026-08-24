@@ -80,6 +80,27 @@ def test_posix_commit_adapter_rejects_stale_plan_before_visible_file_commit(tmp_
     assert (tmp_path / "src" / "update.py").read_text(encoding="utf-8") == "external change\n"
 
 
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rejects_replaced_destination_parent_before_visible_file_commit(
+    tmp_path: Path,
+) -> None:
+    destination_parent = tmp_path / "generated"
+    destination_parent.mkdir()
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+    destination_parent.rmdir()
+    destination_parent.mkdir()
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert not (tmp_path / "generated" / "add.py").exists()
+
+
 def _prepared_plan_and_journal(tmp_path: Path, actions: tuple[PatchAction, ...]):
     snapshot = PosixPatchWorkspaceSnapshotAdapter(
         tmp_path,

@@ -593,6 +593,15 @@ stale-plan rejection. Remaining Task 15 work: full metadata/mode handling,
 broader parent/destination/policy revalidation, and pre-commit fault-injection
 coverage.
 
+**Incremental update:** Added commit-time ancestor identity revalidation for
+planned paths, including absent add/move destinations whose derived parent
+directories may have been created during preparation. Directory ancestor evidence
+now uses stable device/inode/mode identity rather than link-count-sensitive file
+identity so planned child directory creation does not make a valid plan stale.
+Focused integration coverage rejects a replaced destination parent before visible
+file commit. Remaining Task 15 work still includes full metadata/mode handling,
+policy revalidation, and broader pre-commit fault-injection coverage.
+
 ### Task 16: Implement Rollback and Startup Recovery
 
 **Description:** Implement safe rollback after commit failures and startup handling for incomplete journals.

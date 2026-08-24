@@ -188,7 +188,12 @@ def _ancestor_digest(root: Path, path: str) -> str:
     except OSError:
         current = root
         path_stat = current.stat()
-    return _identity_digest(path_stat)
+    return _directory_identity_digest(path_stat)
+
+
+def _directory_identity_digest(path_stat: os.stat_result) -> str:
+    payload = f"{path_stat.st_dev}:{path_stat.st_ino}:{path_stat.st_mode}"
+    return _digest_bytes(payload.encode("utf-8"))
 
 
 def _identity_digest(path_stat: os.stat_result) -> str:

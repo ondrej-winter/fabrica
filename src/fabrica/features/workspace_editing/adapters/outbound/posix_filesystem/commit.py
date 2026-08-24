@@ -106,10 +106,15 @@ class PosixPatchCommitAdapter:
 
 
 def _revalidate_plan(root: Path, plan: PatchPlan) -> PatchResult | None:
+    created_directory_paths = frozenset(directory.path for directory in plan.created_directories)
     for evidence in plan.path_evidence:
         current = _snapshot_path(root, evidence.path)
         if current.exists != evidence.exists:
             return _rejected("STALE_PLAN", f"path existence changed before commit: {evidence.path}")
+        expected_ancestor_digest = evidence.metadata.get("ancestor_identity_digest")
+        current_ancestor_digest = _ancestor_digest(root, evidence.path, excluded_directories=created_directory_paths)
+        if expected_ancestor_digest is not None and current_ancestor_digest != expected_ancestor_digest:
+            return _rejected("STALE_PLAN", f"path ancestor changed before commit: {evidence.path}")
         if evidence.exists and current.content_digest != evidence.content_digest:
             return _rejected("STALE_PLAN", f"path content changed before commit: {evidence.path}")
         if evidence.exists and current.identity_digest != evidence.identity_digest:
@@ -122,14 +127,37 @@ def _snapshot_path(root: Path, path: str) -> PatchPathEvidence:
     try:
         path_stat = absolute.lstat()
     except FileNotFoundError:
-        return PatchPathEvidence(path=path, exists=False)
+        return PatchPathEvidence(
+            path=path,
+            exists=False,
+            metadata={"ancestor_identity_digest": _ancestor_digest(root, path)},
+        )
     content = absolute.read_bytes()
     return PatchPathEvidence(
         path=path,
         exists=True,
         content_digest=_digest_bytes(content),
         identity_digest=_identity_digest(path_stat),
+        metadata={"ancestor_identity_digest": _ancestor_digest(root, path)},
     )
+
+
+def _ancestor_digest(root: Path, path: str, excluded_directories: frozenset[str] = frozenset()) -> str:
+    parent = path.rpartition("/")[0]
+    while parent in excluded_directories:
+        parent = parent.rpartition("/")[0]
+    current = root if not parent else root / parent
+    try:
+        path_stat = current.stat()
+    except OSError:
+        current = root
+        path_stat = current.stat()
+    return _directory_identity_digest(path_stat)
+
+
+def _directory_identity_digest(path_stat: os.stat_result) -> str:
+    payload = f"{path_stat.st_dev}:{path_stat.st_ino}:{path_stat.st_mode}"
+    return _digest_bytes(payload.encode("utf-8"))
 
 
 def _action_for_step(plan: PatchPlan, action_index: int | None) -> PatchAction:
