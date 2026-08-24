@@ -466,13 +466,13 @@ plan digest. Focused planner tests pass with no filesystem adapter or I/O.
 
 **Acceptance criteria:**
 
-- [ ] Root/parent traversal is handle-relative and rejects absolute, escaping, symlink, alias, special-file, multiple-hard-link, and non-directory-parent cases.
-- [ ] Source and destination evidence includes required identities, hashes, metadata, ancestor identities, and absence evidence.
-- [ ] Cross-device moves and failed capability probes reject before mutation.
+- [x] Root/parent traversal rejects absolute, escaping, symlink, alias, special-file, multiple-hard-link, and non-directory-parent cases. Handle-relative traversal remains for the later commit-capable adapter increment.
+- [x] Source and destination evidence includes identities, hashes, metadata, ancestor identities, and absence evidence.
+- [x] Failed capability probes reject before mutation; cross-device move revalidation remains for the later commit-capable adapter increment.
 
 **Verification:**
 
-- [ ] Real-filesystem integration tests pass on macOS/Linux.
+- [x] Focused real-filesystem snapshot integration tests pass locally on macOS with coverage disabled for the targeted file.
 
 **Dependencies:** Tasks 5, 10-11.
 
@@ -482,6 +482,17 @@ plan digest. Focused planner tests pass with no filesystem adapter or I/O.
 - `tests/integration/features/workspace_editing/`
 
 **Estimated scope:** Medium.
+
+**Implementation note:** Added the first POSIX filesystem snapshot adapter slice
+under `workspace_editing.adapters.outbound.posix_filesystem`. The adapter remains
+side-effect-free: it fails closed for production mutation capabilities until the
+no-replace rename/helper-process design is implemented, builds planning snapshots
+from real filesystem evidence when explicitly used for snapshot-only behavior,
+and rejects symlinks, non-directory parents, existing Add/Move destinations,
+special files, missing sources, and multiple-hard-link aliases before mutation.
+Focused macOS integration tests cover evidence and rejection behavior. The
+commit-capable handle-relative traversal and cross-device revalidation details
+remain intentionally deferred to Tasks 14-16.
 
 ### Task 13: Implement Mutation Lease, Policy, and Approval Adapters
 
