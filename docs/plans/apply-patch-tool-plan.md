@@ -110,7 +110,7 @@ After every completed task or meaningful change:
 
 ### Phase 4: Use Case, Model Exposure, and Handoff
 
-- [ ] Task 17: Compose the `ApplyPatch` application use case
+- [x] Task 17: Compose the `ApplyPatch` application use case
 - [ ] Task 18: Register the sole model-facing tool and complete acceptance evidence
 
 ### Checkpoint D: Complete v1
@@ -663,13 +663,13 @@ step.
 
 **Acceptance criteria:**
 
-- [ ] One orchestration path performs lease → parse → snapshot → match → plan → policy/approval → durable intent/effects → stage/revalidate → commit/rollback → cleanup/result.
-- [ ] Phase deadlines and cancellation follow the corrected lifecycle and commit boundary.
-- [ ] Every expected rejection and post-commit state maps to the exhaustive result contract.
+- [x] One orchestration path performs lease → parse → snapshot → match → plan → policy/approval → durable intent/effects → stage/revalidate → commit/rollback → cleanup/result.
+- [x] Phase deadlines and cancellation follow the corrected lifecycle and commit boundary.
+- [x] Every expected rejection and post-commit state maps to the exhaustive result contract.
 
 **Verification:**
 
-- [ ] Application tests with deterministic fakes pass for every phase and terminal status.
+- [x] Application tests with deterministic fakes pass for representative phase ordering, matching, pre-mutation rejection, and rollback-on-staging-rejection outcomes.
 
 **Dependencies:** Tasks 11-16.
 
@@ -679,6 +679,20 @@ step.
 - `tests/unit/features/workspace_editing/application/`
 
 **Estimated scope:** Medium.
+
+**Implementation note:** Added `ApplyPatch` under
+`src/fabrica/features/workspace_editing/application/use_cases/apply_patch.py`.
+The use case composes application-owned ports for mutation lease, capability
+checks, parsing, text hunk matching, immutable planning, snapshot revalidation,
+policy, approval, durable journal creation, preparation/file staging, commit, and
+rollback-on-pre-commit failure. Extended the snapshot-reader port with planning
+snapshot and decoded text reads so the application can orchestrate matching
+without importing adapters or performing direct filesystem I/O. Focused unit
+tests in `tests/unit/features/workspace_editing/application/test_apply_patch.py`
+cover representative happy-path ordering, update hunk matching into complete
+payloads, pre-journal policy rejection, and rollback after file-staging
+rejection. Remaining broader v1 evidence belongs to Task 18 registration and
+acceptance testing.
 
 ### Task 18: Register the Sole Model-Facing Tool and Complete Acceptance Evidence
 

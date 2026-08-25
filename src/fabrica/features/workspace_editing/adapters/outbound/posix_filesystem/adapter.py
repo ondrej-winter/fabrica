@@ -17,6 +17,11 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchResultStatus,
 )
 from fabrica.features.workspace_editing.application.errors import patch_error
+from fabrica.features.workspace_editing.application.text_snapshot import (
+    PatchTextDecodingError,
+    PatchTextSnapshot,
+    decode_patch_text,
+)
 from fabrica.features.workspace_editing.application.use_cases import PatchPlanningSnapshot
 
 
@@ -49,10 +54,27 @@ class PosixPatchWorkspaceSnapshotAdapter:
             return snapshot_result
         return None
 
+    async def snapshot_for_planning(self, actions: tuple[PatchAction, ...]) -> PatchPlanningSnapshot | PatchResult:
+        """Return planning evidence for parsed actions or a no-mutation rejection."""
+        return self.build_planning_snapshot(actions)
+
+    async def read_text_snapshot(self, path: str) -> PatchTextSnapshot | PatchResult:
+        """Read and decode an existing workspace-relative text file."""
+        try:
+            return decode_patch_text((self._workspace_root() / path).read_bytes())
+        except PatchTextDecodingError as err:
+            return PatchResult(
+                status=PatchResultStatus.REJECTED,
+                mutation_guarantee=err.error.mutation_guarantee,
+                error=err.error,
+            )
+        except OSError as err:
+            return _rejected("IO_ERROR", f"could not read source text: {err.strerror}")
+
     def build_planning_snapshot(self, actions: tuple[PatchAction, ...]) -> PatchPlanningSnapshot | PatchResult:
         """Return planning evidence for parsed actions or a no-mutation rejection."""
         try:
-            root = self.workspace_root.resolve(strict=True)
+            root = self._workspace_root()
         except OSError as err:
             return _rejected("IO_ERROR", f"could not resolve workspace root: {err.strerror}")
 
@@ -79,6 +101,9 @@ class PosixPatchWorkspaceSnapshotAdapter:
             evidence_by_path=evidence_by_path,
             existing_directories=frozenset(existing_directories),
         )
+
+    def _workspace_root(self) -> Path:
+        return self.workspace_root.resolve(strict=True)
 
 
 def _walk_existing_directories(root: Path) -> tuple[str, ...]:

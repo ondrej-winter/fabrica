@@ -1,16 +1,22 @@
 """Application-owned ports for safe apply-patch workspace mutation."""
 
-from collections.abc import AsyncIterator
-from contextlib import AbstractAsyncContextManager
-from datetime import datetime
-from typing import Protocol
+from __future__ import annotations
 
-from fabrica.features.workspace_editing.application.dtos import PatchPlan, PatchResult
-from fabrica.features.workspace_editing.application.dtos.recovery import (
-    PatchJournalRecord,
-    PatchJournalState,
-    PatchRecoveryDecision,
-)
+from contextlib import AbstractAsyncContextManager
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+    from datetime import datetime
+
+    from fabrica.features.workspace_editing.application.dtos import PatchAction, PatchPlan, PatchResult
+    from fabrica.features.workspace_editing.application.dtos.recovery import (
+        PatchJournalRecord,
+        PatchJournalState,
+        PatchRecoveryDecision,
+    )
+    from fabrica.features.workspace_editing.application.text_snapshot import PatchTextSnapshot
+    from fabrica.features.workspace_editing.application.use_cases.plan_patch import PatchPlanningSnapshot
 
 
 class PatchMutationLease(AbstractAsyncContextManager["PatchMutationLease"], Protocol):
@@ -50,6 +56,14 @@ class PatchWorkspaceSnapshotReader(Protocol):
 
     async def snapshot_plan_inputs(self, plan: PatchPlan) -> PatchResult | None:
         """Snapshot and validate plan inputs without mutating the workspace."""
+        ...
+
+    async def snapshot_for_planning(self, actions: tuple[PatchAction, ...]) -> PatchPlanningSnapshot | PatchResult:
+        """Return planning evidence for parsed actions or a no-mutation rejection."""
+        ...
+
+    async def read_text_snapshot(self, path: str) -> PatchTextSnapshot | PatchResult:
+        """Return decoded immutable text for an existing patch source file."""
         ...
 
 
