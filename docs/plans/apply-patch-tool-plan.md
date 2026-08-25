@@ -702,7 +702,7 @@ acceptance testing.
 
 - [x] Registration exposes exactly the canonical `{ "input": string }` schema and specified description; provider raw-string repair remains adapter-only.
 - [x] Recoverable rejections continue, success returns normally, and partial/rollback-failed/indeterminate outcomes stop the runtime fatally at the registered-tool outcome mapping boundary.
-- [ ] All spec acceptance scenarios are traceable to tests; README, specs/ADR indexes, import-linter policy, and platform support notes are current.
+- [ ] All spec acceptance scenarios are traceable to tests; README, specs/ADR indexes, import-linter policy, and platform support notes are current. Acceptance traceability, README architecture notes, specs index, and current platform support notes are documented; ADR index, CI platform evidence, remaining open scenario coverage, and final validation remain open.
 
 **Verification:**
 
@@ -746,6 +746,15 @@ model can request the composed `apply_patch` tool, the injected use case receive
 the raw canonical `input`, and committed patch output returns through the runtime
 loop. Remaining Task 18 work is full acceptance traceability, documentation/index
 updates, platform CI evidence, and the full quality gate.
+
+**Incremental update:** Added
+`docs/apply-patch-acceptance-traceability.md` to map the v1 acceptance scenarios
+from `docs/specs/apply-patch-tool.md` to current unit/integration test evidence
+and explicitly list open safety scenarios. Linked the traceability document from
+the specs index and README architecture notes, including the current fail-closed
+production POSIX platform support status. Remaining Task 18 work is ADR index
+review, Linux/macOS CI evidence, closing or deferring the open acceptance
+scenarios, and the full quality gate.
 
 ## Risks and Mitigations
 
