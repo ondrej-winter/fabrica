@@ -11,6 +11,7 @@ from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model import (
     PydanticAIToolAwareTurn,
 )
 from fabrica.features.agent_runtime.adapters.outbound.registered_tool import (
+    AsyncRegisteredTool,
     RegisteredSkillToolPreparer,
     RegisteredTool,
     RegisteredToolExecutor,
@@ -111,7 +112,7 @@ class ModelDrivenSkillRuntime:
 def create_tool_loop_runtime(
     *,
     model: ToolAwareAgentModel,
-    tools: tuple[RegisteredTool, ...] = (),
+    tools: tuple[RegisteredTool | AsyncRegisteredTool, ...] = (),
     limits: ToolLoopLimits | None = None,
 ) -> ToolLoopRuntime:
     """Create an offline tool-loop runtime from explicit in-process tools.
@@ -131,7 +132,7 @@ def create_tool_loop_runtime(
 def create_pydantic_ai_tool_loop_runtime(
     *,
     turn_runner: PydanticAIToolAwareTurn,
-    tools: tuple[RegisteredTool, ...] = (),
+    tools: tuple[RegisteredTool | AsyncRegisteredTool, ...] = (),
     limits: ToolLoopLimits | None = None,
 ) -> ToolLoopRuntime:
     """Create an offline PydanticAI-shaped runtime with explicit registered tools.

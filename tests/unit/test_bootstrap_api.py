@@ -27,6 +27,7 @@ EXPECTED_BOOTSTRAP_EXPORTS = [
     "SkillScriptPolicyEvaluationOptions",
     "StagedGitToolOptions",
     "ToolLoopRuntime",
+    "create_apply_patch_registered_tool_adapter",
     "create_codex_commit_message_workflow",
     "create_codex_confirmed_commit_workflow",
     "create_codex_pydantic_ai_runtime",

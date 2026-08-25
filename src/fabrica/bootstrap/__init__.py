@@ -43,6 +43,7 @@ from fabrica.bootstrap.composition.tool_loop import (
     create_pydantic_ai_tool_loop_runtime,
     create_tool_loop_runtime,
 )
+from fabrica.bootstrap.composition.workspace_editing import create_apply_patch_registered_tool_adapter
 
 __all__ = [
     "DEFAULT_CODEX_AUTH_FILE",
@@ -58,6 +59,7 @@ __all__ = [
     "SkillScriptPolicyEvaluationOptions",
     "StagedGitToolOptions",
     "ToolLoopRuntime",
+    "create_apply_patch_registered_tool_adapter",
     "create_codex_commit_message_workflow",
     "create_codex_confirmed_commit_workflow",
     "create_codex_pydantic_ai_runtime",

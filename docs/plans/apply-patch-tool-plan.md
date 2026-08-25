@@ -700,8 +700,8 @@ acceptance testing.
 
 **Acceptance criteria:**
 
-- [ ] Registration exposes exactly the canonical `{ "input": string }` schema and specified description; provider raw-string repair remains adapter-only.
-- [ ] Recoverable rejections continue, success returns normally, and partial/rollback-failed/indeterminate outcomes stop the runtime fatally.
+- [x] Registration exposes exactly the canonical `{ "input": string }` schema and specified description; provider raw-string repair remains adapter-only.
+- [x] Recoverable rejections continue, success returns normally, and partial/rollback-failed/indeterminate outcomes stop the runtime fatally at the registered-tool outcome mapping boundary.
 - [ ] All spec acceptance scenarios are traceable to tests; README, specs/ADR indexes, import-linter policy, and platform support notes are current.
 
 **Verification:**
@@ -724,6 +724,28 @@ acceptance testing.
 - `pyproject.toml` if boundary or dependency changes are justified
 
 **Estimated scope:** Medium.
+
+**Implementation note:** Added the first Task 18 registration slice under
+`workspace_editing.adapters.inbound.registered_tool`. The adapter exposes the
+sole model-facing `apply_patch` `AsyncRegisteredTool` with the canonical
+`{"input": string}` schema and recommended description, rejects non-string input
+before invoking the application use case, and maps committed results to success,
+no-mutation patch rejections to recoverable model-loop rejections, and retained,
+partial, rollback-failed, or indeterminate mutation guarantees to fatal runtime
+stop outcomes. Focused unit tests cover the schema/description and result-status
+Remaining Task 18 work is bootstrap composition, end-to-end offline
+model-tool-loop acceptance evidence, documentation/index updates, platform CI
+evidence, and the full quality gate.
+
+**Incremental update:** Added bootstrap composition for explicitly supplied
+apply-patch application dependencies through
+`create_apply_patch_registered_tool_adapter`. The helper exposes the model-facing
+tool without filesystem probing, approval prompting, backend calls, or mutation
+during construction. Added an offline tool-loop composition test proving a fake
+model can request the composed `apply_patch` tool, the injected use case receives
+the raw canonical `input`, and committed patch output returns through the runtime
+loop. Remaining Task 18 work is full acceptance traceability, documentation/index
+updates, platform CI evidence, and the full quality gate.
 
 ## Risks and Mitigations
 
