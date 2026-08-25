@@ -42,6 +42,9 @@ from fabrica.features.developer_workflow.application.ports import GitCommitError
 from fabrica.features.developer_workflow.application.use_cases import ConfirmedCommitWorkflow
 
 GIT_EXECUTABLE = shutil.which("git") or "git"
+SHORT_GIT_TIMEOUT_SECONDS = 2.5
+DEFAULT_CONFIRMED_COMMIT_PRE_COMMIT_TIMEOUT_SECONDS = 120.0
+CUSTOM_PRE_COMMIT_TIMEOUT_SECONDS = 180.0
 
 
 @dataclass
@@ -125,6 +128,23 @@ def test_confirmed_commit_workflow_creates_commit_from_parsed_recommendation_mes
     assert result.output_text is None
     assert _git_commit_count(git_repository) == 1
     assert _git_log_message(git_repository) == commit_message
+
+
+def test_confirmed_commit_options_use_dedicated_pre_commit_timeout_default() -> None:
+    options = CommitMessageWorkflowOptions(git_timeout_seconds=SHORT_GIT_TIMEOUT_SECONDS)
+
+    assert options.git_timeout_seconds == SHORT_GIT_TIMEOUT_SECONDS
+    assert options.pre_commit_timeout_seconds == DEFAULT_CONFIRMED_COMMIT_PRE_COMMIT_TIMEOUT_SECONDS
+
+
+def test_confirmed_commit_options_allow_pre_commit_timeout_override() -> None:
+    options = CommitMessageWorkflowOptions(
+        git_timeout_seconds=SHORT_GIT_TIMEOUT_SECONDS,
+        pre_commit_timeout_seconds=CUSTOM_PRE_COMMIT_TIMEOUT_SECONDS,
+    )
+
+    assert options.git_timeout_seconds == SHORT_GIT_TIMEOUT_SECONDS
+    assert options.pre_commit_timeout_seconds == CUSTOM_PRE_COMMIT_TIMEOUT_SECONDS
 
 
 def test_confirmed_commit_workflow_allows_repository_without_pre_commit_config(tmp_path: Path) -> None:

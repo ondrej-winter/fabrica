@@ -31,6 +31,9 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess import
     GitStagedChangesSubprocessLoader,
     PreCommitSubprocessRunner,
 )
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.pre_commit_commands import (
+    DEFAULT_PRE_COMMIT_TIMEOUT_SECONDS,
+)
 from fabrica.features.developer_workflow.adapters.outbound.pre_commit_registered_tool import (
     create_pre_commit_registered_tools,
 )
@@ -69,6 +72,7 @@ class CommitMessageWorkflowOptions:
     staged_diff_bounds: GitStagedDiffBounds | None = None
     skill_bounds: SkillContextBounds | None = None
     git_timeout_seconds: float = 10.0
+    pre_commit_timeout_seconds: float = DEFAULT_PRE_COMMIT_TIMEOUT_SECONDS
     git_working_directory: Path | None = None
     max_parallel_analysis: int = 4
     verbose_diagnostics: bool = False
@@ -202,7 +206,7 @@ def create_confirmed_commit_workflow(
         ),
         pre_commit_runner=PreCommitSubprocessRunner(
             working_directory=workflow_options.git_working_directory,
-            timeout_seconds=workflow_options.git_timeout_seconds,
+            timeout_seconds=workflow_options.pre_commit_timeout_seconds,
             verbose_diagnostics=workflow_options.verbose_diagnostics,
         ),
         evidence_recorder=evidence_recording_runtime,
