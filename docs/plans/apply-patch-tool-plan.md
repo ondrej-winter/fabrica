@@ -626,9 +626,9 @@ pre-commit fault-injection coverage.
 
 **Acceptance criteria:**
 
-- [ ] Rollback never overwrites or removes independently changed paths and removes plan-created directories deepest-first only when identity and emptiness match.
-- [ ] All terminal states include required per-path and directory evidence.
-- [ ] Startup blocks mutation on incomplete journals; only evidence-proven rollback is automatic, otherwise status is `RECOVERY_REQUIRED`.
+- [ ] Rollback never overwrites or removes independently changed paths and removes plan-created directories deepest-first only when identity and emptiness match. Directory-only rollback is implemented; file-operation rollback remains operator-gated until durable preimage evidence exists.
+- [ ] All terminal states include required per-path and directory evidence. Directory rollback/startup recovery evidence is implemented; file rollback evidence remains.
+- [ ] Startup blocks mutation on incomplete journals; only evidence-proven rollback is automatic, otherwise status is `RECOVERY_REQUIRED`. Prepared/preparing directory recovery is implemented; committing journals remain operator-gated.
 
 **Verification:**
 
@@ -643,6 +643,17 @@ pre-commit fault-injection coverage.
 - Integration tests
 
 **Estimated scope:** Medium.
+
+**Incremental update:** Added POSIX directory rollback and startup recovery seams
+to `PosixPatchCommitAdapter`. The adapter now removes journal-created directories
+deepest-first only when identity evidence matches and the directory is empty,
+retains independently populated directories without deleting external content, and
+classifies startup journals so planned/prepared preparation can recover safely while
+commit-phase journals require operator recovery. Focused integration tests cover
+safe directory rollback, retained external content, automatic prepared-journal
+recovery, and operator-gated commit recovery. Remaining Task 16 work: durable
+file-operation preimage evidence plus fault injection after every visible commit
+step.
 
 ### Task 17: Compose the `ApplyPatch` Application Use Case
 

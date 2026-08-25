@@ -10,12 +10,18 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
     PatchCommitOperation,
+    PatchDirectoryOutcome,
+    PatchDirectoryOutcomeState,
     PatchJournalRecord,
+    PatchJournalState,
     PatchMutationGuarantee,
     PatchPathEvidence,
     PatchPathOutcome,
     PatchPathOutcomeState,
     PatchPlan,
+    PatchRecoveryAction,
+    PatchRecoveryDecision,
+    PatchRecoveryStatus,
     PatchResult,
     PatchResultStatus,
 )
@@ -95,6 +101,115 @@ class PosixPatchCommitAdapter:
             created_directories=plan.created_directories,
             directory_outcomes=journal.created_directories,
             path_outcomes=tuple(outcomes),
+        )
+
+    async def roll_back(self, journal: PatchJournalRecord) -> PatchResult:
+        """Roll back evidence-proven reversible directory effects from a journal."""
+        directory_outcomes = _roll_back_directories(self._workspace_root(), journal)
+        uncertain = tuple(
+            directory
+            for directory in directory_outcomes
+            if directory.final_state is PatchDirectoryOutcomeState.REMOVAL_UNCERTAIN
+        )
+        retained = tuple(
+            directory
+            for directory in directory_outcomes
+            if directory.final_state is PatchDirectoryOutcomeState.RETAINED_EXTERNAL_CONTENT
+        )
+        if uncertain:
+            error = patch_error(
+                "ROLLBACK_FAILED",
+                message="rollback could not prove all reversible directory effects were removed safely",
+                metadata={"plan_digest": journal.plan_digest, "path": uncertain[0].path},
+            )
+            return PatchResult(
+                status=PatchResultStatus.ROLLBACK_FAILED,
+                mutation_guarantee=PatchMutationGuarantee.PARTIAL_OR_UNCERTAIN_MUTATION,
+                plan_digest=journal.plan_digest,
+                directory_outcomes=directory_outcomes,
+                path_outcomes=journal.path_outcomes,
+                error=error,
+            )
+        if retained:
+            error = patch_error(
+                "CREATED_DIRECTORY_RETAINED",
+                message="rollback retained independently changed directory content",
+                metadata={"path": retained[0].path, "final_state": retained[0].final_state.value},
+            )
+            return PatchResult(
+                status=PatchResultStatus.RECOVERY_REQUIRED,
+                mutation_guarantee=error.mutation_guarantee,
+                plan_digest=journal.plan_digest,
+                directory_outcomes=directory_outcomes,
+                path_outcomes=journal.path_outcomes,
+                error=error,
+            )
+        error = patch_error(
+            "COMMIT_FAILED_ROLLED_BACK",
+            message="interrupted patch preparation was rolled back safely",
+        )
+        return PatchResult(
+            status=PatchResultStatus.COMMIT_FAILED_ROLLED_BACK,
+            mutation_guarantee=error.mutation_guarantee,
+            plan_digest=journal.plan_digest,
+            directory_outcomes=directory_outcomes,
+            path_outcomes=journal.path_outcomes,
+            error=error,
+        )
+
+    async def inspect(self, journal: PatchJournalRecord) -> PatchRecoveryDecision:
+        """Decide whether startup recovery can proceed from durable journal state."""
+        if journal.state is PatchJournalState.PLANNED:
+            return PatchRecoveryDecision(
+                action=PatchRecoveryAction.NO_ACTION,
+                status=PatchRecoveryStatus.CLEAN,
+                mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
+                result_status=PatchResultStatus.COMMIT_FAILED_ROLLED_BACK,
+            )
+        if journal.state in {PatchJournalState.PREPARING, PatchJournalState.PREPARED}:
+            return PatchRecoveryDecision(
+                action=PatchRecoveryAction.ROLL_BACK_PREPARATION,
+                status=PatchRecoveryStatus.ROLLED_BACK,
+                mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
+                result_status=PatchResultStatus.COMMIT_FAILED_ROLLED_BACK,
+            )
+        return PatchRecoveryDecision(
+            action=PatchRecoveryAction.REQUIRE_OPERATOR_RECOVERY,
+            status=PatchRecoveryStatus.RECOVERY_REQUIRED,
+            mutation_guarantee=PatchMutationGuarantee.PARTIAL_OR_UNCERTAIN_MUTATION,
+            result_status=PatchResultStatus.RECOVERY_REQUIRED,
+        )
+
+    async def recover(self, journal: PatchJournalRecord) -> PatchResult:
+        """Perform safe startup recovery or report operator-gated recovery."""
+        decision = await self.inspect(journal)
+        if decision.action is PatchRecoveryAction.NO_ACTION:
+            error = patch_error(
+                "COMMIT_FAILED_ROLLED_BACK",
+                message="interrupted patch journal had no visible effects",
+            )
+            return PatchResult(
+                status=PatchResultStatus.COMMIT_FAILED_ROLLED_BACK,
+                mutation_guarantee=error.mutation_guarantee,
+                plan_digest=journal.plan_digest,
+                directory_outcomes=journal.created_directories,
+                path_outcomes=journal.path_outcomes,
+                error=error,
+            )
+        if decision.action is PatchRecoveryAction.ROLL_BACK_PREPARATION:
+            return await self.roll_back(journal)
+        error = patch_error(
+            "RECOVERY_REQUIRED",
+            message="incomplete commit journal requires operator recovery",
+            metadata={"journal_digest": journal.journal_digest, "journal_state": journal.state.value},
+        )
+        return PatchResult(
+            status=PatchResultStatus.RECOVERY_REQUIRED,
+            mutation_guarantee=PatchMutationGuarantee.PARTIAL_OR_UNCERTAIN_MUTATION,
+            plan_digest=journal.plan_digest,
+            directory_outcomes=journal.created_directories,
+            path_outcomes=journal.path_outcomes,
+            error=error,
         )
 
     def _workspace_root(self) -> Path:
@@ -276,6 +391,41 @@ def _committed_outcome(root: Path, action: PatchAction) -> PatchPathOutcome:
         final_state=PatchPathOutcomeState.COMMITTED,
         destination_path=action.destination_path,
         evidence=_snapshot_path(root, outcome_path),
+    )
+
+
+def _roll_back_directories(root: Path, journal: PatchJournalRecord) -> tuple[PatchDirectoryOutcome, ...]:
+    outcomes_by_path = {directory.path: directory for directory in journal.created_directories}
+    for directory in sorted(journal.created_directories, key=lambda item: item.path.count("/"), reverse=True):
+        if directory.final_state is not PatchDirectoryOutcomeState.CREATED:
+            continue
+        outcomes_by_path[directory.path] = _roll_back_directory(root, directory)
+    return tuple(outcomes_by_path[directory.path] for directory in journal.created_directories)
+
+
+def _roll_back_directory(root: Path, directory: PatchDirectoryOutcome) -> PatchDirectoryOutcome:
+    absolute = root / directory.path
+    try:
+        path_stat = absolute.lstat()
+    except FileNotFoundError:
+        return _directory_with_state(directory, PatchDirectoryOutcomeState.REMOVED)
+    if not stat.S_ISDIR(path_stat.st_mode) or _directory_identity_digest(path_stat) != directory.identity_digest:
+        return _directory_with_state(directory, PatchDirectoryOutcomeState.REMOVAL_UNCERTAIN)
+    try:
+        absolute.rmdir()
+        _fsync_directory(absolute.parent)
+    except OSError:
+        return _directory_with_state(directory, PatchDirectoryOutcomeState.RETAINED_EXTERNAL_CONTENT)
+    return _directory_with_state(directory, PatchDirectoryOutcomeState.REMOVED)
+
+
+def _directory_with_state(directory: PatchDirectoryOutcome, state: PatchDirectoryOutcomeState) -> PatchDirectoryOutcome:
+    return PatchDirectoryOutcome(
+        path=directory.path,
+        planned_effect=directory.planned_effect,
+        final_state=state,
+        reason=directory.reason,
+        identity_digest=directory.identity_digest,
     )
 
 

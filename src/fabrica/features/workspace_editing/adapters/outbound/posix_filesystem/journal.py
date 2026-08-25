@@ -10,6 +10,7 @@ from pathlib import Path
 from fabrica.features.workspace_editing.application.dtos import (
     PatchDirectoryOutcome,
     PatchDirectoryOutcomeState,
+    PatchDirectoryPlannedEffect,
     PatchJournalRecord,
     PatchJournalState,
     PatchMutationGuarantee,
@@ -219,8 +220,8 @@ def _read_record(path: Path) -> PatchJournalRecord:
         created_directories=tuple(
             PatchDirectoryOutcome(
                 path=item["path"],
-                planned_effect=item["planned_effect"],
-                final_state=item["final_state"],
+                planned_effect=PatchDirectoryPlannedEffect(item["planned_effect"]),
+                final_state=PatchDirectoryOutcomeState(item["final_state"]),
                 reason=item["reason"],
                 identity_digest=item["identity_digest"],
             )
@@ -248,7 +249,7 @@ def _journal_digest(plan_digest: str) -> str:
 
 
 def _identity_digest(path_stat: os.stat_result) -> str:
-    payload = f"{path_stat.st_dev}:{path_stat.st_ino}:{path_stat.st_mode}:{path_stat.st_nlink}"
+    payload = f"{path_stat.st_dev}:{path_stat.st_ino}:{path_stat.st_mode}"
     return "sha256:" + sha256(payload.encode("utf-8")).hexdigest()
 
 

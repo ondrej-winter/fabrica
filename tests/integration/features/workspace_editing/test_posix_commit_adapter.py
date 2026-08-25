@@ -17,7 +17,10 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchActionKind,
     PatchJournalRecord,
     PatchJournalState,
+    PatchMutationGuarantee,
     PatchPathOutcomeState,
+    PatchRecoveryAction,
+    PatchRecoveryStatus,
     PatchResultStatus,
 )
 from fabrica.features.workspace_editing.application.use_cases import PlanPatch
@@ -221,6 +224,74 @@ def test_posix_commit_adapter_rejects_changed_stage_payload_mode_before_visible_
     assert S_IMODE(update_path.stat().st_mode) == EXECUTABLE_UPDATE_MODE
 
 
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rolls_back_created_directories_deepest_first(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="src/generated/nested/new.py"),)
+    _plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+
+    result = run(PosixPatchCommitAdapter(tmp_path).roll_back(journal))
+
+    assert result.status is PatchResultStatus.COMMIT_FAILED_ROLLED_BACK
+    assert result.mutation_guarantee is PatchMutationGuarantee.NO_MUTATION
+    assert not (tmp_path / "src" / "generated").exists()
+    assert [outcome.final_state.value for outcome in result.directory_outcomes] == ["removed", "removed"]
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_roll_back_retains_directory_with_external_content(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="src/generated/new.py"),)
+    _plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    (tmp_path / "src" / "generated" / "external.txt").write_text("external\n", encoding="utf-8")
+
+    result = run(PosixPatchCommitAdapter(tmp_path).roll_back(journal))
+
+    assert result.status is PatchResultStatus.RECOVERY_REQUIRED
+    assert result.mutation_guarantee is PatchMutationGuarantee.REVERSIBLE_EFFECTS_RETAINED
+    assert (tmp_path / "src" / "generated" / "external.txt").is_file()
+    assert result.directory_outcomes[0].final_state.value == "retained_external_content"
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_startup_recovery_rolls_back_prepared_journal(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="src/generated/new.py"),)
+    _plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+
+    decision = run(adapter.inspect(journal))
+    result = run(adapter.recover(journal))
+
+    assert decision.action is PatchRecoveryAction.ROLL_BACK_PREPARATION
+    assert decision.status is PatchRecoveryStatus.ROLLED_BACK
+    assert result.status is PatchResultStatus.COMMIT_FAILED_ROLLED_BACK
+    assert not (tmp_path / "src" / "generated").exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_startup_recovery_requires_operator_for_commit_journal(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="src/generated/new.py"),)
+    _plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    committing_journal = PatchJournalRecord(
+        journal_digest=journal.journal_digest,
+        plan_digest=journal.plan_digest,
+        state=PatchJournalState.COMMITTING,
+        created_directories=journal.created_directories,
+    )
+    adapter = PosixPatchCommitAdapter(tmp_path)
+
+    decision = run(adapter.inspect(committing_journal))
+    result = run(adapter.recover(committing_journal))
+
+    assert decision.action is PatchRecoveryAction.REQUIRE_OPERATOR_RECOVERY
+    assert decision.status is PatchRecoveryStatus.RECOVERY_REQUIRED
+    assert result.status is PatchResultStatus.RECOVERY_REQUIRED
+    assert result.error is not None
+    assert result.error.code == "RECOVERY_REQUIRED"
+
+
 def _prepared_plan_and_journal(tmp_path: Path, actions: tuple[PatchAction, ...]):
     snapshot = PosixPatchWorkspaceSnapshotAdapter(
         tmp_path,
@@ -232,12 +303,8 @@ def _prepared_plan_and_journal(tmp_path: Path, actions: tuple[PatchAction, ...])
     journal_adapter = PosixPatchJournalAndPreparationAdapter(tmp_path)
     journal = run(journal_adapter.create(planned.plan))
     assert run(journal_adapter.prepare(planned.plan, journal)) is None
-    prepared_journal = PatchJournalRecord(
-        journal_digest=journal.journal_digest,
-        plan_digest=journal.plan_digest,
-        state=PatchJournalState.PREPARED,
-        created_directories=planned.plan.created_directories,
-    )
+    prepared_journal = run(journal_adapter.list_incomplete())[0]
+    assert prepared_journal.state is PatchJournalState.PREPARED
     return planned.plan, prepared_journal
 
 
