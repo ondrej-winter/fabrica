@@ -37,7 +37,7 @@ design decision.
 
 ## Local macOS evidence
 
-Recorded on 2026-08-23 from this repository workspace:
+Recorded on 2026-08-25 from this repository workspace:
 
 ```text
 uv run python scripts/apply_patch_posix_capability_probe.py --workspace .
@@ -53,5 +53,31 @@ Summary:
 - Unsupported through the standard library: no-replace rename.
 - Cleanup model decision: supervised helper-process/recovery ownership required.
 
-Linux evidence still needs to be recorded from a Linux runner before Checkpoint A
-can be accepted.
+## Local Docker Linux evidence
+
+Run the standard-library-only probe in an ephemeral Linux container from the
+repository root:
+
+```text
+docker run --rm \
+  --mount type=bind,src="$(pwd)",dst=/workspace,readonly \
+  --workdir /workspace \
+  python:3.13-slim \
+  python scripts/apply_patch_posix_capability_probe.py --workspace /tmp
+```
+
+Recorded on 2026-08-25 with `python:3.13-slim`:
+
+- Platform: Linux (`linux`), Python 3.13.15, `aarch64`.
+- Filesystem type: `overlayfs` for the container-owned `/tmp` probe workspace.
+- Supported through the standard library: traversal, no-follow open, exclusive
+  create, pinned identities, link count, mode bits, file fsync, directory fsync,
+  and file classification.
+- Unsupported through the standard library: no-replace rename.
+- Cleanup model decision: supervised helper-process/recovery ownership required.
+
+These platform checks are deliberately local rather than CI jobs. The repository
+does not commit volatile probe JSON because kernel, filesystem, Docker runtime,
+and host details can change. Production mutation remains fail-closed because the
+probe intentionally reports the unresolved portable no-replace rename and
+bounded-cleanup limitations.

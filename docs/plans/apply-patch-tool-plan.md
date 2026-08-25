@@ -763,6 +763,23 @@ acceptance-traceability record. Remaining Task 18 work is Linux/macOS CI
 evidence, closing or explicitly deferring the open acceptance scenarios, and the
 full quality gate.
 
+**Incremental update:** Recorded local macOS and Docker-based Linux POSIX
+capability evidence without expanding CI/CD. The standard-library probe passed
+on macOS and in `python:3.13-slim` on Linux `overlayfs`, with both environments
+reporting the expected fail-closed decision for unresolved portable no-replace
+rename and bounded-cleanup limitations. The capability-evidence and acceptance-
+traceability notes now include reproducible local and Docker commands instead of
+a CI matrix. Remaining Task 18 work is closing or explicitly deferring the open
+acceptance scenarios and completing the full quality gate.
+
+**Incremental update:** Tightened POSIX parent-chain validation to reject FIFO
+and other non-regular special-file parent components as
+`SPECIAL_FILE_UNSUPPORTED`, while retaining `PARENT_PATH_NOT_DIRECTORY` for
+regular-file parents. Added focused FIFO-parent integration coverage proving the
+rejection is side-effect-free. Remaining Task 18 work is closing or explicitly
+deferring the remaining open acceptance scenarios and completing the full
+quality gate.
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |

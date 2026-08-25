@@ -158,7 +158,13 @@ def _validate_parent_chain(root: Path, path: str) -> PatchResult | None:
         if stat.S_ISLNK(path_stat.st_mode):
             return _rejected("SYMLINK_PATH_UNSUPPORTED", f"symlink parent is unsupported: {parent}")
         if not stat.S_ISDIR(path_stat.st_mode):
-            return _rejected("PARENT_PATH_NOT_DIRECTORY", f"parent path is not a directory: {parent}")
+            code = "PARENT_PATH_NOT_DIRECTORY" if stat.S_ISREG(path_stat.st_mode) else "SPECIAL_FILE_UNSUPPORTED"
+            message = (
+                "parent path is not a directory"
+                if stat.S_ISREG(path_stat.st_mode)
+                else "special-file parent is unsupported"
+            )
+            return _rejected(code, f"{message}: {parent}")
     return None
 
 

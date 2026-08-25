@@ -51,13 +51,14 @@ explicitly deferred in the implementation plan.
   derived parent-directory deduplication.
 - `tests/integration/features/workspace_editing/test_posix_filesystem_snapshot_adapter.py`
   covers source/destination evidence collection, Add-target existence rejection,
-  parent-file rejection, symlink path rejection, and multiple-hard-link rejection.
+  parent-file and FIFO-parent rejection, symlink path rejection, and
+  multiple-hard-link rejection.
 - `tests/integration/features/workspace_editing/test_posix_commit_adapter.py`
   covers stale source content, stale source identity, changed destination parent,
   unexpected Add/Move destination appearance, missing staged payload, and changed
   staged payload mode before visible file commit.
 - **Open:** case/Unicode normalization alias detection, cross-device move
-  evidence, and broader special-file/path-component coverage.
+  evidence, and special-file coverage beyond the FIFO parent case.
 
 ### Preservation
 
@@ -109,7 +110,8 @@ explicitly deferred in the implementation plan.
 
 - Production POSIX mutation remains fail-closed by default through
   `PosixPatchWorkspaceSnapshotAdapter(require_production_capabilities=True)`.
-- Local macOS POSIX capability evidence is recorded in
+- Local macOS and Docker-based Linux POSIX capability evidence, including the
+  reproducible commands and tested environment summaries, is recorded in
   `docs/apply-patch-posix-capability-evidence.md`.
-- Linux capability evidence remains pending in the implementation plan before
-  production mutation can be exposed by default.
+- Production mutation still remains fail-closed until the open no-replace rename,
+  supervised cleanup ownership, and remaining safety scenarios are implemented.

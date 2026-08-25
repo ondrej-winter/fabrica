@@ -105,3 +105,22 @@ def test_posix_snapshot_adapter_rejects_multiple_hard_links(tmp_path: Path) -> N
     assert result.status is PatchResultStatus.REJECTED
     assert result.error is not None
     assert result.error.code == "MULTIPLE_HARD_LINKS_UNSUPPORTED"
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+def test_posix_snapshot_adapter_rejects_fifo_parent_without_mutation(tmp_path: Path) -> None:
+    fifo_parent = tmp_path / "fifo-parent"
+    os.mkfifo(fifo_parent)
+
+    result = PosixPatchWorkspaceSnapshotAdapter(
+        tmp_path,
+        require_production_capabilities=False,
+    ).build_planning_snapshot(
+        (PatchAction(index=0, kind=PatchActionKind.ADD, path="fifo-parent/new.py", added_lines=("new",)),)
+    )
+
+    assert isinstance(result, PatchResult)
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "SPECIAL_FILE_UNSUPPORTED"
+    assert not (tmp_path / "fifo-parent" / "new.py").exists()
