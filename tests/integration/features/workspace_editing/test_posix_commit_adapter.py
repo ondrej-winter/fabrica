@@ -1,5 +1,6 @@
 """Integration tests for POSIX apply-patch staging and commit."""
 
+import json
 import sys
 from asyncio import run
 from pathlib import Path
@@ -67,6 +68,56 @@ def test_posix_commit_adapter_stages_and_commits_add_update_delete_and_move(tmp_
         PatchPathOutcomeState.COMMITTED,
         PatchPathOutcomeState.COMMITTED,
     ]
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_persists_committed_journal_with_path_outcomes(tmp_path: Path) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.COMMITTED
+    committed_evidence = result.path_outcomes[0].evidence
+    assert committed_evidence is not None
+    payload = json.loads(_journal_path(tmp_path, journal).read_text(encoding="utf-8"))
+    assert payload["state"] == PatchJournalState.COMMITTED.value
+    assert payload["path_outcomes"] == [
+        {
+            "evidence": {
+                "content_digest": committed_evidence.content_digest,
+                "exists": True,
+                "identity_digest": committed_evidence.identity_digest,
+                "metadata": dict(committed_evidence.metadata),
+                "path": "generated/add.py",
+            },
+            "final_state": PatchPathOutcomeState.COMMITTED.value,
+            "path": "generated/add.py",
+            "planned_operation": PatchActionKind.ADD.value,
+        }
+    ]
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rejects_journal_digest_mismatch_before_staging(tmp_path: Path) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    mismatched_journal = PatchJournalRecord(
+        journal_digest=journal.journal_digest,
+        plan_digest="sha256:" + "9" * 64,
+        state=journal.state,
+        created_directories=journal.created_directories,
+    )
+
+    result = run(PosixPatchCommitAdapter(tmp_path).prepare(plan, mismatched_journal))
+
+    assert result is not None
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert not _stage_payload_path(tmp_path, journal, action_index=0).exists()
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
@@ -317,3 +368,7 @@ def _stage_payload_path(tmp_path: Path, journal: PatchJournalRecord, *, action_i
         / journal.journal_digest.removeprefix("sha256:")
         / f"{action_index:06d}.payload"
     )
+
+
+def _journal_path(tmp_path: Path, journal: PatchJournalRecord) -> Path:
+    return tmp_path / ".fabrica" / "apply-patch" / "journal" / f"{journal.journal_digest}.json"

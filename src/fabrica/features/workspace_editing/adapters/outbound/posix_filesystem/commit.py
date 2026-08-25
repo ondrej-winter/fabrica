@@ -1,5 +1,6 @@
 """POSIX staging and commit adapter for apply-patch file operations."""
 
+import json
 import os
 import stat
 from dataclasses import dataclass
@@ -37,6 +38,9 @@ class PosixPatchCommitAdapter:
 
     async def prepare(self, plan: PatchPlan, journal: PatchJournalRecord) -> PatchResult | None:
         """Create same-filesystem staged payloads for write and move actions."""
+        journal_result = _revalidate_journal_binding(plan, journal)
+        if journal_result is not None:
+            return journal_result
         stage_root = self._stage_root(journal)
         try:
             stage_root.mkdir(mode=0o700, parents=True, exist_ok=False)
@@ -54,6 +58,10 @@ class PosixPatchCommitAdapter:
 
     async def commit(self, plan: PatchPlan, journal: PatchJournalRecord) -> PatchResult:
         """Revalidate evidence and commit staged payloads in plan order."""
+        journal_result = _revalidate_journal_binding(plan, journal)
+        if journal_result is not None:
+            return journal_result
+
         stale_result = _revalidate_plan(self._workspace_root(), plan)
         if stale_result is not None:
             return stale_result
@@ -65,6 +73,7 @@ class PosixPatchCommitAdapter:
 
         outcomes: list[PatchPathOutcome] = []
         try:
+            _write_record(self._record_path(journal), _journal_with_state(journal, PatchJournalState.COMMITTING))
             for step in plan.commit_steps:
                 if step.operation is PatchCommitOperation.CREATE_DIRECTORY:
                     continue
@@ -92,6 +101,16 @@ class PosixPatchCommitAdapter:
                 path_outcomes=tuple(outcomes),
                 error=error,
             )
+
+        committed_journal = PatchJournalRecord(
+            journal_digest=journal.journal_digest,
+            plan_digest=journal.plan_digest,
+            state=PatchJournalState.COMMITTED,
+            created_directories=journal.created_directories,
+            path_outcomes=tuple(outcomes),
+            metadata=journal.metadata,
+        )
+        _write_record(self._record_path(journal), committed_journal)
 
         return PatchResult(
             status=PatchResultStatus.COMMITTED,
@@ -223,6 +242,28 @@ class PosixPatchCommitAdapter:
             / "stage"
             / journal.journal_digest.removeprefix("sha256:")
         )
+
+    def _record_path(self, journal: PatchJournalRecord) -> Path:
+        return self._workspace_root() / ".fabrica" / "apply-patch" / "journal" / f"{journal.journal_digest}.json"
+
+
+def _revalidate_journal_binding(plan: PatchPlan, journal: PatchJournalRecord) -> PatchResult | None:
+    if journal.plan_digest != plan.plan_digest:
+        return _rejected("STALE_PLAN", "journal plan digest does not match the approved patch plan")
+    if journal.journal_digest != _journal_digest(plan.plan_digest):
+        return _rejected("STALE_PLAN", "journal digest does not match the approved patch plan")
+    return None
+
+
+def _journal_with_state(journal: PatchJournalRecord, state: PatchJournalState) -> PatchJournalRecord:
+    return PatchJournalRecord(
+        journal_digest=journal.journal_digest,
+        plan_digest=journal.plan_digest,
+        state=state,
+        created_directories=journal.created_directories,
+        path_outcomes=journal.path_outcomes,
+        metadata=journal.metadata,
+    )
 
 
 def _revalidate_plan(root: Path, plan: PatchPlan) -> PatchResult | None:
@@ -453,6 +494,56 @@ def _identity_digest(path_stat: os.stat_result) -> str:
 
 def _digest_bytes(content: bytes) -> str:
     return "sha256:" + sha256(content).hexdigest()
+
+
+def _journal_digest(plan_digest: str) -> str:
+    return "sha256:" + sha256(f"apply-patch-journal:{plan_digest}".encode()).hexdigest()
+
+
+def _write_record(path: Path, record: PatchJournalRecord) -> None:
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    payload = {
+        "created_directories": [
+            {
+                "final_state": directory.final_state.value,
+                "identity_digest": directory.identity_digest,
+                "path": directory.path,
+                "planned_effect": directory.planned_effect.value,
+                "reason": directory.reason,
+            }
+            for directory in record.created_directories
+        ],
+        "journal_digest": record.journal_digest,
+        "metadata": dict(record.metadata),
+        "path_outcomes": [_path_outcome_payload(outcome) for outcome in record.path_outcomes],
+        "plan_digest": record.plan_digest,
+        "state": record.state.value,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    tmp_path = path.with_suffix(".tmp")
+    tmp_path.write_bytes(encoded)
+    _fsync_file(tmp_path)
+    tmp_path.replace(path)
+    _fsync_directory(path.parent)
+
+
+def _path_outcome_payload(outcome: PatchPathOutcome) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "final_state": outcome.final_state.value,
+        "path": outcome.path,
+        "planned_operation": outcome.planned_operation.value,
+    }
+    if outcome.destination_path is not None:
+        payload["destination_path"] = outcome.destination_path
+    if outcome.evidence is not None:
+        payload["evidence"] = {
+            "content_digest": outcome.evidence.content_digest,
+            "exists": outcome.evidence.exists,
+            "identity_digest": outcome.evidence.identity_digest,
+            "metadata": dict(outcome.evidence.metadata),
+            "path": outcome.evidence.path,
+        }
+    return payload
 
 
 def _rejected(code: str, message: str) -> PatchResult:

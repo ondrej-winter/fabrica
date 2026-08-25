@@ -566,7 +566,7 @@ intent-before-effect ordering, failure rollback, and incomplete journal discover
 
 - [x] Same-filesystem staging uses host-controlled names and strict permissions, writes full contents, and executes durability barriers for the current complete-payload adapter path.
 - [ ] Applies modes for the full v1 metadata contract.
-- [ ] Source, parent, destination, directory absence, policy, and digest are revalidated at required boundaries. Source identity/content, destination absence, and destination parent identity are covered in the current adapter path; remaining policy and full digest-bound revalidation stay open.
+- [ ] Source, parent, destination, directory absence, policy, and digest are revalidated at required boundaries. Source identity/content, destination absence, destination parent identity, and journal/plan digest binding are covered in the current adapter path; remaining policy and full digest-bound result-payload revalidation stay open.
 - [x] Source identity/content digest revalidation rejects stale plans before visible file commit in the current adapter path.
 - [x] The explicit file commit point and deterministic action schedule match the approved plan for add, update, delete, and move complete-payload actions.
 
@@ -588,10 +588,12 @@ intent-before-effect ordering, failure rollback, and incomplete journal discover
 staging under `.fabrica/apply-patch/stage/<journal-digest>/`, strict staged
 payload permissions, file/directory durability barriers, source evidence
 revalidation, and deterministic commit execution for add/update/delete/move
-steps. Focused integration tests passed for successful mixed-operation commit and
-stale-plan rejection. Remaining Task 15 work: full metadata/mode handling,
-broader parent/destination/policy revalidation, and pre-commit fault-injection
-coverage.
+steps. A later increment added journal/plan digest binding before staging and
+commit, durable COMMITTING/COMMITTED journal writes, and persisted committed path
+outcomes. Focused integration tests passed for successful mixed-operation commit,
+stale-plan rejection, digest mismatch rejection, and committed journal evidence.
+Remaining Task 15 work: full metadata/mode handling, broader
+parent/destination/policy revalidation, and pre-commit fault-injection coverage.
 
 **Incremental update:** Added commit-time ancestor identity revalidation for
 planned paths, including absent add/move destinations whose derived parent
