@@ -51,14 +51,15 @@ explicitly deferred in the implementation plan.
   derived parent-directory deduplication.
 - `tests/integration/features/workspace_editing/test_posix_filesystem_snapshot_adapter.py`
   covers source/destination evidence collection, Add-target existence rejection,
-  parent-file rejection, FIFO source/target/parent rejection, symlink path
-  rejection, and multiple-hard-link rejection.
+  parent-file rejection, FIFO and Unix-domain socket source/target rejection,
+  FIFO and Unix-domain socket parent rejection, symlink path rejection, and
+  multiple-hard-link rejection.
 - `tests/integration/features/workspace_editing/test_posix_commit_adapter.py`
   covers stale source content, stale source identity, changed destination parent,
   unexpected Add/Move destination appearance, missing staged payload, and changed
   staged payload mode before visible file commit.
 - **Open:** case/Unicode normalization alias detection, cross-device move
-  evidence, and special-file classes beyond FIFO nodes.
+  evidence, and special-file classes beyond FIFO and Unix-domain socket nodes.
 
 ### Preservation
 

@@ -1,10 +1,12 @@
 """Integration tests for the POSIX apply-patch snapshot adapter."""
 
 import os
+import socket
 import sys
 from asyncio import run
 from hashlib import sha256
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pytest
 
@@ -135,6 +137,62 @@ def test_posix_snapshot_adapter_rejects_fifo_file_paths_without_mutation(
     current_stat = fifo_path.lstat()
     assert current_stat.st_dev == original_stat.st_dev
     assert current_stat.st_ino == original_stat.st_ino
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+@pytest.mark.parametrize(
+    "action",
+    [
+        PatchAction(index=0, kind=PatchActionKind.UPDATE, path="socket-node"),
+        PatchAction(index=0, kind=PatchActionKind.ADD, path="socket-node", added_lines=("new",)),
+    ],
+)
+def test_posix_snapshot_adapter_rejects_unix_socket_paths_without_mutation(action: PatchAction) -> None:
+    with TemporaryDirectory(prefix="fab-", dir="/tmp") as workspace:
+        workspace_root = Path(workspace)
+        socket_path = workspace_root / "socket-node"
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as unix_socket:
+            unix_socket.bind(str(socket_path))
+            original_stat = socket_path.lstat()
+
+            result = PosixPatchWorkspaceSnapshotAdapter(
+                workspace_root,
+                require_production_capabilities=False,
+            ).build_planning_snapshot((action,))
+
+            assert isinstance(result, PatchResult)
+            assert result.status is PatchResultStatus.REJECTED
+            assert result.error is not None
+            assert result.error.code == "SPECIAL_FILE_UNSUPPORTED"
+            current_stat = socket_path.lstat()
+            assert current_stat.st_dev == original_stat.st_dev
+            assert current_stat.st_ino == original_stat.st_ino
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+def test_posix_snapshot_adapter_rejects_unix_socket_parent_without_mutation() -> None:
+    with TemporaryDirectory(prefix="fab-", dir="/tmp") as workspace:
+        workspace_root = Path(workspace)
+        socket_path = workspace_root / "socket-parent"
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as unix_socket:
+            unix_socket.bind(str(socket_path))
+            original_stat = socket_path.lstat()
+
+            result = PosixPatchWorkspaceSnapshotAdapter(
+                workspace_root,
+                require_production_capabilities=False,
+            ).build_planning_snapshot(
+                (PatchAction(index=0, kind=PatchActionKind.ADD, path="socket-parent/new.py", added_lines=("new",)),)
+            )
+
+            assert isinstance(result, PatchResult)
+            assert result.status is PatchResultStatus.REJECTED
+            assert result.error is not None
+            assert result.error.code == "SPECIAL_FILE_UNSUPPORTED"
+            current_stat = socket_path.lstat()
+            assert current_stat.st_dev == original_stat.st_dev
+            assert current_stat.st_ino == original_stat.st_ino
+            assert not (socket_path / "new.py").exists()
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")

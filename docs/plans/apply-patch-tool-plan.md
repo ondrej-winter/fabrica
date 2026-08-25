@@ -788,6 +788,23 @@ is closing or explicitly deferring case/Unicode alias detection, cross-device
 move evidence, non-FIFO special-file classes, metadata handling, and the open
 rollback/fault-injection scenarios before completing the full quality gate.
 
+**Incremental update:** Added focused POSIX snapshot evidence that Unix-domain
+socket nodes are rejected as both existing Update sources and existing Add
+targets before planning or mutation. The tests preserve and compare the socket
+device/inode identity while it remains bound, extending special-file coverage
+beyond FIFO nodes. Remaining Task 18 work is closing or explicitly deferring
+case/Unicode alias detection, cross-device move evidence, other special-file
+classes, metadata handling, and the open rollback/fault-injection scenarios
+before completing the full quality gate.
+
+**Incremental update:** Added focused POSIX snapshot evidence that a Unix-domain
+socket cannot serve as an Add destination parent. The test preserves and compares
+the bound socket identity and verifies no child path becomes visible, proving
+parent-chain rejection is side-effect-free. Remaining Task 18 work is closing or
+explicitly deferring case/Unicode alias detection, cross-device move evidence,
+other special-file classes, metadata handling, and the open rollback/fault-
+injection scenarios before completing the full quality gate.
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
