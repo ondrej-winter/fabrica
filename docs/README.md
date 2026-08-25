@@ -34,3 +34,15 @@ This directory contains durable project documentation and current reference note
 - `specs/commit-workflows.md` defines read-only commit-message generation and the
   interactive `fabrica commit` workflow that creates commits only after explicit
   approval.
+- `specs/read-files-tool.md` defines bounded workspace file inspection for
+  model-callable coding-agent workflows.
+- `specs/search-codebase-tool.md` defines read-only regex-based workspace source
+  discovery for model-callable coding-agent workflows.
+- `specs/apply-patch-tool.md` defines context-based workspace file mutation,
+  including its fail-closed POSIX safety and recovery contract.
+
+### Acceptance traceability
+
+- `apply-patch-acceptance-traceability.md` maps apply-patch v1 acceptance
+  scenarios to current automated evidence and keeps open safety scenarios
+  visible.

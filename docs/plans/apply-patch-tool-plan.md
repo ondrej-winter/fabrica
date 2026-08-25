@@ -756,6 +756,13 @@ production POSIX platform support status. Remaining Task 18 work is ADR index
 review, Linux/macOS CI evidence, closing or deferring the open acceptance
 scenarios, and the full quality gate.
 
+**Incremental update:** Reviewed the ADR index and confirmed that ADRs 0002 and
+0003 are already indexed. Updated `docs/README.md` to include the current
+read-files, search-codebase, and apply-patch specifications plus the apply-patch
+acceptance-traceability record. Remaining Task 18 work is Linux/macOS CI
+evidence, closing or explicitly deferring the open acceptance scenarios, and the
+full quality gate.
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
