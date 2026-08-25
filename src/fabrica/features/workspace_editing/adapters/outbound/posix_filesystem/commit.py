@@ -3,7 +3,7 @@
 import json
 import os
 import stat
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
 
@@ -35,6 +35,7 @@ class PosixPatchCommitAdapter:
     """Stage complete file payloads and execute an approved deterministic schedule."""
 
     workspace_root: Path
+    _destination_parent_fds: dict[tuple[str, str], int] = field(default_factory=dict, init=False, repr=False)
 
     async def prepare(self, plan: PatchPlan, journal: PatchJournalRecord) -> PatchResult | None:
         """Create same-filesystem staged payloads for write and move actions."""
@@ -43,6 +44,7 @@ class PosixPatchCommitAdapter:
             return journal_result
         stage_root = self._stage_root(journal)
         try:
+            self._capture_destination_parents(plan, journal)
             stage_root.mkdir(mode=0o700, parents=True, exist_ok=False)
             _fsync_directory(stage_root.parent)
             for action in plan.actions:
@@ -53,6 +55,7 @@ class PosixPatchCommitAdapter:
                     _fsync_file(stage_path)
             _fsync_directory(stage_root)
         except OSError as err:
+            self._close_destination_parents(journal)
             return _rejected("IO_ERROR", f"could not stage patch payloads: {err.strerror}")
         return None
 
@@ -60,16 +63,14 @@ class PosixPatchCommitAdapter:
         """Revalidate evidence and commit staged payloads in plan order."""
         journal_result = _revalidate_journal_binding(plan, journal)
         if journal_result is not None:
+            self._close_destination_parents(journal)
             return journal_result
 
-        stale_result = _revalidate_plan(self._workspace_root(), plan)
-        if stale_result is not None:
-            return stale_result
-
         stage_root = self._stage_root(journal)
-        staging_result = _revalidate_staging(stage_root, plan)
-        if staging_result is not None:
-            return staging_result
+        validation_result = self._validate_before_commit(plan, journal, stage_root)
+        if validation_result is not None:
+            self._close_destination_parents(journal)
+            return validation_result
 
         outcomes: list[PatchPathOutcome] = []
         try:
@@ -86,6 +87,7 @@ class PosixPatchCommitAdapter:
                     _commit_move(self._workspace_root(), stage_root, action)
                 outcomes.append(_committed_outcome(self._workspace_root(), action))
         except OSError as err:
+            self._close_destination_parents(journal)
             error = patch_error(
                 "INDETERMINATE_COMMIT_STATE",
                 message=f"commit operation failed: {err.strerror}",
@@ -111,6 +113,7 @@ class PosixPatchCommitAdapter:
             metadata=journal.metadata,
         )
         _write_record(self._record_path(journal), committed_journal)
+        self._close_destination_parents(journal)
 
         return PatchResult(
             status=PatchResultStatus.COMMITTED,
@@ -230,6 +233,50 @@ class PosixPatchCommitAdapter:
             path_outcomes=journal.path_outcomes,
             error=error,
         )
+
+    def _validate_before_commit(
+        self, plan: PatchPlan, journal: PatchJournalRecord, stage_root: Path
+    ) -> PatchResult | None:
+        return (
+            self._revalidate_destination_parents(plan, journal)
+            or _revalidate_plan(self._workspace_root(), plan)
+            or _revalidate_staging(stage_root, plan)
+        )
+
+    def _capture_destination_parents(self, plan: PatchPlan, journal: PatchJournalRecord) -> None:
+        for action in plan.actions:
+            destination_path = _destination_path(action)
+            if destination_path is None:
+                continue
+            parent = destination_path.rpartition("/")[0]
+            absolute = self._workspace_root() if not parent else self._workspace_root() / parent
+            key = (journal.journal_digest, parent)
+            if absolute.is_dir() and key not in self._destination_parent_fds:
+                self._destination_parent_fds[key] = os.open(absolute, os.O_RDONLY)
+
+    def _revalidate_destination_parents(self, plan: PatchPlan, journal: PatchJournalRecord) -> PatchResult | None:
+        for action in plan.actions:
+            destination_path = _destination_path(action)
+            if destination_path is None:
+                continue
+            parent = destination_path.rpartition("/")[0]
+            descriptor = self._destination_parent_fds.get((journal.journal_digest, parent))
+            if descriptor is None:
+                continue
+            absolute = self._workspace_root() if not parent else self._workspace_root() / parent
+            try:
+                descriptor_stat = os.fstat(descriptor)
+                current_stat = absolute.stat()
+            except OSError:
+                return _rejected("STALE_PLAN", f"destination ancestor changed before commit: {destination_path}")
+            if (descriptor_stat.st_dev, descriptor_stat.st_ino) != (current_stat.st_dev, current_stat.st_ino):
+                return _rejected("STALE_PLAN", f"destination ancestor changed before commit: {destination_path}")
+        return None
+
+    def _close_destination_parents(self, journal: PatchJournalRecord) -> None:
+        keys = [key for key in self._destination_parent_fds if key[0] == journal.journal_digest]
+        for key in keys:
+            os.close(self._destination_parent_fds.pop(key))
 
     def _workspace_root(self) -> Path:
         return self.workspace_root.resolve(strict=True)
