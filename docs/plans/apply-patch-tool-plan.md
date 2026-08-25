@@ -801,9 +801,17 @@ before completing the full quality gate.
 socket cannot serve as an Add destination parent. The test preserves and compares
 the bound socket identity and verifies no child path becomes visible, proving
 parent-chain rejection is side-effect-free. Remaining Task 18 work is closing or
-explicitly deferring case/Unicode alias detection, cross-device move evidence,
-other special-file classes, metadata handling, and the open rollback/fault-
-injection scenarios before completing the full quality gate.
+explicitly deferring cross-device move evidence, other special-file classes,
+metadata handling, and the open rollback/fault-injection scenarios before
+completing the full quality gate.
+
+**Incremental update:** Added side-effect-free POSIX snapshot rejection for case-
+and Unicode-normalization-equivalent path aliases, including aliases in destination
+parent components. Focused integration tests preserve existing content and prove
+that no aliased destination becomes visible. Remaining Task 18 work is closing or
+explicitly deferring cross-device move evidence, other special-file classes,
+metadata handling, and the open rollback/fault-injection scenarios before
+completing the full quality gate.
 
 ## Risks and Mitigations
 

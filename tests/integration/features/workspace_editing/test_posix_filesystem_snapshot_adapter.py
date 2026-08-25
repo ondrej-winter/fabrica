@@ -3,6 +3,7 @@
 import os
 import socket
 import sys
+import unicodedata
 from asyncio import run
 from hashlib import sha256
 from pathlib import Path
@@ -11,6 +12,7 @@ from tempfile import TemporaryDirectory
 import pytest
 
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import PosixPatchWorkspaceSnapshotAdapter
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.adapter import _reject_path_alias
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
@@ -212,3 +214,71 @@ def test_posix_snapshot_adapter_rejects_fifo_parent_without_mutation(tmp_path: P
     assert result.error is not None
     assert result.error.code == "SPECIAL_FILE_UNSUPPORTED"
     assert not (tmp_path / "fifo-parent" / "new.py").exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+@pytest.mark.parametrize(
+    ("existing_name", "requested_name"),
+    [("Module.py", "module.py"), ("Café.py", unicodedata.normalize("NFD", "Café.py"))],
+)
+def test_posix_snapshot_adapter_rejects_existing_path_aliases_without_mutation(
+    tmp_path: Path,
+    existing_name: str,
+    requested_name: str,
+) -> None:
+    existing_path = tmp_path / existing_name
+    existing_path.write_text("original\n", encoding="utf-8")
+    actual_name = next(tmp_path.iterdir()).name
+    if unicodedata.normalize("NFC", actual_name).casefold() != unicodedata.normalize("NFC", requested_name).casefold():
+        pytest.skip("filesystem did not preserve an equivalent alias spelling")
+    if actual_name == requested_name:
+        requested_name = existing_name if actual_name != existing_name else unicodedata.normalize("NFD", existing_name)
+
+    result = PosixPatchWorkspaceSnapshotAdapter(
+        tmp_path,
+        require_production_capabilities=False,
+    ).build_planning_snapshot(
+        (PatchAction(index=0, kind=PatchActionKind.ADD, path=requested_name, added_lines=("replacement",)),)
+    )
+
+    assert isinstance(result, PatchResult)
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "PATH_ALIAS_COLLISION"
+    assert existing_path.read_text(encoding="utf-8") == "original\n"
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+def test_posix_snapshot_adapter_rejects_parent_directory_alias_without_mutation(tmp_path: Path) -> None:
+    (tmp_path / "Source").mkdir()
+
+    result = PosixPatchWorkspaceSnapshotAdapter(
+        tmp_path,
+        require_production_capabilities=False,
+    ).build_planning_snapshot(
+        (PatchAction(index=0, kind=PatchActionKind.ADD, path="source/new.py", added_lines=("new",)),)
+    )
+
+    assert isinstance(result, PatchResult)
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "PATH_ALIAS_COLLISION"
+    assert not (tmp_path / "Source" / "new.py").exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+def test_posix_snapshot_adapter_fails_closed_when_alias_directory_scan_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_scandir(_path: Path) -> object:
+        raise PermissionError
+
+    monkeypatch.setattr(os, "scandir", fail_scandir)
+
+    result = _reject_path_alias(tmp_path, "new.py")
+
+    assert isinstance(result, PatchResult)
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "IO_ERROR"

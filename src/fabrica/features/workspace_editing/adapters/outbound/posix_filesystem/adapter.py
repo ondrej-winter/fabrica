@@ -3,6 +3,7 @@
 import os
 import stat
 import sys
+import unicodedata
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -84,6 +85,10 @@ class PosixPatchWorkspaceSnapshotAdapter:
             existing_directories.add(directory)
 
         for action in actions:
+            alias_result = _reject_path_alias(root, action.path)
+            if alias_result is not None:
+                return alias_result
+
             source_result = _snapshot_action_source(root, action)
             if isinstance(source_result, PatchResult):
                 return source_result
@@ -92,6 +97,9 @@ class PosixPatchWorkspaceSnapshotAdapter:
 
             destination = action.path if action.kind is PatchActionKind.ADD else action.destination_path
             if destination is not None:
+                alias_result = _reject_path_alias(root, destination)
+                if alias_result is not None:
+                    return alias_result
                 destination_result = _snapshot_destination(root, action.kind, destination)
                 if isinstance(destination_result, PatchResult):
                     return destination_result
@@ -115,6 +123,41 @@ def _walk_existing_directories(root: Path) -> tuple[str, ...]:
             directories.append(relative)
         dir_names[:] = [name for name in dir_names if not (current_path / name).is_symlink()]
     return tuple(directories)
+
+
+def _reject_path_alias(root: Path, path: str) -> PatchResult | None:
+    current = root
+    result: PatchResult | None = None
+    for part in path.split("/"):
+        try:
+            current_stat = current.lstat()
+        except OSError as err:
+            if not isinstance(err, FileNotFoundError):
+                result = _rejected("IO_ERROR", f"could not inspect path aliases: {err.strerror}")
+            break
+        if not stat.S_ISDIR(current_stat.st_mode):
+            break
+
+        try:
+            entry_names = tuple(entry.name for entry in os.scandir(current))
+        except OSError as err:
+            if not isinstance(err, FileNotFoundError):
+                result = _rejected("IO_ERROR", f"could not inspect path aliases: {err.strerror}")
+            break
+
+        normalized_part = unicodedata.normalize("NFC", part).casefold()
+        aliases = [
+            name
+            for name in entry_names
+            if name != part and unicodedata.normalize("NFC", name).casefold() == normalized_part
+        ]
+        if aliases:
+            result = _rejected("PATH_ALIAS_COLLISION", f"path spelling aliases an existing entry: {path}")
+            break
+        if part not in entry_names:
+            return None
+        current /= part
+    return result
 
 
 def _snapshot_action_source(root: Path, action: PatchAction) -> PatchPathEvidence | PatchResult | None:
