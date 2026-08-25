@@ -108,6 +108,36 @@ def test_posix_snapshot_adapter_rejects_multiple_hard_links(tmp_path: Path) -> N
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+@pytest.mark.parametrize(
+    "action",
+    [
+        PatchAction(index=0, kind=PatchActionKind.UPDATE, path="special-node"),
+        PatchAction(index=0, kind=PatchActionKind.ADD, path="special-node", added_lines=("new",)),
+    ],
+)
+def test_posix_snapshot_adapter_rejects_fifo_file_paths_without_mutation(
+    tmp_path: Path,
+    action: PatchAction,
+) -> None:
+    fifo_path = tmp_path / "special-node"
+    os.mkfifo(fifo_path)
+    original_stat = fifo_path.lstat()
+
+    result = PosixPatchWorkspaceSnapshotAdapter(
+        tmp_path,
+        require_production_capabilities=False,
+    ).build_planning_snapshot((action,))
+
+    assert isinstance(result, PatchResult)
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "SPECIAL_FILE_UNSUPPORTED"
+    current_stat = fifo_path.lstat()
+    assert current_stat.st_dev == original_stat.st_dev
+    assert current_stat.st_ino == original_stat.st_ino
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
 def test_posix_snapshot_adapter_rejects_fifo_parent_without_mutation(tmp_path: Path) -> None:
     fifo_parent = tmp_path / "fifo-parent"
     os.mkfifo(fifo_parent)

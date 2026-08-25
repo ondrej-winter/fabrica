@@ -780,6 +780,14 @@ rejection is side-effect-free. Remaining Task 18 work is closing or explicitly
 deferring the remaining open acceptance scenarios and completing the full
 quality gate.
 
+**Incremental update:** Added focused POSIX snapshot evidence that FIFO nodes are
+rejected as both existing Update sources and existing Add targets before
+planning or mutation. The tests preserve and compare the FIFO device/inode
+identity, proving the unsupported node is not replaced. Remaining Task 18 work
+is closing or explicitly deferring case/Unicode alias detection, cross-device
+move evidence, non-FIFO special-file classes, metadata handling, and the open
+rollback/fault-injection scenarios before completing the full quality gate.
+
 ## Risks and Mitigations
 
 | Risk | Impact | Mitigation |
