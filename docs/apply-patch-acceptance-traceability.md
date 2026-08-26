@@ -99,8 +99,9 @@ explicitly deferred in the implementation plan.
 
 - `tests/unit/features/workspace_editing/application/test_apply_patch.py` covers
   lease-to-commit phase ordering, update hunk matching before planning/staging,
-  pre-journal policy rejection, capability rejection before parsing, parser
-  rejection before snapshot, and rollback after file-staging rejection.
+  pre-journal and pre-commit policy rejection, capability rejection before
+  parsing, parser rejection before snapshot, and rollback after file-staging or
+  pre-commit policy rejection.
 - `tests/integration/features/workspace_editing/test_posix_journal_preparation_adapter.py`
   covers durable intent before directory creation, preparation rollback after
   directory failure, incomplete-journal listing, and illegal transition rejection.

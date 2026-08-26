@@ -657,6 +657,14 @@ integration tests cover durable journal state and plan-binding rejection. Full
 metadata preservation, commit-time policy revalidation, and pre-commit
 fault-injection coverage remain open.
 
+**Incremental update:** `ApplyPatch` now revalidates host policy after staged
+payload preparation and immediately before the file commit point. A policy change
+at that boundary prevents file mutation and invokes rollback for the already
+visible, reversible preparation effects. Focused application orchestration tests
+cover the second policy evaluation, no commit after rejection, and rollback before
+lease release. Full digest-bound result-payload revalidation and pre-commit
+fault-injection coverage remain open.
+
 ### Task 16: Implement Rollback and Startup Recovery
 
 **Description:** Implement safe rollback after commit failures and startup handling for incomplete journals.

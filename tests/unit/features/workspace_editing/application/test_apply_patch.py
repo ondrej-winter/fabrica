@@ -41,6 +41,7 @@ def test_apply_patch_commits_through_ordered_ports() -> None:
         "journal_create",
         "prepare_directories",
         "prepare_files",
+        "policy",
         "commit",
         "lease_exit",
     ]
@@ -80,6 +81,18 @@ def test_apply_patch_rolls_back_preparation_when_file_staging_rejects() -> None:
 
     assert result is staging_rejection
     assert harness.events[-4:] == ["prepare_directories", "prepare_files", "rollback", "lease_exit"]
+
+
+def test_apply_patch_revalidates_policy_after_staging_before_commit() -> None:
+    policy_rejection = _rejected("PROTECTED_PATH_DENIED", "policy changed before commit")
+    harness = _Harness(post_staging_policy_result=policy_rejection)
+    patch = "*** Begin Patch\n*** Add File: src/new.py\n+value = 1\n*** End Patch"
+
+    result = run(harness.use_case.apply(patch))
+
+    assert result is policy_rejection
+    assert harness.events[-5:] == ["prepare_directories", "prepare_files", "policy", "rollback", "lease_exit"]
+    assert "commit" not in harness.events
 
 
 def test_apply_patch_returns_capability_rejection_before_parsing() -> None:
@@ -144,6 +157,7 @@ class _Harness:
     capability_result: PatchResult | None = None
     planning_snapshot_result: PatchPlanningSnapshot | PatchResult | None = None
     policy_result: PatchResult | None = None
+    post_staging_policy_result: PatchResult | None = None
     file_staging_result: PatchResult | None = None
     events: list[str] = field(default_factory=list)
     committed_plan: PatchPlan | None = None
@@ -164,7 +178,7 @@ class _Harness:
         self.use_case = ApplyPatch(
             lease_manager=_LeaseManager(self.events),
             snapshot_reader=self.snapshot_reader,
-            policy_evaluator=_PolicyEvaluator(self.events, self.policy_result),
+            policy_evaluator=_PolicyEvaluator(self.events, self.policy_result, self.post_staging_policy_result),
             approval_requester=_ApprovalRequester(self.events),
             journal_store=self.journal_store,
             preparation_stager=_Stager(self.events, "prepare_directories"),
@@ -233,11 +247,14 @@ class _SnapshotReader:
 class _PolicyEvaluator:
     events: list[str]
     result: PatchResult | None = None
+    post_staging_result: PatchResult | None = None
+    calls: int = 0
 
     async def evaluate(self, plan: PatchPlan) -> PatchResult | None:
         _ = plan
         self.events.append("policy")
-        return self.result
+        self.calls += 1
+        return self.result if self.calls == 1 else self.post_staging_result
 
 
 @dataclass(slots=True)
