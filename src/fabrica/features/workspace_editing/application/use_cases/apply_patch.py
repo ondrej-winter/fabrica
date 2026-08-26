@@ -82,6 +82,10 @@ class ApplyPatch:
         staging_result = await self._prepare_visible_effects(plan, journal)
         if staging_result is not None:
             return staging_result
+        snapshot_revalidation_result = await self.snapshot_reader.snapshot_plan_inputs(plan)
+        if snapshot_revalidation_result is not None:
+            rollback_result = await self.committer.roll_back(journal)
+            return rollback_result if _is_fatal(rollback_result) else snapshot_revalidation_result
         policy_revalidation_result = await self.policy_evaluator.evaluate(plan)
         if policy_revalidation_result is not None:
             rollback_result = await self.committer.roll_back(journal)

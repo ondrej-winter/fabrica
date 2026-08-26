@@ -665,6 +665,14 @@ cover the second policy evaluation, no commit after rejection, and rollback befo
 lease release. Full digest-bound result-payload revalidation and pre-commit
 fault-injection coverage remain open.
 
+**Incremental update:** `ApplyPatch` now also revalidates the immutable workspace
+snapshot after staged payload preparation and before the final policy check and
+file commit. A stale-plan rejection at that boundary prevents file mutation and
+rolls back already-visible reversible preparation effects. Focused application
+orchestration tests cover the second snapshot validation, rollback, and absence of
+a commit call. Full digest-bound result-payload revalidation and pre-commit
+fault-injection coverage remain open.
+
 ### Task 16: Implement Rollback and Startup Recovery
 
 **Description:** Implement safe rollback after commit failures and startup handling for incomplete journals.

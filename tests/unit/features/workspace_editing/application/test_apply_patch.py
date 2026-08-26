@@ -22,6 +22,7 @@ from fabrica.features.workspace_editing.application.use_cases import ApplyPatch,
 
 SHA256_A = "sha256:" + "a" * 64
 SHA256_JOURNAL = "sha256:" + "b" * 64
+POST_STAGING_SNAPSHOT_CALL = 2
 
 
 def test_apply_patch_commits_through_ordered_ports() -> None:
@@ -41,6 +42,7 @@ def test_apply_patch_commits_through_ordered_ports() -> None:
         "journal_create",
         "prepare_directories",
         "prepare_files",
+        "snapshot_plan_inputs",
         "policy",
         "commit",
         "lease_exit",
@@ -91,7 +93,26 @@ def test_apply_patch_revalidates_policy_after_staging_before_commit() -> None:
     result = run(harness.use_case.apply(patch))
 
     assert result is policy_rejection
-    assert harness.events[-5:] == ["prepare_directories", "prepare_files", "policy", "rollback", "lease_exit"]
+    assert harness.events[-6:] == [
+        "prepare_directories",
+        "prepare_files",
+        "snapshot_plan_inputs",
+        "policy",
+        "rollback",
+        "lease_exit",
+    ]
+    assert "commit" not in harness.events
+
+
+def test_apply_patch_revalidates_snapshot_after_staging_before_commit() -> None:
+    snapshot_rejection = _rejected("STALE_PLAN", "workspace changed after staging")
+    harness = _Harness(post_staging_snapshot_result=snapshot_rejection)
+    patch = "*** Begin Patch\n*** Add File: src/new.py\n+value = 1\n*** End Patch"
+
+    result = run(harness.use_case.apply(patch))
+
+    assert result is snapshot_rejection
+    assert harness.events[-4:] == ["prepare_files", "snapshot_plan_inputs", "rollback", "lease_exit"]
     assert "commit" not in harness.events
 
 
@@ -156,6 +177,7 @@ class _Harness:
     text_by_path: dict[str, bytes] = field(default_factory=dict)
     capability_result: PatchResult | None = None
     planning_snapshot_result: PatchPlanningSnapshot | PatchResult | None = None
+    post_staging_snapshot_result: PatchResult | None = None
     policy_result: PatchResult | None = None
     post_staging_policy_result: PatchResult | None = None
     file_staging_result: PatchResult | None = None
@@ -172,6 +194,7 @@ class _Harness:
             self.text_by_path,
             self.capability_result,
             self.planning_snapshot_result,
+            self.post_staging_snapshot_result,
         )
         self.journal_store = _JournalStore(self.events)
         self.committer = _Committer(self.events, self)
@@ -220,6 +243,8 @@ class _SnapshotReader:
     text_by_path: dict[str, bytes]
     capability_result: PatchResult | None = None
     planning_snapshot_result: PatchPlanningSnapshot | PatchResult | None = None
+    post_staging_snapshot_result: PatchResult | None = None
+    snapshot_plan_input_calls: int = 0
 
     async def verify_workspace_capabilities(self) -> PatchResult | None:
         self.events.append("capability")
@@ -228,6 +253,9 @@ class _SnapshotReader:
     async def snapshot_plan_inputs(self, plan: PatchPlan) -> PatchResult | None:
         _ = plan
         self.events.append("snapshot_plan_inputs")
+        self.snapshot_plan_input_calls += 1
+        if self.snapshot_plan_input_calls == POST_STAGING_SNAPSHOT_CALL:
+            return self.post_staging_snapshot_result
         return None
 
     async def snapshot_for_planning(self, actions: tuple[PatchAction, ...]) -> PatchPlanningSnapshot | PatchResult:
