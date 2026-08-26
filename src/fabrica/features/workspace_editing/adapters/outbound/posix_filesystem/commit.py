@@ -3,6 +3,7 @@
 import json
 import os
 import stat
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
@@ -29,13 +30,23 @@ from fabrica.features.workspace_editing.application.dtos import (
 from fabrica.features.workspace_editing.application.errors import patch_error
 from fabrica.features.workspace_editing.application.text_snapshot import render_added_text
 
+DEFAULT_WORKSPACE_UMASK = 0o022
+_PERMISSION_MODE_MASK = 0o777
+
 
 @dataclass(frozen=True, slots=True)
 class PosixPatchCommitAdapter:
     """Stage complete file payloads and execute an approved deterministic schedule."""
 
     workspace_root: Path
+    workspace_umask: int = DEFAULT_WORKSPACE_UMASK
     _destination_parent_fds: dict[tuple[str, str], int] = field(default_factory=dict, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Validate the adapter-owned workspace permission policy."""
+        if not 0 <= self.workspace_umask <= _PERMISSION_MODE_MASK:
+            msg = "workspace_umask must be a POSIX permission mask between 0 and 0o777"
+            raise ValueError(msg)
 
     async def prepare(self, plan: PatchPlan, journal: PatchJournalRecord) -> PatchResult | None:
         """Create same-filesystem staged payloads for write and move actions."""
@@ -51,7 +62,7 @@ class PosixPatchCommitAdapter:
                 if action.kind in {PatchActionKind.ADD, PatchActionKind.UPDATE, PatchActionKind.MOVE}:
                     stage_path = _stage_path(stage_root, action)
                     stage_path.write_bytes(render_added_text(action.added_lines))
-                    stage_path.chmod(_payload_mode(plan, action))
+                    stage_path.chmod(self._payload_mode(plan, action))
                     _fsync_file(stage_path)
             _fsync_directory(stage_root)
         except OSError as err:
@@ -179,6 +190,11 @@ class PosixPatchCommitAdapter:
             error=error,
         )
 
+    def _payload_mode(self, plan: PatchPlan, action: PatchAction) -> int:
+        if action.kind is PatchActionKind.ADD:
+            return 0o666 & ~self.workspace_umask & _PERMISSION_MODE_MASK
+        return _payload_mode(plan, action)
+
     async def inspect(self, journal: PatchJournalRecord) -> PatchRecoveryDecision:
         """Decide whether startup recovery can proceed from durable journal state."""
         if journal.state is PatchJournalState.PLANNED:
@@ -240,7 +256,7 @@ class PosixPatchCommitAdapter:
         return (
             self._revalidate_destination_parents(plan, journal)
             or _revalidate_plan(self._workspace_root(), plan)
-            or _revalidate_staging(stage_root, plan)
+            or _revalidate_staging(stage_root, plan, self._payload_mode)
         )
 
     def _capture_destination_parents(self, plan: PatchPlan, journal: PatchJournalRecord) -> None:
@@ -374,7 +390,11 @@ def _evidence_for_path(plan: PatchPlan, path: str) -> PatchPathEvidence | None:
     return next((item for item in plan.path_evidence if item.path == path), None)
 
 
-def _revalidate_staging(stage_root: Path, plan: PatchPlan) -> PatchResult | None:
+def _revalidate_staging(
+    stage_root: Path,
+    plan: PatchPlan,
+    payload_mode: Callable[[PatchPlan, PatchAction], int],
+) -> PatchResult | None:
     for action in plan.actions:
         if action.kind not in {PatchActionKind.ADD, PatchActionKind.UPDATE, PatchActionKind.MOVE}:
             continue
@@ -385,7 +405,7 @@ def _revalidate_staging(stage_root: Path, plan: PatchPlan) -> PatchResult | None
             return _rejected("STALE_PLAN", f"staged payload missing before commit: {action.path}")
         if not stage_path.is_file() or path_stat.st_size != len(render_added_text(action.added_lines)):
             return _rejected("STALE_PLAN", f"staged payload changed before commit: {action.path}")
-        if stat.S_IMODE(path_stat.st_mode) != _payload_mode(plan, action):
+        if stat.S_IMODE(path_stat.st_mode) != payload_mode(plan, action):
             return _rejected("STALE_PLAN", f"staged payload mode changed before commit: {action.path}")
     return None
 

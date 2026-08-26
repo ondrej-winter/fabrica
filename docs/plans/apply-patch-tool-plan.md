@@ -623,6 +623,16 @@ Add/Update/Move modes and stale staged-mode rejection. Remaining Task 15 work
 still includes broader metadata handling beyond mode, policy revalidation, and
 pre-commit fault-injection coverage.
 
+**Incremental update:** Added an explicit, validated `workspace_umask` setting to
+the POSIX commit adapter. Add payloads now use v1 base mode `0666` filtered by the
+configured workspace umask (default `0022` produces `0644`), while Update and
+Move preserve their planned source modes. Commit-time staged-payload revalidation
+uses the same configured policy and rejects a tampered Add payload before visible
+file mutation. Focused POSIX integration coverage verifies restrictive-umask
+output, tamper rejection, and invalid-mask construction. Remaining Task 15 work
+still includes metadata beyond mode, policy revalidation, and pre-commit
+fault-injection coverage.
+
 ### Task 16: Implement Rollback and Startup Recovery
 
 **Description:** Implement safe rollback after commit failures and startup handling for incomplete journals.

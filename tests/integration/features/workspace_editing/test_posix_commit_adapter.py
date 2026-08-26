@@ -27,6 +27,8 @@ from fabrica.features.workspace_editing.application.dtos import (
 from fabrica.features.workspace_editing.application.use_cases import PlanPatch
 
 DEFAULT_ADD_MODE = 0o644
+RESTRICTIVE_WORKSPACE_UMASK = 0o027
+RESTRICTIVE_ADD_MODE = 0o640
 EXECUTABLE_UPDATE_MODE = 0o755
 OWNER_EXECUTABLE_MOVE_MODE = 0o700
 STALE_STAGE_MODE = 0o600
@@ -251,6 +253,40 @@ def test_posix_commit_adapter_applies_modes_for_add_update_and_move(tmp_path: Pa
     assert S_IMODE((tmp_path / "generated" / "add.py").stat().st_mode) == DEFAULT_ADD_MODE
     assert S_IMODE(update_path.stat().st_mode) == EXECUTABLE_UPDATE_MODE
     assert S_IMODE((tmp_path / "generated" / "move.sh").stat().st_mode) == OWNER_EXECUTABLE_MOVE_MODE
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_applies_configured_workspace_umask_to_add_mode(tmp_path: Path) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path, workspace_umask=RESTRICTIVE_WORKSPACE_UMASK)
+
+    assert run(adapter.prepare(plan, journal)) is None
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.COMMITTED
+    assert S_IMODE((tmp_path / "generated" / "add.py").stat().st_mode) == RESTRICTIVE_ADD_MODE
+
+
+def test_posix_commit_adapter_rejects_invalid_workspace_umask(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="workspace_umask"):
+        PosixPatchCommitAdapter(tmp_path, workspace_umask=0o1000)
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rejects_add_payload_with_mode_outside_configured_workspace_umask(tmp_path: Path) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path, workspace_umask=RESTRICTIVE_WORKSPACE_UMASK)
+    assert run(adapter.prepare(plan, journal)) is None
+    _stage_payload_path(tmp_path, journal, action_index=0).chmod(DEFAULT_ADD_MODE)
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert not (tmp_path / "generated" / "add.py").exists()
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
