@@ -1,8 +1,8 @@
 ---
 name: review-implementation-plan
-description: Review an implementation plan for completeness, ambiguity, sequencing, risks, dependencies, validation, readiness labeling, and handoff before coding.
+description: Review and update an existing implementation plan for completeness, ambiguity, sequencing, risks, dependencies, validation, readiness labeling, and handoff before coding.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   dependencies:
     tools: []
     skills:
@@ -41,19 +41,37 @@ For simple one-file edits, use only the relevant parts and keep the review brief
 
 ## Expected output
 
-Produce a review of the plan rather than rewriting it unless the user asks for a
-revised plan. Organize the review as:
+Review and update the existing implementation plan in place. Preserve valid
+content, decisions, task identifiers, and completed progress while making the
+smallest revisions needed to resolve gaps in scope, sequencing, dependencies,
+risks, ownership, validation, and handoff.
+
+Use the plan path supplied by the user or established by repository context. Do
+not assume a filename or invent a repository path. If no plan file can be
+identified, ask for its location. When no plan exists and requirements are clear,
+use `planning-and-task-breakdown` to create one before reviewing it.
+
+Record unresolved decisions explicitly in the plan rather than inventing
+answers. Every updated plan must include one readiness label:
+
+- `Ready`: the plan is specific enough to implement with known validation
+- `Needs revision`: the plan has gaps, but they can be resolved without changing
+  the core goal
+- `Blocked`: implementation should not start until a missing decision,
+  requirement, dependency, or approval is resolved
+
+After updating the plan, return a concise handoff organized as:
 
 1. readiness label and brief rationale
-2. findings ordered from implementation-blocking gaps to advisory improvements
-3. open questions and decisions, with an owner when known
-4. recommended sequence and validation checks
-5. handoff notes, including deferred work
+2. plan path and sections changed
+3. unresolved questions and decisions, with an owner when known
+4. required validation checks
+5. deferred work
 
-For each finding, identify the relevant plan section or state that the plan omits
-it. Explain the gap, why it matters, and the smallest concrete revision needed.
-Distinguish missing plan evidence from reviewer uncertainty, and do not invent
-repository paths, commands, owners, or requirements.
+When a finding cannot be resolved safely, add it to the plan as an explicit
+question, blocker, risk, or deferred item. Distinguish missing plan evidence from
+reviewer uncertainty, and do not invent repository paths, commands, owners, or
+requirements.
 
 ## Steps
 
@@ -139,28 +157,32 @@ Common risks include:
 
 For each significant risk, note a mitigation, fallback, or question.
 
-### 7. Produce a plan review summary
+### 7. Update the plan and report the result
 
-Return a concise review that includes:
+Apply the review findings directly to the identified plan file:
+
+- preserve valid requirements, decisions, task identifiers, and progress state
+- clarify ambiguous text only when repository evidence supports the revision
+- add omitted tasks, dependencies, risks, validation, or handoff information
+- record unresolved questions without guessing their answers
+- reorder tasks only when the dependency or safety rationale is clear
+- assign exactly one readiness label based on the unresolved findings
+- do not implement any task from the plan
+
+Re-read the updated plan and verify that the review findings are represented
+accurately. Then return a concise handoff that includes:
 
 - readiness assessment
+- updated plan path and changed sections
 - intended implementation owner or handoff audience when relevant
-- required clarifying questions, if any
-- findings tied to missing or weak plan sections
-- recommended implementation order changes
+- unresolved clarifying questions, blockers, and decisions
 - required validation commands or checks
 - deferred backlog items that should not block the first pass
 
-Use a clear readiness label when helpful:
-
-- `Ready`: the plan is specific enough to implement with known validation
-- `Needs revision`: the plan has gaps, but they can be resolved without changing
-  the core goal
-- `Blocked`: implementation should not start until a missing decision,
-  requirement, dependency, or approval is resolved
-
-Do not begin implementation until required questions are answered and the user has
-approved moving from planning to execution.
+Do not recommend implementation while blocking questions remain unresolved.
+Follow the repository or execution environment's approval policy before moving
+from planning to implementation. If no approver is available, hand off the
+updated plan with assumptions and blockers labeled explicitly.
 
 ## Output checklist
 
@@ -170,4 +192,10 @@ approved moving from planning to execution.
 - implementation sequence is reviewable
 - validation strategy is explicit
 - risks, fallback options, and deferred work are documented
-- readiness label is clear when used
+- the identified plan file was updated in place
+- valid existing content, task identifiers, and progress state were preserved
+- unresolved questions were recorded without invented answers
+- review findings are reflected in the plan, not only in the handoff
+- the updated plan was re-read after editing
+- exactly one readiness label is present and supported by the findings
+- no implementation work was started

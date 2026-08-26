@@ -1,8 +1,8 @@
 ---
 name: spec-driven-development
-description: Creates a specification before implementation. Use when starting a project, feature, integration, workflow, migration, or significant change with unclear or incomplete requirements.
+description: Creates and confirms the canonical specification that defines requirements, constraints, boundaries, and success criteria before implementation planning. Use when starting a project, feature, integration, workflow, migration, or significant change with unclear or incomplete requirements.
 metadata:
-  version: "1.3.0"
+  version: "1.5.0"
   dependencies:
     tools: []
     skills:
@@ -24,18 +24,19 @@ metadata:
 
 ## Overview
 
-Write a structured specification before implementation. The spec is the shared
-source of truth between the agent and the human engineer: what is being built,
-why it matters, which constraints apply, and how completion will be verified.
-Code without a spec is guessing.
+Write and confirm a structured specification before implementation planning. The
+spec is the canonical source of truth between the agent and the human engineer:
+what is being built, why it matters, which constraints apply, and how completion
+will be verified. Code without a spec is guessing.
 
 The spec can be short for small changes. Its value is not length; its value is
 making assumptions, success criteria, and boundaries explicit before work starts.
 
-Use `planning-and-task-breakdown` after the spec is accepted when the work needs a
-deeper ordered task list, task sizing, dependency mapping, or parallelization
-plan. Use `review-implementation-plan` before implementation when the resulting
-plan is non-trivial, risky, or needs an independent readiness check.
+Use `planning-and-task-breakdown` after the spec is accepted to derive the
+implementation approach, ordered tasks, task sizing, dependency mapping, and
+parallelization plan. Use `review-implementation-plan` before implementation when
+the resulting plan is non-trivial, risky, or needs an independent readiness
+check. The plan is a derived execution artifact and must not redefine the spec.
 
 Use `interview-me` first when the underlying intent is not yet confirmed. Use
 `idea-refine` first when the intent is understood but the concept, option space,
@@ -59,20 +60,22 @@ small documentation edits where the requested outcome is already precise.
 
 ## The gated workflow
 
-Spec-driven development has four phases. Do not advance until the current phase
-is reviewed or clearly accepted by the user.
+This skill ends with an accepted canonical specification or an explicitly labeled
+unconfirmed draft. It does not create the implementation plan, task list, or code.
 
-If no live user is available, stop at a draft spec, plan, or task list and label
-unconfirmed assumptions clearly. Do not treat an unreviewed draft as accepted.
+If no live user is available, stop at a draft spec and label unconfirmed
+assumptions and blocking questions clearly. Do not treat an unreviewed draft as
+accepted or hand it off as implementation-ready.
 
 ```text
-SPECIFY: define requirements, assumptions, constraints, and success criteria.
-PLAN: choose the technical approach and verification checkpoints.
-TASKS: break the plan into small, ordered, verifiable work items.
-IMPLEMENT: execute tasks and keep the spec current when decisions change.
+CONTEXT: inspect the request, existing system, constraints, and conventions.
+SPECIFY: define requirements, assumptions, boundaries, and success criteria.
+RESOLVE: surface and settle questions that materially affect the required outcome.
+CONFIRM: obtain acceptance or label the specification as an unconfirmed draft.
+HAND OFF: derive planning artifacts separately from the accepted specification.
 ```
 
-## Phase 1: Specify
+## Create the specification
 
 Start by surfacing assumptions. Do not silently fill requirement gaps.
 
@@ -98,78 +101,36 @@ experience, data, security, operations, compatibility, or architecture.
 Cover these areas at the appropriate level of detail:
 
 1. Objective: what is being built, who it is for, and why it matters.
-2. Current context: relevant existing behavior, files, workflows, constraints, and
+2. Status: whether the spec is a draft, accepted, or superseded, plus acceptance
+   and revision details when applicable.
+3. Current context: relevant existing behavior, files, workflows, constraints, and
    dependencies.
-3. Assumptions: unconfirmed beliefs that affect requirements or implementation.
-4. Desired behavior: user-visible behavior, interfaces, data changes,
+4. Assumptions: unconfirmed beliefs that affect requirements or implementation.
+5. Desired behavior: user-visible behavior, interfaces, data changes,
    operational behavior, or workflow changes.
-5. Commands and validation: exact build, test, lint, documentation, migration, or
+6. Scope: required capabilities and related work intentionally excluded.
+7. Commands and validation: exact build, test, lint, documentation, migration, or
    manual verification commands where known.
-6. Project structure: where implementation, tests, docs, and configuration belong.
-7. Style and conventions: naming, formatting, error handling, logging, API,
+8. Project structure: where implementation, tests, docs, and configuration belong.
+9. Style and conventions: naming, formatting, error handling, logging, API,
    accessibility, security, or platform conventions that matter for the change.
-8. Testing strategy: which test levels or checks prove the behavior works.
-9. Boundaries: what to always do, ask before doing, and never do.
-10. Success criteria: specific, testable conditions for completion.
-11. Open questions: unresolved decisions that need user input.
+10. Testing strategy: which test levels or checks prove the behavior works.
+11. Execution boundaries: what to always do, ask before doing, and never do.
+12. Success criteria: specific, testable conditions for completion.
+13. Open questions: unresolved decisions, their impact, owner, and whether they
+    block acceptance or implementation.
 
-### Spec template
+### Specification template
 
-```markdown
-# Spec: <project_or_feature_name>
+Use `assets/specification-template.md` as the starting structure. Adapt its level
+of detail to the change, but preserve the sections that communicate requirements,
+status, scope, constraints, boundaries, success criteria, assumptions, and
+unresolved questions.
 
-## Objective
-
-<What is being built, for whom, and why.>
-
-## Current context
-
-<Existing behavior, constraints, files, systems, and dependencies.>
-
-## Assumptions
-
-- <Assumption that must be confirmed or tested.>
-
-## Desired behavior
-
-<Functional, operational, data, interface, or workflow requirements.>
-
-## Commands and validation
-
-- Build: `<build_command>`
-- Test: `<test_command>`
-- Lint or static checks: `<lint_command>`
-- Manual verification: `<manual_check>`
-
-## Project structure
-
-- Spec: `docs/specs/<name>-spec.md`
-- `<source_location>`: <implementation responsibility>
-- `<test_location>`: <test responsibility>
-- `<docs_location>`: <documentation responsibility>
-
-## Conventions
-
-<Relevant style, naming, error-handling, security, accessibility, logging, or API conventions.>
-
-## Testing strategy
-
-<Test levels, fixtures, edge cases, and acceptance checks.>
-
-## Boundaries
-
-- Always: <required practices>
-- Ask first: <scope-expanding or risky actions>
-- Never: <prohibited actions>
-
-## Success criteria
-
-- <specific verifiable outcome>
-
-## Open questions
-
-- <question requiring user input>
-```
+Remove placeholder text from the resulting specification. Do not silently remove
+a section because its answer is unknown; record the unknown as an assumption or
+open question instead. Mark conditionally applicable concerns as not applicable
+only when repository evidence or user confirmation supports that conclusion.
 
 ### Reframe vague requests as success criteria
 
@@ -189,55 +150,54 @@ PROPOSED SUCCESS CRITERIA
 Ask the user to correct the proposed criteria before implementation depends on
 them.
 
-## Phase 2: Plan
+## Confirm the specification
 
-With the spec validated, create a technical implementation plan:
+Before handoff, ask the user to accept or correct the specification. Acceptance
+may cover the complete spec in one review; it does not require separate approval
+of every section when no material ambiguity remains.
 
-1. Identify the main components, files, interfaces, data paths, or workflows.
-2. Determine implementation order based on dependencies.
-3. Note risks and mitigation strategies.
-4. Identify what can be parallelized and what must be sequential.
-5. Define verification checkpoints between phases.
+Record the result in the specification's status section so later sessions can
+distinguish a draft from an accepted or superseded revision. For an accepted
+specification, record the accepting person or role and acceptance date when
+known. Do not infer acceptance from the absence of questions or from subsequent
+implementation activity.
 
-The plan should be reviewable. The user should be able to approve it or identify
-specific changes.
+Classify every unresolved question as blocking or non-blocking. If a blocking
+question remains, keep the specification labeled as a draft and do not describe
+it as ready for implementation planning. A non-blocking question may remain in
+an accepted specification only when its permitted impact is explicit. If no live
+user is available, record the missing decision, its impact, owner when known,
+and any safe options without choosing one silently.
 
-## Phase 3: Tasks
+## Handoff to planning
 
-Break the plan into discrete tasks:
+The accepted specification is the canonical source for downstream planning and
+implementation. Use `planning-and-task-breakdown` to create a separate derived
+plan under `docs/plans/<name>-plan.md` by default, unless project conventions or
+the user specify another location.
 
-- each task should fit in one focused implementation pass
-- each task has acceptance criteria
-- each task includes a verification step
-- tasks are ordered by dependency
-- tasks should avoid broad, unrelated file churn
+The derived plan may choose implementation details, sequencing, task boundaries,
+and verification checkpoints, but it must preserve the specification's objective,
+requirements, constraints, boundaries, and success criteria.
 
-Task template:
+If a plan conflicts with the specification:
 
-```markdown
-- [ ] Task: <description>
-  - Acceptance: <what must be true when done>
-  - Verify: `<verification_command_or_manual_check>`
-  - Likely files: `<file_or_directory>`
-```
-
-## Phase 4: Implement
-
-Execute tasks one at a time. Keep context focused on the current task, write or
-update tests before changing behavior where practical, and validate after each
-meaningful slice.
-
-If implementation reveals that the spec is wrong or incomplete, update the spec
-before continuing. Do not let the implementation silently become the new source of
-truth.
+1. Treat the specification as authoritative.
+2. Stop planning or implementation at the conflict.
+3. Resolve whether the plan is wrong or the requirement has changed.
+4. Update and re-confirm the specification before accepting a material requirement
+   change.
+5. Revise the derived plan to match the accepted specification.
 
 ## Keeping the spec alive
 
-- Update the spec when scope, data, interfaces, constraints, or decisions change.
+- Update and re-confirm the spec when accepted scope, behavior, data, interfaces,
+  constraints, or success criteria change materially.
 - Link implementation work back to the relevant spec section when useful.
 - Record durable architectural decisions in an ADR when the choice will matter to
   future maintainers.
 - Keep rejected options or unresolved questions visible until resolved.
+- Do not let a plan or implementation silently become the new source of truth.
 
 ## Common rationalizations
 
@@ -253,17 +213,23 @@ truth.
 
 - starting implementation without written success criteria
 - making architectural or data decisions without recording the rationale
-- implementing features not mentioned in the spec or accepted tasks
+- allowing a derived plan to redefine requirements or success criteria
+- implementing behavior not present in the accepted spec
 - skipping clarification when requirements conflict
 - treating an outdated spec as irrelevant instead of updating it
 
 ## Verification
 
-Before implementation begins, confirm:
+Before handing the spec to planning, confirm:
 
 - [ ] assumptions and open questions are visible
+- [ ] every open question records its impact and blocking status
 - [ ] blocking questions are resolved
 - [ ] the spec defines objective, desired behavior, constraints, and boundaries
+- [ ] in-scope and out-of-scope work are explicit
 - [ ] success criteria are specific and testable
 - [ ] validation commands or manual checks are recorded where known
-- [ ] the user has accepted the spec, plan, and task list
+- [ ] the spec is identified as the canonical source for downstream work
+- [ ] the spec status and acceptance details are recorded durably
+- [ ] the user has accepted the spec, or it is explicitly labeled as an
+      unconfirmed draft that is not ready for implementation planning

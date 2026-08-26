@@ -2,7 +2,7 @@
 name: planning-and-task-breakdown
 description: Breaks work into ordered tasks. Use when you have a spec or clear requirements and need to break work into implementable tasks. Use when a task feels too large to start, when you need to estimate scope, or when parallel work is possible.
 metadata:
-  version: "1.3.1"
+  version: "1.4.1"
   dependencies:
     tools: []
     skills:
@@ -42,7 +42,8 @@ Produce a written implementation plan that includes:
 - ordered tasks with acceptance criteria and verification steps
 - dependencies, checkpoints, and sequencing constraints
 - likely files or components touched, using portable placeholders when needed
-- risks, assumptions, and open questions that affect safe implementation
+- scope boundaries, risks, assumptions, and open questions that affect safe
+  implementation
 - explicit instructions to keep the plan current during implementation by
   updating checkboxes, status, scope changes, and newly discovered work
 
@@ -76,8 +77,10 @@ Foundational data or state model
   - Supporting setup, migration, or seed data
 ```
 
-Implementation order follows dependencies from foundations outward: build each
-prerequisite before the work that depends on it.
+Implementation order follows dependencies from foundations outward, but only add
+prerequisite work that cannot safely belong to the first complete feature slice.
+Use the graph to order work within and between slices; do not build every lower
+layer before delivering any working behavior.
 
 ### Step 3: Slice vertically
 
@@ -101,27 +104,39 @@ Task 3: User can add an item (item model + interface + creation workflow)
 Task 4: User can view item history (query path + interface + list or report surface)
 ```
 
-Each vertical slice delivers working, testable functionality.
+Each vertical slice delivers working, testable functionality. A small enabling
+foundation, shared contract, migration, or risk-reduction spike may come first
+when it is a true prerequisite; record why it cannot be included in the first
+slice.
 
 ### Step 4: Write tasks
 
 Each task follows this structure:
 
 ```markdown
-## Task [N]: [Short descriptive title]
+### Task [N]: [Short descriptive title]
+
+**Task completion:**
+
+- [ ] `T<N>` — All required acceptance and verification items are resolved
 
 **Description:** One paragraph explaining what this task accomplishes.
 
 **Acceptance criteria:**
 
-- [ ] [Specific, testable condition]
-- [ ] [Specific, testable condition]
+- [ ] `T<N>-AC1` — [Specific, testable condition]
+- [ ] `T<N>-AC2` — [Specific, testable condition]
 
 **Verification:**
 
-- [ ] Tests pass: `<test_command>`
-- [ ] Build succeeds when applicable: `<build_command>`
-- [ ] Manual check: [description of what to verify]
+- [ ] `T<N>-V1` — Focused check: `<confirmed_test_or_check_command>`
+- [ ] `T<N>-V2` — Build, static, or integration check when applicable: `<confirmed_command>`
+- [ ] `T<N>-V3` — Manual check when applicable: [description of what to verify]
+
+Use only commands confirmed from repository documentation or configuration. If a
+needed command is not yet known, write `Unknown — discover before implementation`.
+For an inapplicable check, write `Not applicable — <reason>` rather than inventing
+a command. Distinguish focused iteration checks from final handoff checks.
 
 **Dependencies:** [Task numbers this depends on, or "None"]
 
@@ -130,17 +145,19 @@ Each task follows this structure:
 - `<module_path>`
 - `<test_path>`
 
-**Estimated scope:** [XS: 1 file | Small: 2 files | Medium: 3-5 files | Large: 6-8 files | XL: 9+ files]
+**Estimated scope:** [XS: 1 file | S: 1-2 files | M: 3-5 files | L: 6-8 files | XL: 9+ files]
 ```
 
 ### Step 5: Order and checkpoint
 
 Arrange tasks so that:
 
-1. Dependencies are satisfied (build foundation first)
+1. Dependencies are satisfied with the smallest necessary prerequisite work
 2. Each task leaves the system in a working state
-3. Verification checkpoints occur after every 2-3 tasks
+3. Checkpoints follow meaningful integration, risk, approval, or phase boundaries
 4. High-risk tasks are early (fail fast)
+
+For a long plan with no natural boundary, add a checkpoint after a few tasks.
 
 Add explicit checkpoints:
 
@@ -155,15 +172,23 @@ Add explicit checkpoints:
 
 ## Task Sizing Guidelines
 
-| Size   | Files | Scope                                      | Example                                          |
-| ------ | ----- | ------------------------------------------ | ------------------------------------------------ |
-| **XS** | 1     | Single function or config change           | Add a validation rule                            |
-| **S**  | 2     | One component, interface, or workflow step | Add a new command handler or interface operation |
-| **M**  | 3-5   | One feature slice                          | User registration flow                           |
-| **L**  | 6-8   | Multi-component feature                    | Search with filtering and pagination             |
-| **XL** | 9+    | **Too large - break it down further**      | Break into smaller tasks                         |
+| Size   | Typical files | Scope                                      | Example                                          |
+| ------ | ------------- | ------------------------------------------ | ------------------------------------------------ |
+| **XS** | 1             | Single function or config change           | Add a validation rule                            |
+| **S**  | 1-2           | One component, interface, or workflow step | Add a new command handler or interface operation |
+| **M**  | 3-5           | One coherent feature slice                 | User registration flow                           |
+| **L**  | 6-8           | Multi-component or uncertain change        | Search with filtering and pagination             |
+| **XL** | 9+             | Likely too large; review for decomposition | Break into smaller tasks                         |
 
-If a task is L or larger, it should be broken into smaller tasks. An agent performs best on S and M tasks.
+Size tasks by logical cohesion, uncertainty, reviewability, and verification
+cost—not file count alone. More than about five independently edited files should
+trigger a decomposition review, not automatically invalidate a task. Exclude
+generated or mechanical updates when they do not add independent implementation
+or verification work.
+
+If a task is L or larger, break it down unless it is an atomic change that cannot
+be safely separated. Record the reason when retaining an L task. An agent performs
+best on S and M tasks.
 
 **When to break a task down further:**
 
@@ -177,80 +202,28 @@ If a task is L or larger, it should be broken into smaller tasks. An agent perfo
 Write the plan to `docs/plans/<kebab-case-name>-plan.md` by default unless the
 user or repository conventions specify another location.
 
+Use `assets/implementation-plan-template.md` as the starting structure. Adapt its
+phases and task count to the work, and remove or mark placeholder sections that
+are not applicable. Keep the task fields defined in Step 4 even when the plan is
+short.
+
+Give every task, acceptance criterion, verification item, and checkpoint
+checkbox a stable progress ID. Duplicate each detailed checkbox in the Progress
+Tracking dashboard with the same ID, and update both copies together whenever
+status or scope changes. The detailed sections remain the source of context; the
+dashboard is the at-a-glance completion view.
+
+Mark a parent task complete only when all required acceptance and verification
+items are resolved. Items explicitly marked not applicable do not block
+completion. Unknown, unresolved, or unapproved deferred items remain unchecked
+and block completion.
+
 Treat the plan as a living document during implementation. Update task and
 checkpoint checkboxes as work is completed, and keep unfinished or unverified
 items unchecked. Record brief status notes, blockers, deviations, changed
 sequencing, and newly discovered work when they affect the remaining plan. Make
 these updates after each completed task or meaningful plan change without
 waiting for the user to ask for progress updates.
-
-```markdown
-# Implementation Plan: [Feature/Project Name]
-
-## Overview
-
-[One paragraph summary of what we're building]
-
-## Architecture Decisions
-
-- [Key decision 1 and rationale]
-- [Key decision 2 and rationale]
-
-## Progress Tracking
-
-Treat this plan as a living document throughout implementation. After each
-completed task or meaningful change:
-
-- check off completed tasks, acceptance criteria, verification items, and
-  checkpoints
-- leave unfinished or unverified items unchecked
-- add newly discovered work and update sequencing when scope or dependencies
-  change
-- note blockers, deviations, and decisions that affect the remaining work
-
-Keep this section and the task list current without waiting for the user to ask
-for progress updates.
-
-## Task List
-
-### Phase 1: Foundation
-
-- [ ] Task 1: ...
-- [ ] Task 2: ...
-
-### Checkpoint: Foundation
-
-- [ ] Tests pass, builds clean
-
-### Phase 2: Core Features
-
-- [ ] Task 3: ...
-- [ ] Task 4: ...
-
-### Checkpoint: Core Features
-
-- [ ] End-to-end flow works
-
-### Phase 3: Polish
-
-- [ ] Task 5: ...
-- [ ] Task 6: ...
-
-### Checkpoint: Complete
-
-- [ ] All acceptance criteria met
-- [ ] Ready for review
-
-## Risks and Mitigations
-
-| Risk   | Impact         | Mitigation |
-| ------ | -------------- | ---------- |
-| [Risk] | [High/Med/Low] | [Strategy] |
-
-## Open Questions
-
-- [Question needing human input]
-```
 
 ## Parallelization Opportunities
 
@@ -286,9 +259,11 @@ Before handing the plan to an implementer or starting implementation yourself, i
 - dependencies and sequencing constraints
 - acceptance criteria for each task
 - likely files or components touched, using portable project-relative placeholders when needed
-- validation commands or manual checks for each task
+- confirmed validation commands or manual checks for each task, plus explicit
+  unknown or not-applicable states where necessary
 - open questions that need human input before work can proceed safely
 - assumptions that an implementer should confirm or preserve
+- explicit in-scope and out-of-scope work
 
 ## Verification
 
@@ -297,8 +272,14 @@ Before starting implementation, confirm:
 - [ ] Every task has acceptance criteria
 - [ ] Every task has a verification step
 - [ ] Task dependencies are identified and ordered correctly
-- [ ] No task touches more than ~5 files
+- [ ] Tasks are small enough to implement, review, and verify coherently; tasks
+      with more than ~5 independently edited files have a recorded decomposition
+      review or atomicity rationale
 - [ ] Checkpoints exist between major phases
 - [ ] The plan says how and when its checkboxes and status will be updated during implementation
+- [ ] Every detailed task, acceptance, verification, and checkpoint checkbox has
+      a matching Progress Tracking checkbox with the same unique ID
+- [ ] Parent tasks are complete only when all required child items are resolved
 - [ ] Required reviews or approvals are identified before implementation starts
 - [ ] Open questions and assumptions are captured or marked not applicable
+- [ ] Scope boundaries and non-goals are captured or marked not applicable
