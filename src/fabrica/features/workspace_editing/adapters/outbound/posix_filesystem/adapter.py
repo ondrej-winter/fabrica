@@ -85,25 +85,9 @@ class PosixPatchWorkspaceSnapshotAdapter:
             existing_directories.add(directory)
 
         for action in actions:
-            alias_result = _reject_path_alias(root, action.path)
-            if alias_result is not None:
-                return alias_result
-
-            source_result = _snapshot_action_source(root, action)
-            if isinstance(source_result, PatchResult):
-                return source_result
-            if source_result is not None:
-                evidence_by_path[action.path] = source_result
-
-            destination = action.path if action.kind is PatchActionKind.ADD else action.destination_path
-            if destination is not None:
-                alias_result = _reject_path_alias(root, destination)
-                if alias_result is not None:
-                    return alias_result
-                destination_result = _snapshot_destination(root, action.kind, destination)
-                if isinstance(destination_result, PatchResult):
-                    return destination_result
-                evidence_by_path[destination] = destination_result
+            action_result = _snapshot_action(root, action, evidence_by_path)
+            if action_result is not None:
+                return action_result
 
         return PatchPlanningSnapshot(
             evidence_by_path=evidence_by_path,
@@ -160,6 +144,46 @@ def _reject_path_alias(root: Path, path: str) -> PatchResult | None:
     return result
 
 
+def _snapshot_action(
+    root: Path,
+    action: PatchAction,
+    evidence_by_path: dict[str, PatchPathEvidence],
+) -> PatchResult | None:
+    alias_result = _reject_path_alias(root, action.path)
+    if alias_result is not None:
+        return alias_result
+
+    source_result = _snapshot_action_source(root, action)
+    if isinstance(source_result, PatchResult):
+        return source_result
+    if source_result is not None:
+        evidence_by_path[action.path] = source_result
+    return _snapshot_action_destination(root, action, source_result, evidence_by_path)
+
+
+def _snapshot_action_destination(
+    root: Path,
+    action: PatchAction,
+    source_evidence: PatchPathEvidence | None,
+    evidence_by_path: dict[str, PatchPathEvidence],
+) -> PatchResult | None:
+    destination = action.path if action.kind is PatchActionKind.ADD else action.destination_path
+    if destination is None:
+        return None
+    alias_result = _reject_path_alias(root, destination)
+    if alias_result is not None:
+        return alias_result
+    destination_result = _snapshot_destination(root, action.kind, destination)
+    if isinstance(destination_result, PatchResult):
+        return destination_result
+    if action.kind is PatchActionKind.MOVE:
+        cross_device_result = _reject_cross_device_move(root, action, source_evidence)
+        if cross_device_result is not None:
+            return cross_device_result
+    evidence_by_path[destination] = destination_result
+    return None
+
+
 def _snapshot_action_source(root: Path, action: PatchAction) -> PatchPathEvidence | PatchResult | None:
     if action.kind is PatchActionKind.ADD:
         return None
@@ -183,6 +207,41 @@ def _snapshot_destination(root: Path, action_kind: PatchActionKind, path: str) -
     if action_kind is PatchActionKind.MOVE and evidence.exists:
         return _rejected("MOVE_TARGET_EXISTS", f"move target already exists: {path}")
     return evidence
+
+
+def _reject_cross_device_move(
+    root: Path,
+    action: PatchAction,
+    source_evidence: PatchPathEvidence | None,
+) -> PatchResult | None:
+    if source_evidence is None or action.destination_path is None:
+        msg = "move actions must have source evidence and a destination path"
+        raise ValueError(msg)
+    source_device = source_evidence.metadata.get("device")
+    if not isinstance(source_device, int):
+        msg = "move source evidence must include an integer device"
+        raise TypeError(msg)
+    try:
+        destination_device = _destination_parent_device(root, action.destination_path)
+    except OSError as err:
+        return _rejected("IO_ERROR", f"could not inspect move destination device: {err.strerror}")
+    if source_device != destination_device:
+        return _rejected(
+            "CROSS_DEVICE_MOVE_UNSUPPORTED",
+            f"move source and destination parent are on different devices: {action.path} -> {action.destination_path}",
+        )
+    return None
+
+
+def _destination_parent_device(root: Path, destination_path: str) -> int:
+    parent = root / destination_path.rpartition("/")[0]
+    while True:
+        try:
+            return parent.stat().st_dev
+        except FileNotFoundError:
+            if parent == root:
+                raise
+            parent = parent.parent
 
 
 def _validate_parent_chain(root: Path, path: str) -> PatchResult | None:

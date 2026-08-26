@@ -12,10 +12,15 @@ from tempfile import TemporaryDirectory
 import pytest
 
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import PosixPatchWorkspaceSnapshotAdapter
-from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.adapter import _reject_path_alias
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import adapter as posix_snapshot_adapter
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.adapter import (
+    _reject_cross_device_move,
+    _reject_path_alias,
+)
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
+    PatchPathEvidence,
     PatchResult,
     PatchResultStatus,
 )
@@ -109,6 +114,85 @@ def test_posix_snapshot_adapter_rejects_multiple_hard_links(tmp_path: Path) -> N
     assert result.status is PatchResultStatus.REJECTED
     assert result.error is not None
     assert result.error.code == "MULTIPLE_HARD_LINKS_UNSUPPORTED"
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+def test_posix_snapshot_adapter_rejects_cross_device_move_before_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source.py"
+    source.write_text("original\n", encoding="utf-8")
+    source_device = source.stat().st_dev
+    monkeypatch.setattr(posix_snapshot_adapter, "_destination_parent_device", lambda _root, _path: source_device + 1)
+
+    result = PosixPatchWorkspaceSnapshotAdapter(
+        tmp_path,
+        require_production_capabilities=False,
+    ).build_planning_snapshot(
+        (PatchAction(index=0, kind=PatchActionKind.MOVE, path="source.py", destination_path="generated/new.py"),)
+    )
+
+    assert isinstance(result, PatchResult)
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "CROSS_DEVICE_MOVE_UNSUPPORTED"
+    assert source.read_text(encoding="utf-8") == "original\n"
+    assert not (tmp_path / "generated").exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+def test_posix_snapshot_adapter_accepts_same_device_move_with_missing_destination_parent(tmp_path: Path) -> None:
+    source = tmp_path / "source.py"
+    source.write_text("original\n", encoding="utf-8")
+
+    snapshot = PosixPatchWorkspaceSnapshotAdapter(
+        tmp_path,
+        require_production_capabilities=False,
+    ).build_planning_snapshot(
+        (PatchAction(index=0, kind=PatchActionKind.MOVE, path="source.py", destination_path="generated/new.py"),)
+    )
+
+    assert not isinstance(snapshot, PatchResult)
+    assert snapshot.evidence_by_path["source.py"].metadata["device"] == source.stat().st_dev
+    assert snapshot.evidence_by_path["generated/new.py"].exists is False
+    assert not (tmp_path / "generated").exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+def test_posix_snapshot_adapter_rejects_move_when_destination_device_cannot_be_inspected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    action = PatchAction(index=0, kind=PatchActionKind.MOVE, path="source.py", destination_path="generated/new.py")
+    source_evidence = PatchPathEvidence(path="source.py", exists=True, metadata={"device": 1})
+    monkeypatch.setattr(
+        posix_snapshot_adapter,
+        "_destination_parent_device",
+        lambda _root, _path: (_ for _ in ()).throw(PermissionError("denied")),
+    )
+
+    result = _reject_cross_device_move(tmp_path, action, source_evidence)
+
+    assert isinstance(result, PatchResult)
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "IO_ERROR"
+
+
+def test_posix_snapshot_adapter_reject_cross_device_move_requires_complete_move_evidence(tmp_path: Path) -> None:
+    action = PatchAction(index=0, kind=PatchActionKind.MOVE, path="source.py", destination_path="generated/new.py")
+
+    with pytest.raises(ValueError, match="source evidence"):
+        _reject_cross_device_move(tmp_path, action, None)
+
+
+def test_posix_snapshot_adapter_reject_cross_device_move_requires_integer_source_device(tmp_path: Path) -> None:
+    action = PatchAction(index=0, kind=PatchActionKind.MOVE, path="source.py", destination_path="generated/new.py")
+    source_evidence = PatchPathEvidence(path="source.py", exists=True, metadata={"device": "one"})
+
+    with pytest.raises(TypeError, match="integer device"):
+        _reject_cross_device_move(tmp_path, action, source_evidence)
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")

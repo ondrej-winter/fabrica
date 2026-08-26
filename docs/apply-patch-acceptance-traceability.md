@@ -54,13 +54,12 @@ explicitly deferred in the implementation plan.
   case/Unicode-normalization alias rejection, parent-file rejection, FIFO and
   Unix-domain socket source/target rejection,
   FIFO and Unix-domain socket parent rejection, symlink path rejection, and
-  multiple-hard-link rejection.
+  multiple-hard-link and cross-device Move rejection.
 - `tests/integration/features/workspace_editing/test_posix_commit_adapter.py`
   covers stale source content, stale source identity, changed destination parent,
   unexpected Add/Move destination appearance, missing staged payload, and changed
   staged payload mode before visible file commit.
-- **Open:** cross-device move evidence and special-file classes beyond FIFO and
-  Unix-domain socket nodes.
+- **Open:** special-file classes beyond FIFO and Unix-domain socket nodes.
 
 ### Preservation
 
