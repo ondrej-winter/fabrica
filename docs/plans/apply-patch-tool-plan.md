@@ -70,29 +70,29 @@ After every completed task or meaningful change:
 - [x] Task 2: Define typed async registered-tool execution contracts
 - [x] Task 3: Migrate the tool loop and model boundary to async
 - [x] Task 4: Implement runtime ledger and mutation-aware status mapping
-- [ ] Task 5: Prove POSIX capability and cleanup-deadline feasibility (macOS-local spike added; Linux evidence pending)
+- [x] Task 5: Prove POSIX capability and cleanup-deadline feasibility
 
 ### Checkpoint A: Architecture Feasibility
 
-- [ ] Tasks 1-5 are accepted.
-- [ ] Async runtime and existing tools pass their tests.
-- [ ] The cleanup/deadline model is credible on both supported platforms. Current spike selects supervised helper-process/recovery ownership; Linux evidence pending.
-- [ ] No new dependency is added without recorded evidence.
-- [ ] Production `workspace_editing` implementation has not started before this checkpoint.
+- [x] Tasks 1-5 are accepted.
+- [x] Async runtime and existing tools pass their tests.
+- [ ] The cleanup/deadline model is credible on both supported platforms. macOS-local and Docker Linux evidence select supervised helper-process/recovery ownership, but that production ownership model remains unimplemented.
+- [x] No new dependency is added without recorded evidence.
+- [ ] Production mutation exposure remains blocked until the selected no-replace rename and supervised-cleanup guarantees are implemented. Pure-core and explicit-dependency adapter work began before this checkpoint by user request; this is a documented sequencing deviation, not evidence that the production capability gate is satisfied.
 
 ### Phase 2: Pure `workspace_editing` Application Core
 
 - [x] Task 6: Establish DTOs, exhaustive errors, and result serialization
-- [ ] Task 7: Implement the side-effect-free patch parser
-- [ ] Task 8: Implement text snapshot decoding and rendering
-- [ ] Task 9: Implement deterministic hunk matching
+- [x] Task 7: Implement the side-effect-free patch parser
+- [x] Task 8: Implement text snapshot decoding and rendering
+- [x] Task 9: Implement deterministic hunk matching
 - [x] Task 10: Define slice-owned ports and recovery state machine
 - [x] Task 11: Implement immutable planning, preview, and digest generation
 
 ### Checkpoint B: Pure Core
 
-- [ ] Parser, text, matcher, ports, recovery state machine, planner, preview, and result-contract tests pass.
-- [ ] No application module performs filesystem or approval UI I/O.
+- [x] Parser, text, matcher, ports, recovery state machine, planner, preview, and result-contract tests pass.
+- [x] No application module performs filesystem or approval UI I/O.
 
 ### Phase 3: POSIX Adapters and Transactional Behavior
 
@@ -100,7 +100,7 @@ After every completed task or meaningful change:
 - [x] Task 13: Implement mutation lease, policy, and approval adapters
 - [x] Task 14: Implement durable journal and reversible pre-commit effects
 - [ ] Task 15: Implement staging, revalidation, and commit scheduling
-- [ ] Task 16: Implement rollback and startup recovery
+- [x] Task 16: Implement rollback and startup recovery
 
 ### Checkpoint C: Filesystem Safety
 
@@ -117,8 +117,8 @@ After every completed task or meaningful change:
 
 - [ ] Every success criterion in the specification maps to passing automated evidence.
 - [ ] No overlapping filesystem mutation tool is registered.
-- [ ] macOS and Linux capability evidence is recorded.
-- [ ] Full local quality gate passes.
+- [x] macOS and Linux capability evidence is recorded.
+- [x] Full local quality gate passes.
 - [ ] This living plan reflects final status, deviations, and unresolved operational follow-ups.
 
 ## Detailed Tasks
@@ -242,8 +242,8 @@ After every completed task or meaningful change:
 
 **Verification:**
 
-- [ ] Focused probe tests run on real macOS and Linux runners. macOS-local probe added; Linux runner evidence pending.
-- [ ] Recorded evidence includes commands, filesystem type, Python version, and results. Local macOS evidence command and summary are recorded in `docs/apply-patch-posix-capability-evidence.md`; raw Linux evidence pending.
+- [x] Focused probe tests run on real macOS and Linux environments. The repository records local macOS and Docker-based Linux evidence.
+- [x] Recorded evidence includes commands, filesystem type, Python version, and results in `docs/apply-patch-posix-capability-evidence.md`.
 
 **Dependencies:** Task 1.
 
@@ -294,9 +294,16 @@ foundation under `src/fabrica/features/workspace_editing/application/` with
 focused unit tests in `tests/unit/features/workspace_editing/application/`.
 Focused pytest passed with coverage disabled because the project-level coverage
 gate is not meaningful for a single-test-file run. Ruff, ty, and import-linter
-checks passed for the new slice. This intentionally starts pure core work before
-Linux Task 5 evidence is recorded because the user explicitly requested the next
-slice; mutating adapters remain blocked by Checkpoint A.
+checks passed for the new slice. This intentionally started pure core work before
+Checkpoint A was accepted because the user explicitly requested the next slice;
+production mutation exposure remains blocked by the unresolved no-replace rename
+and supervised-cleanup guarantees.
+
+**Status reconciliation (2026-08-26):** The Task 5 probe evidence was recorded
+for local macOS and Docker-based Linux on 2026-08-25. Focused validation on
+2026-08-26 passed 156 workspace-editing unit/integration tests, Ruff, ty, and
+import-linter. This verifies the recorded fail-closed decision; it does not
+implement or approve production mutation exposure.
 
 ### Task 7: Implement the Side-Effect-Free Patch Parser
 
