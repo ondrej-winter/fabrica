@@ -13,6 +13,7 @@ from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem impor
     PosixPatchJournalAndPreparationAdapter,
     PosixPatchWorkspaceSnapshotAdapter,
 )
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import commit as posix_commit_module
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
@@ -120,6 +121,66 @@ def test_posix_commit_adapter_rejects_journal_digest_mismatch_before_staging(tmp
     assert result.error is not None
     assert result.error.code == "STALE_PLAN"
     assert not _stage_payload_path(tmp_path, journal, action_index=0).exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rejects_commit_when_durable_journal_is_not_prepared(tmp_path: Path) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+    journal_path = _journal_path(tmp_path, journal)
+    payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    payload["state"] = PatchJournalState.COMMITTING.value
+    journal_path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert not (tmp_path / "generated" / "add.py").exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rejects_staging_when_durable_journal_plan_binding_changes(tmp_path: Path) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    journal_path = _journal_path(tmp_path, journal)
+    payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    payload["plan_digest"] = "sha256:" + "0" * 64
+    journal_path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+
+    result = run(PosixPatchCommitAdapter(tmp_path).prepare(plan, journal))
+
+    assert result is not None
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert not _stage_payload_path(tmp_path, journal, action_index=0).exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_removes_partial_stage_artifacts_after_staging_io_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+
+    def fail_staged_payload_sync(_path: Path) -> None:
+        msg = "injected stage payload sync failure"
+        raise OSError(msg)
+
+    monkeypatch.setattr(posix_commit_module, "_fsync_file", fail_staged_payload_sync)
+
+    result = run(PosixPatchCommitAdapter(tmp_path).prepare(plan, journal))
+
+    assert result is not None
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "IO_ERROR"
+    assert not _stage_payload_path(tmp_path, journal, action_index=0).exists()
+    assert not _stage_payload_path(tmp_path, journal, action_index=0).parent.exists()
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
@@ -407,4 +468,4 @@ def _stage_payload_path(tmp_path: Path, journal: PatchJournalRecord, *, action_i
 
 
 def _journal_path(tmp_path: Path, journal: PatchJournalRecord) -> Path:
-    return tmp_path / ".fabrica" / "apply-patch" / "journal" / f"{journal.journal_digest}.json"
+    return tmp_path / ".fabrica" / "apply-patch" / "journal" / f"{journal.journal_digest.removeprefix('sha256:')}.json"

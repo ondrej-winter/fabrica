@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import stat
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -53,6 +54,9 @@ class PosixPatchCommitAdapter:
         journal_result = _revalidate_journal_binding(plan, journal)
         if journal_result is not None:
             return journal_result
+        durable_journal_result = self._revalidate_durable_prepared_journal(plan, journal)
+        if durable_journal_result is not None:
+            return durable_journal_result
         stage_root = self._stage_root(journal)
         try:
             self._capture_destination_parents(plan, journal)
@@ -66,6 +70,7 @@ class PosixPatchCommitAdapter:
                     _fsync_file(stage_path)
             _fsync_directory(stage_root)
         except OSError as err:
+            _remove_stage_root(stage_root)
             self._close_destination_parents(journal)
             return _rejected("IO_ERROR", f"could not stage patch payloads: {err.strerror}")
         return None
@@ -76,6 +81,10 @@ class PosixPatchCommitAdapter:
         if journal_result is not None:
             self._close_destination_parents(journal)
             return journal_result
+        durable_journal_result = self._revalidate_durable_prepared_journal(plan, journal)
+        if durable_journal_result is not None:
+            self._close_destination_parents(journal)
+            return durable_journal_result
 
         stage_root = self._stage_root(journal)
         validation_result = self._validate_before_commit(plan, journal, stage_root)
@@ -259,6 +268,20 @@ class PosixPatchCommitAdapter:
             or _revalidate_staging(stage_root, plan, self._payload_mode)
         )
 
+    def _revalidate_durable_prepared_journal(self, plan: PatchPlan, journal: PatchJournalRecord) -> PatchResult | None:
+        """Ensure durable recovery evidence still binds this plan before file work."""
+        try:
+            payload = json.loads(self._record_path(journal).read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return _rejected("STALE_PLAN", "durable journal is unavailable or invalid before file commit")
+        if (
+            payload.get("journal_digest") != journal.journal_digest
+            or payload.get("plan_digest") != plan.plan_digest
+            or payload.get("state") != PatchJournalState.PREPARED.value
+        ):
+            return _rejected("STALE_PLAN", "durable journal no longer authorizes the approved file commit")
+        return None
+
     def _capture_destination_parents(self, plan: PatchPlan, journal: PatchJournalRecord) -> None:
         for action in plan.actions:
             destination_path = _destination_path(action)
@@ -307,7 +330,13 @@ class PosixPatchCommitAdapter:
         )
 
     def _record_path(self, journal: PatchJournalRecord) -> Path:
-        return self._workspace_root() / ".fabrica" / "apply-patch" / "journal" / f"{journal.journal_digest}.json"
+        return (
+            self._workspace_root()
+            / ".fabrica"
+            / "apply-patch"
+            / "journal"
+            / f"{journal.journal_digest.removeprefix('sha256:')}.json"
+        )
 
 
 def _revalidate_journal_binding(plan: PatchPlan, journal: PatchJournalRecord) -> PatchResult | None:
@@ -539,6 +568,15 @@ def _directory_with_state(directory: PatchDirectoryOutcome, state: PatchDirector
 
 def _stage_path(stage_root: Path, action: PatchAction) -> Path:
     return stage_root / f"{action.index:06d}.payload"
+
+
+def _remove_stage_root(stage_root: Path) -> None:
+    """Remove adapter-owned incomplete staging artifacts after a pre-commit failure."""
+    try:
+        shutil.rmtree(stage_root)
+        _fsync_directory(stage_root.parent)
+    except OSError:
+        return
 
 
 def _fsync_file(path: Path) -> None:

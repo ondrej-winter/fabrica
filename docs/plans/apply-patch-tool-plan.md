@@ -647,6 +647,16 @@ adapter cannot preserve. Focused integration coverage proves the rejection occur
 before a destination child becomes visible. Portable ACL and extended-attribute
 detection or preservation remain open.
 
+**Incremental update:** File staging and commit now revalidate the durable journal
+record immediately before pre-commit staging and again before the explicit file
+commit point. The record must still bind the approved plan and be in the
+`PREPARED` state, preventing a tampered, stale, or already-committing journal from
+authorizing file mutation. Failed staging also removes adapter-owned incomplete
+stage artifacts before reporting the no-file-mutation rejection. Focused POSIX
+integration tests cover durable journal state and plan-binding rejection. Full
+metadata preservation, commit-time policy revalidation, and pre-commit
+fault-injection coverage remain open.
+
 ### Task 16: Implement Rollback and Startup Recovery
 
 **Description:** Implement safe rollback after commit failures and startup handling for incomplete journals.
