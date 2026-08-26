@@ -803,7 +803,7 @@ acceptance testing.
 - [x] End-to-end offline model-tool-loop tests pass.
 - [ ] Complete acceptance matrix passes.
 - [ ] macOS/Linux CI evidence is recorded.
-- [ ] Full quality gate passes.
+- [x] Full quality gate passes.
 
 **Dependencies:** Task 17.
 
@@ -915,6 +915,14 @@ Production default mutation composition remains fail-closed pending the document
 POSIX no-replace rename and supervised-cleanup guarantees. Remaining Task 18 work
 is closing or explicitly deferring the open acceptance scenarios and completing
 the full quality gate.
+
+**Incremental update:** Closed the remaining special-file classification evidence
+gap without requiring privileged device-node creation. Focused tests now exercise
+character- and block-device modes at both existing action-path and parent-path
+classification boundaries, complementing the real FIFO and Unix-domain socket
+integration tests. All such modes fail before mutation as
+`SPECIAL_FILE_UNSUPPORTED`. Remaining Task 18 work is closing or explicitly
+deferring the other open acceptance scenarios. The full local quality gate passes with 1,026 tests, 2 skips, and 93.01% coverage; broader Task 18 acceptance and production-exposure gates remain open.
 
 ## Risks and Mitigations
 

@@ -2,6 +2,7 @@
 
 import os
 import socket
+import stat
 import sys
 import unicodedata
 from asyncio import run
@@ -19,6 +20,8 @@ from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.adapt
     _reject_cross_device_move,
     _reject_path_alias,
     _reject_unsupported_metadata,
+    _unsupported_existing_path_result,
+    _validate_existing_parent,
 )
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
@@ -198,6 +201,30 @@ def test_posix_snapshot_adapter_reject_cross_device_move_requires_integer_source
 
     with pytest.raises(TypeError, match="integer device"):
         _reject_cross_device_move(tmp_path, action, source_evidence)
+
+
+@pytest.mark.parametrize("file_type", [stat.S_IFCHR, stat.S_IFBLK])
+def test_posix_snapshot_adapter_rejects_device_file_modes(file_type: int, tmp_path: Path) -> None:
+    path_stat = os.stat_result((file_type | 0o600, 0, 0, 1, 0, 0, 0, 0, 0, 0))
+
+    result = _unsupported_existing_path_result(tmp_path / "device-node", path_stat, "device-node")
+
+    assert result is not None
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "SPECIAL_FILE_UNSUPPORTED"
+
+
+@pytest.mark.parametrize("file_type", [stat.S_IFCHR, stat.S_IFBLK])
+def test_posix_snapshot_adapter_rejects_device_parent_modes(file_type: int, tmp_path: Path) -> None:
+    path_stat = os.stat_result((file_type | 0o600, 0, 0, 1, 0, 0, 0, 0, 0, 0))
+
+    result = _validate_existing_parent(tmp_path / "device-parent", "device-parent", path_stat)
+
+    assert result is not None
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "SPECIAL_FILE_UNSUPPORTED"
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")

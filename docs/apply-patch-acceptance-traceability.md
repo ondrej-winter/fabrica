@@ -14,7 +14,7 @@ explicitly deferred in the implementation plan.
 | --- | --- |
 | Basic operations | Covered for parser/planner and POSIX add, update, delete, move, and multi-file commit paths. |
 | Grammar and matching | Covered by parser and deterministic hunk-matching unit tests. |
-| Validation and paths | Covered for core duplicate/collision validation and selected POSIX path safety checks; alias and cross-device cases remain open. |
+| Validation and paths | Covered for core duplicate/collision validation and POSIX path safety checks, including aliases, cross-device moves, and special-file classification. |
 | Preservation | Covered for UTF-8/BOM/EOL rendering, POSIX mode preservation, and fail-closed rejection of nonzero POSIX file flags plus ACL/security extended attributes on action paths and existing destination parents. |
 | Authorization and runtime behavior | Covered for policy/approval adapters, registered-tool result mapping, duplicate runtime delivery, and offline tool-loop composition. |
 | Commit, rollback, recovery, and deadlines | Covered for deterministic commit order, stale-plan rejection, directory rollback/recovery, operator-gated commit recovery, durable file preimage rollback, and interruption recovery after each visible commit step. |
@@ -51,15 +51,15 @@ explicitly deferred in the implementation plan.
   derived parent-directory deduplication.
 - `tests/integration/features/workspace_editing/test_posix_filesystem_snapshot_adapter.py`
   covers source/destination evidence collection, Add-target existence rejection,
-  case/Unicode-normalization alias rejection, parent-file rejection, FIFO and
-  Unix-domain socket source/target rejection,
-  FIFO and Unix-domain socket parent rejection, symlink path rejection, and
-  multiple-hard-link and cross-device Move rejection.
+  case/Unicode-normalization alias rejection, parent-file rejection, real FIFO and
+  Unix-domain socket source/target rejection, real FIFO and Unix-domain socket
+  parent rejection, synthetic character/block-device classification at action and
+  parent boundaries, symlink path rejection, and multiple-hard-link and
+  cross-device Move rejection.
 - `tests/integration/features/workspace_editing/test_posix_commit_adapter.py`
   covers stale source content, stale source identity, changed destination parent,
   unexpected Add/Move destination appearance, missing staged payload, and changed
   staged payload mode before visible file commit.
-- **Open:** special-file classes beyond FIFO and Unix-domain socket nodes.
 
 ### Preservation
 
