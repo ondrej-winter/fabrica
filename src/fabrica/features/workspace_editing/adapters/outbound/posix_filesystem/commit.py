@@ -508,8 +508,11 @@ def _revalidate_staging(
             path_stat = stage_path.stat()
         except FileNotFoundError:
             return _rejected("STALE_PLAN", f"staged payload missing before commit: {action.path}")
-        if not stage_path.is_file() or path_stat.st_size != len(render_added_text(action.added_lines)):
+        expected_payload = render_added_text(action.added_lines)
+        if not stage_path.is_file() or path_stat.st_size != len(expected_payload):
             return _rejected("STALE_PLAN", f"staged payload changed before commit: {action.path}")
+        if _digest_bytes(stage_path.read_bytes()) != _digest_bytes(expected_payload):
+            return _rejected("STALE_PLAN", f"staged payload content changed before commit: {action.path}")
         if stat.S_IMODE(path_stat.st_mode) != payload_mode(plan, action):
             return _rejected("STALE_PLAN", f"staged payload mode changed before commit: {action.path}")
     return None

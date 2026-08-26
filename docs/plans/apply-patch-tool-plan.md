@@ -681,6 +681,13 @@ orchestration tests cover the second snapshot validation, rollback, and absence 
 a commit call. Full digest-bound result-payload revalidation and pre-commit
 fault-injection coverage remain open.
 
+**Incremental update:** The POSIX commit adapter now verifies each staged payload's
+SHA-256 digest against the immutable planned bytes immediately before the visible
+file commit point, in addition to the existing presence, size, and mode checks.
+Focused integration coverage rejects same-length staged-payload tampering before
+the destination becomes visible. Remaining Task 15 work is metadata beyond mode
+plus broader pre-commit fault-injection coverage.
+
 ### Task 16: Implement Rollback and Startup Recovery
 
 **Description:** Implement safe rollback after commit failures and startup handling for incomplete journals.

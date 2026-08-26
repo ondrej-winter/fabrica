@@ -325,6 +325,24 @@ def test_posix_commit_adapter_rejects_missing_stage_payload_before_visible_file_
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rejects_same_length_changed_stage_payload_before_visible_file_commit(
+    tmp_path: Path,
+) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("approved",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+    _stage_payload_path(tmp_path, journal, action_index=0).write_bytes(b"tampered\n")
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert not (tmp_path / "generated" / "add.py").exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
 def test_posix_commit_adapter_applies_modes_for_add_update_and_move(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     update_path = tmp_path / "src" / "update.sh"
