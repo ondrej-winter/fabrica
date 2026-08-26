@@ -1,9 +1,8 @@
-"""Probe POSIX filesystem primitives required by the future apply_patch adapter.
+"""Probe POSIX filesystem primitives required by the apply_patch adapter.
 
-This is a non-production feasibility spike for Task 5 in
-``docs/plans/apply-patch-tool-plan.md``. It intentionally lives outside the
-``src/fabrica`` package so Checkpoint A can collect platform evidence without
-starting the production ``workspace_editing`` slice.
+This non-production feasibility probe remains outside the ``src/fabrica`` package
+so platform capability evidence can be collected independently of production
+workspace-editing composition.
 """
 
 from __future__ import annotations

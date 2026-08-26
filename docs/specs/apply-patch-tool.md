@@ -30,8 +30,8 @@ before mutation rather than silently degrade to weaker guarantees.
 - Read-only file inspection is owned by `docs/specs/read-files-tool.md`.
 - Textual source discovery is owned by `docs/specs/search-codebase-tool.md`.
 - Command execution is owned by `docs/specs/run-commands-tool.md`.
-- This spec defines the desired `apply_patch` tool contract only. It does not
-  implement the tool.
+- This spec defines the durable `apply_patch` tool contract. The implementation
+  is owned by the `workspace_editing` feature and bootstrap composition.
 
 ## Design principles
 

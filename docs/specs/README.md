@@ -28,12 +28,6 @@ ownership, validation expectations, and preserved historical decisions.
 - `apply-patch-tool.md` defines the context-based workspace file mutation
   primitive for model-callable coding-agent workflows.
 
-## Acceptance traceability
-
-- `../apply-patch-acceptance-traceability.md` maps apply-patch v1 acceptance
-  scenarios to current unit and integration test evidence and lists the remaining
-  open safety scenarios.
-
 ## Placement guidance
 
 - Add a new spec only when the work introduces a durable concern that does not

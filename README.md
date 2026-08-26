@@ -876,8 +876,7 @@ feature slices:
   model-facing mutation tool, including parsing, hunk matching, immutable
   planning, authorization, POSIX filesystem adapters, journaling, rollback, and
   startup recovery boundaries. Production POSIX mutation remains fail-closed by
-  default until platform capability evidence is complete; current acceptance
-  coverage is tracked in `docs/apply-patch-acceptance-traceability.md`.
+  default until the required platform capabilities are available.
 - `src/fabrica/shared_kernel/` contains pure concepts genuinely shared by slices,
   such as provider-neutral model usage and pricing evidence DTOs.
 - `src/fabrica/bootstrap/` contains composition-root code, dependency wiring, and

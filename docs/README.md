@@ -40,9 +40,3 @@ This directory contains durable project documentation and current reference note
   discovery for model-callable coding-agent workflows.
 - `specs/apply-patch-tool.md` defines context-based workspace file mutation,
   including its fail-closed POSIX safety and recovery contract.
-
-### Acceptance traceability
-
-- `apply-patch-acceptance-traceability.md` maps apply-patch v1 acceptance
-  scenarios to current automated evidence and keeps open safety scenarios
-  visible.
