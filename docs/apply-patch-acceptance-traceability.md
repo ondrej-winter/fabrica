@@ -17,7 +17,7 @@ explicitly deferred in the implementation plan.
 | Validation and paths | Covered for core duplicate/collision validation and selected POSIX path safety checks; alias and cross-device cases remain open. |
 | Preservation | Covered for UTF-8/BOM/EOL rendering, POSIX mode preservation, and fail-closed rejection of nonzero POSIX file flags on action paths and existing destination parents; ACL and extended-attribute handling remain open. |
 | Authorization and runtime behavior | Covered for policy/approval adapters, registered-tool result mapping, duplicate runtime delivery, and offline tool-loop composition. |
-| Commit, rollback, recovery, and deadlines | Covered for deterministic commit order, stale-plan rejection, directory rollback/recovery, and operator-gated commit recovery; file preimage rollback and full fault injection remain open. |
+| Commit, rollback, recovery, and deadlines | Covered for deterministic commit order, stale-plan rejection, directory rollback/recovery, operator-gated commit recovery, durable file preimage rollback, and interruption recovery after each visible commit step. |
 
 ## Test evidence by scenario group
 
@@ -110,9 +110,11 @@ explicitly deferred in the implementation plan.
   directory rollback, retained external directory content, automatic prepared
   journal recovery, durable file preimages/postimages, automatic committing-journal
   file rollback, retention of independently changed files, and injected staged-
-  payload durability failures before the visible file commit point.
-- **Open:** fault injection after every visible file commit step and dedicated
-  restart/crash-fixture coverage.
+  payload durability failures before the visible file commit point. It also
+  injects an interruption after each durable visible Add, Update, Delete, and
+  Move commit step, reloads the incomplete `COMMITTING` journal through a fresh
+  adapter instance, and verifies evidence-proven rollback restores the original
+  workspace.
 
 ## Platform support notes
 

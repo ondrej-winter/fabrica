@@ -13,6 +13,7 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
     PatchCommitOperation,
+    PatchCommitStep,
     PatchDirectoryOutcome,
     PatchDirectoryOutcomeState,
     PatchJournalRecord,
@@ -42,6 +43,7 @@ class PosixPatchCommitAdapter:
 
     workspace_root: Path
     workspace_umask: int = DEFAULT_WORKSPACE_UMASK
+    after_commit_step: Callable[[PatchAction], None] | None = field(default=None, repr=False)
     _destination_parent_fds: dict[tuple[str, str], int] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -101,19 +103,8 @@ class PosixPatchCommitAdapter:
             for step in plan.commit_steps:
                 if step.operation is PatchCommitOperation.CREATE_DIRECTORY:
                     continue
-                action = _action_for_step(plan, step.action_index)
-                rollback_entry = _rollback_entry_for_action(self._workspace_root(), stage_root, action)
-                committing_journal = _journal_with_rollback_entry(committing_journal, rollback_entry)
-                _write_record(self._record_path(journal), committing_journal)
-                if step.operation is PatchCommitOperation.WRITE_FILE:
-                    _commit_write(self._workspace_root(), stage_root, action)
-                elif step.operation is PatchCommitOperation.DELETE_FILE:
-                    (self._workspace_root() / step.path).unlink()
-                elif step.operation is PatchCommitOperation.MOVE_FILE:
-                    _commit_move(self._workspace_root(), stage_root, action)
-                outcomes.append(_committed_outcome(self._workspace_root(), action))
-                committing_journal = _journal_with_path_outcome(committing_journal, outcomes[-1])
-                _write_record(self._record_path(journal), committing_journal)
+                committing_journal, outcome = self._commit_step(plan, stage_root, committing_journal, step)
+                outcomes.append(outcome)
         except OSError:
             self._close_destination_parents(journal)
             return await self.roll_back(committing_journal)
@@ -139,6 +130,31 @@ class PosixPatchCommitAdapter:
             directory_outcomes=journal.created_directories,
             path_outcomes=tuple(outcomes),
         )
+
+    def _commit_step(
+        self,
+        plan: PatchPlan,
+        stage_root: Path,
+        journal: PatchJournalRecord,
+        step: PatchCommitStep,
+    ) -> tuple[PatchJournalRecord, PatchPathOutcome]:
+        """Commit one file action after recording its reversible recovery evidence."""
+        action = _action_for_step(plan, step.action_index)
+        rollback_entry = _rollback_entry_for_action(self._workspace_root(), stage_root, action)
+        committing_journal = _journal_with_rollback_entry(journal, rollback_entry)
+        _write_record(self._record_path(journal), committing_journal)
+        if step.operation is PatchCommitOperation.WRITE_FILE:
+            _commit_write(self._workspace_root(), stage_root, action)
+        elif step.operation is PatchCommitOperation.DELETE_FILE:
+            (self._workspace_root() / step.path).unlink()
+        elif step.operation is PatchCommitOperation.MOVE_FILE:
+            _commit_move(self._workspace_root(), stage_root, action)
+        outcome = _committed_outcome(self._workspace_root(), action)
+        committing_journal = _journal_with_path_outcome(committing_journal, outcome)
+        _write_record(self._record_path(journal), committing_journal)
+        if self.after_commit_step is not None:
+            self.after_commit_step(action)
+        return committing_journal, outcome
 
     async def roll_back(self, journal: PatchJournalRecord) -> PatchResult:
         """Roll back evidence-proven file and directory effects from a journal."""

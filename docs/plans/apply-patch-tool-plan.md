@@ -693,7 +693,7 @@ fault-injection coverage remain open.
 
 **Verification:**
 
-- [ ] Fault injection after every visible commit step plus restart/crash-fixture tests pass.
+- [x] Fault injection after every visible commit step plus restart/crash-fixture tests pass.
 
 **Dependencies:** Tasks 10, 14-15.
 
@@ -726,6 +726,13 @@ per-path evidence and `RECOVERY_REQUIRED`. Focused POSIX integration tests cover
 automatic file rollback from a durable committing journal and external-change
 retention. Remaining Task 16 work is fault injection after every visible commit
 step and restart/crash-fixture coverage.
+
+**Incremental update:** Added an adapter-local, test-only post-commit-step seam
+that runs only after each visible file action and its updated `COMMITTING` journal
+record are durable. A parameterized POSIX integration test interrupts after every
+mixed-patch Add, Update, Delete, and Move step, discovers the incomplete journal
+through a fresh adapter instance, and verifies evidence-proven rollback restores
+the original workspace. Task 16 verification is now complete.
 
 ### Task 17: Compose the `ApplyPatch` Application Use Case
 

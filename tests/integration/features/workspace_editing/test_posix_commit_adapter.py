@@ -577,6 +577,58 @@ def test_posix_commit_adapter_rolls_back_move_with_durable_preimage(tmp_path: Pa
     assert not (tmp_path / "generated" / "move.py").exists()
 
 
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+@pytest.mark.parametrize("interrupted_action_index", [0, 1, 2, 3])
+def test_posix_commit_adapter_recovers_after_interruption_at_each_visible_commit_step(
+    tmp_path: Path, interrupted_action_index: int
+) -> None:
+    (tmp_path / "src").mkdir()
+    update_path = tmp_path / "src" / "update.py"
+    delete_path = tmp_path / "src" / "delete.py"
+    move_path = tmp_path / "src" / "move.py"
+    update_path.write_text("old update\n", encoding="utf-8")
+    delete_path.write_text("delete me\n", encoding="utf-8")
+    move_path.write_text("old move\n", encoding="utf-8")
+    actions = (
+        PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added",)),
+        PatchAction(index=1, kind=PatchActionKind.UPDATE, path="src/update.py", added_lines=("updated",)),
+        PatchAction(index=2, kind=PatchActionKind.DELETE, path="src/delete.py"),
+        PatchAction(
+            index=3,
+            kind=PatchActionKind.MOVE,
+            path="src/move.py",
+            destination_path="generated/move.py",
+            added_lines=("moved",),
+        ),
+    )
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+
+    def interrupt_after_selected_action(action: PatchAction) -> None:
+        if action.index == interrupted_action_index:
+            raise _InjectedCommitInterruptionError
+
+    interrupted_adapter = PosixPatchCommitAdapter(tmp_path, after_commit_step=interrupt_after_selected_action)
+    assert run(interrupted_adapter.prepare(plan, journal)) is None
+
+    with pytest.raises(_InjectedCommitInterruptionError):
+        run(interrupted_adapter.commit(plan, journal))
+
+    recovered_journal = run(PosixPatchJournalAndPreparationAdapter(tmp_path).list_incomplete())[0]
+    result = run(PosixPatchCommitAdapter(tmp_path).recover(recovered_journal))
+
+    assert recovered_journal.state is PatchJournalState.COMMITTING
+    assert result.status is PatchResultStatus.COMMIT_FAILED_ROLLED_BACK
+    assert not (tmp_path / "generated" / "add.py").exists()
+    assert update_path.read_text(encoding="utf-8") == "old update\n"
+    assert delete_path.read_text(encoding="utf-8") == "delete me\n"
+    assert move_path.read_text(encoding="utf-8") == "old move\n"
+    assert not (tmp_path / "generated" / "move.py").exists()
+
+
+class _InjectedCommitInterruptionError(Exception):
+    """Synthetic process interruption after a durable visible commit step."""
+
+
 def _prepared_plan_and_journal(tmp_path: Path, actions: tuple[PatchAction, ...]):
     snapshot = PosixPatchWorkspaceSnapshotAdapter(
         tmp_path,
