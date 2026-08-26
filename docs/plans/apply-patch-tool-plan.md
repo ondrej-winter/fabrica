@@ -640,6 +640,13 @@ cover accepted zero flags and the no-mutation rejection path. Remaining Task 15
 metadata work is portable ACL and extended-attribute detection or preservation,
 along with policy revalidation and pre-commit fault-injection coverage.
 
+**Incremental update:** Extended nonzero POSIX file-flag rejection to existing
+destination parent directories during snapshot planning. This prevents Add or
+Move operations from modifying a directory hierarchy whose metadata the current
+adapter cannot preserve. Focused integration coverage proves the rejection occurs
+before a destination child becomes visible. Portable ACL and extended-attribute
+detection or preservation remain open.
+
 ### Task 16: Implement Rollback and Startup Recovery
 
 **Description:** Implement safe rollback after commit failures and startup handling for incomplete journals.

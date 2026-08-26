@@ -21,10 +21,12 @@ from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.adapt
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
+    PatchMutationGuarantee,
     PatchPathEvidence,
     PatchResult,
     PatchResultStatus,
 )
+from fabrica.features.workspace_editing.application.errors import patch_error
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
@@ -380,3 +382,37 @@ def test_posix_snapshot_adapter_rejects_nonzero_posix_file_flags_before_mutation
     assert result.status is PatchResultStatus.REJECTED
     assert result.error is not None
     assert result.error.code == "UNSUPPORTED_METADATA"
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+def test_posix_snapshot_adapter_rejects_unsupported_metadata_on_destination_parent_before_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "generated").mkdir()
+
+    def reject_parent_metadata(path: str, *, flags: int) -> PatchResult | None:
+        del flags
+        if path == "generated":
+            error = patch_error("UNSUPPORTED_METADATA", message="unsupported parent metadata")
+            return PatchResult(
+                status=PatchResultStatus.REJECTED,
+                mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
+                error=error,
+            )
+        return None
+
+    monkeypatch.setattr(posix_snapshot_adapter, "_reject_unsupported_metadata", reject_parent_metadata)
+
+    result = PosixPatchWorkspaceSnapshotAdapter(
+        tmp_path,
+        require_production_capabilities=False,
+    ).build_planning_snapshot(
+        (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/new.py", added_lines=("new",)),)
+    )
+
+    assert isinstance(result, PatchResult)
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "UNSUPPORTED_METADATA"
+    assert not (tmp_path / "generated" / "new.py").exists()

@@ -257,17 +257,32 @@ def _validate_parent_chain(root: Path, path: str) -> PatchResult | None:
             return None
         except OSError as err:
             return _rejected("IO_ERROR", f"could not inspect parent path: {err.strerror}")
-        if stat.S_ISLNK(path_stat.st_mode):
-            return _rejected("SYMLINK_PATH_UNSUPPORTED", f"symlink parent is unsupported: {parent}")
-        if not stat.S_ISDIR(path_stat.st_mode):
-            code = "PARENT_PATH_NOT_DIRECTORY" if stat.S_ISREG(path_stat.st_mode) else "SPECIAL_FILE_UNSUPPORTED"
-            message = (
-                "parent path is not a directory"
-                if stat.S_ISREG(path_stat.st_mode)
-                else "special-file parent is unsupported"
-            )
-            return _rejected(code, f"{message}: {parent}")
+        parent_result = _validate_existing_parent(root, current, parent, path_stat)
+        if parent_result is not None:
+            return parent_result
     return None
+
+
+def _validate_existing_parent(
+    root: Path,
+    current: Path,
+    parent: str,
+    path_stat: os.stat_result,
+) -> PatchResult | None:
+    if stat.S_ISLNK(path_stat.st_mode):
+        return _rejected("SYMLINK_PATH_UNSUPPORTED", f"symlink parent is unsupported: {parent}")
+    if not stat.S_ISDIR(path_stat.st_mode):
+        code = "PARENT_PATH_NOT_DIRECTORY" if stat.S_ISREG(path_stat.st_mode) else "SPECIAL_FILE_UNSUPPORTED"
+        message = (
+            "parent path is not a directory"
+            if stat.S_ISREG(path_stat.st_mode)
+            else "special-file parent is unsupported"
+        )
+        return _rejected(code, f"{message}: {parent}")
+    return _reject_unsupported_metadata(
+        current.relative_to(root).as_posix(),
+        flags=getattr(path_stat, "st_flags", 0),
+    )
 
 
 def _snapshot_existing_file(root: Path, path: str) -> PatchPathEvidence | PatchResult:
