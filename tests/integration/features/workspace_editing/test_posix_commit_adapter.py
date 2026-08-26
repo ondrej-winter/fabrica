@@ -1,6 +1,7 @@
 """Integration tests for POSIX apply-patch staging and commit."""
 
 import json
+import os
 import sys
 from asyncio import run
 from pathlib import Path
@@ -121,6 +122,45 @@ def test_posix_commit_adapter_rejects_journal_digest_mismatch_before_staging(tmp
     assert result.error is not None
     assert result.error.code == "STALE_PLAN"
     assert not _stage_payload_path(tmp_path, journal, action_index=0).exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+@pytest.mark.parametrize("failing_payload_number", [1, 2])
+def test_posix_commit_adapter_cleans_staging_faults_before_visible_file_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failing_payload_number: int,
+) -> None:
+    (tmp_path / "src").mkdir()
+    source_path = tmp_path / "src" / "existing.py"
+    source_path.write_text("original\n", encoding="utf-8")
+    actions = (
+        PatchAction(index=0, kind=PatchActionKind.UPDATE, path="src/existing.py", added_lines=("updated",)),
+        PatchAction(index=1, kind=PatchActionKind.ADD, path="generated/new.py", added_lines=("new",)),
+    )
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    fsync_calls = 0
+
+    def fail_during_staged_payload_fsync(path: Path) -> None:
+        nonlocal fsync_calls
+        fsync_calls += 1
+        if fsync_calls == failing_payload_number:
+            message = "injected staging durability failure"
+            raise OSError(message)
+        with path.open("rb") as handle:
+            os.fsync(handle.fileno())
+
+    monkeypatch.setattr(posix_commit_module, "_fsync_file", fail_during_staged_payload_fsync)
+
+    result = run(PosixPatchCommitAdapter(tmp_path).prepare(plan, journal))
+
+    assert result is not None
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "IO_ERROR"
+    assert source_path.read_text(encoding="utf-8") == "original\n"
+    assert not (tmp_path / "generated" / "new.py").exists()
+    assert not _stage_payload_path(tmp_path, journal, action_index=0).parent.exists()
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")

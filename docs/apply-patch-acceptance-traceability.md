@@ -109,7 +109,8 @@ explicitly deferred in the implementation plan.
   covers deterministic commit execution, committed journal evidence, safe
   directory rollback, retained external directory content, automatic prepared
   journal recovery, durable file preimages/postimages, automatic committing-journal
-  file rollback, and retention of independently changed files.
+  file rollback, retention of independently changed files, and injected staged-
+  payload durability failures before the visible file commit point.
 - **Open:** fault injection after every visible file commit step and dedicated
   restart/crash-fixture coverage.
 

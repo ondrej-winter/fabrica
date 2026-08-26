@@ -574,7 +574,7 @@ intent-before-effect ordering, failure rollback, and incomplete journal discover
 **Verification:**
 
 - [x] Focused POSIX integration tests cover staging/commit for add, update, delete, move and stale-plan rejection before visible file commit.
-- [ ] Pre-commit fault tests prove either no visible effect or fully reported reversible directory effects.
+- [x] Focused staging fault tests prove no visible file effect and clean up host-managed stage artifacts before the file commit point.
 
 **Dependencies:** Task 14.
 
@@ -595,6 +595,14 @@ outcomes. Focused integration tests passed for successful mixed-operation commit
 stale-plan rejection, digest mismatch rejection, and committed journal evidence.
 Remaining Task 15 work: full metadata/mode handling, broader
 parent/destination/policy revalidation, and pre-commit fault-injection coverage.
+
+**Incremental update:** Added deterministic staging-durability fault coverage
+for failures while flushing both the first and a later staged payload. The
+adapter rejects before the explicit file commit point, removes host-managed
+staging artifacts, preserves existing source content, and leaves the planned
+destination absent. Remaining Task 15 work is portable ACL and extended-
+attribute handling plus policy revalidation; visible-file-commit crash/fault
+coverage remains Task 16/18 work.
 
 **Incremental update:** Added commit-time ancestor identity revalidation for
 planned paths, including absent add/move destinations whose derived parent
