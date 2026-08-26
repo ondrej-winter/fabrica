@@ -663,9 +663,9 @@ fault-injection coverage remain open.
 
 **Acceptance criteria:**
 
-- [ ] Rollback never overwrites or removes independently changed paths and removes plan-created directories deepest-first only when identity and emptiness match. Directory-only rollback is implemented; file-operation rollback remains operator-gated until durable preimage evidence exists.
-- [ ] All terminal states include required per-path and directory evidence. Directory rollback/startup recovery evidence is implemented; file rollback evidence remains.
-- [ ] Startup blocks mutation on incomplete journals; only evidence-proven rollback is automatic, otherwise status is `RECOVERY_REQUIRED`. Prepared/preparing directory recovery is implemented; committing journals remain operator-gated.
+- [x] Rollback never overwrites or removes independently changed paths and removes plan-created directories deepest-first only when identity and emptiness match.
+- [x] All terminal states include required per-path and directory evidence.
+- [x] Startup blocks mutation on incomplete journals; only evidence-proven rollback is automatic, otherwise status is `RECOVERY_REQUIRED`.
 
 **Verification:**
 
@@ -691,6 +691,17 @@ safe directory rollback, retained external content, automatic prepared-journal
 recovery, and operator-gated commit recovery. Remaining Task 16 work: durable
 file-operation preimage evidence plus fault injection after every visible commit
 step.
+
+**Incremental update:** Added durable file-operation rollback evidence to the
+POSIX commit adapter. Before each visible file operation, the adapter now records
+the action preimage and expected postimage in the durable journal; non-Add source
+contents are held in host-managed backup artifacts. Restart recovery can restore
+Add, Update, Delete, and Move effects only while on-disk postimage evidence still
+matches. Independently changed paths are retained untouched with `UNKNOWN`
+per-path evidence and `RECOVERY_REQUIRED`. Focused POSIX integration tests cover
+automatic file rollback from a durable committing journal and external-change
+retention. Remaining Task 16 work is fault injection after every visible commit
+step and restart/crash-fixture coverage.
 
 ### Task 17: Compose the `ApplyPatch` Application Use Case
 

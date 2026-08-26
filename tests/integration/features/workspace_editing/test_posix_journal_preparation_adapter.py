@@ -14,9 +14,14 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchDirectoryOutcome,
     PatchDirectoryOutcomeState,
     PatchDirectoryPlannedEffect,
+    PatchJournalRecord,
     PatchJournalState,
+    PatchPathEvidence,
+    PatchPathOutcome,
+    PatchPathOutcomeState,
     PatchPlan,
     PatchResultStatus,
+    PatchRollbackEntry,
 )
 
 PLAN_DIGEST = "sha256:" + "1" * 64
@@ -109,6 +114,52 @@ def test_posix_journal_prepare_rejects_preexisting_directory_without_mutation(tm
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX preparation adapter targets macOS/Linux")
 def test_posix_journal_list_incomplete_returns_empty_when_no_journal_root(tmp_path: Path) -> None:
     assert run(PosixPatchJournalAndPreparationAdapter(tmp_path).list_incomplete()) == ()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX preparation adapter targets macOS/Linux")
+def test_posix_journal_round_trips_path_outcomes_and_rollback_entries(tmp_path: Path) -> None:
+    adapter = PosixPatchJournalAndPreparationAdapter(tmp_path)
+    journal = run(adapter.create(_plan("generated")))
+    rollback_entry = PatchRollbackEntry(
+        path="src/original.py",
+        operation=PatchActionKind.UPDATE,
+        destination_path=None,
+        backup_path=".fabrica/apply-patch/stage/backup.preimage",
+        preimage=PatchPathEvidence(path="src/original.py", exists=True, content_digest="sha256:" + "2" * 64),
+        postimage=PatchPathEvidence(path="src/original.py", exists=True, content_digest="sha256:" + "3" * 64),
+    )
+    outcome = PatchPathOutcome(
+        path="src/original.py",
+        planned_operation=PatchActionKind.UPDATE,
+        final_state=PatchPathOutcomeState.COMMITTED,
+        evidence=rollback_entry.postimage,
+    )
+    absent_postimage_entry = PatchRollbackEntry(
+        path="generated/new.py",
+        operation=PatchActionKind.ADD,
+        destination_path=None,
+        backup_path=None,
+        preimage=PatchPathEvidence(path="generated/new.py", exists=False),
+    )
+    no_evidence_outcome = PatchPathOutcome(
+        path="generated/new.py",
+        planned_operation=PatchActionKind.ADD,
+        final_state=PatchPathOutcomeState.UNKNOWN,
+    )
+    populated_journal = PatchJournalRecord(
+        journal_digest=journal.journal_digest,
+        plan_digest=journal.plan_digest,
+        state=journal.state,
+        created_directories=journal.created_directories,
+        path_outcomes=(outcome, no_evidence_outcome),
+        rollback_entries=(rollback_entry, absent_postimage_entry),
+    )
+    run(adapter.transition(populated_journal, PatchJournalState.PREPARING))
+
+    restored = run(adapter.list_incomplete())[0]
+
+    assert restored.path_outcomes == (outcome, no_evidence_outcome)
+    assert restored.rollback_entries == (rollback_entry, absent_postimage_entry)
 
 
 def _plan(*directories: str) -> PatchPlan:

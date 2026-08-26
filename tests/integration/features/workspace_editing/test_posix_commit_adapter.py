@@ -440,6 +440,103 @@ def test_posix_commit_adapter_startup_recovery_requires_operator_for_commit_jour
     assert result.error.code == "RECOVERY_REQUIRED"
 
 
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rolls_back_committed_file_effects_from_durable_preimages(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    update_path = tmp_path / "src" / "update.py"
+    delete_path = tmp_path / "src" / "delete.py"
+    update_path.write_text("old update\n", encoding="utf-8")
+    delete_path.write_text("delete me\n", encoding="utf-8")
+    actions = (
+        PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added",)),
+        PatchAction(index=1, kind=PatchActionKind.UPDATE, path="src/update.py", added_lines=("updated",)),
+        PatchAction(index=2, kind=PatchActionKind.DELETE, path="src/delete.py"),
+    )
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+
+    assert run(adapter.prepare(plan, journal)) is None
+    assert run(adapter.commit(plan, journal)).status is PatchResultStatus.COMMITTED
+    committed_journal = run(PosixPatchJournalAndPreparationAdapter(tmp_path).list_incomplete())
+    assert committed_journal == ()
+    journal_payload = json.loads(_journal_path(tmp_path, journal).read_text(encoding="utf-8"))
+    assert journal_payload["rollback_entries"]
+
+    # Reload the durable committing record to exercise the real restart path.
+    _journal_path(tmp_path, journal).write_text(
+        json.dumps({**journal_payload, "state": PatchJournalState.COMMITTING.value}), encoding="utf-8"
+    )
+    recovered_journal = run(PosixPatchJournalAndPreparationAdapter(tmp_path).list_incomplete())[0]
+    result = run(adapter.recover(recovered_journal))
+
+    assert result.status is PatchResultStatus.COMMIT_FAILED_ROLLED_BACK
+    assert (tmp_path / "src" / "update.py").read_text(encoding="utf-8") == "old update\n"
+    assert (tmp_path / "src" / "delete.py").read_text(encoding="utf-8") == "delete me\n"
+    assert not (tmp_path / "generated" / "add.py").exists()
+    assert [outcome.final_state is PatchPathOutcomeState.ROLLED_BACK for outcome in result.path_outcomes] == [
+        True,
+        True,
+        True,
+    ]
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_file_rollback_retains_independently_changed_path(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    update_path = tmp_path / "src" / "update.py"
+    update_path.write_text("old update\n", encoding="utf-8")
+    actions = (PatchAction(index=0, kind=PatchActionKind.UPDATE, path="src/update.py", added_lines=("updated",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+
+    assert run(adapter.prepare(plan, journal)) is None
+    assert run(adapter.commit(plan, journal)).status is PatchResultStatus.COMMITTED
+    update_path.write_text("external\n", encoding="utf-8")
+    journal_payload = json.loads(_journal_path(tmp_path, journal).read_text(encoding="utf-8"))
+    _journal_path(tmp_path, journal).write_text(
+        json.dumps({**journal_payload, "state": PatchJournalState.COMMITTING.value}), encoding="utf-8"
+    )
+
+    recovered_journal = run(PosixPatchJournalAndPreparationAdapter(tmp_path).list_incomplete())[0]
+    result = run(adapter.recover(recovered_journal))
+
+    assert result.status is PatchResultStatus.RECOVERY_REQUIRED
+    assert update_path.read_text(encoding="utf-8") == "external\n"
+    assert result.path_outcomes[0].final_state is PatchPathOutcomeState.UNKNOWN
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rolls_back_move_with_durable_preimage(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    source_path = tmp_path / "src" / "move.py"
+    source_path.write_text("original\n", encoding="utf-8")
+    actions = (
+        PatchAction(
+            index=0,
+            kind=PatchActionKind.MOVE,
+            path="src/move.py",
+            destination_path="generated/move.py",
+            added_lines=("moved",),
+        ),
+    )
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+
+    assert run(adapter.prepare(plan, journal)) is None
+    assert run(adapter.commit(plan, journal)).status is PatchResultStatus.COMMITTED
+    journal_payload = json.loads(_journal_path(tmp_path, journal).read_text(encoding="utf-8"))
+    _journal_path(tmp_path, journal).write_text(
+        json.dumps({**journal_payload, "state": PatchJournalState.COMMITTING.value}), encoding="utf-8"
+    )
+
+    recovered_journal = run(PosixPatchJournalAndPreparationAdapter(tmp_path).list_incomplete())[0]
+    result = run(adapter.recover(recovered_journal))
+
+    assert result.status is PatchResultStatus.COMMIT_FAILED_ROLLED_BACK
+    assert source_path.read_text(encoding="utf-8") == "original\n"
+    assert not (tmp_path / "generated" / "move.py").exists()
+
+
 def _prepared_plan_and_journal(tmp_path: Path, actions: tuple[PatchAction, ...]):
     snapshot = PosixPatchWorkspaceSnapshotAdapter(
         tmp_path,

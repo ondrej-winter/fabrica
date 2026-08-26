@@ -8,15 +8,20 @@ from hashlib import sha256
 from pathlib import Path
 
 from fabrica.features.workspace_editing.application.dtos import (
+    PatchActionKind,
     PatchDirectoryOutcome,
     PatchDirectoryOutcomeState,
     PatchDirectoryPlannedEffect,
     PatchJournalRecord,
     PatchJournalState,
     PatchMutationGuarantee,
+    PatchPathEvidence,
+    PatchPathOutcome,
+    PatchPathOutcomeState,
     PatchPlan,
     PatchResult,
     PatchResultStatus,
+    PatchRollbackEntry,
     is_legal_patch_journal_transition,
 )
 from fabrica.features.workspace_editing.application.errors import patch_error
@@ -68,6 +73,7 @@ class PosixPatchJournalAndPreparationAdapter:
             state=destination,
             created_directories=record.created_directories,
             path_outcomes=record.path_outcomes,
+            rollback_entries=record.rollback_entries,
             metadata=record.metadata,
         )
         _write_record(self._record_path(updated), updated)
@@ -170,6 +176,7 @@ def _replace_record_directories(
         state=record.state,
         created_directories=directories,
         path_outcomes=record.path_outcomes,
+        rollback_entries=record.rollback_entries,
         metadata=record.metadata,
     )
 
@@ -199,9 +206,10 @@ def _write_record(path: Path, record: PatchJournalRecord) -> None:
         ],
         "journal_digest": record.journal_digest,
         "metadata": dict(record.metadata),
-        "path_outcomes": [],
+        "path_outcomes": [_path_outcome_payload(outcome) for outcome in record.path_outcomes],
         "plan_digest": record.plan_digest,
         "state": record.state.value,
+        "rollback_entries": [_rollback_entry_payload(entry) for entry in record.rollback_entries],
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     tmp_path = path.with_suffix(".tmp")
@@ -227,7 +235,88 @@ def _read_record(path: Path) -> PatchJournalRecord:
             )
             for item in payload["created_directories"]
         ),
+        path_outcomes=tuple(_path_outcome_from_payload(item) for item in payload["path_outcomes"]),
+        rollback_entries=tuple(_rollback_entry_from_payload(item) for item in payload.get("rollback_entries", [])),
         metadata=payload["metadata"],
+    )
+
+
+def _path_evidence_payload(evidence: PatchPathEvidence) -> dict[str, object]:
+    return {
+        "content_digest": evidence.content_digest,
+        "exists": evidence.exists,
+        "identity_digest": evidence.identity_digest,
+        "metadata": dict(evidence.metadata),
+        "path": evidence.path,
+    }
+
+
+def _path_evidence_from_payload(payload: dict[str, object]) -> PatchPathEvidence:
+    content_digest = payload.get("content_digest")
+    identity_digest = payload.get("identity_digest")
+    metadata = payload.get("metadata")
+    return PatchPathEvidence(
+        path=str(payload["path"]),
+        exists=bool(payload["exists"]),
+        content_digest=content_digest if isinstance(content_digest, str) else None,
+        identity_digest=identity_digest if isinstance(identity_digest, str) else None,
+        metadata={str(key): value for key, value in metadata.items()} if isinstance(metadata, dict) else {},
+    )
+
+
+def _path_outcome_payload(outcome: PatchPathOutcome) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "final_state": outcome.final_state.value,
+        "path": outcome.path,
+        "planned_operation": outcome.planned_operation.value,
+    }
+    if outcome.destination_path is not None:
+        payload["destination_path"] = outcome.destination_path
+    if outcome.evidence is not None:
+        payload["evidence"] = _path_evidence_payload(outcome.evidence)
+    return payload
+
+
+def _path_outcome_from_payload(payload: dict[str, object]) -> PatchPathOutcome:
+    evidence_payload = payload.get("evidence")
+    destination_path = payload.get("destination_path")
+    return PatchPathOutcome(
+        path=str(payload["path"]),
+        planned_operation=PatchActionKind(str(payload["planned_operation"])),
+        final_state=PatchPathOutcomeState(str(payload["final_state"])),
+        destination_path=destination_path if isinstance(destination_path, str) else None,
+        evidence=_path_evidence_from_payload(evidence_payload) if isinstance(evidence_payload, dict) else None,
+    )
+
+
+def _rollback_entry_payload(entry: PatchRollbackEntry) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "backup_path": entry.backup_path,
+        "destination_path": entry.destination_path,
+        "operation": entry.operation.value,
+        "path": entry.path,
+        "preimage": _path_evidence_payload(entry.preimage),
+    }
+    if entry.postimage is not None:
+        payload["postimage"] = _path_evidence_payload(entry.postimage)
+    return payload
+
+
+def _rollback_entry_from_payload(payload: dict[str, object]) -> PatchRollbackEntry:
+    postimage_payload = payload.get("postimage")
+    preimage_payload = payload["preimage"]
+    if not isinstance(preimage_payload, dict):
+        msg = "rollback entry preimage must be an object"
+        raise TypeError(msg)
+    destination_path = payload.get("destination_path")
+    backup_path = payload.get("backup_path")
+    return PatchRollbackEntry(
+        path=str(payload["path"]),
+        operation=PatchActionKind(str(payload["operation"])),
+        destination_path=destination_path if isinstance(destination_path, str) else None,
+        backup_path=backup_path if isinstance(backup_path, str) else None,
+        preimage=_path_evidence_from_payload(preimage_payload),
+        postimage=_path_evidence_from_payload(postimage_payload) if isinstance(postimage_payload, dict) else None,
     )
 
 

@@ -107,9 +107,10 @@ explicitly deferred in the implementation plan.
 - `tests/integration/features/workspace_editing/test_posix_commit_adapter.py`
   covers deterministic commit execution, committed journal evidence, safe
   directory rollback, retained external directory content, automatic prepared
-  journal recovery, and operator-gated commit recovery.
-- **Open:** durable file-operation preimage evidence, rollback after every
-  visible file commit step, and restart/crash-fixture fault injection.
+  journal recovery, durable file preimages/postimages, automatic committing-journal
+  file rollback, and retention of independently changed files.
+- **Open:** fault injection after every visible file commit step and dedicated
+  restart/crash-fixture coverage.
 
 ## Platform support notes
 

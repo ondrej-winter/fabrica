@@ -6,8 +6,10 @@ from enum import StrEnum
 from types import MappingProxyType
 
 from fabrica.features.workspace_editing.application.dtos.patch import (
+    PatchActionKind,
     PatchDirectoryOutcome,
     PatchMutationGuarantee,
+    PatchPathEvidence,
     PatchPathOutcome,
     PatchResultStatus,
     SafePatchMetadataValue,
@@ -61,12 +63,26 @@ class PatchJournalRecord:
     state: PatchJournalState
     created_directories: tuple[PatchDirectoryOutcome, ...] = field(default_factory=tuple)
     path_outcomes: tuple[PatchPathOutcome, ...] = field(default_factory=tuple)
+    rollback_entries: tuple["PatchRollbackEntry", ...] = field(default_factory=tuple)
     metadata: Mapping[str, SafePatchMetadataValue] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "created_directories", tuple(self.created_directories))
         object.__setattr__(self, "path_outcomes", tuple(self.path_outcomes))
+        object.__setattr__(self, "rollback_entries", tuple(self.rollback_entries))
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+
+@dataclass(frozen=True, slots=True)
+class PatchRollbackEntry:
+    """Durable preimage and postimage evidence for one reversible file effect."""
+
+    path: str
+    operation: PatchActionKind
+    destination_path: str | None
+    backup_path: str | None
+    preimage: PatchPathEvidence
+    postimage: PatchPathEvidence | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,5 +156,6 @@ __all__ = [
     "PatchRecoveryAction",
     "PatchRecoveryDecision",
     "PatchRecoveryStatus",
+    "PatchRollbackEntry",
     "is_legal_patch_journal_transition",
 ]

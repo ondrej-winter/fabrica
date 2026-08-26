@@ -27,6 +27,7 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchRecoveryStatus,
     PatchResult,
     PatchResultStatus,
+    PatchRollbackEntry,
 )
 from fabrica.features.workspace_editing.application.errors import patch_error
 from fabrica.features.workspace_editing.application.text_snapshot import render_added_text
@@ -68,6 +69,7 @@ class PosixPatchCommitAdapter:
                     stage_path.write_bytes(render_added_text(action.added_lines))
                     stage_path.chmod(self._payload_mode(plan, action))
                     _fsync_file(stage_path)
+            self._prepare_rollback_backups(plan, journal)
             _fsync_directory(stage_root)
         except OSError as err:
             _remove_stage_root(stage_root)
@@ -93,12 +95,16 @@ class PosixPatchCommitAdapter:
             return validation_result
 
         outcomes: list[PatchPathOutcome] = []
+        committing_journal = _journal_with_state(journal, PatchJournalState.COMMITTING)
         try:
-            _write_record(self._record_path(journal), _journal_with_state(journal, PatchJournalState.COMMITTING))
+            _write_record(self._record_path(journal), committing_journal)
             for step in plan.commit_steps:
                 if step.operation is PatchCommitOperation.CREATE_DIRECTORY:
                     continue
                 action = _action_for_step(plan, step.action_index)
+                rollback_entry = _rollback_entry_for_action(self._workspace_root(), stage_root, action)
+                committing_journal = _journal_with_rollback_entry(committing_journal, rollback_entry)
+                _write_record(self._record_path(journal), committing_journal)
                 if step.operation is PatchCommitOperation.WRITE_FILE:
                     _commit_write(self._workspace_root(), stage_root, action)
                 elif step.operation is PatchCommitOperation.DELETE_FILE:
@@ -106,23 +112,11 @@ class PosixPatchCommitAdapter:
                 elif step.operation is PatchCommitOperation.MOVE_FILE:
                     _commit_move(self._workspace_root(), stage_root, action)
                 outcomes.append(_committed_outcome(self._workspace_root(), action))
-        except OSError as err:
+                committing_journal = _journal_with_path_outcome(committing_journal, outcomes[-1])
+                _write_record(self._record_path(journal), committing_journal)
+        except OSError:
             self._close_destination_parents(journal)
-            error = patch_error(
-                "INDETERMINATE_COMMIT_STATE",
-                message=f"commit operation failed: {err.strerror}",
-                metadata={"plan_digest": plan.plan_digest},
-            )
-            return PatchResult(
-                status=PatchResultStatus.INDETERMINATE_COMMIT_STATE,
-                mutation_guarantee=error.mutation_guarantee,
-                plan_digest=plan.plan_digest,
-                changes=plan.changes,
-                created_directories=plan.created_directories,
-                directory_outcomes=journal.created_directories,
-                path_outcomes=tuple(outcomes),
-                error=error,
-            )
+            return await self.roll_back(committing_journal)
 
         committed_journal = PatchJournalRecord(
             journal_digest=journal.journal_digest,
@@ -130,6 +124,7 @@ class PosixPatchCommitAdapter:
             state=PatchJournalState.COMMITTED,
             created_directories=journal.created_directories,
             path_outcomes=tuple(outcomes),
+            rollback_entries=committing_journal.rollback_entries,
             metadata=journal.metadata,
         )
         _write_record(self._record_path(journal), committed_journal)
@@ -146,7 +141,8 @@ class PosixPatchCommitAdapter:
         )
 
     async def roll_back(self, journal: PatchJournalRecord) -> PatchResult:
-        """Roll back evidence-proven reversible directory effects from a journal."""
+        """Roll back evidence-proven file and directory effects from a journal."""
+        path_outcomes, path_recovery_required = _roll_back_files(self._workspace_root(), journal)
         directory_outcomes = _roll_back_directories(self._workspace_root(), journal)
         uncertain = tuple(
             directory
@@ -158,18 +154,32 @@ class PosixPatchCommitAdapter:
             for directory in directory_outcomes
             if directory.final_state is PatchDirectoryOutcomeState.RETAINED_EXTERNAL_CONTENT
         )
+        if path_recovery_required:
+            error = patch_error(
+                "RECOVERY_REQUIRED",
+                message="rollback retained a file path whose current state could not be proven safe to replace",
+                metadata={"journal_digest": journal.journal_digest, "journal_state": journal.state.value},
+            )
+            return PatchResult(
+                status=PatchResultStatus.RECOVERY_REQUIRED,
+                mutation_guarantee=PatchMutationGuarantee.PARTIAL_OR_UNCERTAIN_MUTATION,
+                plan_digest=journal.plan_digest,
+                directory_outcomes=directory_outcomes,
+                path_outcomes=path_outcomes,
+                error=error,
+            )
         if uncertain:
             error = patch_error(
                 "ROLLBACK_FAILED",
                 message="rollback could not prove all reversible directory effects were removed safely",
-                metadata={"plan_digest": journal.plan_digest, "path": uncertain[0].path},
+                metadata={"plan_digest": journal.plan_digest},
             )
             return PatchResult(
                 status=PatchResultStatus.ROLLBACK_FAILED,
                 mutation_guarantee=PatchMutationGuarantee.PARTIAL_OR_UNCERTAIN_MUTATION,
                 plan_digest=journal.plan_digest,
                 directory_outcomes=directory_outcomes,
-                path_outcomes=journal.path_outcomes,
+                path_outcomes=path_outcomes,
                 error=error,
             )
         if retained:
@@ -183,7 +193,7 @@ class PosixPatchCommitAdapter:
                 mutation_guarantee=error.mutation_guarantee,
                 plan_digest=journal.plan_digest,
                 directory_outcomes=directory_outcomes,
-                path_outcomes=journal.path_outcomes,
+                path_outcomes=path_outcomes,
                 error=error,
             )
         error = patch_error(
@@ -195,7 +205,7 @@ class PosixPatchCommitAdapter:
             mutation_guarantee=error.mutation_guarantee,
             plan_digest=journal.plan_digest,
             directory_outcomes=directory_outcomes,
-            path_outcomes=journal.path_outcomes,
+            path_outcomes=path_outcomes,
             error=error,
         )
 
@@ -216,6 +226,13 @@ class PosixPatchCommitAdapter:
         if journal.state in {PatchJournalState.PREPARING, PatchJournalState.PREPARED}:
             return PatchRecoveryDecision(
                 action=PatchRecoveryAction.ROLL_BACK_PREPARATION,
+                status=PatchRecoveryStatus.ROLLED_BACK,
+                mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
+                result_status=PatchResultStatus.COMMIT_FAILED_ROLLED_BACK,
+            )
+        if journal.state in {PatchJournalState.COMMITTING, PatchJournalState.ROLLING_BACK} and journal.rollback_entries:
+            return PatchRecoveryDecision(
+                action=PatchRecoveryAction.ROLL_BACK_COMMIT,
                 status=PatchRecoveryStatus.ROLLED_BACK,
                 mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
                 result_status=PatchResultStatus.COMMIT_FAILED_ROLLED_BACK,
@@ -244,6 +261,8 @@ class PosixPatchCommitAdapter:
                 error=error,
             )
         if decision.action is PatchRecoveryAction.ROLL_BACK_PREPARATION:
+            return await self.roll_back(journal)
+        if decision.action is PatchRecoveryAction.ROLL_BACK_COMMIT:
             return await self.roll_back(journal)
         error = patch_error(
             "RECOVERY_REQUIRED",
@@ -338,6 +357,22 @@ class PosixPatchCommitAdapter:
             / f"{journal.journal_digest.removeprefix('sha256:')}.json"
         )
 
+    def _backup_root(self, journal: PatchJournalRecord) -> Path:
+        return self._stage_root(journal) / "backups"
+
+    def _prepare_rollback_backups(self, plan: PatchPlan, journal: PatchJournalRecord) -> None:
+        backup_root = self._backup_root(journal)
+        for action in plan.actions:
+            if action.kind is PatchActionKind.ADD:
+                continue
+            backup_path = _backup_path(backup_root, action)
+            backup_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            shutil.copyfile(self._workspace_root() / action.path, backup_path)
+            backup_path.chmod(self._payload_mode(plan, action))
+            _fsync_file(backup_path)
+        if backup_root.exists():
+            _fsync_directory(backup_root)
+
 
 def _revalidate_journal_binding(plan: PatchPlan, journal: PatchJournalRecord) -> PatchResult | None:
     if journal.plan_digest != plan.plan_digest:
@@ -354,6 +389,31 @@ def _journal_with_state(journal: PatchJournalRecord, state: PatchJournalState) -
         state=state,
         created_directories=journal.created_directories,
         path_outcomes=journal.path_outcomes,
+        rollback_entries=journal.rollback_entries,
+        metadata=journal.metadata,
+    )
+
+
+def _journal_with_rollback_entry(journal: PatchJournalRecord, entry: PatchRollbackEntry) -> PatchJournalRecord:
+    return PatchJournalRecord(
+        journal_digest=journal.journal_digest,
+        plan_digest=journal.plan_digest,
+        state=journal.state,
+        created_directories=journal.created_directories,
+        path_outcomes=journal.path_outcomes,
+        rollback_entries=(*journal.rollback_entries, entry),
+        metadata=journal.metadata,
+    )
+
+
+def _journal_with_path_outcome(journal: PatchJournalRecord, outcome: PatchPathOutcome) -> PatchJournalRecord:
+    return PatchJournalRecord(
+        journal_digest=journal.journal_digest,
+        plan_digest=journal.plan_digest,
+        state=journal.state,
+        created_directories=journal.created_directories,
+        path_outcomes=(*journal.path_outcomes, outcome),
+        rollback_entries=journal.rollback_entries,
         metadata=journal.metadata,
     )
 
@@ -570,6 +630,112 @@ def _stage_path(stage_root: Path, action: PatchAction) -> Path:
     return stage_root / f"{action.index:06d}.payload"
 
 
+def _backup_path(backup_root: Path, action: PatchAction) -> Path:
+    return backup_root / f"{action.index:06d}.preimage"
+
+
+def _rollback_entry_for_action(root: Path, stage_root: Path, action: PatchAction) -> PatchRollbackEntry:
+    postimage_path = action.destination_path if action.kind is PatchActionKind.MOVE else action.path
+    if postimage_path is None:
+        msg = "move actions must include a destination path"
+        raise ValueError(msg)
+    postimage = (
+        PatchPathEvidence(path=postimage_path, exists=False)
+        if action.kind is PatchActionKind.DELETE
+        else _staged_postimage(postimage_path, _stage_path(stage_root, action), action)
+    )
+    backup_path = None if action.kind is PatchActionKind.ADD else _backup_path(stage_root / "backups", action)
+    return PatchRollbackEntry(
+        path=action.path,
+        operation=action.kind,
+        destination_path=action.destination_path,
+        backup_path=str(backup_path.relative_to(root)) if backup_path is not None else None,
+        preimage=_snapshot_path(root, action.path),
+        postimage=postimage,
+    )
+
+
+def _staged_postimage(path: str, stage_path: Path, action: PatchAction) -> PatchPathEvidence:
+    payload = stage_path.read_bytes()
+    return PatchPathEvidence(
+        path=path,
+        exists=True,
+        content_digest=_digest_bytes(payload),
+        metadata={"mode": stat.S_IMODE(stage_path.stat().st_mode), "operation": action.kind.value},
+    )
+
+
+def _roll_back_files(root: Path, journal: PatchJournalRecord) -> tuple[tuple[PatchPathOutcome, ...], bool]:
+    outcomes: list[PatchPathOutcome] = []
+    recovery_required = False
+    for entry in reversed(journal.rollback_entries):
+        outcome, entry_recovery_required = _roll_back_file(root, entry)
+        outcomes.append(outcome)
+        recovery_required = recovery_required or entry_recovery_required
+    return tuple(reversed(outcomes)), recovery_required
+
+
+def _roll_back_file(root: Path, entry: PatchRollbackEntry) -> tuple[PatchPathOutcome, bool]:
+    current_path = entry.destination_path if entry.operation is PatchActionKind.MOVE else entry.path
+    if current_path is None or entry.postimage is None or not _matches_postimage(root, current_path, entry.postimage):
+        return _rollback_unknown_outcome(entry), True
+    try:
+        if entry.operation is PatchActionKind.ADD:
+            (root / current_path).unlink()
+            _fsync_directory((root / current_path).parent)
+        else:
+            if entry.backup_path is None:
+                return _rollback_unknown_outcome(entry), True
+            backup_path = root / entry.backup_path
+            if not _matches_preimage_file(backup_path, entry.preimage):
+                return _rollback_unknown_outcome(entry), True
+            backup_path.replace(root / entry.path)
+            _fsync_file(root / entry.path)
+            _fsync_directory((root / entry.path).parent)
+            if entry.operation is PatchActionKind.MOVE:
+                (root / current_path).unlink()
+                _fsync_directory((root / current_path).parent)
+    except OSError:
+        return _rollback_unknown_outcome(entry), True
+    return (
+        PatchPathOutcome(
+            path=entry.path,
+            planned_operation=entry.operation,
+            final_state=PatchPathOutcomeState.ROLLED_BACK,
+            destination_path=entry.destination_path,
+            evidence=_snapshot_path(root, entry.path),
+        ),
+        False,
+    )
+
+
+def _matches_postimage(root: Path, path: str, expected: PatchPathEvidence) -> bool:
+    current = _snapshot_path(root, path)
+    if not expected.exists:
+        return not current.exists
+    return (
+        current.exists
+        and current.content_digest == expected.content_digest
+        and current.metadata.get("mode") == expected.metadata.get("mode")
+    )
+
+
+def _matches_preimage_file(path: Path, expected: PatchPathEvidence) -> bool:
+    if not path.is_file() or not expected.exists:
+        return False
+    return _digest_bytes(path.read_bytes()) == expected.content_digest
+
+
+def _rollback_unknown_outcome(entry: PatchRollbackEntry) -> PatchPathOutcome:
+    return PatchPathOutcome(
+        path=entry.path,
+        planned_operation=entry.operation,
+        final_state=PatchPathOutcomeState.UNKNOWN,
+        destination_path=entry.destination_path,
+        evidence=entry.postimage,
+    )
+
+
 def _remove_stage_root(stage_root: Path) -> None:
     """Remove adapter-owned incomplete staging artifacts after a pre-commit failure."""
     try:
@@ -622,6 +788,7 @@ def _write_record(path: Path, record: PatchJournalRecord) -> None:
         "metadata": dict(record.metadata),
         "path_outcomes": [_path_outcome_payload(outcome) for outcome in record.path_outcomes],
         "plan_digest": record.plan_digest,
+        "rollback_entries": [_rollback_entry_payload(entry) for entry in record.rollback_entries],
         "state": record.state.value,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -649,6 +816,29 @@ def _path_outcome_payload(outcome: PatchPathOutcome) -> dict[str, object]:
             "path": outcome.evidence.path,
         }
     return payload
+
+
+def _rollback_entry_payload(entry: PatchRollbackEntry) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "backup_path": entry.backup_path,
+        "destination_path": entry.destination_path,
+        "operation": entry.operation.value,
+        "path": entry.path,
+        "preimage": _path_evidence_payload(entry.preimage),
+    }
+    if entry.postimage is not None:
+        payload["postimage"] = _path_evidence_payload(entry.postimage)
+    return payload
+
+
+def _path_evidence_payload(evidence: PatchPathEvidence) -> dict[str, object]:
+    return {
+        "content_digest": evidence.content_digest,
+        "exists": evidence.exists,
+        "identity_digest": evidence.identity_digest,
+        "metadata": dict(evidence.metadata),
+        "path": evidence.path,
+    }
 
 
 def _rejected(code: str, message: str) -> PatchResult:
