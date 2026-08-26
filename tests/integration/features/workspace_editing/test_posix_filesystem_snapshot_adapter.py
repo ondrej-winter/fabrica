@@ -16,6 +16,7 @@ from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem impor
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.adapter import (
     _reject_cross_device_move,
     _reject_path_alias,
+    _reject_unsupported_metadata,
 )
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
@@ -366,3 +367,16 @@ def test_posix_snapshot_adapter_fails_closed_when_alias_directory_scan_fails(
     assert result.status is PatchResultStatus.REJECTED
     assert result.error is not None
     assert result.error.code == "IO_ERROR"
+
+
+def test_posix_snapshot_adapter_allows_files_without_posix_flags() -> None:
+    assert _reject_unsupported_metadata("src/example.py", flags=0) is None
+
+
+def test_posix_snapshot_adapter_rejects_nonzero_posix_file_flags_before_mutation() -> None:
+    result = _reject_unsupported_metadata("src/example.py", flags=2)
+
+    assert result is not None
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "UNSUPPORTED_METADATA"

@@ -358,4 +358,11 @@ def _unsupported_existing_path_result(path_stat: os.stat_result, path: str) -> P
         return _rejected(code, f"path is not a regular file: {path}")
     if path_stat.st_nlink != 1:
         return _rejected("MULTIPLE_HARD_LINKS_UNSUPPORTED", f"multiple hard links are unsupported: {path}")
-    return None
+    return _reject_unsupported_metadata(path, flags=getattr(path_stat, "st_flags", 0))
+
+
+def _reject_unsupported_metadata(path: str, *, flags: int) -> PatchResult | None:
+    """Reject file flags because staged replacement cannot preserve them safely."""
+    if flags == 0:
+        return None
+    return _rejected("UNSUPPORTED_METADATA", f"file flags cannot be preserved safely: {path}")

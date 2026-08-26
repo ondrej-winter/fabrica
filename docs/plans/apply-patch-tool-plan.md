@@ -633,6 +633,13 @@ output, tamper rejection, and invalid-mask construction. Remaining Task 15 work
 still includes metadata beyond mode, policy revalidation, and pre-commit
 fault-injection coverage.
 
+**Incremental update:** The POSIX snapshot adapter now rejects nonzero POSIX file
+flags with `UNSUPPORTED_METADATA` before planning, staging, or mutation because
+the staged-replacement commit path cannot preserve them safely. Focused tests
+cover accepted zero flags and the no-mutation rejection path. Remaining Task 15
+metadata work is portable ACL and extended-attribute detection or preservation,
+along with policy revalidation and pre-commit fault-injection coverage.
+
 ### Task 16: Implement Rollback and Startup Recovery
 
 **Description:** Implement safe rollback after commit failures and startup handling for incomplete journals.

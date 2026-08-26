@@ -15,7 +15,7 @@ explicitly deferred in the implementation plan.
 | Basic operations | Covered for parser/planner and POSIX add, update, delete, move, and multi-file commit paths. |
 | Grammar and matching | Covered by parser and deterministic hunk-matching unit tests. |
 | Validation and paths | Covered for core duplicate/collision validation and selected POSIX path safety checks; alias and cross-device cases remain open. |
-| Preservation | Covered for UTF-8/BOM/EOL rendering and POSIX mode preservation for the current payload path; full metadata handling remains open. |
+| Preservation | Covered for UTF-8/BOM/EOL rendering, POSIX mode preservation, and fail-closed rejection of nonzero POSIX file flags; ACL and extended-attribute handling remain open. |
 | Authorization and runtime behavior | Covered for policy/approval adapters, registered-tool result mapping, duplicate runtime delivery, and offline tool-loop composition. |
 | Commit, rollback, recovery, and deadlines | Covered for deterministic commit order, stale-plan rejection, directory rollback/recovery, and operator-gated commit recovery; file preimage rollback and full fault injection remain open. |
 
@@ -70,8 +70,11 @@ explicitly deferred in the implementation plan.
 - `tests/integration/features/workspace_editing/test_posix_commit_adapter.py`
   covers Add default mode and Update/Move source-mode preservation in the current
   staged-payload path.
-- **Open:** full security-relevant metadata preservation or fail-closed handling
-  beyond the currently implemented mode contract.
+- `tests/integration/features/workspace_editing/test_posix_filesystem_snapshot_adapter.py`
+  covers fail-closed rejection of nonzero POSIX file flags before staging or
+  mutation, because the current staged-replacement path cannot preserve them.
+- **Open:** ACL and extended-attribute preservation or portable fail-closed
+  detection beyond the current mode and POSIX-file-flag contract.
 
 ### Authorization and runtime behavior
 
