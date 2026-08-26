@@ -12,6 +12,7 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchResult,
     PatchResultStatus,
 )
+from fabrica.features.workspace_editing.application.errors import patch_error
 from fabrica.features.workspace_editing.application.ports import (
     PatchApprovalRequester,
     PatchCancellationSignal,
@@ -94,7 +95,7 @@ class ApplyPatch:
         self.cancellation.throw_if_cancelled()
         commit_result = await self.committer.commit(plan, journal)
         if _is_terminal_commit_result(commit_result):
-            return commit_result
+            return _validate_terminal_commit_result(plan, commit_result)
         rollback_result = await self.committer.roll_back(journal)
         return rollback_result if _is_fatal(rollback_result) else commit_result
 
@@ -178,6 +179,23 @@ def _is_terminal_commit_result(result: PatchResult) -> bool:
         PatchResultStatus.INDETERMINATE_COMMIT_STATE,
         PatchResultStatus.RECOVERY_REQUIRED,
     }
+
+
+def _validate_terminal_commit_result(plan: PatchPlan, result: PatchResult) -> PatchResult:
+    """Fail closed when terminal adapter evidence is not bound to the approved plan."""
+    if result.plan_digest == plan.plan_digest:
+        return result
+    error = patch_error(
+        "INDETERMINATE_COMMIT_STATE",
+        message="terminal commit result was not bound to the approved patch plan",
+        metadata={"plan_digest": plan.plan_digest},
+    )
+    return PatchResult(
+        status=PatchResultStatus.INDETERMINATE_COMMIT_STATE,
+        mutation_guarantee=error.mutation_guarantee,
+        plan_digest=plan.plan_digest,
+        error=error,
+    )
 
 
 __all__ = ["ApplyPatch"]

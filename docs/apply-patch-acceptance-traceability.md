@@ -102,7 +102,9 @@ explicitly deferred in the implementation plan.
   lease-to-commit phase ordering, update hunk matching before planning/staging,
   pre-journal and pre-commit policy rejection, capability rejection before
   parsing, parser rejection before snapshot, and rollback after file-staging or
-  pre-commit policy rejection.
+  pre-commit policy rejection. It also proves that a terminal committer result
+  with a missing or mismatched approved plan digest is converted to the fatal
+  `INDETERMINATE_COMMIT_STATE` result rather than being reported as committed.
 - `tests/integration/features/workspace_editing/test_posix_journal_preparation_adapter.py`
   covers durable intent before directory creation, preparation rollback after
   directory failure, incomplete-journal listing, and illegal transition rejection.

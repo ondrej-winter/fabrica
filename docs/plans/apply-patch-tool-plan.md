@@ -99,7 +99,7 @@ After every completed task or meaningful change:
 - [x] Task 12: Implement the mutating resolver and snapshot adapter
 - [x] Task 13: Implement mutation lease, policy, and approval adapters
 - [x] Task 14: Implement durable journal and reversible pre-commit effects
-- [ ] Task 15: Implement staging, revalidation, and commit scheduling
+- [x] Task 15: Implement staging, revalidation, and commit scheduling
 - [x] Task 16: Implement rollback and startup recovery
 
 ### Checkpoint C: Filesystem Safety
@@ -574,7 +574,7 @@ intent-before-effect ordering, failure rollback, and incomplete journal discover
 
 - [x] Same-filesystem staging uses host-controlled names and strict permissions, writes full contents, and executes durability barriers for the current complete-payload adapter path.
 - [x] Applies modes for the full v1 metadata contract.
-- [ ] Source, parent, destination, directory absence, policy, and digest are revalidated at required boundaries. Source identity/content, destination absence, destination parent identity, and journal/plan digest binding are covered in the current adapter path; remaining policy and full digest-bound result-payload revalidation stay open.
+- [x] Source, parent, destination, directory absence, policy, and digest are revalidated at required boundaries. Source identity/content, destination absence, destination parent identity, journal/plan digest binding, post-staging policy, and terminal result plan-digest binding are covered.
 - [x] Source identity/content digest revalidation rejects stale plans before visible file commit in the current adapter path.
 - [x] The explicit file commit point and deterministic action schedule match the approved plan for add, update, delete, and move complete-payload actions.
 
@@ -697,6 +697,15 @@ file commit point, in addition to the existing presence, size, and mode checks.
 Focused integration coverage rejects same-length staged-payload tampering before
 the destination becomes visible. Remaining Task 15 work is metadata beyond mode
 plus broader pre-commit fault-injection coverage.
+
+**Incremental update:** Closed Task 15's final application-boundary revalidation
+gap. `ApplyPatch` already performs snapshot and policy revalidation after staged
+payload preparation; it now also fails closed if a terminal committer result omits
+or disagrees with the approved plan digest. The use case reports the fatal
+`INDETERMINATE_COMMIT_STATE` contract rather than returning unbound terminal
+evidence. Focused orchestration coverage proves a mismatched terminal digest is
+not reported as committed. Broader production mutation exposure remains blocked by
+the separate no-replace rename and supervised-cleanup guarantees.
 
 ### Task 16: Implement Rollback and Startup Recovery
 

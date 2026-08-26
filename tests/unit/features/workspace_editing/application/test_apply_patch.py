@@ -116,6 +116,20 @@ def test_apply_patch_revalidates_snapshot_after_staging_before_commit() -> None:
     assert "commit" not in harness.events
 
 
+def test_apply_patch_reports_indeterminate_state_when_terminal_commit_result_has_wrong_plan_digest() -> None:
+    harness = _Harness(commit_result_plan_digest="sha256:" + "c" * 64)
+    patch = "*** Begin Patch\n*** Add File: src/new.py\n+value = 1\n*** End Patch"
+
+    result = run(harness.use_case.apply(patch))
+
+    assert result.status is PatchResultStatus.INDETERMINATE_COMMIT_STATE
+    assert result.mutation_guarantee is PatchMutationGuarantee.PARTIAL_OR_UNCERTAIN_MUTATION
+    assert result.error is not None
+    assert result.error.code == "INDETERMINATE_COMMIT_STATE"
+    assert harness.committed_plan is not None
+    assert result.error.metadata["plan_digest"] == harness.committed_plan.plan_digest
+
+
 def test_apply_patch_returns_capability_rejection_before_parsing() -> None:
     rejection = _rejected("UNSUPPORTED_FILESYSTEM_GUARANTEE", "unsupported")
     harness = _Harness(capability_result=rejection)
@@ -181,6 +195,7 @@ class _Harness:
     policy_result: PatchResult | None = None
     post_staging_policy_result: PatchResult | None = None
     file_staging_result: PatchResult | None = None
+    commit_result_plan_digest: str | None = None
     events: list[str] = field(default_factory=list)
     committed_plan: PatchPlan | None = None
     snapshot_reader: "_SnapshotReader" = field(init=False)
@@ -338,7 +353,7 @@ class _Committer:
         return PatchResult(
             status=PatchResultStatus.COMMITTED,
             mutation_guarantee=PatchMutationGuarantee.COMMITTED,
-            plan_digest=plan.plan_digest,
+            plan_digest=self.harness.commit_result_plan_digest or plan.plan_digest,
             changes=plan.changes,
         )
 
