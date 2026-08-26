@@ -14,6 +14,8 @@ import pytest
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import PosixPatchWorkspaceSnapshotAdapter
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import adapter as posix_snapshot_adapter
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.adapter import (
+    _list_extended_attribute_names,
+    _list_extended_attributes,
     _reject_cross_device_move,
     _reject_path_alias,
     _reject_unsupported_metadata,
@@ -384,6 +386,94 @@ def test_posix_snapshot_adapter_rejects_nonzero_posix_file_flags_before_mutation
     assert result.error.code == "UNSUPPORTED_METADATA"
 
 
+def test_posix_snapshot_adapter_allows_empty_extended_attribute_metadata() -> None:
+    assert _reject_unsupported_metadata("src/example.py", flags=0, extended_attribute_names=()) is None
+
+
+def test_posix_snapshot_adapter_allows_non_security_extended_attributes() -> None:
+    assert (
+        _reject_unsupported_metadata(
+            "src/example.py",
+            flags=0,
+            extended_attribute_names=("com.apple.provenance",),
+        )
+        is None
+    )
+
+
+def test_posix_snapshot_adapter_rejects_acl_extended_attributes_before_mutation() -> None:
+    result = _reject_unsupported_metadata(
+        "src/example.py",
+        flags=0,
+        extended_attribute_names=("system.posix_acl_access",),
+    )
+
+    assert result is not None
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "UNSUPPORTED_METADATA"
+
+
+def test_posix_snapshot_adapter_preserves_extended_attribute_inspection_rejection() -> None:
+    inspection_error = patch_error("UNSUPPORTED_METADATA", message="xattr inspection failed")
+    inspection_result = PatchResult(
+        status=PatchResultStatus.REJECTED,
+        mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
+        error=inspection_error,
+    )
+
+    assert (
+        _reject_unsupported_metadata(
+            "src/example.py",
+            flags=0,
+            extended_attribute_names=inspection_result,
+        )
+        is inspection_result
+    )
+
+
+def test_posix_snapshot_adapter_rejects_uninspectable_extended_attributes_before_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unsupported_listxattr(_path: Path) -> tuple[str, ...]:
+        raise NotImplementedError
+
+    monkeypatch.setattr(posix_snapshot_adapter, "_list_extended_attributes", unsupported_listxattr)
+
+    result = _list_extended_attribute_names(tmp_path / "example.py")
+
+    assert isinstance(result, PatchResult)
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "UNSUPPORTED_METADATA"
+
+
+def test_posix_snapshot_adapter_uses_native_extended_attribute_listing_when_available(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def native_listxattr(path: Path, *, follow_symlinks: bool) -> tuple[str, ...]:
+        assert path == tmp_path / "example.py"
+        assert follow_symlinks is False
+        return ("user.example",)
+
+    monkeypatch.setattr(os, "listxattr", native_listxattr, raising=False)
+
+    assert _list_extended_attributes(tmp_path / "example.py") == ("user.example",)
+
+
+def test_posix_snapshot_adapter_fails_closed_without_extended_attribute_support(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delattr(os, "listxattr", raising=False)
+    monkeypatch.setattr(posix_snapshot_adapter.sys, "platform", "freebsd")
+
+    with pytest.raises(NotImplementedError, match="inspection is unavailable"):
+        _list_extended_attributes(tmp_path / "example.py")
+
+
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
 def test_posix_snapshot_adapter_rejects_unsupported_metadata_on_destination_parent_before_mutation(
     tmp_path: Path,
@@ -391,8 +481,13 @@ def test_posix_snapshot_adapter_rejects_unsupported_metadata_on_destination_pare
 ) -> None:
     (tmp_path / "generated").mkdir()
 
-    def reject_parent_metadata(path: str, *, flags: int) -> PatchResult | None:
-        del flags
+    def reject_parent_metadata(
+        path: str,
+        *,
+        flags: int,
+        extended_attribute_names: tuple[str, ...] | PatchResult = (),
+    ) -> PatchResult | None:
+        del flags, extended_attribute_names
         if path == "generated":
             error = patch_error("UNSUPPORTED_METADATA", message="unsupported parent metadata")
             return PatchResult(

@@ -1,5 +1,6 @@
 """POSIX snapshot and capability adapter for apply-patch planning."""
 
+import ctypes
 import os
 import stat
 import sys
@@ -24,6 +25,15 @@ from fabrica.features.workspace_editing.application.text_snapshot import (
     decode_patch_text,
 )
 from fabrica.features.workspace_editing.application.use_cases import PatchPlanningSnapshot
+
+_SECURITY_RELEVANT_EXTENDED_ATTRIBUTE_PREFIXES = ("security.",)
+_SECURITY_RELEVANT_EXTENDED_ATTRIBUTE_NAMES = frozenset(
+    {
+        "com.apple.macl",
+        "system.posix_acl_access",
+        "system.posix_acl_default",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,18 +267,13 @@ def _validate_parent_chain(root: Path, path: str) -> PatchResult | None:
             return None
         except OSError as err:
             return _rejected("IO_ERROR", f"could not inspect parent path: {err.strerror}")
-        parent_result = _validate_existing_parent(root, current, parent, path_stat)
+        parent_result = _validate_existing_parent(current, parent, path_stat)
         if parent_result is not None:
             return parent_result
     return None
 
 
-def _validate_existing_parent(
-    root: Path,
-    current: Path,
-    parent: str,
-    path_stat: os.stat_result,
-) -> PatchResult | None:
+def _validate_existing_parent(current: Path, parent: str, path_stat: os.stat_result) -> PatchResult | None:
     if stat.S_ISLNK(path_stat.st_mode):
         return _rejected("SYMLINK_PATH_UNSUPPORTED", f"symlink parent is unsupported: {parent}")
     if not stat.S_ISDIR(path_stat.st_mode):
@@ -280,8 +285,9 @@ def _validate_existing_parent(
         )
         return _rejected(code, f"{message}: {parent}")
     return _reject_unsupported_metadata(
-        current.relative_to(root).as_posix(),
+        parent,
         flags=getattr(path_stat, "st_flags", 0),
+        extended_attribute_names=_list_extended_attribute_names(current),
     )
 
 
@@ -305,7 +311,7 @@ def _snapshot_optional_path(root: Path, path: str) -> PatchPathEvidence | PatchR
     except OSError as err:
         return _rejected("IO_ERROR", f"could not inspect path: {err.strerror}")
 
-    unsupported_result = _unsupported_existing_path_result(path_stat, path)
+    unsupported_result = _unsupported_existing_path_result(absolute, path_stat, path)
     if unsupported_result is not None:
         return unsupported_result
 
@@ -365,7 +371,7 @@ def _rejected(code: str, message: str) -> PatchResult:
 __all__ = ["PosixPatchWorkspaceSnapshotAdapter"]
 
 
-def _unsupported_existing_path_result(path_stat: os.stat_result, path: str) -> PatchResult | None:
+def _unsupported_existing_path_result(absolute: Path, path_stat: os.stat_result, path: str) -> PatchResult | None:
     if stat.S_ISLNK(path_stat.st_mode):
         return _rejected("SYMLINK_PATH_UNSUPPORTED", f"symlink paths are unsupported: {path}")
     if not stat.S_ISREG(path_stat.st_mode):
@@ -373,11 +379,76 @@ def _unsupported_existing_path_result(path_stat: os.stat_result, path: str) -> P
         return _rejected(code, f"path is not a regular file: {path}")
     if path_stat.st_nlink != 1:
         return _rejected("MULTIPLE_HARD_LINKS_UNSUPPORTED", f"multiple hard links are unsupported: {path}")
-    return _reject_unsupported_metadata(path, flags=getattr(path_stat, "st_flags", 0))
+    return _reject_unsupported_metadata(
+        path,
+        flags=getattr(path_stat, "st_flags", 0),
+        extended_attribute_names=_list_extended_attribute_names(absolute),
+    )
 
 
-def _reject_unsupported_metadata(path: str, *, flags: int) -> PatchResult | None:
-    """Reject file flags because staged replacement cannot preserve them safely."""
+def _list_extended_attribute_names(path: Path) -> tuple[str, ...] | PatchResult:
+    """Return xattr names or reject when metadata inspection cannot be proven."""
+    try:
+        return _list_extended_attributes(path)
+    except (NotImplementedError, OSError) as err:
+        detail = err.strerror if isinstance(err, OSError) and err.strerror is not None else type(err).__name__
+        return _rejected("UNSUPPORTED_METADATA", f"extended attributes cannot be inspected safely: {path}: {detail}")
+
+
+def _list_extended_attributes(path: Path) -> tuple[str, ...]:
+    listxattr = getattr(os, "listxattr", None)
+    if callable(listxattr):
+        return tuple(sorted(listxattr(path, follow_symlinks=False)))
+    if sys.platform == "darwin":
+        return _list_darwin_extended_attributes(path)
+    msg = "extended-attribute inspection is unavailable on this platform"
+    raise NotImplementedError(msg)
+
+
+def _list_darwin_extended_attributes(path: Path) -> tuple[str, ...]:
+    """List macOS extended attributes without following a symlink."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    listxattr = libc.listxattr
+    listxattr.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int)
+    listxattr.restype = ctypes.c_ssize_t
+    encoded_path = os.fsencode(path)
+    required_size = listxattr(encoded_path, None, 0, 1)
+    if required_size < 0:
+        raise OSError(ctypes.get_errno(), os.strerror(ctypes.get_errno()), path)
+    if required_size == 0:
+        return ()
+    names_buffer = ctypes.create_string_buffer(required_size)
+    actual_size = listxattr(encoded_path, names_buffer, required_size, 1)
+    if actual_size < 0:
+        raise OSError(ctypes.get_errno(), os.strerror(ctypes.get_errno()), path)
+    return tuple(
+        sorted(
+            name.decode("utf-8", errors="surrogateescape")
+            for name in names_buffer.raw[:actual_size].split(b"\0")
+            if name
+        )
+    )
+
+
+def _reject_unsupported_metadata(
+    path: str,
+    *,
+    flags: int,
+    extended_attribute_names: tuple[str, ...] | PatchResult = (),
+) -> PatchResult | None:
+    """Reject metadata that staged replacement cannot preserve safely."""
     if flags == 0:
-        return None
+        if isinstance(extended_attribute_names, PatchResult):
+            return extended_attribute_names
+        if not _contains_security_relevant_extended_attribute(extended_attribute_names):
+            return None
+        return _rejected("UNSUPPORTED_METADATA", f"ACL or security metadata cannot be preserved safely: {path}")
     return _rejected("UNSUPPORTED_METADATA", f"file flags cannot be preserved safely: {path}")
+
+
+def _contains_security_relevant_extended_attribute(attribute_names: tuple[str, ...]) -> bool:
+    return any(
+        attribute_name in _SECURITY_RELEVANT_EXTENDED_ATTRIBUTE_NAMES
+        or attribute_name.startswith(_SECURITY_RELEVANT_EXTENDED_ATTRIBUTE_PREFIXES)
+        for attribute_name in attribute_names
+    )

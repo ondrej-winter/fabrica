@@ -566,7 +566,7 @@ intent-before-effect ordering, failure rollback, and incomplete journal discover
 **Acceptance criteria:**
 
 - [x] Same-filesystem staging uses host-controlled names and strict permissions, writes full contents, and executes durability barriers for the current complete-payload adapter path.
-- [ ] Applies modes for the full v1 metadata contract.
+- [x] Applies modes for the full v1 metadata contract.
 - [ ] Source, parent, destination, directory absence, policy, and digest are revalidated at required boundaries. Source identity/content, destination absence, destination parent identity, and journal/plan digest binding are covered in the current adapter path; remaining policy and full digest-bound result-payload revalidation stay open.
 - [x] Source identity/content digest revalidation rejects stale plans before visible file commit in the current adapter path.
 - [x] The explicit file commit point and deterministic action schedule match the approved plan for add, update, delete, and move complete-payload actions.
@@ -593,16 +593,22 @@ steps. A later increment added journal/plan digest binding before staging and
 commit, durable COMMITTING/COMMITTED journal writes, and persisted committed path
 outcomes. Focused integration tests passed for successful mixed-operation commit,
 stale-plan rejection, digest mismatch rejection, and committed journal evidence.
-Remaining Task 15 work: full metadata/mode handling, broader
-parent/destination/policy revalidation, and pre-commit fault-injection coverage.
+Remaining Task 15 work: broader parent/destination/policy revalidation and
+pre-commit fault-injection coverage.
 
 **Incremental update:** Added deterministic staging-durability fault coverage
 for failures while flushing both the first and a later staged payload. The
 adapter rejects before the explicit file commit point, removes host-managed
 staging artifacts, preserves existing source content, and leaves the planned
-destination absent. Remaining Task 15 work is portable ACL and extended-
-attribute handling plus policy revalidation; visible-file-commit crash/fault
-coverage remains Task 16/18 work.
+destination absent. Remaining Task 15 work is policy revalidation; visible-file-
+commit crash/fault coverage remains Task 16/18 work.
+
+**Incremental update:** The POSIX snapshot adapter now captures portable mode
+bits for replacement payloads and rejects nonzero POSIX file flags plus all
+ACL/security-relevant extended attributes before mutation. This fail-closed
+contract covers ACL-backed extended attributes that the staged-replacement adapter
+cannot preserve without rejecting unrelated host provenance metadata. Focused
+tests cover empty, benign, ACL-backed, and uninspectable extended-attribute states.
 
 **Incremental update:** Added commit-time ancestor identity revalidation for
 planned paths, including absent add/move destinations whose derived parent
@@ -613,14 +619,14 @@ The adapter now explicitly rejects add/move destination appearance before the
 visible file commit point and verifies destination parent identity against the
 approved plan evidence.
 Focused integration coverage rejects a replaced destination parent before visible
-file commit. Remaining Task 15 work still includes full metadata/mode handling,
-policy revalidation, and broader pre-commit fault-injection coverage.
+file commit. Remaining Task 15 work still includes policy revalidation and
+broader pre-commit fault-injection coverage.
 
 **Incremental update:** Added commit-time staged-payload revalidation before the
 file commit loop. Missing or changed staged payloads now reject as stale before
 any visible file operation, with focused integration coverage for the missing
-payload case. Remaining Task 15 work still includes full metadata/mode handling,
-policy revalidation, and broader pre-commit fault-injection coverage.
+payload case. Remaining Task 15 work still includes policy revalidation and
+broader pre-commit fault-injection coverage.
 
 **Incremental update:** Added POSIX staged payload mode handling for the current
 complete-payload adapter path. Update and Move payloads now preserve the planned
@@ -628,8 +634,7 @@ source file mode, Add payloads use the adapter default `0644`, commit-time stagi
 revalidation rejects changed payload modes before visible file mutation, and final
 path evidence reports resulting file mode. Focused integration coverage verifies
 Add/Update/Move modes and stale staged-mode rejection. Remaining Task 15 work
-still includes broader metadata handling beyond mode, policy revalidation, and
-pre-commit fault-injection coverage.
+still includes policy revalidation and pre-commit fault-injection coverage.
 
 **Incremental update:** Added an explicit, validated `workspace_umask` setting to
 the POSIX commit adapter. Add payloads now use v1 base mode `0666` filtered by the
@@ -638,22 +643,20 @@ Move preserve their planned source modes. Commit-time staged-payload revalidatio
 uses the same configured policy and rejects a tampered Add payload before visible
 file mutation. Focused POSIX integration coverage verifies restrictive-umask
 output, tamper rejection, and invalid-mask construction. Remaining Task 15 work
-still includes metadata beyond mode, policy revalidation, and pre-commit
-fault-injection coverage.
+still includes policy revalidation and pre-commit fault-injection coverage.
 
 **Incremental update:** The POSIX snapshot adapter now rejects nonzero POSIX file
 flags with `UNSUPPORTED_METADATA` before planning, staging, or mutation because
 the staged-replacement commit path cannot preserve them safely. Focused tests
 cover accepted zero flags and the no-mutation rejection path. Remaining Task 15
-metadata work is portable ACL and extended-attribute detection or preservation,
-along with policy revalidation and pre-commit fault-injection coverage.
+work is policy revalidation and pre-commit fault-injection coverage.
 
 **Incremental update:** Extended nonzero POSIX file-flag rejection to existing
 destination parent directories during snapshot planning. This prevents Add or
 Move operations from modifying a directory hierarchy whose metadata the current
 adapter cannot preserve. Focused integration coverage proves the rejection occurs
-before a destination child becomes visible. Portable ACL and extended-attribute
-detection or preservation remain open.
+before a destination child becomes visible. Policy revalidation and pre-commit
+fault-injection coverage remain open.
 
 **Incremental update:** File staging and commit now revalidate the durable journal
 record immediately before pre-commit staging and again before the explicit file
