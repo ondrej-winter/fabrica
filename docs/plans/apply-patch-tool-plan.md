@@ -790,7 +790,7 @@ acceptance testing.
 
 **Verification:**
 
-- [ ] End-to-end offline model-tool-loop tests pass.
+- [x] End-to-end offline model-tool-loop tests pass.
 - [ ] Complete acceptance matrix passes.
 - [ ] macOS/Linux CI evidence is recorded.
 - [ ] Full quality gate passes.
@@ -896,6 +896,15 @@ that no aliased destination becomes visible. Remaining Task 18 work is closing o
 explicitly deferring cross-device move evidence, other special-file classes,
 metadata handling, and the open rollback/fault-injection scenarios before
 completing the full quality gate.
+
+**Incremental update:** Extended offline end-to-end model-tool-loop acceptance
+evidence for the explicitly composed `apply_patch` tool. Integration coverage now
+proves that no-mutation patch rejections are delivered to a subsequent model turn
+and that indeterminate mutation states stop the runtime before another model turn.
+Production default mutation composition remains fail-closed pending the documented
+POSIX no-replace rename and supervised-cleanup guarantees. Remaining Task 18 work
+is closing or explicitly deferring the open acceptance scenarios and completing
+the full quality gate.
 
 ## Risks and Mitigations
 

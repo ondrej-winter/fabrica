@@ -10,6 +10,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolAwareModelResponse,
     ToolCallRequest,
     ToolCallResult,
+    ToolCallResultStatus,
     ToolCancellationSignal,
     ToolDefinition,
     ToolLoopLimits,
@@ -22,8 +23,10 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchResult,
     PatchResultStatus,
 )
+from fabrica.features.workspace_editing.application.errors import patch_error
 
 PLAN_DIGEST = "sha256:" + "c" * 64
+EXPECTED_TOOL_LOOP_TURN_COUNT = 2
 
 
 @dataclass(slots=True)
@@ -88,11 +91,66 @@ def test_apply_patch_tool_helper_composes_explicit_use_case_without_mutating_dur
     assert model.calls[1][2] == result.tool_results
 
 
+def test_apply_patch_tool_loop_continues_after_recoverable_patch_rejection() -> None:
+    model = ApplyPatchToolAwareModel()
+    use_case = _FakeApplyPatch(_rejected_result())
+    tool = create_apply_patch_registered_tool_adapter(use_case)
+    runtime = create_tool_loop_runtime(model=model, tools=(tool,), limits=ToolLoopLimits(max_tool_iterations=2))
+
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Apply the patch.")))
+
+    assert result.status is ToolLoopRunStatus.SUCCESS
+    assert len(result.tool_results) == 1
+    assert result.tool_results[0].status is ToolCallResultStatus.REJECTED
+    assert result.output_text is not None
+    assert result.output_text.startswith("final:")
+    assert len(model.calls) == EXPECTED_TOOL_LOOP_TURN_COUNT
+    assert model.calls[1][2] == result.tool_results
+
+
+def test_apply_patch_tool_loop_stops_after_fatal_mutation_state() -> None:
+    model = ApplyPatchToolAwareModel()
+    use_case = _FakeApplyPatch(_indeterminate_result())
+    tool = create_apply_patch_registered_tool_adapter(use_case)
+    runtime = create_tool_loop_runtime(model=model, tools=(tool,), limits=ToolLoopLimits(max_tool_iterations=2))
+
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Apply the patch.")))
+
+    assert result.status is ToolLoopRunStatus.TOOL_FAILURE
+    assert len(result.tool_results) == 1
+    assert result.tool_results[0].status is ToolCallResultStatus.TOOL_FAILURE
+    assert result.output_text is None
+    assert len(model.calls) == 1
+
+
 def _committed_result() -> PatchResult:
     return PatchResult(
         status=PatchResultStatus.COMMITTED,
         mutation_guarantee=PatchMutationGuarantee.COMMITTED,
         plan_digest=PLAN_DIGEST,
+    )
+
+
+def _rejected_result() -> PatchResult:
+    error = patch_error("SOURCE_NOT_FOUND", message="source not found")
+    return PatchResult(
+        status=PatchResultStatus.REJECTED,
+        mutation_guarantee=error.mutation_guarantee,
+        error=error,
+    )
+
+
+def _indeterminate_result() -> PatchResult:
+    error = patch_error(
+        "INDETERMINATE_COMMIT_STATE",
+        message="commit state is unknown",
+        metadata={"plan_digest": PLAN_DIGEST},
+    )
+    return PatchResult(
+        status=PatchResultStatus.INDETERMINATE_COMMIT_STATE,
+        mutation_guarantee=error.mutation_guarantee,
+        plan_digest=PLAN_DIGEST,
+        error=error,
     )
 
 

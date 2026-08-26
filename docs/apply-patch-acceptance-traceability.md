@@ -91,7 +91,8 @@ explicitly deferred in the implementation plan.
   tool rejection continuation, and fatal tool outcomes.
 - `tests/integration/features/workspace_editing/test_apply_patch_tool_composition.py`
   covers offline tool-loop composition for the explicitly injected apply-patch
-  registered tool.
+  registered tool, committed output delivery, recoverable rejection continuation,
+  and fatal mutation-state runtime stopping.
 - **Open:** production default approval wiring remains blocked by platform
   capability evidence and is not exposed as an automatic default composition.
 
