@@ -560,6 +560,8 @@ The adapter contract:
   and `shell=False`;
 - starts the subprocess in a dedicated process group and, on timeout, terminates
   that group with a bounded cleanup grace period before reporting timeout;
+- uses a dedicated commit-execution timeout that accommodates native Git hooks;
+  the post-commit short-hash lookup has a separate short timeout;
 - preserves subject, body, and Conventional Commits footers exactly;
 - uses the composition-owned working directory;
 - never stages files, amends commits, bypasses hooks, opens an editor, fetches,

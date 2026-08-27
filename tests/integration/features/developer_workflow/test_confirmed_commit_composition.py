@@ -44,7 +44,11 @@ from fabrica.features.developer_workflow.application.use_cases import ConfirmedC
 GIT_EXECUTABLE = shutil.which("git") or "git"
 SHORT_GIT_TIMEOUT_SECONDS = 2.5
 DEFAULT_CONFIRMED_COMMIT_PRE_COMMIT_TIMEOUT_SECONDS = 120.0
+DEFAULT_CONFIRMED_COMMIT_EXECUTION_TIMEOUT_SECONDS = 120.0
+DEFAULT_CONFIRMED_COMMIT_HASH_LOOKUP_TIMEOUT_SECONDS = 10.0
 CUSTOM_PRE_COMMIT_TIMEOUT_SECONDS = 180.0
+CUSTOM_COMMIT_EXECUTION_TIMEOUT_SECONDS = 240.0
+CUSTOM_COMMIT_HASH_LOOKUP_TIMEOUT_SECONDS = 5.0
 
 
 @dataclass
@@ -130,21 +134,27 @@ def test_confirmed_commit_workflow_creates_commit_from_parsed_recommendation_mes
     assert _git_log_message(git_repository) == commit_message
 
 
-def test_confirmed_commit_options_use_dedicated_pre_commit_timeout_default() -> None:
-    options = CommitMessageWorkflowOptions(git_timeout_seconds=SHORT_GIT_TIMEOUT_SECONDS)
+def test_confirmed_commit_options_use_dedicated_timeout_defaults() -> None:
+    options = CommitMessageWorkflowOptions(staged_git_timeout_seconds=SHORT_GIT_TIMEOUT_SECONDS)
 
-    assert options.git_timeout_seconds == SHORT_GIT_TIMEOUT_SECONDS
+    assert options.staged_git_timeout_seconds == SHORT_GIT_TIMEOUT_SECONDS
     assert options.pre_commit_timeout_seconds == DEFAULT_CONFIRMED_COMMIT_PRE_COMMIT_TIMEOUT_SECONDS
+    assert options.git_commit_timeout_seconds == DEFAULT_CONFIRMED_COMMIT_EXECUTION_TIMEOUT_SECONDS
+    assert options.git_hash_lookup_timeout_seconds == DEFAULT_CONFIRMED_COMMIT_HASH_LOOKUP_TIMEOUT_SECONDS
 
 
-def test_confirmed_commit_options_allow_pre_commit_timeout_override() -> None:
+def test_confirmed_commit_options_allow_dedicated_timeout_overrides() -> None:
     options = CommitMessageWorkflowOptions(
-        git_timeout_seconds=SHORT_GIT_TIMEOUT_SECONDS,
+        staged_git_timeout_seconds=SHORT_GIT_TIMEOUT_SECONDS,
         pre_commit_timeout_seconds=CUSTOM_PRE_COMMIT_TIMEOUT_SECONDS,
+        git_commit_timeout_seconds=CUSTOM_COMMIT_EXECUTION_TIMEOUT_SECONDS,
+        git_hash_lookup_timeout_seconds=CUSTOM_COMMIT_HASH_LOOKUP_TIMEOUT_SECONDS,
     )
 
-    assert options.git_timeout_seconds == SHORT_GIT_TIMEOUT_SECONDS
+    assert options.staged_git_timeout_seconds == SHORT_GIT_TIMEOUT_SECONDS
     assert options.pre_commit_timeout_seconds == CUSTOM_PRE_COMMIT_TIMEOUT_SECONDS
+    assert options.git_commit_timeout_seconds == CUSTOM_COMMIT_EXECUTION_TIMEOUT_SECONDS
+    assert options.git_hash_lookup_timeout_seconds == CUSTOM_COMMIT_HASH_LOOKUP_TIMEOUT_SECONDS
 
 
 def test_confirmed_commit_workflow_allows_repository_without_pre_commit_config(tmp_path: Path) -> None:

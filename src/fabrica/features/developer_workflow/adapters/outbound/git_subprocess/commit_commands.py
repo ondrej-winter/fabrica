@@ -1,6 +1,7 @@
 """Git command constants for approved commit creation."""
 
-DEFAULT_GIT_COMMIT_TIMEOUT_SECONDS = 10.0
+DEFAULT_GIT_COMMIT_TIMEOUT_SECONDS = 120.0
+DEFAULT_GIT_HASH_LOOKUP_TIMEOUT_SECONDS = 10.0
 GIT_COMMIT_FILE_ARGV_PREFIX = ("git", "--no-pager", "commit", "--file")
 GIT_REV_PARSE_SHORT_HEAD_ARGV = ("git", "--no-pager", "rev-parse", "--short", "HEAD")
 

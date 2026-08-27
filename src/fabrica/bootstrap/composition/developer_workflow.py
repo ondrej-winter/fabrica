@@ -31,8 +31,15 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess import
     GitStagedChangesSubprocessLoader,
     PreCommitSubprocessRunner,
 )
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.commit_commands import (
+    DEFAULT_GIT_COMMIT_TIMEOUT_SECONDS,
+    DEFAULT_GIT_HASH_LOOKUP_TIMEOUT_SECONDS,
+)
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.pre_commit_commands import (
     DEFAULT_PRE_COMMIT_TIMEOUT_SECONDS,
+)
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.staged_changes_commands import (
+    DEFAULT_GIT_TIMEOUT_SECONDS,
 )
 from fabrica.features.developer_workflow.adapters.outbound.pre_commit_registered_tool import (
     create_pre_commit_registered_tools,
@@ -71,8 +78,10 @@ class CommitMessageWorkflowOptions:
     skill_roots: tuple[Path, ...] | None = None
     staged_diff_bounds: GitStagedDiffBounds | None = None
     skill_bounds: SkillContextBounds | None = None
-    git_timeout_seconds: float = 10.0
+    staged_git_timeout_seconds: float = DEFAULT_GIT_TIMEOUT_SECONDS
     pre_commit_timeout_seconds: float = DEFAULT_PRE_COMMIT_TIMEOUT_SECONDS
+    git_commit_timeout_seconds: float = DEFAULT_GIT_COMMIT_TIMEOUT_SECONDS
+    git_hash_lookup_timeout_seconds: float = DEFAULT_GIT_HASH_LOOKUP_TIMEOUT_SECONDS
     git_working_directory: Path | None = None
     max_parallel_analysis: int = 4
     verbose_diagnostics: bool = False
@@ -200,7 +209,8 @@ def create_confirmed_commit_workflow(
         committer=CreateGitCommit(
             commit_creator=GitCommitSubprocessCreator(
                 working_directory=workflow_options.git_working_directory,
-                timeout_seconds=workflow_options.git_timeout_seconds,
+                commit_timeout_seconds=workflow_options.git_commit_timeout_seconds,
+                hash_lookup_timeout_seconds=workflow_options.git_hash_lookup_timeout_seconds,
                 verbose_diagnostics=workflow_options.verbose_diagnostics,
             ),
         ),
@@ -222,7 +232,7 @@ def _create_commit_message_generator(
     staged_changes_loader = GitStagedChangesSubprocessLoader(
         working_directory=options.git_working_directory,
         bounds=options.staged_diff_bounds,
-        timeout_seconds=options.git_timeout_seconds,
+        timeout_seconds=options.staged_git_timeout_seconds,
         verbose_diagnostics=options.verbose_diagnostics,
     )
     skill_context_loader = create_skill_context_loader(

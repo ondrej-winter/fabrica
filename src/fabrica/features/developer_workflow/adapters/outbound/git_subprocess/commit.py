@@ -15,6 +15,7 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.comman
 )
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.commit_commands import (
     DEFAULT_GIT_COMMIT_TIMEOUT_SECONDS,
+    DEFAULT_GIT_HASH_LOOKUP_TIMEOUT_SECONDS,
     GIT_REV_PARSE_SHORT_HEAD_ARGV,
     git_commit_file_argv,
 )
@@ -43,15 +44,20 @@ class GitCommitSubprocessCreator:
         self,
         *,
         working_directory: Path | None = None,
-        timeout_seconds: float = DEFAULT_GIT_COMMIT_TIMEOUT_SECONDS,
+        commit_timeout_seconds: float = DEFAULT_GIT_COMMIT_TIMEOUT_SECONDS,
+        hash_lookup_timeout_seconds: float = DEFAULT_GIT_HASH_LOOKUP_TIMEOUT_SECONDS,
         runner: GitCommandRunner | None = None,
         verbose_diagnostics: bool = False,
     ) -> None:
-        if timeout_seconds <= 0:
-            msg = "timeout_seconds must be positive"
+        if commit_timeout_seconds <= 0:
+            msg = "commit_timeout_seconds must be positive"
+            raise ValueError(msg)
+        if hash_lookup_timeout_seconds <= 0:
+            msg = "hash_lookup_timeout_seconds must be positive"
             raise ValueError(msg)
         self._working_directory = working_directory
-        self._timeout_seconds = timeout_seconds
+        self._commit_timeout_seconds = commit_timeout_seconds
+        self._hash_lookup_timeout_seconds = hash_lookup_timeout_seconds
         self._runner = runner or run_git_command
         self._verbose_diagnostics = verbose_diagnostics
 
@@ -61,7 +67,10 @@ class GitCommitSubprocessCreator:
             message_file_path = Path(temp_directory) / "COMMIT_EDITMSG"
             message_file_path.write_text(command.message, encoding="utf-8")
 
-            result, duration_seconds = self._run_git(git_commit_file_argv(str(message_file_path)))
+            result, duration_seconds = self._run_git(
+                git_commit_file_argv(str(message_file_path)),
+                timeout_seconds=self._commit_timeout_seconds,
+            )
             stderr = self._decode(result.stderr)
             if result.returncode != 0:
                 raise self._non_zero_error(
@@ -72,7 +81,10 @@ class GitCommitSubprocessCreator:
 
     def _load_short_hash(self) -> str | None:
         try:
-            result, _duration_seconds = self._run_git(GIT_REV_PARSE_SHORT_HEAD_ARGV)
+            result, _duration_seconds = self._run_git(
+                GIT_REV_PARSE_SHORT_HEAD_ARGV,
+                timeout_seconds=self._hash_lookup_timeout_seconds,
+            )
             if result.returncode != 0:
                 return None
             short_hash = self._decode(result.stdout).strip()
@@ -80,13 +92,13 @@ class GitCommitSubprocessCreator:
             return None
         return short_hash or None
 
-    def _run_git(self, argv: Sequence[str]) -> tuple[GitCommandResult, float]:
+    def _run_git(self, argv: Sequence[str], *, timeout_seconds: float) -> tuple[GitCommandResult, float]:
         started = monotonic()
         try:
             result = self._runner(
                 argv,
                 cwd=self._working_directory,
-                timeout_seconds=self._timeout_seconds,
+                timeout_seconds=timeout_seconds,
             )
         except FileNotFoundError as err:
             raise self._commit_error(

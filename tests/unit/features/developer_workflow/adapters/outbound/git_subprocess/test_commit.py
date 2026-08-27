@@ -16,6 +16,7 @@ from fabrica.features.developer_workflow.application.ports import GitCommitError
 
 GIT_COMMIT_FILE_ARGC = 5
 TEST_TIMEOUT_SECONDS = 2.5
+TEST_HASH_LOOKUP_TIMEOUT_SECONDS = 1.5
 
 
 @dataclass
@@ -51,7 +52,8 @@ def test_adapter_invokes_git_commit_file_command_with_exact_message() -> None:
 
     result = GitCommitSubprocessCreator(
         working_directory=Path("repo"),
-        timeout_seconds=TEST_TIMEOUT_SECONDS,
+        commit_timeout_seconds=TEST_TIMEOUT_SECONDS,
+        hash_lookup_timeout_seconds=TEST_HASH_LOOKUP_TIMEOUT_SECONDS,
         runner=runner,
     ).create_commit(CreateGitCommitCommand(message=message))
 
@@ -63,7 +65,7 @@ def test_adapter_invokes_git_commit_file_command_with_exact_message() -> None:
     assert runner.calls[1] == (
         ("git", "--no-pager", "rev-parse", "--short", "HEAD"),
         Path("repo"),
-        TEST_TIMEOUT_SECONDS,
+        TEST_HASH_LOOKUP_TIMEOUT_SECONDS,
     )
     assert runner.observed_message_files[0][1] == message
 
@@ -174,6 +176,11 @@ def test_adapter_returns_success_without_hash_when_hash_lookup_start_fails() -> 
     assert result == GitCommitResult(short_hash=None)
 
 
-def test_adapter_rejects_non_positive_timeout() -> None:
-    with pytest.raises(ValueError, match="positive"):
-        GitCommitSubprocessCreator(timeout_seconds=0)
+def test_adapter_rejects_non_positive_commit_timeout() -> None:
+    with pytest.raises(ValueError, match="commit_timeout_seconds"):
+        GitCommitSubprocessCreator(commit_timeout_seconds=0)
+
+
+def test_adapter_rejects_non_positive_hash_lookup_timeout() -> None:
+    with pytest.raises(ValueError, match="hash_lookup_timeout_seconds"):
+        GitCommitSubprocessCreator(hash_lookup_timeout_seconds=0)
