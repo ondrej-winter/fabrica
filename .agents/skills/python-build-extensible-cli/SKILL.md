@@ -2,9 +2,15 @@
 name: python-build-extensible-cli
 description: Build or refactor an extensible product CLI for a Python hexagonal vertical-slice project, with a feature-neutral shell, feature-owned command contributions, bootstrap-owned composition, stable exit semantics, and tests. Use when multiple feature slices need to contribute commands without leaking parser or process concerns into application or domain code.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   dependencies:
-    tools: []
+    tools:
+      - name: uv
+        purpose: Run the project's configured formatting, type-checking, test, and entrypoint checks.
+        required: false
+      - name: import-linter
+        purpose: Verify CLI-shell and feature-boundary import contracts when configured.
+        required: false
     skills:
       - name: python-add-adapter
         purpose: Add individual feature-owned inbound CLI adapters that call application ports.
@@ -69,6 +75,11 @@ not know feature behavior.
   environment/configuration access, registrar assembly, entrypoints, and optional
   test overrides.
 
+Keep the shell's public extension API intentionally small. Export command
+contracts such as `Command`, `CommandRegistry`, `CommandContext`, `UsageError`,
+and the shell runner, but keep parser construction, registry implementations,
+namespace splitting, and runtime invocation types private to the shell package.
+
 ## Steps
 
 ### 1. Confirm the CLI boundary
@@ -112,7 +123,8 @@ Good options:
 
 Document any intentional exception to normal dependency rules. If feature CLI
 adapters import a product CLI adapter package, keep the allowed surface tiny and
-consider an ADR with `write-adr`.
+consider an ADR with `write-adr`. Feature packages must not import shell parser,
+registry, runtime, or bootstrap implementation modules merely for convenience.
 
 The contract should usually include:
 
@@ -134,7 +146,8 @@ The shell should:
 - build the root parser and add global options once
 - create subparsers and pass a registry to feature registrars
 - validate command names, help text, duplicate registrations, and reserved parser
-  destinations before runtime
+  destinations before runtime, including destinations set through
+  `ArgumentParser.set_defaults()` or nested subparsers
 - parse argv exactly once
 - extract shell-owned values such as selected command and global options
 - remove shell-owned parser destinations before invoking feature decoders
@@ -164,9 +177,11 @@ src/<app_name>/features/<feature_name>/adapters/inbound/cli/
 Feature CLI adapters should:
 
 - register commands through the shell's `CommandRegistry` contract
-- configure only command-specific arguments and defaults
-- decode parsed values into frozen adapter-local command objects or application
-  DTOs
+- configure only command-specific arguments and defaults that do not mutate
+  shell-reserved destinations
+- decode parsed values into frozen adapter-local command objects. When bootstrap
+  needs CLI-derived composition settings, return an immutable parsed wrapper that
+  keeps the use-case command separate from adapter-local composition options.
 - convert repeated arguments to immutable containers such as tuples or frozensets
 - validate CLI-only values at the adapter boundary
 - call application inbound ports or application services through explicit
@@ -195,7 +210,9 @@ Bootstrap should:
   clear stderr diagnostic and documented exit code
 
 Expose the command through the project's normal script entrypoint, for example a
-`[project.scripts]` entry in `pyproject.toml`.
+`[project.scripts]` entry in `pyproject.toml`. When the package supports
+`python -m <app_name>`, make its `__main__.py` delegate to the same bootstrap
+`main()` function rather than duplicate CLI composition.
 
 ### 7. Test from the right boundaries
 
@@ -207,7 +224,8 @@ Add tests that prove behavior without coupling to implementation details:
 - feature CLI adapter tests for command registration, decoding, immutable command
   values, output mapping, and application-port calls with fakes
 - bootstrap or integration tests for registrar assembly, dependency overrides,
-  process entrypoint behavior, and selected-command lazy construction
+  process entrypoint behavior, selected-command lazy construction, and both the
+  installed console script and `python -m <app_name>` when both are supported
 - architecture tests or import-linter contracts proving the shell does not import
   features or bootstrap and feature slices import only the documented extension
   surface
@@ -253,8 +271,11 @@ When available, use `run-python-quality-gate` for the full validation pass.
 - Parser/framework/process types stay out of application and domain contracts.
 - Global options and command-specific options are separated.
 - Feature decoders receive only feature-owned parsed values.
-- Decoded command values are immutable snapshots of one invocation.
+- Decoded command values, repeated arguments, and composition options are
+  immutable snapshots of one invocation.
 - Registration errors and user usage errors have distinct exception paths.
+- Parser `SystemExit` is converted only around parser construction, parsing, and
+  decoding; runner-owned exits and unexpected failures are not silently hidden.
 - Help, mandatory root `--version`, usage, stdout, stderr, and exit-code behavior are tested.
 - Composition root owns environment/configuration lookup and concrete wiring.
 - Any intentional extension-surface dependency exception is documented and, when
@@ -267,6 +288,8 @@ When available, use `run-python-quality-gate` for the full validation pass.
   or framework request/response objects.
 - Feature adapters mutate or retain parser namespaces instead of decoding to
   immutable boundary values.
+- Feature parser configuration reuses shell-reserved destinations, including
+  through `set_defaults()` or nested subparsers.
 - Each feature parses argv independently, creating inconsistent global flags or
   help behavior.
 - Registration validation failures are reported like user input mistakes without
