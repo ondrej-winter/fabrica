@@ -5,6 +5,20 @@
 Define the model-facing and host-facing specification for a read-only
 `read_files` filesystem inspection tool.
 
+## Status
+
+**Status:** Accepted — ready for implementation planning.
+
+**Acceptance:** Confirmed on August 27, 2026.
+
+**Revision:** Audited against `.agents/skills/spec-driven-development/SKILL.md` on
+August 27, 2026.
+
+This document is the canonical source of truth for the proposed `read_files`
+tool contract. A later implementation plan must preserve its requirements,
+constraints, boundaries, and success criteria. It must be updated and
+re-confirmed if those items change materially.
+
 The tool is for autonomous coding agents that need one preferred primitive for
 reading known workspace files, reading inclusive line ranges, paging through
 large files, batching independent reads, and inspecting supported images when the
@@ -36,8 +50,9 @@ explicit metadata about any content it did not receive.
 - Canonical model-facing paths are workspace-relative, not absolute.
 - The host can provide a canonical workspace root, model image-capability
   information, cancellation signals, timeout configuration, and retry policy.
-- Version 1 supports UTF-8 and UTF-8 BOM text. UTF-16 LE/BE may be added when it
-  can be detected reliably.
+- Version 1 supports UTF-8 and UTF-8 BOM text only. UTF-16 LE/BE is explicitly
+  rejected with `UNSUPPORTED_ENCODING` until a later accepted revision adds
+  decoding and test coverage.
 - Documentation-only changes should be reviewed for clarity and consistency;
   implementation changes will require tests and the project quality gate.
 
@@ -188,15 +203,25 @@ Reject by default:
 - symlink escapes;
 - paths that resolve outside the workspace.
 
-An embedding application may explicitly enable external reads with a host-owned
-permission such as `allow_external_reads = true`, but this must not be controlled
-by the model.
+The runtime host or composition root may authorize external reads per invocation
+with a host-owned capability or policy such as `allow_external_reads = true`.
+This decision must be made from explicit policy and audit context; it must not be
+controlled by the model or implemented inside the read-files core.
 
 Symlinks may be followed only when the final canonical target remains inside the
 permitted workspace. Containment must be checked against the final
 filesystem-resolved path, not only the lexical path.
 
-Unicode filename tolerance may be supported carefully:
+The containment check must apply to the same filesystem object that is opened and
+read. The implementation must defend against time-of-check/time-of-use replacement
+races, such as a workspace-contained file being replaced with an escaping symlink
+after validation. Prefer descriptor-relative, no-follow filesystem APIs when the
+platform supports them. Otherwise, revalidate the opened object immediately and
+fail closed if its identity or containment changed.
+
+Unicode-normalized filename fallback is disabled by default. A host may enable it
+only through an explicit compatibility setting. When enabled, it may be supported
+carefully:
 
 1. attempt exact path resolution;
 2. only if it fails, optionally attempt Unicode-normalized matching;
@@ -204,7 +229,8 @@ Unicode filename tolerance may be supported carefully:
 4. report the actual resolved path.
 
 The implementation must never heuristically choose among multiple similar
-filenames.
+filenames. If Unicode-normalized matching yields multiple candidates, reject the
+request as ambiguous rather than selecting a candidate.
 
 ## Range semantics
 
@@ -290,6 +316,10 @@ A truncated line should render as:
 The result must include structured truncation metadata. Truncation must never be
 silent.
 
+Per-line truncation and pagination are distinct: truncating a long line does not
+by itself make a read incomplete when EOF is reached. In that case, `complete`
+remains `true` and `truncated_lines` identifies every partially returned line.
+
 ## Structured result contract
 
 Top-level result:
@@ -322,8 +352,10 @@ For long individual lines, include their line numbers:
 }
 ```
 
-If output is capped, `complete` must be `false` and `next_start_line` must point
-to the line the model should request next when continuing pagination.
+If output is capped before the requested range or EOF is reached, `end_line` must
+be the final line actually returned, `complete` must be `false`, and
+`next_start_line` must point to the next unread line. The implementation must not
+silently continue across internal pages to satisfy the original request.
 
 If the total line count is unknown or approximate:
 
@@ -404,7 +436,10 @@ lines.
 The model benefits from total-line metadata, but counting every remaining line in
 a huge file can make a small read unexpectedly expensive.
 
-Recommended metadata scan ceiling:
+Version 1 must always honor this metadata scan ceiling; it must not scan an
+otherwise eligible small file fully merely to make `total_lines` exact.
+
+Metadata scan ceiling:
 
 ```text
 MAX_METADATA_SCAN_LINES = 50,000
@@ -440,7 +475,9 @@ MAX_FILES_PER_CALL = 20
 MAX_PARALLEL_READS = 8
 ```
 
-Batch results must preserve request ordering.
+Batch results must preserve request ordering, irrespective of completion order.
+Implementations should associate each request with its original index and place
+completed results into that index before formatting the response.
 
 Partial failures must not fail the entire batch. If A succeeds, B fails, and C
 succeeds, the result must contain success for A, failure for B, and success for C
@@ -527,9 +564,11 @@ If the active model supports image input, an image result should be:
 }
 ```
 
-The runtime should send bytes to the provider using its native image-content
+The core result must use a provider-neutral `ImageContent` value containing
+verified image bytes and metadata, including the source path and media type.
+Provider adapters must convert that value into the provider's native image-content
 representation rather than exposing base64 text to the model. Base64, if needed,
-must remain an implementation detail.
+must remain an adapter implementation detail.
 
 Recommended maximum:
 
@@ -578,7 +617,8 @@ Version 1 should support:
 - UTF-8;
 - UTF-8 BOM.
 
-UTF-16 LE/BE may be supported when detected reliably.
+UTF-16 LE/BE is unsupported in Version 1 and must be rejected with
+`UNSUPPORTED_ENCODING`.
 
 The reader must not silently replace extensive invalid byte sequences and pretend
 the content was read correctly. If decoding fails:
@@ -599,7 +639,10 @@ Cancellation must:
 - stop streaming;
 - close file handles;
 - cancel remaining queued reads;
-- return promptly.
+- return promptly with a `READ_CANCELLED` outcome for affected work.
+
+Cancellation cleanup must complete before the tool returns: active streams stop,
+open handles close, and queued work must not begin after cancellation is observed.
 
 Recommended defaults:
 
@@ -758,19 +801,27 @@ read_image_file(request, context)
 The reader must know nothing about LLM provider-specific JSON schemas. Provider
 adaptation happens one layer above or below it as appropriate.
 
-Likely future implementation ownership:
+Implementation ownership follows the same pattern as `apply_patch` and its
+`workspace_editing` slice:
 
 - Spec: `docs/specs/read-files-tool.md`.
-- Runtime tool contracts and DTOs: under
-  `src/fabrica/features/agent_runtime/application/` if exposed as a model-callable
-  runtime tool.
+- Read capability source, application DTOs, ports, and use cases:
+  `src/fabrica/features/workspace_reading/`.
 - Filesystem reading, path resolution, streaming, MIME detection, and provider
-  image conversion: adapter or infrastructure code, not domain or application
-  core.
-- Unit tests: mirrored under `tests/unit/` for validator, path resolver,
-  classifier, limiter, formatter, and text/image reader behavior.
-- Integration tests: under `tests/integration/` for real filesystem behavior,
-  symlink containment, streaming, cancellation, and timeout checks.
+  image conversion: outbound adapters in `workspace_reading`, not domain or
+  application core.
+- Runtime registered-tool adapter: an adapter or composition component that
+  exposes the `workspace_reading` inbound port through `agent_runtime` without
+  leaking filesystem or provider details into the runtime core.
+- Bootstrap/composition: supplies the workspace root, per-invocation external-read
+  capability or policy, cancellation/deadline configuration, and model/provider
+  image-capability information.
+- Unit tests: mirrored under `tests/unit/features/workspace_reading/` for
+  validator, path resolver, classifier, limiter, formatter, and text/image reader
+  behavior.
+- Integration tests: under `tests/integration/features/workspace_reading/` for
+  real filesystem behavior, symlink containment, streaming, cancellation, and
+  timeout checks.
 
 Implementation must preserve hexagonal boundaries: domain and application code
 must not perform filesystem I/O directly, and provider-specific multimodal
@@ -847,13 +898,18 @@ Required future acceptance tests include the following scenarios.
 - More than 48,000 output characters.
 - Individual line over 2,000 characters.
 - Multiple oversized lines.
-- Pagination produces the correct `next_start_line`.
+- Pagination produces the correct `next_start_line` and reports the final returned
+  `end_line`, rather than the requested `end_line`, when an output cap intervenes.
+- A line truncated by `MAX_LINE_CHARS` is visibly marked and listed in
+  `truncated_lines` while `complete` remains `true` if EOF is reached.
 
 ### Batch behavior
 
 - All files succeed.
 - One file fails and others succeed.
-- Request ordering is preserved in the result.
+- Request ordering is preserved in the result even when completion order differs.
+- Cancellation stops active streams, closes handles, and prevents queued reads from
+  starting.
 - Concurrency cap is enforced.
 
 ### Paths
@@ -863,6 +919,8 @@ Reject:
 - `../foo`;
 - absolute paths;
 - symlink escaping workspace;
+- a file replaced by an escaping symlink between validation and open;
+- ambiguous Unicode-normalized fallback candidates;
 - directory path.
 
 Allow:
@@ -919,15 +977,24 @@ model-callable runtime adapter.
 - Always keep filesystem reads bounded, line-numbered, and explicit about
   truncation.
 - Always resolve paths relative to a configured workspace root and verify final
-  canonical containment.
+  canonical containment for the filesystem object actually opened and read.
+- Always reject ambiguous Unicode-normalized path fallback results rather than
+  guessing a filename.
 - Always keep image provider adaptation outside the core reader contract.
-- Always return independent per-file results in request order.
-- Ask before enabling model-controlled external reads, broad compatibility input
-  shapes in the public schema, non-UTF-8 encodings beyond reliable BOM detection,
-  or unbounded concurrency.
+- Always return independent per-file results in request order, irrespective of
+  concurrent completion order.
+- Always keep external-read authorization in the runtime host or composition root;
+  the core receives only an already-authorized capability or policy.
+- Always keep Unicode-normalized path fallback disabled unless the host explicitly
+  enables its compatibility setting.
+- Always enforce the 50,000-line metadata scan ceiling, including for narrow reads
+  of otherwise small files.
+- Ask before adding non-UTF-8 encodings, broad compatibility input shapes in the
+  public schema, or unbounded concurrency.
 - Never read directories through `read_files`.
 - Never expose arbitrary binary or base64 data as model-visible text.
-- Never silently truncate output.
+- Never silently truncate output or silently continue pagination beyond an output
+  cap.
 - Never automatically page through an entire large file.
 - Never allow paths to escape the configured workspace through absolute paths,
   parent traversal, or symlinks.
@@ -941,31 +1008,42 @@ model-callable runtime adapter.
 - The path model includes workspace containment, absolute-path rejection,
   traversal rejection, symlink escape protection, and optional host-controlled
   external-read permission.
-- The text output model includes default line numbers, UTF-8-oriented decoding,
-  streaming, file-size limits, per-line limits, per-file output limits,
-  structured truncation metadata, pagination, and total-line exactness metadata.
+- The text output model includes default line numbers, UTF-8/UTF-8-BOM decoding,
+  explicit rejection of UTF-16 LE/BE, streaming, file-size limits, per-line
+  limits, per-file output limits, structured truncation metadata, pagination, and
+  total-line exactness metadata bounded by a 50,000-line metadata scan ceiling.
 - The batch model includes partial success, request-order preservation, bounded
   batch size, and bounded concurrency.
 - The image model includes supported formats, model capability checks, image size
-  limits, native multimodal delivery, and magic-byte validation.
+  limits, provider-neutral `ImageContent`, adapter-owned native multimodal
+  delivery, and magic-byte validation.
 - The runtime model includes cancellation, timeouts, selective retry, and stable
   error codes.
-- The architecture separates validation, path resolution, classification,
-  text/image reading, output limiting, formatting, and provider adaptation.
+- The `workspace_reading` slice owns the capability and separates validation, path
+  resolution, classification, text/image reading, output limiting, formatting,
+  and provider adaptation; `agent_runtime` exposes it as a model-callable tool.
 - Future acceptance tests are explicit enough to drive implementation.
 
-## Open questions
+## Resolved decisions
 
-- Should Version 1 support UTF-16 LE/BE text files, or should it reject them until
-  explicit implementation and tests are added?
-- Which host component should own `allow_external_reads`, if any workflow ever
-  needs external reads?
-- Should Unicode-normalized filename fallback be enabled by default or only behind
-  a compatibility flag?
-- What provider abstraction should carry native image content without exposing
-  base64 as model-visible text?
-- Should total-line counting be exact for small files even when the requested
-  range is narrow, or should the metadata scan ceiling always govern cost?
-- Should the read-files implementation live inside the `agent_runtime` slice, a
-  dedicated feature slice, or a shared infrastructure package once multiple
-  workflows need it?
+1. **Version 1 text encoding:** Support UTF-8 and UTF-8 BOM only. Reject UTF-16
+   LE/BE with `UNSUPPORTED_ENCODING` until a later accepted revision adds support.
+2. **External-read authorization:** The runtime host or composition root owns
+   per-invocation external-read authorization. The read-files core receives only
+   an already-authorized capability or policy.
+3. **Unicode-normalized fallback:** Disable it by default. Permit it only through
+   an explicit host compatibility setting, and reject ambiguous matches.
+4. **Native image content:** The core returns provider-neutral `ImageContent`
+   containing verified bytes and metadata. Provider adapters create native
+   multimodal message parts; base64 is never model-visible result text.
+5. **Total-line cost policy:** Always honor `MAX_METADATA_SCAN_LINES = 50,000`.
+   Return exact totals only when EOF is reached within that bounded scan.
+6. **Implementation ownership:** Create a dedicated
+   `src/fabrica/features/workspace_reading/` slice, mirroring the
+   `workspace_editing` ownership pattern for `apply_patch`. `agent_runtime`
+   exposes its application port as the model-callable tool, and developer
+   workflows consume that runtime registration rather than owning filesystem
+   behavior.
+
+No blocking questions remain. This accepted specification is ready for
+implementation planning.
