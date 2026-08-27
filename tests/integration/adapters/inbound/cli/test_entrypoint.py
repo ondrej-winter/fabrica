@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+from importlib.metadata import version
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -23,6 +24,18 @@ def test_console_script_help_is_offline_and_lists_explicit_script_execution_comm
     result = _run_console_script("--help")
 
     _assert_help_result(result)
+
+
+def test_root_module_entrypoint_version_matches_installed_distribution() -> None:
+    result = _run_module_entrypoint("--version")
+
+    _assert_version_result(result)
+
+
+def test_console_script_version_matches_installed_distribution() -> None:
+    result = _run_console_script("--version")
+
+    _assert_version_result(result)
 
 
 def test_root_module_entrypoint_dispatches_script_policy_through_bootstrap_without_execution(tmp_path: Path) -> None:
@@ -86,6 +99,12 @@ def _assert_help_result(result: subprocess.CompletedProcess[str]) -> None:
     assert "commit-message" in result.stdout
     assert "script-policy" in result.stdout
     assert "script-execute" in result.stdout
+    assert result.stderr == ""
+
+
+def _assert_version_result(result: subprocess.CompletedProcess[str]) -> None:
+    assert result.returncode == 0
+    assert result.stdout == f"fabrica {version('fabrica')}\n"
     assert result.stderr == ""
 
 

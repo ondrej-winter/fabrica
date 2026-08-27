@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import FrozenInstanceError, dataclass
+from importlib.metadata import version
 from io import StringIO
 from typing import TYPE_CHECKING, Any, TextIO, cast, get_type_hints
 
@@ -114,6 +115,23 @@ class RecordingHandlers:
             composition_options=composition_options,
         )
         return 0
+
+
+def test_run_cli_version_writes_package_version_to_stdout_and_exits_successfully() -> None:
+    stdout = StringIO()
+    stderr = StringIO()
+
+    exit_code = run_product_cli(
+        ("--version",),
+        command_registrars=(_register_synthetic_command,),
+        stdin=StringIO(),
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert stdout.getvalue() == f"fabrica {version('fabrica')}\n"
+    assert stderr.getvalue() == ""
 
 
 def test_run_cli_round_trips_bound_handler() -> None:

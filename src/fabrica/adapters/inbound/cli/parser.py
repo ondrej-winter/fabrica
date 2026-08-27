@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import argparse
 import sys
+from importlib.metadata import version
 from typing import TYPE_CHECKING, Never, Protocol, TextIO
 
 from fabrica.adapters.inbound.cli.command import CommandRegistrar, RegistrationError
 from fabrica.adapters.inbound.cli.destinations import COMMAND_DEST
 from fabrica.adapters.inbound.cli.options import add_global_options
 from fabrica.adapters.inbound.cli.registry import ArgparseCommandRegistry
+
+DISTRIBUTION_NAME = "fabrica"
+
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -39,6 +43,14 @@ class StreamArgumentParser(argparse.ArgumentParser):
         self.stdout = stdout if stdout is not None else sys.stdout
         self.stderr = stderr if stderr is not None else sys.stderr
 
+    def _print_message(self, message: str, file: TextWriter | None = None) -> None:
+        """Route argparse process-global message streams to bound streams."""
+        if file is sys.stdout:
+            file = getattr(self, "stdout", sys.stdout)
+        elif file is sys.stderr:
+            file = getattr(self, "stderr", sys.stderr)
+        super()._print_message(message, file)
+
     def print_help(self, file: TextWriter | None = None) -> None:
         """Print help to the bound stdout when no file is supplied."""
         super().print_help(file or getattr(self, "stdout", sys.stdout))
@@ -53,9 +65,10 @@ class StreamArgumentParser(argparse.ArgumentParser):
         self.exit(2, f"{self.prog}: error: {message}\n")
 
     def exit(self, status: int = 0, message: str | None = None) -> Never:
-        """Raise ``SystemExit`` after routing exit messages to bound stderr."""
+        """Raise ``SystemExit`` after routing exit messages to the bound stream."""
         if message:
-            getattr(self, "stderr", sys.stderr).write(message)
+            stream = getattr(self, "stdout", sys.stdout) if status == 0 else getattr(self, "stderr", sys.stderr)
+            stream.write(message)
         raise SystemExit(status)
 
 
@@ -97,6 +110,12 @@ def build_parser(
         description="Run local Fabrica workflows.",
     )
     parser.bind_streams(stdout=stdout, stderr=stderr)
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {version(DISTRIBUTION_NAME)}",
+        help="Show version information and exit.",
+    )
     add_global_options(parser)
     subparsers = parser.add_subparsers(
         dest=COMMAND_DEST,

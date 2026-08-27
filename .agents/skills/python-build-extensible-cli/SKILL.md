@@ -129,6 +129,8 @@ Keep the shell independent of feature slices and bootstrap composition.
 
 The shell should:
 
+- **Must** expose a root `--version` option that prints the installed distribution version to stdout, exits successfully, and does not require a subcommand
+- **Must** source `--version` from canonical package metadata rather than duplicating a version literal in CLI code
 - build the root parser and add global options once
 - create subparsers and pass a registry to feature registrars
 - validate command names, help text, duplicate registrations, and reserved parser
@@ -199,9 +201,9 @@ Expose the command through the project's normal script entrypoint, for example a
 
 Add tests that prove behavior without coupling to implementation details:
 
-- shell unit tests for help routing, usage errors, duplicate registration,
-  reserved destinations, namespace isolation, explicit streams, and exit-code
-  conversion
+- shell unit tests for help and mandatory version routing, usage errors, duplicate
+  registration, reserved destinations, namespace isolation, explicit streams, and
+  exit-code conversion
 - feature CLI adapter tests for command registration, decoding, immutable command
   values, output mapping, and application-port calls with fakes
 - bootstrap or integration tests for registrar assembly, dependency overrides,
@@ -218,7 +220,7 @@ Use `write-pytest-tests` for focused pytest mechanics.
 
 Document user-visible CLI behavior in the README or command reference:
 
-- invocation examples
+- invocation examples, including the mandatory root `--version` option
 - global option placement rules
 - command-specific flags
 - stdin/stdout/stderr expectations
@@ -253,7 +255,7 @@ When available, use `run-python-quality-gate` for the full validation pass.
 - Feature decoders receive only feature-owned parsed values.
 - Decoded command values are immutable snapshots of one invocation.
 - Registration errors and user usage errors have distinct exception paths.
-- Help, usage, stdout, stderr, and exit-code behavior are tested.
+- Help, mandatory root `--version`, usage, stdout, stderr, and exit-code behavior are tested.
 - Composition root owns environment/configuration lookup and concrete wiring.
 - Any intentional extension-surface dependency exception is documented and, when
   possible, enforced by import-boundary tooling.

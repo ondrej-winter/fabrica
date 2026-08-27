@@ -916,6 +916,9 @@ argparse.Namespace
 
 Global flags therefore remain shell-owned, are passed to runners through
 `CommandContext.global_options`, and must be supplied before the subcommand.
+The root CLI also provides `fabrica --version`, which prints the installed
+`fabrica` distribution version to stdout and exits successfully without selecting
+a subcommand.
 
 ```python
 from argparse import ArgumentParser, Namespace

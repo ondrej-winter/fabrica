@@ -141,6 +141,17 @@ class UsageError(Exception):
 Use project-specific global options and command fields. Avoid copying fields that
 are not part of the target product's CLI contract.
 
+## Mandatory version option
+
+Every product CLI built with this pattern **must** provide a root `--version`
+option. It must print the executable name and installed distribution version to
+stdout, exit with status 0, and work without a selected subcommand. Source the
+value from canonical package metadata, such as `importlib.metadata.version`, so
+release tooling and CLI output cannot drift through duplicated literals.
+
+For `argparse`, prefer its built-in `version` action on the root parser. Cover the
+shell behavior and each installed process entrypoint with tests.
+
 ## Namespace isolation
 
 The shell should reserve parser destinations for shell-owned concerns such as the
@@ -165,6 +176,7 @@ Define the target project's exact matrix. A common shape is:
 | Case | Owner | Behavior |
 | --- | --- | --- |
 | Help requested | Shell/parser | Write help to stdout and return 0 |
+| Version requested | Shell/parser | Write installed distribution version to stdout and return 0 without requiring a subcommand |
 | Invalid CLI syntax | Shell/parser | Write usage diagnostic to stderr and return 2 |
 | Invalid decoded user value | Feature decoder plus shell | Raise usage error and route through parser usage path |
 | Invalid registration | Shell/bootstrap | Raise registration error; process boundary writes stderr and returns configuration error code |
@@ -215,6 +227,7 @@ and the approved modules in project documentation or an ADR.
 Useful tests include:
 
 - root help uses stdout and exits successfully
+- root `--version` reports canonical installed package metadata on stdout and exits successfully without a subcommand
 - missing subcommand and invalid flags use stderr and return the usage exit code
 - global flags are accepted only where documented
 - duplicate command names fail registration
