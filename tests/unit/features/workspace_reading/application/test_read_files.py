@@ -174,6 +174,40 @@ def test_read_files_cancels_active_work_and_suppresses_queue_after_tool_deadline
     )
 
 
+def test_read_files_translates_adapter_os_error_when_retry_is_disabled() -> None:
+    request = ReadFileRequest("src/error.py")
+    reader = SequencedReader({request.path: (OSError(),)})
+
+    outcome = asyncio.run(
+        ReadFiles(reader).read(ReadFilesCommand((request,)), _context(limits=ReadFilesLimits(max_retries=0)))
+    ).results[0]
+
+    assert isinstance(outcome, ReadFileFailure)
+    assert outcome.error.code is ReadFileErrorCode.IO_ERROR
+    assert outcome.error.metadata == {"transient": True}
+
+
+def test_read_files_uses_an_expired_host_deadline_to_suppress_the_entire_queue() -> None:
+    requests = (ReadFileRequest("src/first.py"), ReadFileRequest("src/second.py"))
+    reader = SequencedReader({request.path: (_success(request),) for request in requests})
+    context = WorkspaceReadContext(
+        external_read_authorized=True,
+        image_input_supported=False,
+        cancellation=MutableCancellation(),
+        deadline_at=datetime.now(UTC) - timedelta(seconds=1),
+        limits=ReadFilesLimits(),
+    )
+
+    results = asyncio.run(ReadFiles(reader).read(ReadFilesCommand(requests), context)).results
+
+    assert all(isinstance(result, ReadFileFailure) for result in results)
+    assert tuple(result.error.code for result in results if isinstance(result, ReadFileFailure)) == (
+        ReadFileErrorCode.READ_TIMEOUT,
+        ReadFileErrorCode.READ_TIMEOUT,
+    )
+    assert reader.calls == {}
+
+
 def _context(
     *,
     cancellation: MutableCancellation | None = None,

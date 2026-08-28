@@ -108,9 +108,9 @@ explicitly marked not applicable with a reason.
   - [x] **T6.A1** Batch results retain request order and isolate individual failures.
   - [x] **T6.V1** Scheduler, cancellation, timeout, and retry tests pass.
   - [ ] **T6.V2** Real helper-process cancellation and timeout cleanup integration tests pass.
-- [ ] **T7** Implement verified provider-neutral image reading.
-  - [ ] **T7.A1** Only supported, verified images are returned as `ImageContent`.
-  - [ ] **T7.V1** Image format, capability, magic-byte, and size tests pass.
+- [x] **T7** Implement verified provider-neutral image reading.
+  - [x] **T7.A1** Only supported, verified images are returned as `ImageContent`.
+  - [x] **T7.V1** Image format, capability, magic-byte, and size tests pass.
 - [ ] **T8** Add the canonical `read_files` registered-tool adapter.
   - [ ] **T8.A1** The adapter exposes only the specified tool schema and maps outcomes safely.
   - [ ] **T8.V1** Adapter schema, validation, and outcome-mapping tests pass.
@@ -463,13 +463,13 @@ termination, and bounded join; a helper owns one isolated filesystem read attemp
 
 **Acceptance criteria:**
 
-- [ ] **T7.A1** Unsupported, oversized, fake-extension, and image-input-disabled
+- [x] **T7.A1** Unsupported, oversized, fake-extension, and image-input-disabled
   cases return stable errors without falling back to text.
-- [ ] **T7.A2** No core DTO or port refers to a provider-native multimodal type.
+- [x] **T7.A2** No core DTO or port refers to a provider-native multimodal type.
 
 **Verification:**
 
-- [ ] **T7.V1** Add unit/integration coverage for PNG, JPEG, GIF, WebP, invalid
+- [x] **T7.V1** Add unit/integration coverage for PNG, JPEG, GIF, WebP, invalid
   magic bytes, capability denial, and image size denial.
 
 ### T8. Add the canonical `read_files` registered-tool adapter
