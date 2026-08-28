@@ -98,8 +98,8 @@ explicitly marked not applicable with a reason.
   - [ ] **P0.A1** Generic runtime contracts represent canonical bounded immutable nested JSON arguments and ordered provider-neutral text/image content parts.
   - [ ] **P0.V1** Agent-runtime and PydanticAI regression tests cover bounds, canonical argument digests, nested mapping, and multipart returns before `read_files` runtime exposure begins.
 - [ ] **T4** Implement capability-gated secure POSIX path resolution and file classification.
-  - [ ] **T4.A1** Open-time containment rejects traversal and escaping symlinks.
-  - [ ] **T4.V1** Real-filesystem containment and classification integration tests pass.
+  - [x] **T4.A1** Open-time containment rejects traversal and escaping symlinks.
+  - [x] **T4.V1** Real-filesystem containment and classification integration tests pass.
 - [ ] **T5** Implement streamed UTF-8 text reads and bounded total-line metadata.
   - [ ] **T5.A1** Text reads respect file, line, output, and metadata scan limits.
   - [ ] **T5.V1** Text streaming, encoding, range, and pagination tests pass.
