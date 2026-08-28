@@ -104,10 +104,10 @@ explicitly marked not applicable with a reason.
   - [x] **T5.A1** Text reads respect file, line, output, and metadata scan limits.
   - [x] **T5.V1** Text streaming, encoding, range, and pagination tests pass.
 - [x] **C2** Secure text-read checkpoint: T4–T5 complete before runtime exposure.
-- [ ] **T6** Implement supervised helper-process batch execution, cancellation, deadlines, and retry.
+- [x] **T6** Implement supervised helper-process batch execution, cancellation, deadlines, and retry.
   - [x] **T6.A1** Batch results retain request order and isolate individual failures.
   - [x] **T6.V1** Scheduler, cancellation, timeout, and retry tests pass.
-  - [ ] **T6.V2** Real helper-process cancellation and timeout cleanup integration tests pass.
+  - [x] **T6.V2** Real helper-process cancellation and timeout cleanup integration tests pass.
 - [x] **T7** Implement verified provider-neutral image reading.
   - [x] **T7.A1** Only supported, verified images are returned as `ImageContent`.
   - [x] **T7.V1** Image format, capability, magic-byte, and size tests pass.
@@ -431,17 +431,17 @@ termination, and bounded join; a helper owns one isolated filesystem read attemp
 
 **Acceptance criteria:**
 
-- [ ] **T6.A1** A mixed batch returns a corresponding ordered success/error
+- [x] **T6.A1** A mixed batch returns a corresponding ordered success/error
   result for every request.
-- [ ] **T6.A2** Cancellation and timeout cleanup complete before the tool returns.
-- [ ] **T6.A3** A blocked helper cannot outlive the documented bounded termination
+- [x] **T6.A2** Cancellation and timeout cleanup complete before the tool returns.
+- [x] **T6.A3** A blocked helper cannot outlive the documented bounded termination
   and join period, and a timeout or cancellation never starts queued work.
 
 **Verification:**
 
-- [ ] **T6.V1** Fake-port tests prove concurrency caps, ordering, partial
+- [x] **T6.V1** Fake-port tests prove concurrency caps, ordering, partial
   success, retry classification, and queued-work suppression.
-- [ ] **T6.V2** Integration tests verify large-stream cancellation and blocked
+- [x] **T6.V2** Integration tests verify large-stream cancellation and blocked
   read timeout cleanup, including helper termination and join.
 
 ### T7. Implement verified provider-neutral image reading
