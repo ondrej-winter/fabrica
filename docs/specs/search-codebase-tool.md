@@ -1,5 +1,15 @@
 # Spec: Search Codebase Tool
 
+## Status
+
+**Status:** Accepted — ready for implementation planning.
+
+**Acceptance:** Confirmed on August 28, 2026.
+
+**Revision:** Canonicalized against `.agents/skills/spec-driven-development/SKILL.md` on August 28, 2026.
+
+This document is the canonical source of truth for the accepted `search_codebase` tool contract. Any derived implementation plan and implementation must preserve its objective, requirements, constraints, boundaries, and success criteria. Material changes require this specification to be updated and re-confirmed.
+
 ## Objective
 
 Define the model-facing and host-facing specification for a read-only
@@ -21,8 +31,8 @@ implementation quirks.
 - Runtime direction is owned by `docs/specs/agent-runtime.md`.
 - Filesystem reading is owned by `docs/specs/read-files-tool.md`.
 - Filesystem mutation is owned by `docs/specs/apply-patch-tool.md`.
-- This spec defines the desired `search_codebase` tool contract only. It does not
-  implement the tool.
+- This spec defines the accepted `search_codebase` tool contract. The capability
+  is owned by `src/fabrica/features/workspace_searching/`.
 - `search_codebase` is the discovery counterpart to `read_files`: the model
   searches for relevant locations, reads the files that matter, reasons from
   source context, then applies patches or runs verification.
@@ -117,7 +127,8 @@ Canonical model-facing JSON schema:
             "minLength": 1
           },
           "glob": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "minLength": 1
           },
           "case_sensitive": {
             "type": "boolean"
@@ -163,7 +174,7 @@ Example:
 For Cline compatibility, a runtime adapter may accept non-canonical inputs such
 as `{ "queries": ["class\\s+UserService"] }`, a single string, or an array of
 strings, then normalize them to the canonical query object form. These shapes
-should not be advertised in the canonical schema.
+should not be advertised in the canonical schema or exposed to the search core.
 
 ## Model-facing description
 
@@ -294,6 +305,9 @@ meaning the workspace root.
 - a directory, searched recursively beneath it; or
 - an individual file, searched only as that file.
 
+`path` is always a literal workspace-relative scope; it is never shell-expanded
+or interpreted as a glob. Use `glob` to filter candidate files.
+
 Canonical paths must be workspace-relative. Reject:
 
 - absolute paths;
@@ -324,6 +338,9 @@ Default symlink behavior:
 ## File glob
 
 `glob` optionally limits candidate files within `path`.
+
+Version 1 uses documented ripgrep-compatible glob grammar. The tool evaluates
+that grammar itself; host-shell expansion must never influence search semantics.
 
 Examples:
 
@@ -394,9 +411,10 @@ docker/.env.example
 Use ripgrep-equivalent `--hidden` behavior while still respecting ignore rules
 and always excluding `.git/`.
 
-If `path` explicitly identifies a single ignored file, the explicit file path
-should override ordinary ignore filtering. Workspace-security restrictions still
-apply. A directory scope does not disable ignore rules.
+An ignored file is searchable only when `path` names that exact
+workspace-relative file path. The exact explicit path overrides ordinary ignore
+filtering, but workspace-security restrictions still apply. Directory scopes,
+glob-like `path` values, and `glob` filters do not disable ignore rules.
 
 ## File classification and size limits
 
@@ -485,21 +503,25 @@ A result should include structured context:
   "before": [
     {
       "line": 85,
-      "text": ""
+      "text": "",
+      "text_truncated": false
     },
     {
       "line": 86,
-      "text": "@injectable"
+      "text": "@injectable",
+      "text_truncated": false
     }
   ],
   "after": [
     {
       "line": 88,
-      "text": "    def __init__(self, repo):"
+      "text": "    def __init__(self, repo):",
+      "text_truncated": false
     },
     {
       "line": 89,
-      "text": "        self.repo = repo"
+      "text": "        self.repo = repo",
+      "text_truncated": false
     }
   ]
 }
@@ -530,8 +552,7 @@ If a matching line exceeds the cap:
 }
 ```
 
-Context lines should use the same cap and include equivalent truncation metadata
-if the result contract grows per-context-line truncation flags.
+Context lines must use the same cap and include `text_truncated: bool`.
 
 ## Output limits
 
@@ -574,12 +595,25 @@ results and mark subsequent ones:
 
 ```json
 {
+  "query": {
+    "pattern": "UserService\\(",
+    "path": ".",
+    "glob": null,
+    "case_sensitive": false
+  },
   "success": true,
   "matches": [],
+  "matches_returned": 0,
+  "limit_reached": false,
+  "output_truncated": false,
   "output_omitted": true,
-  "reason": "BATCH_OUTPUT_LIMIT"
+  "reason": "BATCH_OUTPUT_LIMIT",
+  "more_results_possible": true
 }
 ```
+
+An omitted result is not a no-match result: it did not receive a model-visible
+representation because the aggregate output budget was exhausted.
 
 Do not implement cursors or pagination in Version 1. When a query reaches a
 result or output limit, the preferred recovery is to narrow the regex, `path`, or
@@ -655,6 +689,31 @@ Failure example:
         "code": "INVALID_REGEX",
         "message": "Unclosed character class"
       }
+    }
+  ]
+}
+```
+
+Aggregate-output omission example:
+
+```json
+{
+  "results": [
+    {
+      "query": {
+        "pattern": "UserService\\(",
+        "path": ".",
+        "glob": null,
+        "case_sensitive": false
+      },
+      "success": true,
+      "matches": [],
+      "matches_returned": 0,
+      "limit_reached": false,
+      "output_truncated": false,
+      "output_omitted": true,
+      "reason": "BATCH_OUTPUT_LIMIT",
+      "more_results_possible": true
     }
   ]
 }
@@ -751,7 +810,11 @@ requested search path.
 
 ## Ripgrep execution guidance
 
-Recommended conceptual invocation:
+Version 1 must execute the bundled, pinned ripgrep binary only. It must not
+discover, validate, or fall back to a host-installed ripgrep binary. Packaging,
+startup validation, and conformance tests must target that pinned version.
+
+Conceptual invocation:
 
 ```bash
 rg \
@@ -1075,6 +1138,8 @@ Required future acceptance tests include the following scenarios.
 - 100-result cap.
 - 48,000-character query-output cap.
 - Aggregate batch-output cap.
+- Empty `glob` rejected at schema validation.
+- Aggregate-output omission is distinguishable from a completed no-match query.
 - No partial JSON or partial result objects.
 - `more_results_possible` correctly set.
 
@@ -1124,18 +1189,24 @@ before adding a model-callable runtime adapter.
 
 - Always treat `search_codebase` as textual regex search, not semantic search.
 - Always keep the canonical public schema as `{ "queries": [query objects] }`.
-- Always keep backend selection unobservable in search semantics.
+- Always use the bundled, pinned ripgrep binary for Version 1 search execution.
+- Always evaluate ripgrep-compatible `glob` values in the tool; never permit host
+  shell expansion to influence file selection.
 - Always reject empty patterns and invalid regexes explicitly.
 - Always resolve paths relative to a configured workspace root and verify final
   canonical containment.
 - Always return independent per-query results in request order.
 - Always keep results structured, bounded, and explicit about truncation or output
   omission.
+- Allow compatibility-only non-canonical input normalization only in the runtime
+  adapter; the public schema and search core must receive canonical query objects.
 - Always hydrate context through common logic rather than ripgrep-specific context
   event parsing.
-- Ask before introducing an indexed search layer, semantic search, model-visible
-  non-canonical input shapes, pagination, or a different canonical regex engine.
+- Ask before introducing an indexed search layer, semantic search, pagination, or
+  a different canonical regex engine.
 - Never silently change regex languages because a backend is unavailable.
+- Never discover, validate, or fall back to a host-installed ripgrep binary in
+  Version 1.
 - Never use Cline's `--max-count=1` per-file behavior.
 - Never buffer unbounded backend output before parsing.
 - Never allow search paths to escape the configured workspace through absolute
@@ -1149,34 +1220,44 @@ before adding a model-callable runtime adapter.
   query objects containing `pattern`, optional `path`, optional `glob`, and
   optional `case_sensitive`.
 - The path model includes workspace-relative paths, path/file scopes, glob
-  filtering, ignore semantics, hidden-file search, symlink containment, and
-  explicit ignored-file behavior.
+  filtering using tool-evaluated ripgrep-compatible grammar, ignore semantics,
+  hidden-file search, symlink containment, and exact explicit ignored-file
+  behavior.
 - The regex model is deterministic, line-oriented, case-insensitive by default,
   ReDoS-resistant, and explicit about invalid or empty patterns.
 - The result model includes one matching-line result per line, one-based
   line/column locations, Unicode-aware columns, deterministic ordering,
-  structured context, long-line protection, and stable error codes.
+  structured context with per-line truncation metadata, long-line protection, and
+  stable error codes.
 - The limit model includes per-query result caps, per-query output caps, aggregate
   batch caps, no partial result objects, and no pagination in Version 1.
 - The runtime model includes bounded concurrency, partial failures, cancellation,
   timeouts, selective retry, binary/oversized-file handling, and streaming backend
   parsing.
-- The architecture separates validation, path resolution, planning, backend
-  search, context hydration, result limiting, formatting, and provider adaptation.
+- The `workspace_searching` slice owns validation, path resolution, planning,
+  pinned-backend search, context hydration, result limiting, and formatting;
+  `agent_runtime` exposes its application port as the model-callable tool.
 - Future acceptance tests are explicit enough to drive implementation.
 
-## Open questions
+## Resolved decisions
 
-- Should Version 1 require bundled ripgrep, discover a host ripgrep binary, or
-  allow either as long as the same canonical regex semantics are guaranteed?
-- What exact glob grammar should be canonical if host platforms differ?
-- Should context-line truncation include per-context-line `text_truncated` flags
-  in the initial result contract, or is truncating context text sufficient until a
-  caller needs structured context truncation metadata?
-- Should ignored explicit files be searchable only when they are named exactly, or
-  also when a `path` names a glob-like single-file candidate through host
-  expansion? Version 1 should avoid shell expansion and prefer exact explicit
-  file paths.
-- Should the implementation live inside the `agent_runtime` slice, a dedicated
-  search feature slice, or a shared infrastructure package once multiple runtime
-  tools need the same workspace resolver and filesystem classification logic?
+1. **Search backend distribution:** Version 1 requires the bundled, pinned
+   ripgrep binary only. Host ripgrep discovery, validation, and fallback are out
+   of scope.
+2. **Canonical glob grammar:** `glob` uses documented ripgrep-compatible grammar
+   evaluated by the tool. Host-shell expansion is never part of the contract.
+3. **Context truncation metadata:** Every matching or context line includes
+   `text_truncated: bool` so callers can distinguish complete from clipped text.
+4. **Ignored explicit-file behavior:** Only an exact workspace-relative file path
+   in `path` can opt an ignored file into search. `path` is never glob-expanded.
+5. **Implementation ownership:** The dedicated
+   `src/fabrica/features/workspace_searching/` slice owns the capability, mirroring
+   `workspace_reading` and `workspace_editing`. `agent_runtime` registers its
+   application port as a model-callable tool. Extract shared infrastructure only
+   after concrete reuse demonstrates the need.
+
+## Acceptance and planning gate
+
+The user/maintainer confirmed the resolved decisions on August 28, 2026. Use
+`planning-and-task-breakdown` to create a separate derived implementation plan;
+that plan must not redefine this specification.
