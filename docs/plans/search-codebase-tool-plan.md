@@ -45,11 +45,11 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
   - [x] `T1-AC2` — Invalid input and empty patterns produce independent per-query failures without invalidating other batch entries; backend-classified invalid regexes and invalid globs have stable result representations reserved for T3.
   - [x] `T1-V1` — Focused DTO/validator tests pass.
   - [x] `T1-V2` — `uv run ruff check src/fabrica/features/workspace_searching tests/unit/features/workspace_searching` passes.
-- [ ] `T2` — Define and implement workspace-contained scope resolution plus a fail-closed subprocess-containment boundary.
-  - [ ] `T2-AC1` — Literal workspace-relative file/directory paths reject absolute paths, traversal, non-filesystem targets, missing paths, and symlink escapes.
-  - [ ] `T2-AC2` — The selected launch boundary prevents ripgrep from traversing outside the configured workspace for the subprocess lifetime, including after pathname/symlink races; unsupported hosts fail closed before spawning a backend.
-  - [ ] `T2-V1` — Focused scope and containment-design tests cover the accepted path matrix, launch preconditions, and race/escape regressions.
-  - [ ] `T2-V2` — POSIX integration tests prove an attempted post-validation escape cannot be searched and unsupported containment capabilities fail closed.
+- [x] `T2` — Define and implement workspace-contained scope resolution plus a fail-closed subprocess-containment boundary.
+  - [x] `T2-AC1` — Literal workspace-relative file/directory paths reject absolute paths, traversal, non-filesystem targets, missing paths, and symlink escapes.
+  - [x] `T2-AC2` — The selected launch boundary prevents ripgrep from traversing outside the configured workspace for the subprocess lifetime, including after pathname/symlink races; unsupported hosts fail closed before spawning a backend.
+  - [x] `T2-V1` — Focused scope and containment-design tests cover the accepted path matrix, launch preconditions, and race/escape regressions.
+  - [x] `T2-V2` — POSIX integration tests prove an attempted post-validation escape cannot be searched and unsupported containment capabilities fail closed.
 - [ ] `CP1` — Application contracts and the concrete subprocess-containment design are reviewed against the accepted spec before backend wiring; unresolved containment blocks T3.
 
 ### Phase 2: Pinned backend, context, limits, and scheduling
@@ -133,19 +133,19 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 **Task completion:**
 
-- [ ] `T2` — All required acceptance and verification items are resolved.
+- [x] `T2` — All required acceptance and verification items are resolved.
 
 **Description:** Implement search-specific workspace path resolution and a concrete, lifecycle-long containment mechanism for the ripgrep subprocess. A preflight canonical-path check, a file-only descriptor opener, or `rg --no-follow` alone is not sufficient because directory contents can change after validation. Select a supported POSIX mechanism that prevents all backend traversal outside the pinned workspace, document its ownership and failure mode, and fail closed before launch when the guarantee cannot be provided. Reuse or extract containment infrastructure only after the read/search use cases demonstrate a stable shared boundary; do not migrate `workspace_editing` merely for symmetry.
 
 **Acceptance criteria:**
 
-- [ ] `T2-AC1` — Literal workspace-relative file/directory paths reject absolute paths, traversal, non-filesystem targets, missing paths, and symlink escapes.
-- [ ] `T2-AC2` — The launch boundary prevents backend traversal outside the configured workspace for the complete subprocess lifetime, including pathname replacement and symlink-race attempts; unsupported hosts return `SEARCH_BACKEND_UNAVAILABLE` without spawning ripgrep.
+- [x] `T2-AC1` — Literal workspace-relative file/directory paths reject absolute paths, traversal, non-filesystem targets, missing paths, and symlink escapes.
+- [x] `T2-AC2` — The launch boundary prevents backend traversal outside the configured workspace for the complete subprocess lifetime, including pathname replacement and symlink-race attempts; unsupported hosts return `SEARCH_BACKEND_UNAVAILABLE` without spawning ripgrep.
 
 **Verification:**
 
-- [ ] `T2-V1` — Focused path/containment tests cover the accepted scope matrix, launch preconditions, and escape/race regressions.
-- [ ] `T2-V2` — POSIX integration tests prove an attempted post-validation escape cannot be searched and that unsupported containment capabilities fail closed.
+- [x] `T2-V1` — Focused path/containment tests cover the accepted scope matrix, launch preconditions, and escape/race regressions.
+- [x] `T2-V2` — POSIX integration tests prove an attempted post-validation escape cannot be searched and that unsupported containment capabilities fail closed.
 
 **Dependencies:** T1; accepted containment mechanism recorded in OQ1.
 

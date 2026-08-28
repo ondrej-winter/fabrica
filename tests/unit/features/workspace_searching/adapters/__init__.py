@@ -1,0 +1,1 @@
+"""Workspace-searching adapter tests."""

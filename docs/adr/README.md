@@ -8,3 +8,4 @@ This directory contains accepted architecture decisions for Fabrica.
 | [0002](./0002-use-typed-async-registered-tool-execution.md) | Use Typed Async Registered Tool Execution | 2026-08-23 | Accepted |
 | [0003](./0003-use-journaled-reversible-workspace-mutation-lifecycle.md) | Use Journaled Reversible Workspace Mutation Lifecycle | 2026-08-23 | Accepted |
 | [0004](./0004-use-bounded-multimodal-read-tool-runtime-contracts.md) | Use Bounded Multimodal Read Tool Runtime Contracts | 2026-08-28 | Accepted |
+| [0005](./0005-pin-workspace-search-subprocess-containment.md) | Pin Workspace Search Subprocess Containment | 2026-08-28 | Accepted |
