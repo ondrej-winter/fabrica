@@ -7,17 +7,18 @@ Define the model-facing and host-facing specification for a read-only
 
 ## Status
 
-**Status:** Accepted — ready for implementation planning.
+**Status:** Accepted and implemented.
 
 **Acceptance:** Confirmed on August 27, 2026.
 
 **Revision:** Audited against `.agents/skills/spec-driven-development/SKILL.md` on
 August 27, 2026.
 
-This document is the canonical source of truth for the proposed `read_files`
-tool contract. A later implementation plan must preserve its requirements,
-constraints, boundaries, and success criteria. It must be updated and
-re-confirmed if those items change materially.
+This document is the canonical source of truth for the implemented `read_files`
+tool contract. The `workspace_reading` slice, its registered-tool adapter, and
+its bootstrap composition must preserve these requirements, constraints,
+boundaries, and success criteria. Update and re-confirm this specification if
+they change materially.
 
 The tool is for autonomous coding agents that need one preferred primitive for
 reading known workspace files, reading inclusive line ranges, paging through
@@ -34,8 +35,8 @@ explicit metadata about any content it did not receive.
   `src/` layout and hexagonal architecture organized by vertical slices.
 - Runtime direction is owned by `docs/specs/agent-runtime.md`.
 - Filesystem mutation tool design is owned by `docs/specs/apply-patch-tool.md`.
-- This spec defines the desired `read_files` tool contract only. It does not
-  implement the tool.
+- This spec defines the implemented `read_files` tool contract. The capability
+  is owned by `src/fabrica/features/workspace_reading/`.
 - `read_files` is the read-side counterpart to `apply_patch`: the model reads
   bounded source context, reasons from stable line numbers, then applies
   contextual patches or asks for narrower ranges.
@@ -44,9 +45,8 @@ explicit metadata about any content it did not receive.
 
 - The primary caller is a model-driven coding agent operating inside a configured
   workspace root.
-- The default implementation target will be Python and should follow Fabrica's
-  feature-slice and hexagonal architecture conventions when implementation work
-  begins.
+- The Python implementation follows Fabrica's feature-slice and hexagonal
+  architecture conventions.
 - Canonical model-facing paths are workspace-relative, not absolute.
 - The host can provide a canonical workspace root, model image-capability
   information, cancellation signals, timeout configuration, and retry policy.
@@ -1022,7 +1022,7 @@ model-callable runtime adapter.
 - The `workspace_reading` slice owns the capability and separates validation, path
   resolution, classification, text/image reading, output limiting, formatting,
   and provider adaptation; `agent_runtime` exposes it as a model-callable tool.
-- Future acceptance tests are explicit enough to drive implementation.
+- Unit and integration coverage verifies the accepted behavior.
 
 ## Resolved decisions
 
@@ -1038,12 +1038,12 @@ model-callable runtime adapter.
    multimodal message parts; base64 is never model-visible result text.
 5. **Total-line cost policy:** Always honor `MAX_METADATA_SCAN_LINES = 50,000`.
    Return exact totals only when EOF is reached within that bounded scan.
-6. **Implementation ownership:** Create a dedicated
-   `src/fabrica/features/workspace_reading/` slice, mirroring the
+6. **Implementation ownership:** The dedicated
+   `src/fabrica/features/workspace_reading/` slice mirrors the
    `workspace_editing` ownership pattern for `apply_patch`. `agent_runtime`
    exposes its application port as the model-callable tool, and developer
    workflows consume that runtime registration rather than owning filesystem
    behavior.
 
-No blocking questions remain. This accepted specification is ready for
-implementation planning.
+The accepted contract is implemented and remains the durable reference for
+future changes.

@@ -4,9 +4,8 @@ This directory contains durable project documentation and current reference note
 
 ## Documentation lifecycle
 
-- `ideas/` is temporary. Delete an idea after it is promoted into a spec,
-  implementation, or decision record.
-- `plans/` is temporary. Delete a plan after the planned work is complete.
+- Temporary ideas and implementation plans should be deleted after promotion
+  into a spec, implementation, or decision record.
 - `specs/` and `adr/` are durable records. Keep them when they explain current
   behavior, historical context, or decisions that future work still needs to
   understand.
