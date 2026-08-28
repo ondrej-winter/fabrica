@@ -87,9 +87,9 @@ explicitly marked not applicable with a reason.
 - [x] **T1** Define workspace-reading DTOs, limits, result variants, and stable errors.
   - [x] **T1.A1** DTOs enforce valid ranges, paths, limits, pagination, and safe metadata.
   - [x] **T1.V1** Focused DTO/error tests pass.
-- [ ] **T2** Define application ports, read context, and use-case orchestration boundary.
-  - [ ] **T2.A1** Application code depends only on DTOs and ports; host policy is explicit.
-  - [ ] **T2.V1** Port export/type-contract tests pass.
+- [x] **T2** Define application ports, read context, and use-case orchestration boundary.
+  - [x] **T2.A1** Application code depends only on DTOs and ports; host policy is explicit.
+  - [x] **T2.V1** Port export/type-contract tests pass.
 - [ ] **T3** Implement pure range validation, output limiting, and text formatting.
   - [ ] **T3.A1** Formatting and pagination are explicit and never silently truncate output.
   - [ ] **T3.V1** Parametrized unit tests cover ranges, caps, truncation, and line rendering.
@@ -191,15 +191,15 @@ explicitly marked not applicable with a reason.
 
 **Acceptance criteria:**
 
-- [ ] **T2.A1** The application layer contains no `open()`, path-resolution,
+- [x] **T2.A1** The application layer contains no `open()`, path-resolution,
   MIME, provider SDK, or runtime-specific implementation dependencies.
-- [ ] **T2.A2** All dependencies required for real filesystem reads are explicit
+- [x] **T2.A2** All dependencies required for real filesystem reads are explicit
   application-owned ports, and batch execution ownership is explicitly deferred
   to T6.
 
 **Verification:**
 
-- [ ] **T2.V1** Add port/export tests and type-check application boundaries.
+- [x] **T2.V1** Add port/export tests and type-check application boundaries.
 
 ### T3. Implement pure range validation, output limiting, and text formatting
 

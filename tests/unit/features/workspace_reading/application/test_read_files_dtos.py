@@ -59,6 +59,13 @@ def test_read_files_limits_match_accepted_defaults() -> None:
     assert limits.tool_deadline_seconds == DEFAULT_TOOL_DEADLINE_SECONDS == EXPECTED_TOOL_DEADLINE_SECONDS
 
 
+def test_read_files_limits_reject_non_positive_bounds_and_deadlines() -> None:
+    with pytest.raises(ValueError, match="max_files_per_call must be at least 1"):
+        ReadFilesLimits(max_files_per_call=0)
+    with pytest.raises(ValueError, match="read deadlines must be positive"):
+        ReadFilesLimits(per_file_deadline_seconds=0)
+
+
 @pytest.mark.parametrize(
     ("factory", "message"),
     [
