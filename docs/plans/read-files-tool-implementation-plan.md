@@ -118,9 +118,9 @@ explicitly marked not applicable with a reason.
   - [x] **T9.A1** Construction is side-effect free and filesystem/provider details remain outside runtime core.
   - [x] **T9.V1** Bootstrap API and tool-loop integration tests pass.
 - [x] **C3** Runtime checkpoint: T6–T9 complete and the full vertical path is offline-testable.
-- [ ] **T10** Update applicable public documentation and execute the full quality gate.
-  - [ ] **T10.A1** Documentation reflects implemented behavior without changing the accepted spec silently.
-  - [ ] **T10.V1** Format, lint, type check, tests, and import-boundary checks pass.
+- [x] **T10** Update applicable public documentation and execute the full quality gate.
+  - [x] **T10.A1** Documentation reflects implemented behavior without changing the accepted spec silently.
+  - [x] **T10.V1** Format, lint, type check, tests, and import-boundary checks pass.
 
 ## Detailed Tasks
 
@@ -582,16 +582,16 @@ and verified binary image content.
 
 **Acceptance criteria:**
 
-- [ ] **T10.A1** Public documentation and implementation behavior agree, and no
+- [x] **T10.A1** Public documentation and implementation behavior agree, and no
   unsupported configuration surface is documented.
 
 **Verification:**
 
-- [ ] **T10.V1** Run `uv run ruff format .`.
-- [ ] **T10.V2** Run `uv run ruff check .`.
-- [ ] **T10.V3** Run `uv run ty check src tests`.
-- [ ] **T10.V4** Run `uv run pytest`.
-- [ ] **T10.V5** Run `uv run lint-imports`.
+- [x] **T10.V1** Run `uv run ruff format .`.
+- [x] **T10.V2** Run `uv run ruff check .`.
+- [x] **T10.V3** Run `uv run ty check src tests`.
+- [x] **T10.V4** Run `uv run pytest`.
+- [x] **T10.V5** Run `uv run lint-imports`.
 
 ## Risks and controls
 

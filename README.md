@@ -25,6 +25,40 @@ uv run pytest
 The default test suite is deterministic and offline. It does not read real Codex
 credentials and does not call the live Codex backend.
 
+## Workspace file-reading tool composition
+
+Hosts can explicitly add the read-only `read_files` tool to a tool-loop runtime.
+The factory requires the workspace root plus host-owned authorization and model
+image-capability policy; construction does not inspect the workspace, start
+helper processes, or contact a model provider.
+
+```python
+from pathlib import Path
+
+from fabrica.bootstrap import create_read_files_registered_tool_adapter, create_tool_loop_runtime
+from fabrica.features.agent_runtime.application.dtos import ToolLoopLimits
+
+read_files_tool = create_read_files_registered_tool_adapter(
+    Path("/path/to/workspace"),
+    external_read_authorized=True,
+    image_input_supported=False,
+)
+runtime = create_tool_loop_runtime(
+    model=model,
+    tools=(read_files_tool,),
+    limits=ToolLoopLimits(),
+)
+```
+
+The registered tool accepts the canonical `{ "files": [...] }` request shape
+with workspace-relative paths and optional inclusive one-based `start_line` and
+`end_line` bounds. It preserves batch request order, returns structured
+per-file outcomes, and supports UTF-8/UTF-8-BOM text plus verified PNG, JPEG,
+GIF, and WebP images when `image_input_supported=True`. Reads are bounded,
+read-only, restricted to the configured workspace, and can be truncated or
+paged; consult [`docs/specs/read-files-tool.md`](docs/specs/read-files-tool.md)
+for the complete accepted contract and limits.
+
 You can also run the default tests through `make`:
 
 ```bash
