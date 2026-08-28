@@ -33,13 +33,13 @@ COMPLETED
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
-- Runtime direction is owned by `docs/specs/agent-runtime.md`.
-- Primitive capability specs include `docs/specs/read-files-tool.md`,
-  `docs/specs/search-codebase-tool.md`, `docs/specs/run-commands-tool.md`,
-  `docs/specs/fetch-web-content-tool.md`, and
-  `docs/specs/apply-patch-tool.md`.
-- Agent orchestration specs include `docs/specs/skills-tool.md` and
-  `docs/specs/ask-question-tool.md`.
+- Runtime direction is owned by `docs/specs/agent-runtime-spec.md`.
+- Primitive capability specs include `docs/specs/tools-read-files-tool-spec.md`,
+  `docs/specs/tools-search-codebase-tool-spec.md`, `docs/specs/tools-run-commands-tool-spec.md`,
+  `docs/specs/tools-fetch-web-content-tool-spec.md`, and
+  `docs/specs/tools-apply-patch-tool-spec.md`.
+- Agent orchestration specs include `docs/specs/tools-skills-tool-spec.md` and
+  `docs/specs/tools-ask-question-tool-spec.md`.
 - Neighboring specs already classify `submit_and_exit` as an orchestration
   primitive alongside `skills` and `ask_question`.
 - This spec defines the desired `submit_and_exit` tool contract only. It does not
@@ -776,7 +776,7 @@ itself is suspended there.
 
 Likely future implementation ownership:
 
-- Spec: `docs/specs/submit-and-exit-tool.md`.
+- Spec: `docs/specs/tools-submit-and-exit-tool-spec.md`.
 - Runtime tool contracts, DTOs, completion records, guard ports, completion
   policy, and orchestration use cases: under
   `src/fabrica/features/agent_runtime/application/`.

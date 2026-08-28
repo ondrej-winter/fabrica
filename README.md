@@ -56,7 +56,7 @@ with workspace-relative paths and optional inclusive one-based `start_line` and
 per-file outcomes, and supports UTF-8/UTF-8-BOM text plus verified PNG, JPEG,
 GIF, and WebP images when `image_input_supported=True`. Reads are bounded,
 read-only, restricted to the configured workspace, and can be truncated or
-paged; consult [`docs/specs/read-files-tool.md`](docs/specs/read-files-tool.md)
+paged; consult [`docs/specs/tools-read-files-tool-spec.md`](docs/specs/tools-read-files-tool-spec.md)
 for the complete accepted contract and limits.
 
 You can also run the default tests through `make`:

@@ -22,10 +22,10 @@ as an explicitly requested capability.
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
-- Runtime direction is owned by `docs/specs/agent-runtime.md`.
-- Filesystem reading is owned by `docs/specs/read-files-tool.md`.
-- Textual source discovery is owned by `docs/specs/search-codebase-tool.md`.
-- Filesystem mutation is owned by `docs/specs/apply-patch-tool.md`.
+- Runtime direction is owned by `docs/specs/agent-runtime-spec.md`.
+- Filesystem reading is owned by `docs/specs/tools-read-files-tool-spec.md`.
+- Textual source discovery is owned by `docs/specs/tools-search-codebase-tool-spec.md`.
+- Filesystem mutation is owned by `docs/specs/tools-apply-patch-tool-spec.md`.
 - This spec defines the desired `run_commands` tool contract only. It does not
   implement the tool.
 - `run_commands` is the verification and project-tooling counterpart to the
@@ -1161,7 +1161,7 @@ must operate with bounded memory.
 
 Likely future implementation ownership:
 
-- Spec: `docs/specs/run-commands-tool.md`.
+- Spec: `docs/specs/tools-run-commands-tool-spec.md`.
 - Runtime tool contracts and DTOs: under
   `src/fabrica/features/agent_runtime/application/` if exposed as a model-callable
   runtime tool.

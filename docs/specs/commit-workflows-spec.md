@@ -4,7 +4,7 @@ This spec is the canonical source of truth for Fabrica's developer-facing commit
 workflows. It defines the read-only `fabrica commit-message` preview workflow and
 the explicitly confirmed mutating `fabrica commit` workflow.
 
-`docs/specs/git-workflow-tools.md` owns git subprocess and registered-tool
+`docs/specs/tools-git-workflow-tools-spec.md` owns git subprocess and registered-tool
 adapter contracts, including approved commit creation and explicitly composed
 pre-commit execution. This spec owns the user workflows, safety boundaries,
 interaction model, and application orchestration expectations for commit-message
@@ -177,7 +177,7 @@ from a generated recommendation.
 
 Before generating a commit-message recommendation, `fabrica commit` runs the
 configured pre-commit quality check through the explicitly composed pre-commit
-adapter described in `docs/specs/git-workflow-tools.md` when the repository has a
+adapter described in `docs/specs/tools-git-workflow-tools-spec.md` when the repository has a
 `.pre-commit-config.yaml` file. Repositories without pre-commit configuration are
 valid; the workflow treats the pre-commit gate as a successful skip and continues
 to recommendation generation.
@@ -239,7 +239,7 @@ leaves staged files untouched.
 
 Git commit execution lives behind a developer-workflow-owned outbound port and
 subprocess adapter. The adapter contract is owned by
-`docs/specs/git-workflow-tools.md`.
+`docs/specs/tools-git-workflow-tools-spec.md`.
 
 After explicit approval, the workflow:
 
@@ -307,8 +307,8 @@ no commit is created after answering anything other than explicit yes.
 Implementation preserves hexagonal boundaries in the `developer_workflow` feature
 slice.
 
-- Spec: `docs/specs/commit-workflows.md`.
-- Related git subprocess/tool adapter spec: `docs/specs/git-workflow-tools.md`.
+- Spec: `docs/specs/commit-workflows-spec.md`.
+- Related git subprocess/tool adapter spec: `docs/specs/tools-git-workflow-tools-spec.md`.
 - Generic CLI shell parser and command contracts:
   `src/fabrica/adapters/inbound/cli/`.
 - Developer-workflow parsed command DTOs and feature-owned registrations:
@@ -410,7 +410,7 @@ ambient staged git state.
   - commit command/result DTOs validate required message text;
   - the commit execution port receives the exact generated commit message.
 - Unit-test git commit subprocess adapter behavior with an injectable git command
-  runner according to `docs/specs/git-workflow-tools.md`.
+  runner according to `docs/specs/tools-git-workflow-tools-spec.md`.
 - Integration-test temporary git repositories:
   - approval creates exactly one commit with the generated message;
   - rejection creates no commit and preserves staged changes;

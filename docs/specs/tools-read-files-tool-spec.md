@@ -33,8 +33,8 @@ explicit metadata about any content it did not receive.
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
-- Runtime direction is owned by `docs/specs/agent-runtime.md`.
-- Filesystem mutation tool design is owned by `docs/specs/apply-patch-tool.md`.
+- Runtime direction is owned by `docs/specs/agent-runtime-spec.md`.
+- Filesystem mutation tool design is owned by `docs/specs/tools-apply-patch-tool-spec.md`.
 - This spec defines the implemented `read_files` tool contract. The capability
   is owned by `src/fabrica/features/workspace_reading/`.
 - `read_files` is the read-side counterpart to `apply_patch`: the model reads
@@ -804,7 +804,7 @@ adaptation happens one layer above or below it as appropriate.
 Implementation ownership follows the same pattern as `apply_patch` and its
 `workspace_editing` slice:
 
-- Spec: `docs/specs/read-files-tool.md`.
+- Spec: `docs/specs/tools-read-files-tool-spec.md`.
 - Read capability source, application DTOs, ports, and use cases:
   `src/fabrica/features/workspace_reading/`.
 - Filesystem reading, path resolution, streaming, MIME detection, and provider

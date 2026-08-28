@@ -21,21 +21,21 @@ This directory contains durable project documentation and current reference note
 ### Specs
 
 - `specs/README.md` explains the concern-oriented spec taxonomy.
-- `specs/agent-runtime.md` defines the local Python agent runtime direction and
+- `specs/agent-runtime-spec.md` defines the local Python agent runtime direction and
   its provider-agnostic boundaries.
-- `specs/codex-transport.md` defines the subscription-backed Codex transport
+- `specs/codex-transport-spec.md` defines the subscription-backed Codex transport
   support path and preserves private-backend errata.
-- `specs/model-usage-and-cost-evidence.md` defines the generic usage and pricing
+- `specs/model-usage-and-cost-evidence-spec.md` defines the generic usage and pricing
   evidence model for model-call results.
-- `specs/git-workflow-tools.md` defines git-related developer workflow tools and
+- `specs/tools-git-workflow-tools-spec.md` defines git-related developer workflow tools and
   adapters, including read-only git context, approved commit creation, and
   explicitly composed pre-commit execution.
-- `specs/commit-workflows.md` defines read-only commit-message generation and the
+- `specs/commit-workflows-spec.md` defines read-only commit-message generation and the
   interactive `fabrica commit` workflow that creates commits only after explicit
   approval.
-- `specs/read-files-tool.md` defines bounded workspace file inspection for
+- `specs/tools-read-files-tool-spec.md` defines bounded workspace file inspection for
   model-callable coding-agent workflows.
-- `specs/search-codebase-tool.md` defines read-only regex-based workspace source
+- `specs/tools-search-codebase-tool-spec.md` defines read-only regex-based workspace source
   discovery for model-callable coding-agent workflows.
-- `specs/apply-patch-tool.md` defines context-based workspace file mutation,
+- `specs/tools-apply-patch-tool-spec.md` defines context-based workspace file mutation,
   including its fail-closed POSIX safety and recovery contract.

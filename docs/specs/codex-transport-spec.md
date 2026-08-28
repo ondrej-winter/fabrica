@@ -19,9 +19,9 @@ The immediate goal is a narrow transport support path that validates direct,
 subscription-backed Codex backend access and keeps volatile private-backend
 details isolated behind replaceable hexagonal boundaries.
 
-The broader runtime direction is owned by `docs/specs/agent-runtime.md`.
+The broader runtime direction is owned by `docs/specs/agent-runtime-spec.md`.
 Provider-neutral usage and pricing evidence is owned by
-`docs/specs/model-usage-and-cost-evidence.md`.
+`docs/specs/model-usage-and-cost-evidence-spec.md`.
 
 ## Current context
 
@@ -149,8 +149,8 @@ viable only if the support path demonstrates:
 
 ## Project structure
 
-- Spec: `docs/specs/codex-transport.md`.
-- Runtime spec: `docs/specs/agent-runtime.md`.
+- Spec: `docs/specs/codex-transport-spec.md`.
+- Runtime spec: `docs/specs/agent-runtime-spec.md`.
 - Transport source: `src/fabrica/features/codex_transport/`.
 - Application ports and DTOs: under the owning slice's `application/ports/` and
   `application/dtos/` packages.

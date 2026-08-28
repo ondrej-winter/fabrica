@@ -8,25 +8,31 @@ ownership, validation expectations, and preserved historical decisions.
 
 ## Current specs
 
-- `agent-runtime.md` defines the local Python agent runtime direction and its
+- `agent-runtime-spec.md` defines the local Python agent runtime direction and its
   provider-agnostic runtime boundaries.
-- `codex-transport.md` defines the subscription-backed Codex transport support
+- `codex-transport-spec.md` defines the subscription-backed Codex transport support
   path, private-backend constraints, credential safety, and opt-in live
   validation rules.
-- `model-usage-and-cost-evidence.md` defines provider-neutral usage and pricing
+- `model-usage-and-cost-evidence-spec.md` defines provider-neutral usage and pricing
   evidence for model-call results.
-- `git-workflow-tools.md` defines git-related developer workflow tools and
+- `tools-git-workflow-tools-spec.md` defines git-related developer workflow tools and
   adapters, including read-only git context, approved commit creation, and
   explicitly composed pre-commit execution.
-- `commit-workflows.md` defines developer-facing commit workflows, including the
+- `commit-workflows-spec.md` defines developer-facing commit workflows, including the
   read-only `fabrica commit-message` preview and the explicitly confirmed
   mutating `fabrica commit` flow.
-- `read-files-tool.md` defines the read-only workspace file inspection primitive
+- `tools-read-files-tool-spec.md` defines the read-only workspace file inspection primitive
   for model-callable coding-agent workflows.
-- `search-codebase-tool.md` defines the read-only textual regex discovery
+- `tools-search-codebase-tool-spec.md` defines the read-only textual regex discovery
   primitive for locating relevant workspace file contents before reading files.
-- `apply-patch-tool.md` defines the context-based workspace file mutation
+- `tools-apply-patch-tool-spec.md` defines the context-based workspace file mutation
   primitive for model-callable coding-agent workflows.
+
+## Naming convention
+
+- General specifications must use `<name>-spec.md`.
+- Tool-owned specifications must use `tools-<tool-name>-tool-spec.md`, for
+  example `tools-read-files-tool-spec.md`.
 
 ## Placement guidance
 
@@ -35,7 +41,7 @@ ownership, validation expectations, and preserved historical decisions.
 - Prefer adding a section to an existing concern spec when a new workflow extends
   the same product or architectural surface.
 - Keep provider-specific volatility in provider-owned specs, such as
-  `codex-transport.md`, instead of hiding it inside generic runtime or usage
+  `codex-transport-spec.md`, instead of hiding it inside generic runtime or usage
   specifications.
 - Keep mutating workflows separate from read-only tool or preview concerns unless
   one spec explicitly owns the relevant safety categories.

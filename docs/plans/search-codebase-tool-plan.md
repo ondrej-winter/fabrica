@@ -9,7 +9,7 @@ Implement the accepted, read-only `search_codebase` tool as the new `workspace_s
 ### In scope
 
 - The accepted canonical `{ "queries": [...] }` interface, query/result DTOs, stable errors, validation, path containment, glob/ignore semantics, pinned-backend execution, context hydration, output limiting, cancellation, retries, and tool-loop composition.
-- Unit, integration, backend-conformance, and composition coverage required by `docs/specs/search-codebase-tool.md`.
+- Unit, integration, backend-conformance, and composition coverage required by `docs/specs/tools-search-codebase-tool-spec.md`.
 - Bootstrap exports and user-facing README documentation required for a new model-callable workspace tool.
 
 ### Out of scope

@@ -22,11 +22,11 @@ capability.
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
-- Runtime direction is owned by `docs/specs/agent-runtime.md`.
+- Runtime direction is owned by `docs/specs/agent-runtime-spec.md`.
 - Model-callable primitive capability specs include
-  `docs/specs/read-files-tool.md`, `docs/specs/search-codebase-tool.md`,
-  `docs/specs/run-commands-tool.md`, `docs/specs/fetch-web-content-tool.md`, and
-  `docs/specs/apply-patch-tool.md`.
+  `docs/specs/tools-read-files-tool-spec.md`, `docs/specs/tools-search-codebase-tool-spec.md`,
+  `docs/specs/tools-run-commands-tool-spec.md`, `docs/specs/tools-fetch-web-content-tool-spec.md`, and
+  `docs/specs/tools-apply-patch-tool-spec.md`.
 - Existing Agent Skill support under `src/fabrica/features/agent_runtime/` can
   load explicitly selected local `SKILL.md` markdown, selected text resources,
   and policy-gated selected skill scripts through application ports and adapters.
@@ -757,7 +757,7 @@ Responsibilities:
 
 Likely future implementation ownership:
 
-- Spec: `docs/specs/skills-tool.md`.
+- Spec: `docs/specs/tools-skills-tool-spec.md`.
 - Runtime tool contracts, DTOs, and orchestration use cases: under
   `src/fabrica/features/agent_runtime/application/`.
 - Filesystem-backed global/workspace providers, `SKILL.md` parsing, resource

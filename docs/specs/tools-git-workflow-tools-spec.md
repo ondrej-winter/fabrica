@@ -30,7 +30,7 @@ composition root explicitly registers them for a runtime or workflow. Read-only
 tools and mutating tools must be registered separately so a workflow can grant
 inspection capabilities without also granting mutation.
 
-`docs/specs/commit-workflows.md` owns the deterministic
+`docs/specs/commit-workflows-spec.md` owns the deterministic
 `fabrica commit-message` preview workflow and the explicitly confirmed mutating
 `fabrica commit` user flow. This spec owns the git subprocess and registered-tool
 adapter contracts used by those workflows. Git workflow tools must not change the
@@ -549,7 +549,7 @@ They must never be exposed through a generic git or shell command surface.
 
 The approved git commit adapter creates a commit from an already-approved commit
 message. It is used by the `fabrica commit` workflow after
-`docs/specs/commit-workflows.md` has generated a recommendation, displayed it to
+`docs/specs/commit-workflows-spec.md` has generated a recommendation, displayed it to
 the user, and received explicit approval.
 
 The adapter contract:
@@ -572,7 +572,7 @@ The adapter contract:
 - returns a concise commit result with the new short hash when available.
 
 The user-facing confirmation prompt, approval/rejection behavior, and terminal
-output remain owned by `docs/specs/commit-workflows.md`. This spec owns only the
+output remain owned by `docs/specs/commit-workflows-spec.md`. This spec owns only the
 git subprocess adapter safety contract.
 
 ### `run_pre_commit`
@@ -717,7 +717,7 @@ private diagnostics, secrets, or raw file contents.
 Implementation must preserve hexagonal boundaries in the
 `developer_workflow` feature slice.
 
-- Spec: `docs/specs/git-workflow-tools.md`.
+- Spec: `docs/specs/tools-git-workflow-tools-spec.md`.
 - Developer-workflow DTOs:
   `src/fabrica/features/developer_workflow/application/dtos/`.
 - Developer-workflow ports:
@@ -752,7 +752,7 @@ silently expose broader worktree, unstaged, commit, or ref/range tools to the
 model.
 
 `fabrica commit` remains the explicitly confirmed mutating user workflow owned by
-`docs/specs/commit-workflows.md`. The git commit subprocess adapter contract is
+`docs/specs/commit-workflows-spec.md`. The git commit subprocess adapter contract is
 owned here so all git subprocess safety rules live in one spec.
 
 ## Non-goals

@@ -11,8 +11,8 @@ support as the first high-risk transport capability.
 
 This spec owns the runtime-level design. Codex-specific authentication,
 private-backend request details, and live validation rules belong in
-`docs/specs/codex-transport.md`. Provider-neutral usage and pricing evidence
-belongs in `docs/specs/model-usage-and-cost-evidence.md`.
+`docs/specs/codex-transport-spec.md`. Provider-neutral usage and pricing evidence
+belongs in `docs/specs/model-usage-and-cost-evidence-spec.md`.
 
 ## Current context
 
@@ -68,14 +68,14 @@ Fabrica should expose a local Python agent runtime that can:
 ### Runtime milestones
 
 1. Validate Codex transport support separately in
-   `docs/specs/codex-transport.md`.
+   `docs/specs/codex-transport-spec.md`.
 2. Use the validated Codex transport through application-level runtime ports and
    DTOs.
 3. Add provider-agnostic usage and cost evidence according to
-   `docs/specs/model-usage-and-cost-evidence.md`.
+   `docs/specs/model-usage-and-cost-evidence-spec.md`.
 4. Add model-callable tools through explicit, bounded capabilities such as the
    read-only git context tools in
-   `docs/specs/git-workflow-tools.md`.
+   `docs/specs/tools-git-workflow-tools-spec.md`.
 5. Keep Agent Skills script support explicit and policy-controlled: load
    immutable script bytes with their computed approval binding, compare that
    binding to the approved metadata, and execute only a private temporary
@@ -93,8 +93,8 @@ Fabrica should expose a local Python agent runtime that can:
 
 ## Project structure
 
-- Spec: `docs/specs/agent-runtime.md`.
-- Codex support spec: `docs/specs/codex-transport.md`.
+- Spec: `docs/specs/agent-runtime-spec.md`.
+- Codex support spec: `docs/specs/codex-transport-spec.md`.
 - Runtime source: `src/fabrica/features/agent_runtime/`.
 - Runtime application ports and DTOs: under the owning slice's
   `application/ports/` and `application/dtos/` packages.

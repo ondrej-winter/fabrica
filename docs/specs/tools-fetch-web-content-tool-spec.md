@@ -22,10 +22,10 @@ The runtime retrieves and normalizes content; the agent performs the reasoning.
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
-- Runtime direction is owned by `docs/specs/agent-runtime.md`.
-- Workspace file reading is owned by `docs/specs/read-files-tool.md`.
-- Workspace source discovery is owned by `docs/specs/search-codebase-tool.md`.
-- Process execution is owned by `docs/specs/run-commands-tool.md`.
+- Runtime direction is owned by `docs/specs/agent-runtime-spec.md`.
+- Workspace file reading is owned by `docs/specs/tools-read-files-tool-spec.md`.
+- Workspace source discovery is owned by `docs/specs/tools-search-codebase-tool-spec.md`.
+- Process execution is owned by `docs/specs/tools-run-commands-tool-spec.md`.
 - This spec defines the desired `fetch_web_content` tool contract only. It does
   not implement the tool.
 - `fetch_web_content` should be preferred over ordinary `curl`, `wget`, or ad hoc
@@ -915,7 +915,7 @@ and redirect code.
 
 Likely future implementation ownership:
 
-- Spec: `docs/specs/fetch-web-content-tool.md`.
+- Spec: `docs/specs/tools-fetch-web-content-tool-spec.md`.
 - Runtime tool contracts and DTOs: under
   `src/fabrica/features/agent_runtime/application/` if exposed as a model-callable
   runtime tool.

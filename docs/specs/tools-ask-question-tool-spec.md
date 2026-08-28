@@ -30,12 +30,12 @@ fabricate that information simply to keep the run moving.
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
-- Runtime direction is owned by `docs/specs/agent-runtime.md`.
-- Primitive capability specs include `docs/specs/read-files-tool.md`,
-  `docs/specs/search-codebase-tool.md`, `docs/specs/run-commands-tool.md`,
-  `docs/specs/fetch-web-content-tool.md`, and
-  `docs/specs/apply-patch-tool.md`.
-- `docs/specs/skills-tool.md` already classifies `ask_question` as an agent
+- Runtime direction is owned by `docs/specs/agent-runtime-spec.md`.
+- Primitive capability specs include `docs/specs/tools-read-files-tool-spec.md`,
+  `docs/specs/tools-search-codebase-tool-spec.md`, `docs/specs/tools-run-commands-tool-spec.md`,
+  `docs/specs/tools-fetch-web-content-tool-spec.md`, and
+  `docs/specs/tools-apply-patch-tool-spec.md`.
+- `docs/specs/tools-skills-tool-spec.md` already classifies `ask_question` as an agent
   orchestration primitive alongside `skills` and `submit_and_exit`.
 - This spec defines the desired `ask_question` tool contract only. It does not
   implement the tool.
@@ -706,7 +706,7 @@ The human wait itself has no ordinary tool timeout.
 
 Likely future implementation ownership:
 
-- Spec: `docs/specs/ask-question-tool.md`.
+- Spec: `docs/specs/tools-ask-question-tool-spec.md`.
 - Runtime tool contracts, DTOs, interaction state, and orchestration use cases:
   under `src/fabrica/features/agent_runtime/application/`.
 - Inbound or outbound interaction transports: under the relevant adapter package

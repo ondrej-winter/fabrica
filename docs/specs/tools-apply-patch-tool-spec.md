@@ -26,10 +26,10 @@ before mutation rather than silently degrade to weaker guarantees.
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
-- Runtime direction is owned by `docs/specs/agent-runtime.md`.
-- Read-only file inspection is owned by `docs/specs/read-files-tool.md`.
-- Textual source discovery is owned by `docs/specs/search-codebase-tool.md`.
-- Command execution is owned by `docs/specs/run-commands-tool.md`.
+- Runtime direction is owned by `docs/specs/agent-runtime-spec.md`.
+- Read-only file inspection is owned by `docs/specs/tools-read-files-tool-spec.md`.
+- Textual source discovery is owned by `docs/specs/tools-search-codebase-tool-spec.md`.
+- Command execution is owned by `docs/specs/tools-run-commands-tool-spec.md`.
 - This spec defines the durable `apply_patch` tool contract. The implementation
   is owned by the `workspace_editing` feature and bootstrap composition.
 
@@ -933,7 +933,7 @@ approval UI, leases, and recovery.
 
 Likely implementation ownership:
 
-- Spec: `docs/specs/apply-patch-tool.md`.
+- Spec: `docs/specs/tools-apply-patch-tool-spec.md`.
 - Patch capability source: `src/fabrica/features/workspace_editing/`.
 - Application DTOs: `src/fabrica/features/workspace_editing/application/dtos/`.
 - Application ports: `src/fabrica/features/workspace_editing/application/ports/`.
