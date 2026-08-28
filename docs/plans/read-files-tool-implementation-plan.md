@@ -97,7 +97,7 @@ explicitly marked not applicable with a reason.
 - [x] **P0** Implement accepted agent-runtime nested-argument and multipart-result contracts.
   - [x] **P0.A1** Generic runtime contracts represent canonical bounded immutable nested JSON arguments and ordered provider-neutral text/image content parts.
   - [x] **P0.V1** Agent-runtime and PydanticAI regression tests cover bounds, canonical argument digests, nested mapping, and multipart returns before `read_files` runtime exposure begins.
-- [ ] **T4** Implement capability-gated secure POSIX path resolution and file classification.
+- [x] **T4** Implement capability-gated secure POSIX path resolution and file classification.
   - [x] **T4.A1** Open-time containment rejects traversal and escaping symlinks.
   - [x] **T4.V1** Real-filesystem containment and classification integration tests pass.
 - [x] **T5** Implement streamed UTF-8 text reads and bounded total-line metadata.
@@ -111,9 +111,9 @@ explicitly marked not applicable with a reason.
 - [x] **T7** Implement verified provider-neutral image reading.
   - [x] **T7.A1** Only supported, verified images are returned as `ImageContent`.
   - [x] **T7.V1** Image format, capability, magic-byte, and size tests pass.
-- [ ] **T8** Add the canonical `read_files` registered-tool adapter.
-  - [ ] **T8.A1** The adapter exposes only the specified tool schema and maps outcomes safely.
-  - [ ] **T8.V1** Adapter schema, validation, and outcome-mapping tests pass.
+- [x] **T8** Add the canonical `read_files` registered-tool adapter.
+  - [x] **T8.A1** The adapter exposes only the specified tool schema and maps outcomes safely.
+  - [x] **T8.V1** Adapter schema, validation, and outcome-mapping tests pass.
 - [ ] **T9** Add composition-root factory and offline tool-loop integration.
   - [ ] **T9.A1** Construction is side-effect free and filesystem/provider details remain outside runtime core.
   - [ ] **T9.V1** Bootstrap API and tool-loop integration tests pass.
@@ -498,16 +498,22 @@ termination, and bounded join; a helper owns one isolated filesystem read attemp
 
 **Acceptance criteria:**
 
-- [ ] **T8.A1** The model sees only one read tool, never `read_file` or
+- [x] **T8.A1** The model sees only one read tool, never `read_file` or
   `read_file_range` variants.
-- [ ] **T8.A2** Invalid runtime arguments are rejected before use-case execution,
+- [x] **T8.A2** Invalid runtime arguments are rejected before use-case execution,
   and the adapter does not access the filesystem directly.
 
 **Verification:**
 
-- [ ] **T8.V1** Test schema/description fidelity, argument mapping, text and
+- [x] **T8.V1** Test schema/description fidelity, argument mapping, text and
   mixed outcomes, invalid arguments, cancellation/error mapping, and output
   bounds.
+
+**Implementation note (August 28, 2026):** The generic runtime multipart bounds
+now allow 40 ordered content parts and 48,000 characters per text part. This is
+the minimum needed to preserve the accepted 20-file batch and 48,000-character
+per-file read-output bounds when image results require both structured metadata
+and verified binary image content.
 
 ### T9. Add composition-root factory and offline tool-loop integration
 

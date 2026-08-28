@@ -24,11 +24,16 @@ MAX_TOOL_CALL_ID_CHARS = 120
 MAX_TOOL_DESCRIPTION_CHARS = 1_000
 MAX_TOOL_ERROR_MESSAGE_CHARS = 1_000
 MAX_TOOL_RESPONSE_TEXT_CHARS = 20_000
+# Multipart content must carry one accepted read-file text result without
+# truncating its independently bounded 48,000-character output.
+MAX_TOOL_CONTENT_TEXT_CHARS = 48_000
 MAX_TOOL_ARGUMENT_NESTING_DEPTH = 8
 MAX_TOOL_ARGUMENT_MAPPING_ENTRIES = 100
 MAX_TOOL_ARGUMENT_SEQUENCE_ENTRIES = 100
 MAX_TOOL_ARGUMENT_STRING_CHARS = 20_000
-MAX_TOOL_CONTENT_PARTS = 20
+# A registered tool may return one textual structured-result part plus one binary
+# image part for each member of a 20-file batch.
+MAX_TOOL_CONTENT_PARTS = 40
 MAX_TOOL_IMAGE_BYTES = 10_000_000
 SAFE_TOOL_IDENTIFIER_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-")
 type ToolArgumentSchemaValue = (
@@ -71,7 +76,7 @@ class ToolTextContent:
     text: str
 
     def __post_init__(self) -> None:
-        if len(self.text) > MAX_TOOL_RESPONSE_TEXT_CHARS:
+        if len(self.text) > MAX_TOOL_CONTENT_TEXT_CHARS:
             msg = "tool text content exceeds the safe response bound"
             raise ValueError(msg)
 

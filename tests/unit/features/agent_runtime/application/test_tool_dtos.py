@@ -14,6 +14,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     MAX_TOOL_ARGUMENT_STRING_CHARS,
     MAX_TOOL_CALL_ID_CHARS,
     MAX_TOOL_CONTENT_PARTS,
+    MAX_TOOL_CONTENT_TEXT_CHARS,
     MAX_TOOL_DESCRIPTION_CHARS,
     MAX_TOOL_ERROR_MESSAGE_CHARS,
     MAX_TOOL_IMAGE_BYTES,
@@ -267,8 +268,9 @@ def test_tool_call_request_rejects_invalid_recursive_json_values(
 
 
 def test_tool_content_parts_enforce_provider_neutral_bounds() -> None:
+    assert ToolTextContent(text="x" * MAX_TOOL_CONTENT_TEXT_CHARS).text == "x" * MAX_TOOL_CONTENT_TEXT_CHARS
     with pytest.raises(ValueError, match="text content exceeds"):
-        ToolTextContent(text="x" * (MAX_TOOL_RESPONSE_TEXT_CHARS + 1))
+        ToolTextContent(text="x" * (MAX_TOOL_CONTENT_TEXT_CHARS + 1))
     with pytest.raises(ValueError, match="must not be empty"):
         ToolImageContent(data=b"", media_type="image/png")
     with pytest.raises(ValueError, match="image bound"):
