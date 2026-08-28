@@ -39,6 +39,7 @@ EXPECTED_BOOTSTRAP_EXPORTS = [
     "create_pydantic_ai_model_driven_skill_runtime",
     "create_pydantic_ai_runtime",
     "create_pydantic_ai_tool_loop_runtime",
+    "create_read_files_registered_tool_adapter",
     "create_skill_augmented_local_agent_command",
     "create_skill_context_augmented_local_agent_command",
     "create_skill_context_loader",

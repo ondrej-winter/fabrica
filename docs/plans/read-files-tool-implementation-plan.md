@@ -114,10 +114,10 @@ explicitly marked not applicable with a reason.
 - [x] **T8** Add the canonical `read_files` registered-tool adapter.
   - [x] **T8.A1** The adapter exposes only the specified tool schema and maps outcomes safely.
   - [x] **T8.V1** Adapter schema, validation, and outcome-mapping tests pass.
-- [ ] **T9** Add composition-root factory and offline tool-loop integration.
-  - [ ] **T9.A1** Construction is side-effect free and filesystem/provider details remain outside runtime core.
-  - [ ] **T9.V1** Bootstrap API and tool-loop integration tests pass.
-- [ ] **C3** Runtime checkpoint: T6–T9 complete and the full vertical path is offline-testable.
+- [x] **T9** Add composition-root factory and offline tool-loop integration.
+  - [x] **T9.A1** Construction is side-effect free and filesystem/provider details remain outside runtime core.
+  - [x] **T9.V1** Bootstrap API and tool-loop integration tests pass.
+- [x] **C3** Runtime checkpoint: T6–T9 complete and the full vertical path is offline-testable.
 - [ ] **T10** Update applicable public documentation and execute the full quality gate.
   - [ ] **T10.A1** Documentation reflects implemented behavior without changing the accepted spec silently.
   - [ ] **T10.V1** Format, lint, type check, tests, and import-boundary checks pass.
@@ -544,20 +544,20 @@ and verified binary image content.
 
 **Acceptance criteria:**
 
-- [ ] **T9.A1** `agent_runtime` receives an explicit registered tool, not
+- [x] **T9.A1** `agent_runtime` receives an explicit registered tool, not
   filesystem details or provider-specific image logic.
-- [ ] **T9.A2** Construction is side-effect free.
+- [x] **T9.A2** Construction is side-effect free.
 
 **Verification:**
 
-- [ ] **T9.V1** Bootstrap export tests and offline tool-loop integration tests
+- [x] **T9.V1** Bootstrap export tests and offline tool-loop integration tests
   pass.
 
 ### C3. Runtime checkpoint
 
 **Dependencies:** T6, T7, T8, T9.
 
-- [ ] **C3** Confirm the secure, bounded, offline-testable vertical path works
+- [x] **C3** Confirm the secure, bounded, offline-testable vertical path works
   from model-facing schema through application contracts to filesystem adapter.
 
 ### T10. Update applicable documentation and execute the quality gate
