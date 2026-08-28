@@ -179,8 +179,8 @@ class TextFileResult:
 
     path: str
     content: str
-    start_line: int
-    end_line: int
+    start_line: int | None
+    end_line: int | None
     complete: bool
     next_start_line: int | None
     total_lines: int
@@ -192,20 +192,31 @@ class TextFileResult:
         _validate_workspace_relative_path(self.path, field_name="path")
         _validate_line_number(self.start_line, field_name="start_line")
         _validate_line_number(self.end_line, field_name="end_line")
-        if self.end_line < self.start_line:
+        if (self.start_line is None) != (self.end_line is None):
+            msg = "empty output must not have a partial line range"
+            raise ValueError(msg)
+        if self.start_line is not None and self.end_line is not None and self.end_line < self.start_line:
             msg = "end_line must not precede start_line"
             raise ValueError(msg)
-        if self.total_lines < self.end_line:
+        if self.end_line is not None and self.total_lines < self.end_line:
             msg = "total_lines must cover returned lines"
             raise ValueError(msg)
         if self.complete != (self.next_start_line is None):
             msg = "pagination metadata must match complete"
             raise ValueError(msg)
-        if self.next_start_line is not None and self.next_start_line != self.end_line + 1:
+        expected_next_start_line = 1 if self.end_line is None else self.end_line + 1
+        if self.next_start_line is not None and self.next_start_line != expected_next_start_line:
             msg = "next_start_line must immediately follow end_line"
             raise ValueError(msg)
         truncated_lines = tuple(self.truncated_lines)
-        if any(line < self.start_line or line > self.end_line for line in truncated_lines):
+        if self.start_line is None and truncated_lines:
+            msg = "empty output must not have truncated lines"
+            raise ValueError(msg)
+        if (
+            self.start_line is not None
+            and self.end_line is not None
+            and any(line < self.start_line or line > self.end_line for line in truncated_lines)
+        ):
             msg = "truncated lines must be returned lines"
             raise ValueError(msg)
         if tuple(sorted(set(truncated_lines))) != truncated_lines:

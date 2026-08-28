@@ -9,9 +9,17 @@ from fabrica.features.workspace_reading.adapters.outbound.posix_filesystem.path_
     WorkspacePathResolutionError,
     open_workspace_file,
 )
+from fabrica.features.workspace_reading.adapters.outbound.posix_filesystem.text_reader import (
+    PosixTextFileReader,
+    TextFileTooLargeError,
+    UnsupportedTextEncodingError,
+)
 
 __all__ = [
     "OpenedWorkspaceFile",
+    "PosixTextFileReader",
+    "TextFileTooLargeError",
+    "UnsupportedTextEncodingError",
     "WorkspaceFileClassification",
     "WorkspacePathResolutionError",
     "classify_file_bytes",

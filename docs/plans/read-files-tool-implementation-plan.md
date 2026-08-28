@@ -100,9 +100,9 @@ explicitly marked not applicable with a reason.
 - [ ] **T4** Implement capability-gated secure POSIX path resolution and file classification.
   - [x] **T4.A1** Open-time containment rejects traversal and escaping symlinks.
   - [x] **T4.V1** Real-filesystem containment and classification integration tests pass.
-- [ ] **T5** Implement streamed UTF-8 text reads and bounded total-line metadata.
-  - [ ] **T5.A1** Text reads respect file, line, output, and metadata scan limits.
-  - [ ] **T5.V1** Text streaming, encoding, range, and pagination tests pass.
+- [x] **T5** Implement streamed UTF-8 text reads and bounded total-line metadata.
+  - [x] **T5.A1** Text reads respect file, line, output, and metadata scan limits.
+  - [x] **T5.V1** Text streaming, encoding, range, and pagination tests pass.
 - [ ] **C2** Secure text-read checkpoint: T4–T5 complete before runtime exposure.
 - [ ] **T6** Implement supervised helper-process batch execution, cancellation, deadlines, and retry.
   - [ ] **T6.A1** Batch results retain request order and isolate individual failures.
