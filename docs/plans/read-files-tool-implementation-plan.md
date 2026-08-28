@@ -103,10 +103,11 @@ explicitly marked not applicable with a reason.
 - [x] **T5** Implement streamed UTF-8 text reads and bounded total-line metadata.
   - [x] **T5.A1** Text reads respect file, line, output, and metadata scan limits.
   - [x] **T5.V1** Text streaming, encoding, range, and pagination tests pass.
-- [ ] **C2** Secure text-read checkpoint: T4–T5 complete before runtime exposure.
+- [x] **C2** Secure text-read checkpoint: T4–T5 complete before runtime exposure.
 - [ ] **T6** Implement supervised helper-process batch execution, cancellation, deadlines, and retry.
-  - [ ] **T6.A1** Batch results retain request order and isolate individual failures.
-  - [ ] **T6.V1** Scheduler, cancellation, timeout, and retry tests pass.
+  - [x] **T6.A1** Batch results retain request order and isolate individual failures.
+  - [x] **T6.V1** Scheduler, cancellation, timeout, and retry tests pass.
+  - [ ] **T6.V2** Real helper-process cancellation and timeout cleanup integration tests pass.
 - [ ] **T7** Implement verified provider-neutral image reading.
   - [ ] **T7.A1** Only supported, verified images are returned as `ImageContent`.
   - [ ] **T7.V1** Image format, capability, magic-byte, and size tests pass.

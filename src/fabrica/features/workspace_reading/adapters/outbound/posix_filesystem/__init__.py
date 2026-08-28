@@ -4,6 +4,9 @@ from fabrica.features.workspace_reading.adapters.outbound.posix_filesystem.class
     WorkspaceFileClassification,
     classify_file_bytes,
 )
+from fabrica.features.workspace_reading.adapters.outbound.posix_filesystem.helper_process import (
+    PosixHelperProcessFileReader,
+)
 from fabrica.features.workspace_reading.adapters.outbound.posix_filesystem.path_resolution import (
     OpenedWorkspaceFile,
     WorkspacePathResolutionError,
@@ -17,6 +20,7 @@ from fabrica.features.workspace_reading.adapters.outbound.posix_filesystem.text_
 
 __all__ = [
     "OpenedWorkspaceFile",
+    "PosixHelperProcessFileReader",
     "PosixTextFileReader",
     "TextFileTooLargeError",
     "UnsupportedTextEncodingError",

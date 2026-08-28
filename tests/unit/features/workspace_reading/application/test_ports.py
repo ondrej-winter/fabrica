@@ -2,7 +2,7 @@
 
 import asyncio
 import inspect
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -78,7 +78,7 @@ def test_read_files_delegates_each_request_in_command_order_with_the_host_contex
         external_read_authorized=True,
         image_input_supported=True,
         cancellation=NeverCancelled(),
-        deadline_at=datetime(2026, 8, 28, tzinfo=UTC),
+        deadline_at=datetime.now(UTC) + timedelta(seconds=5),
         limits=ReadFilesLimits(),
     )
     command = ReadFilesCommand((ReadFileRequest("src/first.py"), ReadFileRequest("src/second.py", start_line=4)))
