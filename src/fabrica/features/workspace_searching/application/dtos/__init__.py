@@ -25,6 +25,7 @@ from fabrica.features.workspace_searching.application.dtos.search_codebase impor
     SearchQueryResult,
     SearchQuerySuccess,
 )
+from fabrica.features.workspace_searching.application.dtos.search_location import SearchLocation
 
 __all__ = [
     "DEFAULT_CONTEXT_LINES",
@@ -45,6 +46,7 @@ __all__ = [
     "SearchError",
     "SearchErrorCode",
     "SearchLimits",
+    "SearchLocation",
     "SearchMatch",
     "SearchQuery",
     "SearchQueryFailure",

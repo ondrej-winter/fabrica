@@ -62,6 +62,16 @@ upload_to_release = false
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fabrica"]
+artifacts = [
+    "src/fabrica/features/workspace_searching/adapters/outbound/ripgrep_binaries/**/*.json",
+    "src/fabrica/features/workspace_searching/adapters/outbound/ripgrep_binaries/**/rg",
+]
+
+[tool.hatch.build.targets.sdist]
+artifacts = [
+    "src/fabrica/features/workspace_searching/adapters/outbound/ripgrep_binaries/**/*.json",
+    "src/fabrica/features/workspace_searching/adapters/outbound/ripgrep_binaries/**/rg",
+]
 
 [tool.ruff]
 line-length = 120
