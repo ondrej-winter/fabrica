@@ -84,9 +84,9 @@ task, verification step, scope change, blocker, or newly discovered work. A
 parent item is complete only after all of its child checks are complete or
 explicitly marked not applicable with a reason.
 
-- [ ] **T1** Define workspace-reading DTOs, limits, result variants, and stable errors.
-  - [ ] **T1.A1** DTOs enforce valid ranges, paths, limits, pagination, and safe metadata.
-  - [ ] **T1.V1** Focused DTO/error tests pass.
+- [x] **T1** Define workspace-reading DTOs, limits, result variants, and stable errors.
+  - [x] **T1.A1** DTOs enforce valid ranges, paths, limits, pagination, and safe metadata.
+  - [x] **T1.V1** Focused DTO/error tests pass.
 - [ ] **T2** Define application ports, read context, and use-case orchestration boundary.
   - [ ] **T2.A1** Application code depends only on DTOs and ports; host policy is explicit.
   - [ ] **T2.V1** Port export/type-contract tests pass.
@@ -153,16 +153,16 @@ explicitly marked not applicable with a reason.
 
 **Acceptance criteria:**
 
-- [ ] **T1.A1** Invalid ranges, blank paths, invalid limits, unsafe error
+- [x] **T1.A1** Invalid ranges, blank paths, invalid limits, unsafe error
   metadata, and inconsistent pagination are rejected at DTO construction.
-- [ ] **T1.A2** The result model represents exact and bounded/inexact line
+- [x] **T1.A2** The result model represents exact and bounded/inexact line
   totals without provider-specific or filesystem-specific types.
 
 **Verification:**
 
-- [ ] **T1.V1** Add focused pytest coverage for each DTO invariant and error
+- [x] **T1.V1** Add focused pytest coverage for each DTO invariant and error
   code.
-- [ ] **T1.V2** Run `uv run ruff check` and `uv run ty check` for the affected
+- [x] **T1.V2** Run `uv run ruff check` and `uv run ty check` for the affected
   source and tests.
 
 ### T2. Define application ports, read context, and use-case orchestration boundary

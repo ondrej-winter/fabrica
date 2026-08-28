@@ -1,0 +1,1 @@
+"""Workspace-reading capability slice."""
