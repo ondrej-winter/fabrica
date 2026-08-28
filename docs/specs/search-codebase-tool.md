@@ -327,7 +327,9 @@ canonical_path = filesystem_resolve(resolved_path)
 The implementation must verify that the final canonical path remains inside the
 configured workspace root before searching. The same workspace boundary should be
 shared by `read_files`, `search_codebase`, and `apply_patch`. Prefer one
-`WorkspacePathResolver` rather than three subtly different implementations.
+descriptor-based POSIX `WorkspacePathResolver` rather than three subtly different
+implementations. It must preserve the fail-closed containment guarantees proven by
+`workspace_reading`; a resolve-then-open check is insufficient.
 
 Default symlink behavior:
 
@@ -339,8 +341,11 @@ Default symlink behavior:
 
 `glob` optionally limits candidate files within `path`.
 
-Version 1 uses documented ripgrep-compatible glob grammar. The tool evaluates
-that grammar itself; host-shell expansion must never influence search semantics.
+Version 1 uses the bundled pinned ripgrep binary as the authoritative
+ripgrep-compatible glob parser. The adapter validates only structural input
+constraints locally, passes each glob literally to that binary, and maps its
+recognized deterministic invalid-glob diagnostic to `INVALID_GLOB`. Host-shell
+expansion must never influence search semantics.
 
 Examples:
 
@@ -562,8 +567,13 @@ Recommended initial defaults:
 MAX_RESULTS_PER_QUERY     = 100
 MAX_OUTPUT_PER_QUERY      = 48,000 chars
 MAX_QUERIES_PER_CALL      = 8
-MAX_OUTPUT_PER_TOOL_CALL  = 96,000 chars
+MAX_OUTPUT_PER_TOOL_CALL  = 48,000 chars
 ```
+
+The registered-tool adapter must serialize the complete canonical top-level
+`{ "results": [...] }` object as exactly one `ToolTextContent` part. The aggregate
+serialized-output budget therefore matches the runtime's 48,000-character
+per-part limit.
 
 A result means one matching line, not one regex submatch.
 
@@ -811,8 +821,13 @@ requested search path.
 ## Ripgrep execution guidance
 
 Version 1 must execute the bundled, pinned ripgrep binary only. It must not
-discover, validate, or fall back to a host-installed ripgrep binary. Packaging,
-startup validation, and conformance tests must target that pinned version.
+discover, validate, or fall back to a host-installed ripgrep binary. Ship the
+exact executables as wheel and source-distribution package data with committed
+SHA-256 verification metadata. Runtime selection may use only the bundled binary
+for macOS Apple Silicon (`arm64`) or Linux (`x86_64`); other OS/architecture
+combinations, including Intel macOS, must fail closed with
+`SEARCH_BACKEND_UNAVAILABLE`. Packaging, startup validation, and conformance tests
+must target that pinned version and support matrix.
 
 Conceptual invocation:
 
