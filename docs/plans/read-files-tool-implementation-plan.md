@@ -94,9 +94,9 @@ explicitly marked not applicable with a reason.
   - [x] **T3.A1** Formatting and pagination are explicit and never silently truncate output.
   - [x] **T3.V1** Parametrized unit tests cover ranges, caps, truncation, and line rendering.
 - [x] **C1** Contract checkpoint: T1–T3 complete before filesystem implementation.
-- [ ] **P0** Implement accepted agent-runtime nested-argument and multipart-result contracts.
-  - [ ] **P0.A1** Generic runtime contracts represent canonical bounded immutable nested JSON arguments and ordered provider-neutral text/image content parts.
-  - [ ] **P0.V1** Agent-runtime and PydanticAI regression tests cover bounds, canonical argument digests, nested mapping, and multipart returns before `read_files` runtime exposure begins.
+- [x] **P0** Implement accepted agent-runtime nested-argument and multipart-result contracts.
+  - [x] **P0.A1** Generic runtime contracts represent canonical bounded immutable nested JSON arguments and ordered provider-neutral text/image content parts.
+  - [x] **P0.V1** Agent-runtime and PydanticAI regression tests cover bounds, canonical argument digests, nested mapping, and multipart returns before `read_files` runtime exposure begins.
 - [ ] **T4** Implement capability-gated secure POSIX path resolution and file classification.
   - [x] **T4.A1** Open-time containment rejects traversal and escaping symlinks.
   - [x] **T4.V1** Real-filesystem containment and classification integration tests pass.

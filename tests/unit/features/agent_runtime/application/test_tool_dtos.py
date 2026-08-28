@@ -1,6 +1,6 @@
 """Tests for tool-loop application DTO contracts."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime, timedelta
 from typing import cast
@@ -9,26 +9,35 @@ import pytest
 
 from fabrica.features.agent_runtime.application.dtos import (
     DEFAULT_MAX_TOOL_CALLS_PER_TURN,
+    MAX_TOOL_ARGUMENT_NESTING_DEPTH,
+    MAX_TOOL_ARGUMENT_SEQUENCE_ENTRIES,
+    MAX_TOOL_ARGUMENT_STRING_CHARS,
     MAX_TOOL_CALL_ID_CHARS,
+    MAX_TOOL_CONTENT_PARTS,
     MAX_TOOL_DESCRIPTION_CHARS,
     MAX_TOOL_ERROR_MESSAGE_CHARS,
+    MAX_TOOL_IMAGE_BYTES,
     MAX_TOOL_NAME_CHARS,
     MAX_TOOL_RESPONSE_TEXT_CHARS,
     RegisteredToolOutcome,
     RuntimeObservation,
+    ToolArgumentValue,
     ToolAwareModelResponse,
     ToolCallRequest,
     ToolCallResult,
     ToolCallResultStatus,
+    ToolContentPart,
     ToolDefinition,
     ToolExecutionContext,
     ToolExecutionPhaseDeadline,
     ToolExecutionRuntimeDisposition,
+    ToolImageContent,
     ToolLoopLimits,
     ToolLoopRunResult,
     ToolLoopRunStatus,
     ToolMutationGuarantee,
     ToolOutcomeStatus,
+    ToolTextContent,
     canonical_tool_arguments_digest,
     canonical_tool_arguments_json,
 )
@@ -199,13 +208,87 @@ def test_tool_execution_context_carries_digest_deadlines_and_cancellation() -> N
 
 
 def test_tool_argument_digest_uses_canonical_json() -> None:
-    left = {"b": 2, "a": "safe"}
-    right = {"a": "safe", "b": 2}
+    left = {"b": (2, {"nested": "safe"}), "a": "safe"}
+    right = {"a": "safe", "b": (2, {"nested": "safe"})}
 
-    assert canonical_tool_arguments_json(left) == '{"a":"safe","b":2}'
+    assert canonical_tool_arguments_json(left) == '{"a":"safe","b":[2,{"nested":"safe"}]}'
     assert canonical_tool_arguments_digest(left) == canonical_tool_arguments_digest(right)
     with pytest.raises(ValueError, match="finite"):
         canonical_tool_arguments_json({"bad": float("inf")})
+
+
+def test_tool_call_request_normalizes_bounded_immutable_recursive_json_arguments() -> None:
+    request = ToolCallRequest(
+        call_id="call-1",
+        tool_name="lookup_note",
+        arguments={"files": ({"path": "src/example.py", "lines": (1, 3)},)},
+    )
+
+    assert request.arguments == {"files": ({"path": "src/example.py", "lines": (1, 3)},)}
+    with pytest.raises(TypeError):
+        cast("dict[str, object]", request.arguments)["files"] = ()
+    with pytest.raises(ValueError, match="nesting depth"):
+        ToolCallRequest(
+            call_id="call-2",
+            tool_name="lookup_note",
+            arguments=cast(
+                "Mapping[str, ToolArgumentValue]",
+                {"nested": _nested_tuple(MAX_TOOL_ARGUMENT_NESTING_DEPTH + 1)},
+            ),
+        )
+    with pytest.raises(ValueError, match="sequence"):
+        ToolCallRequest(
+            call_id="call-3",
+            tool_name="lookup_note",
+            arguments={"items": tuple(range(MAX_TOOL_ARGUMENT_SEQUENCE_ENTRIES + 1))},
+        )
+    with pytest.raises(TypeError, match="immutable JSON"):
+        ToolCallRequest(
+            call_id="call-4",
+            tool_name="lookup_note",
+            arguments=cast("Mapping[str, ToolArgumentValue]", {"items": ["mutable"]}),
+        )
+
+
+@pytest.mark.parametrize(
+    ("arguments", "error_type", "message"),
+    [
+        (cast("Mapping[str, ToolArgumentValue]", {1: "value"}), TypeError, "keys must be strings"),
+        ({"x" * (MAX_TOOL_ARGUMENT_STRING_CHARS + 1): "value"}, ValueError, "keys exceed"),
+        ({"value": "x" * (MAX_TOOL_ARGUMENT_STRING_CHARS + 1)}, ValueError, "strings exceed"),
+        (cast("Mapping[str, ToolArgumentValue]", {"value": object()}), TypeError, "immutable JSON"),
+    ],
+)
+def test_tool_call_request_rejects_invalid_recursive_json_values(
+    arguments: Mapping[str, ToolArgumentValue], error_type: type[Exception], message: str
+) -> None:
+    with pytest.raises(error_type, match=message):
+        ToolCallRequest(call_id="call-1", tool_name="lookup_note", arguments=arguments)
+
+
+def test_tool_content_parts_enforce_provider_neutral_bounds() -> None:
+    with pytest.raises(ValueError, match="text content exceeds"):
+        ToolTextContent(text="x" * (MAX_TOOL_RESPONSE_TEXT_CHARS + 1))
+    with pytest.raises(ValueError, match="must not be empty"):
+        ToolImageContent(data=b"", media_type="image/png")
+    with pytest.raises(ValueError, match="image bound"):
+        ToolImageContent(data=b"x" * (MAX_TOOL_IMAGE_BYTES + 1), media_type="image/png")
+    with pytest.raises(ValueError, match="media type is unsupported"):
+        ToolImageContent(data=b"image", media_type="image/svg+xml")
+    with pytest.raises(ValueError, match="content exceeds"):
+        ToolCallResult(
+            call_id="call-1",
+            tool_name="read_files",
+            status=ToolCallResultStatus.SUCCESS,
+            content=tuple(ToolTextContent(text="part") for _ in range(MAX_TOOL_CONTENT_PARTS + 1)),
+        )
+    with pytest.raises(TypeError, match="text or image parts"):
+        ToolCallResult(
+            call_id="call-1",
+            tool_name="read_files",
+            status=ToolCallResultStatus.SUCCESS,
+            content=cast("tuple[ToolContentPart, ...]", ("invalid",)),
+        )
 
 
 def test_registered_tool_outcome_invariants_distinguish_runtime_disposition() -> None:
@@ -254,3 +337,26 @@ def test_registered_tool_outcome_bounding_preserves_required_fields() -> None:
     assert "excerpt" not in serialized
     with pytest.raises(ValueError, match="mandatory tool outcome fields"):
         outcome.to_bounded_json(max_chars=10)
+
+
+def test_tool_result_preserves_ordered_provider_neutral_text_and_image_content() -> None:
+    image = ToolImageContent(data=b"\x89PNG\r\n\x1a\nimage", media_type="image/png")
+    result = ToolCallResult(
+        call_id="call-1",
+        tool_name="read_files",
+        status=ToolCallResultStatus.SUCCESS,
+        content=(ToolTextContent(text="src/example.py"), image, ToolTextContent(text="done")),
+    )
+
+    assert result.content == (ToolTextContent(text="src/example.py"), image, ToolTextContent(text="done"))
+    assert "image" not in RegisteredToolOutcome.model_continue_success(
+        mutation_guarantee=ToolMutationGuarantee.NO_MUTATION,
+        content=result.content,
+    ).to_bounded_json(max_chars=1_000)
+
+
+def _nested_tuple(depth: int) -> tuple[object, ...]:
+    value: tuple[object, ...] = ()
+    for _ in range(depth):
+        value = (value,)
+    return value

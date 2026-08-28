@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from pydantic_ai.messages import (
+    BinaryContent,
     ModelMessage,
     ModelRequest,
     ModelResponse,
@@ -18,13 +19,15 @@ from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model.message_
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     RuntimeObservation,
-    SafeRuntimeMetadataValue,
+    ToolArgumentValue,
     ToolAwareModelResponse,
     ToolCallRequest,
     ToolCallResult,
     ToolCallResultStatus,
     ToolCancellationSignal,
     ToolDefinition,
+    ToolImageContent,
+    ToolTextContent,
 )
 from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModelError
 
@@ -96,7 +99,7 @@ def _build_messages(prompt: str, tool_results: tuple[ToolCallResult, ...]) -> tu
 
 
 def _tool_return_part(result: ToolCallResult) -> ToolReturnPart:
-    content = result.result_text if result.status is ToolCallResultStatus.SUCCESS else result.error_message
+    content = _tool_return_content(result)
     return ToolReturnPart(
         tool_name=result.tool_name,
         content=content or result.status.value,
@@ -104,6 +107,20 @@ def _tool_return_part(result: ToolCallResult) -> ToolReturnPart:
         outcome="success" if result.status is ToolCallResultStatus.SUCCESS else "failed",
         metadata={"status": result.status.value},
     )
+
+
+def _tool_return_content(result: ToolCallResult) -> str | tuple[str | BinaryContent, ...]:
+    if result.status is not ToolCallResultStatus.SUCCESS:
+        return result.error_message or result.status.value
+    if not result.content:
+        return result.result_text or result.status.value
+    content: list[str | BinaryContent] = []
+    for part in result.content:
+        if isinstance(part, ToolTextContent):
+            content.append(part.text)
+        elif isinstance(part, ToolImageContent):
+            content.append(BinaryContent(data=part.data, media_type=part.media_type))
+    return tuple(content)
 
 
 def _response_to_tool_aware_model_response(response: ModelResponse) -> ToolAwareModelResponse:
@@ -138,23 +155,38 @@ def _tool_call_part_to_request(part: ToolCallPart) -> ToolCallRequest:
             category="invalid_tool_arguments",
             metadata={"tool_name": part.tool_name},
         ) from err
-    return ToolCallRequest(
-        call_id=part.tool_call_id,
-        tool_name=part.tool_name,
-        arguments=_safe_arguments(raw_arguments),
-    )
-
-
-def _safe_arguments(arguments: Mapping[str, object]) -> dict[str, SafeRuntimeMetadataValue]:
-    safe: dict[str, SafeRuntimeMetadataValue] = {}
-    for key, value in arguments.items():
-        if isinstance(value, str | int | float | bool) or value is None:
-            safe[key] = value
-            continue
-        msg = "pydanticai tool call arguments contained unsupported values"
+    try:
+        return ToolCallRequest(
+            call_id=part.tool_call_id,
+            tool_name=part.tool_name,
+            arguments=_safe_arguments(raw_arguments),
+        )
+    except (TypeError, ValueError) as err:
+        msg = "pydanticai tool call arguments were invalid"
         raise ToolAwareAgentModelError(
             msg,
             category="invalid_tool_arguments",
-            metadata={"argument_name": key, "argument_type": type(value).__name__},
-        )
+            metadata={"tool_name": part.tool_name},
+        ) from err
+
+
+def _safe_arguments(arguments: Mapping[str, object]) -> dict[str, ToolArgumentValue]:
+    safe: dict[str, ToolArgumentValue] = {}
+    for key, value in arguments.items():
+        safe[key] = _safe_argument_value(value, argument_name=key)
     return safe
+
+
+def _safe_argument_value(value: object, *, argument_name: str) -> ToolArgumentValue:
+    if value is None or isinstance(value, bool | int | float | str):
+        return value
+    if isinstance(value, list):
+        return tuple(_safe_argument_value(item, argument_name=argument_name) for item in value)
+    if isinstance(value, Mapping):
+        return {key: _safe_argument_value(item, argument_name=argument_name) for key, item in value.items()}
+    msg = "pydanticai tool call arguments contained unsupported values"
+    raise ToolAwareAgentModelError(
+        msg,
+        category="invalid_tool_arguments",
+        metadata={"argument_name": argument_name, "argument_type": type(value).__name__},
+    )

@@ -11,7 +11,7 @@ from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model import P
 from fabrica.features.agent_runtime.adapters.outbound.registered_tool import RegisteredTool
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
-    SafeRuntimeMetadataValue,
+    ToolArgumentValue,
     ToolAwareModelResponse,
     ToolCallRequest,
     ToolCallResult,
@@ -102,7 +102,7 @@ def test_registered_tool_loop_factory_does_not_call_model_or_registered_tool_dur
     model = SyntheticToolAwareModel()
     called = False
 
-    def synthetic_tool(_arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+    def synthetic_tool(_arguments: Mapping[str, ToolArgumentValue]) -> str:
         nonlocal called
         called = True
         return "called"
@@ -151,7 +151,7 @@ def test_pydantic_ai_tool_loop_factory_does_not_call_turn_or_tool_during_constru
     turn = SyntheticPydanticAIToolAwareTurn()
     called = False
 
-    def synthetic_tool(_arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+    def synthetic_tool(_arguments: Mapping[str, ToolArgumentValue]) -> str:
         nonlocal called
         called = True
         return "called"
@@ -171,7 +171,7 @@ def test_pydantic_ai_tool_loop_factory_does_not_call_turn_or_tool_during_constru
     assert called is False
 
 
-def _lookup_note(arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+def _lookup_note(arguments: Mapping[str, ToolArgumentValue]) -> str:
     note_id = arguments.get("note_id")
     if not isinstance(note_id, str):
         msg = "note_id must be a string"

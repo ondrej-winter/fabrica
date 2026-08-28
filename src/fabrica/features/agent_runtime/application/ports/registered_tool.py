@@ -5,14 +5,14 @@ from dataclasses import dataclass
 
 from fabrica.features.agent_runtime.application.dtos import (
     RegisteredToolOutcome,
-    SafeRuntimeMetadataValue,
+    ToolArgumentValue,
     ToolDefinition,
     ToolExecutionContext,
 )
 
-RegisteredToolHandler = Callable[[Mapping[str, SafeRuntimeMetadataValue]], str]
+RegisteredToolHandler = Callable[[Mapping[str, ToolArgumentValue]], str]
 AsyncRegisteredToolHandler = Callable[
-    [Mapping[str, SafeRuntimeMetadataValue], ToolExecutionContext],
+    [Mapping[str, ToolArgumentValue], ToolExecutionContext],
     Awaitable[RegisteredToolOutcome],
 ]
 

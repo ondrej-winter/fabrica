@@ -21,11 +21,11 @@ from fabrica.features.agent_runtime.adapters.outbound.registered_tool import (
 )
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
-    SafeRuntimeMetadataValue,
     SelectedSkill,
     SelectedSkillResource,
     SelectedSkillToolDeclaration,
     SkillToolExposureStatus,
+    ToolArgumentValue,
     ToolAwareModelResponse,
     ToolCallRequest,
     ToolCallResult,
@@ -157,7 +157,7 @@ def test_model_driven_skill_runtime_construction_is_side_effect_free(tmp_path: P
     model = SyntheticSkillToolAwareModel()
     called = False
 
-    def synthetic_tool(_arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+    def synthetic_tool(_arguments: Mapping[str, ToolArgumentValue]) -> str:
         nonlocal called
         called = True
         return "called"
@@ -241,7 +241,7 @@ def _skill_lookup_tool(skill_id: str) -> SkillAssociatedRegisteredTool:
     )
 
 
-def _lookup_note(arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+def _lookup_note(arguments: Mapping[str, ToolArgumentValue]) -> str:
     note_id = arguments.get("note_id")
     if not isinstance(note_id, str):
         msg = "note_id must be a string"

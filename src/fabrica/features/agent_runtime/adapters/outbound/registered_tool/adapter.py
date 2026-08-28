@@ -159,6 +159,7 @@ def _outcome_result(request: ToolCallRequest, outcome: RegisteredToolOutcome, li
         status=status,
         runtime_disposition=outcome.runtime_disposition,
         result_text=result_text,
+        content=outcome.content,
         error_message=outcome.error_message,
         observations=_outcome_observations(request, outcome),
     )

@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 
-from fabrica.features.agent_runtime.application.dtos import SafeRuntimeMetadataValue
+from fabrica.features.agent_runtime.application.dtos import ToolArgumentValue
 from fabrica.features.developer_workflow.application.dtos import (
     PreCommitRunCommand,
     PreCommitRunResult,
@@ -12,7 +12,7 @@ from fabrica.features.developer_workflow.application.ports import PreCommitRunEr
 _PRE_COMMIT_TOOL_FAILURE_MESSAGE = "pre-commit could not be run"
 
 
-def handle_run_pre_commit(runner: PreCommitRunner, arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+def handle_run_pre_commit(runner: PreCommitRunner, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return deterministic text output for one pre-commit tool call."""
     hook_id = _optional_string_argument(arguments, "hook_id", tool_name="run_pre_commit")
     all_files = _optional_bool_argument(arguments, "all_files", tool_name="run_pre_commit") or False
@@ -39,7 +39,7 @@ def _format_result(result: PreCommitRunResult) -> str:
 
 
 def _reject_unknown_arguments(
-    arguments: Mapping[str, SafeRuntimeMetadataValue], *, allowed_names: set[str], tool_name: str
+    arguments: Mapping[str, ToolArgumentValue], *, allowed_names: set[str], tool_name: str
 ) -> None:
     unknown_names = set(arguments) - allowed_names
     if unknown_names:
@@ -47,9 +47,7 @@ def _reject_unknown_arguments(
         raise ValueError(msg)
 
 
-def _optional_string_argument(
-    arguments: Mapping[str, SafeRuntimeMetadataValue], name: str, *, tool_name: str
-) -> str | None:
+def _optional_string_argument(arguments: Mapping[str, ToolArgumentValue], name: str, *, tool_name: str) -> str | None:
     if name not in arguments:
         return None
     value = arguments[name]
@@ -59,9 +57,7 @@ def _optional_string_argument(
     return value
 
 
-def _optional_bool_argument(
-    arguments: Mapping[str, SafeRuntimeMetadataValue], name: str, *, tool_name: str
-) -> bool | None:
+def _optional_bool_argument(arguments: Mapping[str, ToolArgumentValue], name: str, *, tool_name: str) -> bool | None:
     if name not in arguments:
         return None
     value = arguments[name]

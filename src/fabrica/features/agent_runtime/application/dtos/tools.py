@@ -24,9 +24,18 @@ MAX_TOOL_CALL_ID_CHARS = 120
 MAX_TOOL_DESCRIPTION_CHARS = 1_000
 MAX_TOOL_ERROR_MESSAGE_CHARS = 1_000
 MAX_TOOL_RESPONSE_TEXT_CHARS = 20_000
+MAX_TOOL_ARGUMENT_NESTING_DEPTH = 8
+MAX_TOOL_ARGUMENT_MAPPING_ENTRIES = 100
+MAX_TOOL_ARGUMENT_SEQUENCE_ENTRIES = 100
+MAX_TOOL_ARGUMENT_STRING_CHARS = 20_000
+MAX_TOOL_CONTENT_PARTS = 20
+MAX_TOOL_IMAGE_BYTES = 10_000_000
 SAFE_TOOL_IDENTIFIER_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-")
 type ToolArgumentSchemaValue = (
     str | int | float | bool | tuple[ToolArgumentSchemaValue, ...] | Mapping[str, ToolArgumentSchemaValue] | None
+)
+type ToolArgumentValue = (
+    str | int | float | bool | tuple[ToolArgumentValue, ...] | Mapping[str, ToolArgumentValue] | None
 )
 
 
@@ -53,6 +62,41 @@ class ToolExecutionRuntimeDisposition(StrEnum):
 
     CONTINUE_MODEL = "continue_model"
     STOP_RUNTIME = "stop_runtime"
+
+
+@dataclass(frozen=True, slots=True)
+class ToolTextContent:
+    """Provider-neutral bounded text content returned by a registered tool."""
+
+    text: str
+
+    def __post_init__(self) -> None:
+        if len(self.text) > MAX_TOOL_RESPONSE_TEXT_CHARS:
+            msg = "tool text content exceeds the safe response bound"
+            raise ValueError(msg)
+
+
+@dataclass(frozen=True, slots=True)
+class ToolImageContent:
+    """Provider-neutral verified image bytes returned by a registered tool."""
+
+    data: bytes
+    media_type: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "data", bytes(self.data))
+        if not self.data:
+            msg = "tool image content must not be empty"
+            raise ValueError(msg)
+        if len(self.data) > MAX_TOOL_IMAGE_BYTES:
+            msg = "tool image content exceeds the safe image bound"
+            raise ValueError(msg)
+        if self.media_type not in {"image/png", "image/jpeg", "image/gif", "image/webp"}:
+            msg = "tool image content media type is unsupported"
+            raise ValueError(msg)
+
+
+type ToolContentPart = ToolTextContent | ToolImageContent
 
 
 class ToolCancellationSignal(Protocol):
@@ -166,6 +210,7 @@ class RegisteredToolOutcome:
     mutation_guarantee: ToolMutationGuarantee
     runtime_disposition: ToolExecutionRuntimeDisposition = ToolExecutionRuntimeDisposition.CONTINUE_MODEL
     result_text: str | None = None
+    content: tuple[ToolContentPart, ...] = field(default_factory=tuple)
     error_code: str | None = None
     error_message: str | None = None
     retryable: bool = False
@@ -185,6 +230,8 @@ class RegisteredToolOutcome:
         if self.error_message is not None and len(self.error_message) > MAX_TOOL_ERROR_MESSAGE_CHARS:
             msg = "tool outcome error message exceeds the safe error bound"
             raise ValueError(msg)
+        _validate_tool_content(self.content)
+        object.__setattr__(self, "content", tuple(self.content))
         object.__setattr__(self, "details", MappingProxyType(dict(self.details)))
 
     @classmethod
@@ -193,6 +240,7 @@ class RegisteredToolOutcome:
         *,
         mutation_guarantee: ToolMutationGuarantee,
         result_text: str | None = None,
+        content: tuple[ToolContentPart, ...] = (),
         details: Mapping[str, SafeRuntimeMetadataValue] | None = None,
     ) -> "RegisteredToolOutcome":
         """Create a successful outcome that lets the model loop continue."""
@@ -200,6 +248,7 @@ class RegisteredToolOutcome:
             status=ToolOutcomeStatus.SUCCESS,
             mutation_guarantee=mutation_guarantee,
             result_text=result_text,
+            content=content,
             details=details or {},
         )
 
@@ -328,12 +377,12 @@ class ToolCallRequest:
 
     call_id: str
     tool_name: str
-    arguments: Mapping[str, SafeRuntimeMetadataValue] = field(default_factory=dict)
+    arguments: Mapping[str, ToolArgumentValue] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _validate_tool_identifier(self.call_id, field_name="tool call id", max_chars=MAX_TOOL_CALL_ID_CHARS)
         _validate_tool_identifier(self.tool_name, field_name="tool name", max_chars=MAX_TOOL_NAME_CHARS)
-        object.__setattr__(self, "arguments", MappingProxyType(dict(self.arguments)))
+        object.__setattr__(self, "arguments", _normalize_tool_arguments(self.arguments))
 
 
 @dataclass(frozen=True, slots=True)
@@ -345,6 +394,7 @@ class ToolCallResult:
     status: ToolCallResultStatus
     runtime_disposition: ToolExecutionRuntimeDisposition = ToolExecutionRuntimeDisposition.CONTINUE_MODEL
     result_text: str | None = None
+    content: tuple[ToolContentPart, ...] = field(default_factory=tuple)
     error_message: str | None = None
     observations: tuple[RuntimeObservation, ...] = field(default_factory=tuple)
 
@@ -357,6 +407,8 @@ class ToolCallResult:
         if self.error_message is not None and len(self.error_message) > MAX_TOOL_ERROR_MESSAGE_CHARS:
             msg = "tool error message exceeds the safe error bound"
             raise ValueError(msg)
+        _validate_tool_content(self.content)
+        object.__setattr__(self, "content", tuple(self.content))
         object.__setattr__(self, "observations", tuple(self.observations))
 
     def bounded(self, limits: ToolLoopLimits) -> "ToolCallResult":
@@ -369,6 +421,7 @@ class ToolCallResult:
             status=self.status,
             runtime_disposition=self.runtime_disposition,
             result_text=self.result_text[: limits.max_tool_result_chars],
+            content=self.content,
             error_message=self.error_message,
             observations=(
                 *self.observations,
@@ -475,18 +528,17 @@ def _validate_fatal_outcome(outcome: RegisteredToolOutcome) -> None:
         raise ValueError(msg)
 
 
-def canonical_tool_arguments_json(arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+def canonical_tool_arguments_json(arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return deterministic compact JSON for normalized tool arguments."""
-    _validate_json_safe_mapping(arguments)
     return json.dumps(
-        {key: _json_safe_value(value) for key, value in arguments.items()},
+        _json_serializable_tool_argument_value(_normalize_tool_arguments(arguments)),
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,
     )
 
 
-def canonical_tool_arguments_digest(arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+def canonical_tool_arguments_digest(arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return a SHA-256 digest for canonical normalized tool arguments."""
     canonical_json = canonical_tool_arguments_json(arguments)
     return f"sha256:{sha256(canonical_json.encode('utf-8')).hexdigest()}"
@@ -496,22 +548,85 @@ def _compact_json(payload: Mapping[str, object]) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
-def _validate_json_safe_mapping(arguments: Mapping[str, SafeRuntimeMetadataValue]) -> None:
+def _normalize_tool_arguments(arguments: Mapping[str, ToolArgumentValue]) -> Mapping[str, ToolArgumentValue]:
+    if not isinstance(arguments, Mapping):
+        msg = "tool arguments must be a mapping"
+        raise TypeError(msg)
+    if len(arguments) > MAX_TOOL_ARGUMENT_MAPPING_ENTRIES:
+        msg = "tool arguments exceed the safe mapping entry bound"
+        raise ValueError(msg)
+    normalized: dict[str, ToolArgumentValue] = {}
     for key, value in arguments.items():
         if not isinstance(key, str):
             msg = "tool argument keys must be strings"
             raise TypeError(msg)
-        if isinstance(value, float) and not isfinite(value):
+        if len(key) > MAX_TOOL_ARGUMENT_STRING_CHARS:
+            msg = "tool argument keys exceed the safe string bound"
+            raise ValueError(msg)
+        normalized[key] = _normalize_tool_argument_value(value, depth=1)
+    return MappingProxyType(normalized)
+
+
+def _normalize_tool_argument_value(value: object, *, depth: int) -> ToolArgumentValue:
+    if depth > MAX_TOOL_ARGUMENT_NESTING_DEPTH:
+        msg = "tool arguments exceed the safe nesting depth"
+        raise ValueError(msg)
+    if value is None or isinstance(value, bool | int):
+        return value
+    if isinstance(value, float):
+        if not isfinite(value):
             msg = "tool argument numbers must be finite"
             raise ValueError(msg)
-
-
-def _json_safe_value(value: SafeRuntimeMetadataValue) -> object:
+        return value
+    if isinstance(value, str):
+        if len(value) > MAX_TOOL_ARGUMENT_STRING_CHARS:
+            msg = "tool argument strings exceed the safe string bound"
+            raise ValueError(msg)
+        return value
     if isinstance(value, Mapping):
-        return {str(key): _json_safe_value(item) for key, item in value.items()}
+        return _normalize_tool_arguments_nested(value, depth=depth)
     if isinstance(value, tuple):
-        return tuple(_json_safe_value(item) for item in value)
+        if len(value) > MAX_TOOL_ARGUMENT_SEQUENCE_ENTRIES:
+            msg = "tool argument sequences exceed the safe entry bound"
+            raise ValueError(msg)
+        return tuple(_normalize_tool_argument_value(item, depth=depth + 1) for item in value)
+    msg = "tool arguments must contain immutable JSON values"
+    raise TypeError(msg)
+
+
+def _normalize_tool_arguments_nested(
+    arguments: Mapping[object, object], *, depth: int
+) -> Mapping[str, ToolArgumentValue]:
+    if len(arguments) > MAX_TOOL_ARGUMENT_MAPPING_ENTRIES:
+        msg = "tool argument mappings exceed the safe entry bound"
+        raise ValueError(msg)
+    normalized: dict[str, ToolArgumentValue] = {}
+    for key, value in arguments.items():
+        if not isinstance(key, str):
+            msg = "tool argument keys must be strings"
+            raise TypeError(msg)
+        if len(key) > MAX_TOOL_ARGUMENT_STRING_CHARS:
+            msg = "tool argument keys exceed the safe string bound"
+            raise ValueError(msg)
+        normalized[key] = _normalize_tool_argument_value(value, depth=depth + 1)
+    return MappingProxyType(normalized)
+
+
+def _json_serializable_tool_argument_value(value: ToolArgumentValue) -> object:
+    if isinstance(value, Mapping):
+        return {key: _json_serializable_tool_argument_value(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_json_serializable_tool_argument_value(item) for item in value]
     return value
+
+
+def _validate_tool_content(content: tuple[ToolContentPart, ...]) -> None:
+    if len(content) > MAX_TOOL_CONTENT_PARTS:
+        msg = "tool content exceeds the safe part bound"
+        raise ValueError(msg)
+    if any(not isinstance(part, ToolTextContent | ToolImageContent) for part in content):
+        msg = "tool content must contain provider-neutral text or image parts"
+        raise TypeError(msg)
 
 
 def _validate_tool_digest(value: str) -> None:

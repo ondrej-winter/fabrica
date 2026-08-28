@@ -16,17 +16,19 @@ from fabrica.features.agent_runtime.adapters.outbound.registered_tool import (
 from fabrica.features.agent_runtime.application.dtos import (
     RegisteredToolOutcome,
     RuntimeObservation,
-    SafeRuntimeMetadataValue,
     SelectedSkill,
     SkillToolExposureStatus,
     SkillToolPreparationCommand,
+    ToolArgumentValue,
     ToolCallRequest,
     ToolCallResult,
     ToolCallResultStatus,
     ToolDefinition,
     ToolExecutionContext,
+    ToolImageContent,
     ToolLoopLimits,
     ToolMutationGuarantee,
+    ToolTextContent,
 )
 from fabrica.features.agent_runtime.application.use_cases import PrepareSkillTools
 
@@ -59,7 +61,7 @@ def test_async_registered_tool_contract_keeps_typed_handler_without_execution() 
     called = False
 
     async def synthetic_tool(
-        _arguments: Mapping[str, SafeRuntimeMetadataValue],
+        _arguments: Mapping[str, ToolArgumentValue],
         _context: ToolExecutionContext,
     ) -> RegisteredToolOutcome:
         nonlocal called
@@ -82,7 +84,7 @@ def test_registered_tool_executor_runs_async_typed_tool_with_execution_context()
     contexts: list[ToolExecutionContext] = []
 
     async def synthetic_tool(
-        _arguments: Mapping[str, SafeRuntimeMetadataValue],
+        _arguments: Mapping[str, ToolArgumentValue],
         context: ToolExecutionContext,
     ) -> RegisteredToolOutcome:
         contexts.append(context)
@@ -117,9 +119,42 @@ def test_registered_tool_executor_runs_async_typed_tool_with_execution_context()
     assert contexts[0].argument_digest.startswith("sha256:")
 
 
+def test_registered_tool_executor_preserves_typed_ordered_content_parts() -> None:
+    async def synthetic_tool(
+        _arguments: Mapping[str, ToolArgumentValue],
+        _context: ToolExecutionContext,
+    ) -> RegisteredToolOutcome:
+        return RegisteredToolOutcome.model_continue_success(
+            mutation_guarantee=ToolMutationGuarantee.NO_MUTATION,
+            content=(
+                ToolTextContent(text="first"),
+                ToolImageContent(data=b"\x89PNG\r\n\x1a\nimage", media_type="image/png"),
+                ToolTextContent(text="last"),
+            ),
+        )
+
+    result = asyncio.run(
+        RegisteredToolExecutor(
+            (
+                AsyncRegisteredTool(
+                    definition=ToolDefinition(name="read_files", description="Read synthetic files"),
+                    handler=synthetic_tool,
+                ),
+            ),
+        ).execute_tool(
+            ToolCallRequest(call_id="call-1", tool_name="read_files"),
+            ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=1_000),
+            _NeverCancelledToolCancellationSignal(),
+        ),
+    )
+
+    assert result.status is ToolCallResultStatus.SUCCESS
+    assert tuple(type(part) for part in result.content) == (ToolTextContent, ToolImageContent, ToolTextContent)
+
+
 def test_registered_tool_executor_maps_async_rejection_to_recoverable_result() -> None:
     async def reject_tool(
-        _arguments: Mapping[str, SafeRuntimeMetadataValue],
+        _arguments: Mapping[str, ToolArgumentValue],
         _context: ToolExecutionContext,
     ) -> RegisteredToolOutcome:
         return RegisteredToolOutcome.recoverable_rejection(
@@ -137,7 +172,7 @@ def test_registered_tool_executor_maps_async_rejection_to_recoverable_result() -
 
 def test_registered_tool_executor_maps_async_fatal_outcome_to_stop_disposition() -> None:
     async def fail_tool(
-        _arguments: Mapping[str, SafeRuntimeMetadataValue],
+        _arguments: Mapping[str, ToolArgumentValue],
         _context: ToolExecutionContext,
     ) -> RegisteredToolOutcome:
         return RegisteredToolOutcome.fatal_runtime_stop(
@@ -176,7 +211,7 @@ def test_registered_tool_executor_fails_closed_for_unknown_tool() -> None:
 
 
 def test_registered_tool_executor_maps_value_error_to_invalid_arguments() -> None:
-    def reject_arguments(_arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+    def reject_arguments(_arguments: Mapping[str, ToolArgumentValue]) -> str:
         msg = "private validation detail"
         raise ValueError(msg)
 
@@ -195,7 +230,7 @@ def test_registered_tool_executor_maps_missing_argument_to_invalid_arguments() -
 
 
 def test_registered_tool_executor_maps_timeout_error_to_timeout() -> None:
-    def time_out(_arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+    def time_out(_arguments: Mapping[str, ToolArgumentValue]) -> str:
         msg = "private timeout detail"
         raise TimeoutError(msg)
 
@@ -207,7 +242,7 @@ def test_registered_tool_executor_maps_timeout_error_to_timeout() -> None:
 
 
 def test_registered_tool_executor_maps_runtime_error_to_tool_failure() -> None:
-    def fail(_arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+    def fail(_arguments: Mapping[str, ToolArgumentValue]) -> str:
         msg = "private failure detail"
         raise RuntimeError(msg)
 
@@ -219,7 +254,7 @@ def test_registered_tool_executor_maps_runtime_error_to_tool_failure() -> None:
 
 
 def test_registered_tool_executor_maps_unexpected_exception_to_tool_failure() -> None:
-    def fail(_arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+    def fail(_arguments: Mapping[str, ToolArgumentValue]) -> str:
         msg = "private os detail"
         raise OSError(msg)
 
@@ -254,7 +289,7 @@ def test_registered_tool_executor_bounds_oversized_output() -> None:
 def test_constructing_registered_tool_executor_does_not_call_registered_tool() -> None:
     called = False
 
-    def synthetic_tool(_arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+    def synthetic_tool(_arguments: Mapping[str, ToolArgumentValue]) -> str:
         nonlocal called
         called = True
         return "called"
@@ -318,7 +353,7 @@ def test_registered_skill_tool_preparer_maps_explicit_registration_to_declaratio
 def test_registered_skill_tool_preparer_does_not_call_registered_tool_during_preparation() -> None:
     called = False
 
-    def synthetic_tool(_arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+    def synthetic_tool(_arguments: Mapping[str, ToolArgumentValue]) -> str:
         nonlocal called
         called = True
         return "called"
@@ -419,7 +454,7 @@ def _execute_tool_with_handler(
 
 
 def _execute_async_tool_with_handler(
-    handler: Callable[[Mapping[str, SafeRuntimeMetadataValue], ToolExecutionContext], Awaitable[RegisteredToolOutcome]],
+    handler: Callable[[Mapping[str, ToolArgumentValue], ToolExecutionContext], Awaitable[RegisteredToolOutcome]],
 ) -> ToolCallResult:
     executor = RegisteredToolExecutor(
         (

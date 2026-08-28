@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 
-from fabrica.features.agent_runtime.application.dtos import SafeRuntimeMetadataValue
+from fabrica.features.agent_runtime.application.dtos import ToolArgumentValue
 from fabrica.features.developer_workflow.application.ports import (
     GitStagedChangesLoader,
     GitStagedChangesLoadError,
@@ -11,7 +11,7 @@ from fabrica.features.developer_workflow.application.ports import (
 _STAGED_GIT_TOOL_FAILURE_MESSAGE = "staged git changes could not be loaded"
 
 
-def handle_staged_files(loader: GitStagedChangesLoader, arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+def handle_staged_files(loader: GitStagedChangesLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return staged file status and path lines for a registered tool call."""
     _require_no_arguments(arguments)
     try:
@@ -21,7 +21,7 @@ def handle_staged_files(loader: GitStagedChangesLoader, arguments: Mapping[str, 
     return "\n".join(f"{file.status.value}\t{file.path}" for file in staged_files.files)
 
 
-def handle_staged_diff(loader: GitStagedChangesLoader, arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+def handle_staged_diff(loader: GitStagedChangesLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return the full staged diff text for a registered tool call."""
     _require_no_arguments(arguments)
     try:
@@ -30,7 +30,7 @@ def handle_staged_diff(loader: GitStagedChangesLoader, arguments: Mapping[str, S
         raise RuntimeError(_STAGED_GIT_TOOL_FAILURE_MESSAGE) from err
 
 
-def handle_staged_file_diff(loader: GitStagedChangesLoader, arguments: Mapping[str, SafeRuntimeMetadataValue]) -> str:
+def handle_staged_file_diff(loader: GitStagedChangesLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return the staged diff text for one registered-tool path argument."""
     if set(arguments) != {"path"}:
         msg = "git_staged_file_diff requires exactly the path argument"
@@ -45,7 +45,7 @@ def handle_staged_file_diff(loader: GitStagedChangesLoader, arguments: Mapping[s
         raise RuntimeError(_STAGED_GIT_TOOL_FAILURE_MESSAGE) from err
 
 
-def _require_no_arguments(arguments: Mapping[str, SafeRuntimeMetadataValue]) -> None:
+def _require_no_arguments(arguments: Mapping[str, ToolArgumentValue]) -> None:
     if arguments:
         msg = "staged git tool does not accept arguments"
         raise ValueError(msg)

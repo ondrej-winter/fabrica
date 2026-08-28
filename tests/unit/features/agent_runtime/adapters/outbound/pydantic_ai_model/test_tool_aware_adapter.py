@@ -2,9 +2,10 @@
 
 import asyncio
 from dataclasses import dataclass, field
+from typing import cast
 
 import pytest
-from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, ToolReturnPart
+from pydantic_ai.messages import BinaryContent, ModelResponse, TextPart, ToolCallPart, ToolReturnPart
 
 from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model import (
     PydanticAIToolAwareAgentModel,
@@ -18,6 +19,8 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolCallResult,
     ToolCallResultStatus,
     ToolDefinition,
+    ToolImageContent,
+    ToolTextContent,
 )
 from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModelError
 
@@ -105,6 +108,38 @@ def test_tool_aware_adapter_passes_prior_tool_results_as_pydanticai_tool_returns
     assert tool_return.metadata == {"status": "success"}
 
 
+def test_tool_aware_adapter_renders_ordered_provider_neutral_content_parts_at_provider_boundary() -> None:
+    turn = FakeToolAwareTurn(response=ModelResponse(parts=[TextPart("final")]))
+    tool_result = ToolCallResult(
+        call_id="call-1",
+        tool_name="read_files",
+        status=ToolCallResultStatus.SUCCESS,
+        content=(
+            ToolTextContent(text="first"),
+            ToolImageContent(data=b"\x89PNG\r\n\x1a\nimage", media_type="image/png"),
+            ToolTextContent(text="last"),
+        ),
+    )
+
+    asyncio.run(
+        PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
+            LocalAgentRunCommand(prompt="Continue"),
+            available_tools=(),
+            tool_results=(tool_result,),
+        ),
+    )
+
+    tool_return = turn.calls[0].messages[1].parts[0]
+    assert isinstance(tool_return, ToolReturnPart)
+    assert isinstance(tool_return.content, tuple)
+    first, image, last = cast("tuple[str | BinaryContent, ...]", tool_return.content)
+    assert first == "first"
+    assert isinstance(image, BinaryContent)
+    assert image.data == b"\x89PNG\r\n\x1a\nimage"
+    assert image.media_type == "image/png"
+    assert last == "last"
+
+
 def test_tool_aware_adapter_maps_failed_prior_tool_results_as_failed_returns() -> None:
     turn = FakeToolAwareTurn(response=ModelResponse(parts=[TextPart("final")]))
     tool_result = ToolCallResult(
@@ -129,10 +164,29 @@ def test_tool_aware_adapter_maps_failed_prior_tool_results_as_failed_returns() -
     assert tool_return.metadata == {"status": "tool_failure"}
 
 
-def test_tool_aware_adapter_rejects_tool_call_with_unsupported_argument_value() -> None:
+def test_tool_aware_adapter_maps_nested_tool_call_arguments_to_immutable_json_values() -> None:
     turn = FakeToolAwareTurn(
         response=ModelResponse(
             parts=[ToolCallPart(tool_name="lookup_note", args={"nested": {"unsafe": "value"}}, tool_call_id="call-1")],
+        ),
+    )
+
+    result = asyncio.run(
+        PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
+            LocalAgentRunCommand(prompt="Use a tool"),
+            available_tools=(),
+        ),
+    )
+
+    assert result.tool_calls[0].arguments == {"nested": {"unsafe": "value"}}
+    with pytest.raises(TypeError):
+        cast("dict[str, object]", result.tool_calls[0].arguments)["nested"] = "changed"
+
+
+def test_tool_aware_adapter_rejects_unsupported_tool_call_argument_value() -> None:
+    turn = FakeToolAwareTurn(
+        response=ModelResponse(
+            parts=[ToolCallPart(tool_name="lookup_note", args={"unsupported": {"value"}}, tool_call_id="call-1")],
         ),
     )
 
@@ -145,7 +199,28 @@ def test_tool_aware_adapter_rejects_tool_call_with_unsupported_argument_value() 
         )
 
     assert error_info.value.category == "invalid_tool_arguments"
-    assert error_info.value.metadata == {"argument_name": "nested", "argument_type": "dict"}
+    assert error_info.value.metadata == {"argument_name": "unsupported", "argument_type": "set"}
+
+
+@pytest.mark.parametrize(
+    "parts",
+    [
+        (TextPart("done"), ToolCallPart(tool_name="lookup_note", args={}, tool_call_id="call-1")),
+        (),
+    ],
+)
+def test_tool_aware_adapter_rejects_invalid_pydanticai_response_parts(parts: tuple[object, ...]) -> None:
+    turn = FakeToolAwareTurn(response=ModelResponse(parts=parts))  # ty: ignore[invalid-argument-type]
+
+    with pytest.raises(ToolAwareAgentModelError) as error_info:
+        asyncio.run(
+            PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(
+                LocalAgentRunCommand(prompt="Continue"),
+                available_tools=(),
+            ),
+        )
+
+    assert error_info.value.category == "invalid_pydanticai_response"
 
 
 def test_tool_aware_adapter_normalizes_dependency_failure() -> None:

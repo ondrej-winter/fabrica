@@ -6,7 +6,7 @@ from typing import Protocol
 
 from fabrica.features.agent_runtime.application.dtos import (
     RegisteredToolOutcome,
-    SafeRuntimeMetadataValue,
+    ToolArgumentValue,
     ToolDefinition,
     ToolExecutionContext,
     ToolMutationGuarantee,
@@ -73,7 +73,7 @@ class ApplyPatchRegisteredToolAdapter:
 
     async def handle(
         self,
-        arguments: Mapping[str, SafeRuntimeMetadataValue],
+        arguments: Mapping[str, ToolArgumentValue],
         context: ToolExecutionContext,
     ) -> RegisteredToolOutcome:
         """Run one canonical patch request and return a typed runtime outcome."""
