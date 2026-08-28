@@ -90,10 +90,10 @@ explicitly marked not applicable with a reason.
 - [x] **T2** Define application ports, read context, and use-case orchestration boundary.
   - [x] **T2.A1** Application code depends only on DTOs and ports; host policy is explicit.
   - [x] **T2.V1** Port export/type-contract tests pass.
-- [ ] **T3** Implement pure range validation, output limiting, and text formatting.
-  - [ ] **T3.A1** Formatting and pagination are explicit and never silently truncate output.
-  - [ ] **T3.V1** Parametrized unit tests cover ranges, caps, truncation, and line rendering.
-- [ ] **C1** Contract checkpoint: T1–T3 complete before filesystem implementation.
+- [x] **T3** Implement pure range validation, output limiting, and text formatting.
+  - [x] **T3.A1** Formatting and pagination are explicit and never silently truncate output.
+  - [x] **T3.V1** Parametrized unit tests cover ranges, caps, truncation, and line rendering.
+- [x] **C1** Contract checkpoint: T1–T3 complete before filesystem implementation.
 - [ ] **P0** Implement accepted agent-runtime nested-argument and multipart-result contracts.
   - [ ] **P0.A1** Generic runtime contracts represent canonical bounded immutable nested JSON arguments and ordered provider-neutral text/image content parts.
   - [ ] **P0.V1** Agent-runtime and PydanticAI regression tests cover bounds, canonical argument digests, nested mapping, and multipart returns before `read_files` runtime exposure begins.
