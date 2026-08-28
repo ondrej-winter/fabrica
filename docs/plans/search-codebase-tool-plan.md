@@ -40,11 +40,11 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 ### Phase 1: Contract and safe search planning
 
-- [ ] `T1` — Establish search application contracts, DTOs, limits, validation, and result serialization.
-  - [ ] `T1-AC1` — Canonical query objects, immutable results, one-based Unicode column semantics, defaults, stable error codes, and all per-query/batch limits are represented and validated.
-  - [ ] `T1-AC2` — Invalid input and empty patterns produce independent per-query failures without invalidating other batch entries; backend-classified invalid regexes and invalid globs have stable result representations reserved for T3.
-  - [ ] `T1-V1` — Focused DTO/validator tests pass.
-  - [ ] `T1-V2` — `uv run ruff check src/fabrica/features/workspace_searching tests/unit/features/workspace_searching` passes.
+- [x] `T1` — Establish search application contracts, DTOs, limits, validation, and result serialization.
+  - [x] `T1-AC1` — Canonical query objects, immutable results, one-based Unicode column semantics, defaults, stable error codes, and all per-query/batch limits are represented and validated.
+  - [x] `T1-AC2` — Invalid input and empty patterns produce independent per-query failures without invalidating other batch entries; backend-classified invalid regexes and invalid globs have stable result representations reserved for T3.
+  - [x] `T1-V1` — Focused DTO/validator tests pass.
+  - [x] `T1-V2` — `uv run ruff check src/fabrica/features/workspace_searching tests/unit/features/workspace_searching` passes.
 - [ ] `T2` — Define and implement workspace-contained scope resolution plus a fail-closed subprocess-containment boundary.
   - [ ] `T2-AC1` — Literal workspace-relative file/directory paths reject absolute paths, traversal, non-filesystem targets, missing paths, and symlink escapes.
   - [ ] `T2-AC2` — The selected launch boundary prevents ripgrep from traversing outside the configured workspace for the subprocess lifetime, including after pathname/symlink races; unsupported hosts fail closed before spawning a backend.
@@ -102,19 +102,19 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 **Task completion:**
 
-- [ ] `T1` — All required acceptance and verification items are resolved.
+- [x] `T1` — All required acceptance and verification items are resolved.
 
 **Description:** Define immutable search DTOs, error taxonomy, defaults/limits, application ports, canonical query validation, structural-only glob validation, and pure output-size accounting before any process execution. Ripgrep remains the sole glob grammar authority; this task must not implement or classify glob syntax beyond structural input constraints.
 
 **Acceptance criteria:**
 
-- [ ] `T1-AC1` — Canonical query objects, immutable results, one-based Unicode column semantics, defaults, stable error codes, and all per-query/batch limits are represented and validated.
-- [ ] `T1-AC2` — Invalid input and empty patterns produce independent per-query failures without invalidating other batch entries; backend-classified invalid regexes and invalid globs have stable result representations reserved for T3.
+- [x] `T1-AC1` — Canonical query objects, immutable results, one-based Unicode column semantics, defaults, stable error codes, and all per-query/batch limits are represented and validated.
+- [x] `T1-AC2` — Invalid input and empty patterns produce independent per-query failures without invalidating other batch entries; backend-classified invalid regexes and invalid globs have stable result representations reserved for T3.
 
 **Verification:**
 
-- [ ] `T1-V1` — Focused DTO/validator tests pass.
-- [ ] `T1-V2` — `uv run ruff check src/fabrica/features/workspace_searching tests/unit/features/workspace_searching` passes.
+- [x] `T1-V1` — Focused DTO/validator tests pass.
+- [x] `T1-V2` — `uv run ruff check src/fabrica/features/workspace_searching tests/unit/features/workspace_searching` passes.
 
 **Dependencies:** None.
 
