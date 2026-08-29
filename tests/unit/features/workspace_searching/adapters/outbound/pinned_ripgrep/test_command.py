@@ -17,8 +17,10 @@ def test_pinned_ripgrep_command_for_directory_forwards_literal_glob_and_safe_def
 
     backend = _backend_arguments(command)
     assert "--json" in backend
+    assert "--no-config" in backend
     assert "--hidden" in backend
     assert "--no-follow" in backend
+    assert "--no-ignore-parent" in backend
     assert "--ignore-case" in backend
     assert "--max-filesize=1234" in backend
     assert "--glob=!.git/**" in backend

@@ -35,8 +35,10 @@ class PinnedRipgrepCommandBuilder:
         arguments = [
             str(executable.path),
             "--json",
+            "--no-config",
             "--hidden",
             "--no-follow",
+            "--no-ignore-parent",
             f"--max-filesize={limits.max_search_file_bytes}",
             *(f"--glob={glob}" for glob in _ALWAYS_EXCLUDED_GLOBS),
         ]

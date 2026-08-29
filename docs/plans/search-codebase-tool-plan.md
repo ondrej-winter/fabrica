@@ -60,6 +60,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
   - [ ] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process-cleanup, pinned-version, checksum, executable-permission, and platform-selection conformance tests pass.
   - [ ] `T3-V2` — Focused integration tests verify actual fixture searches with the packaged binary, including ignore/hidden/explicit-file glob behavior.
   - [ ] `T3-V3` — Clean-environment tests install both the built wheel and source distribution, verify the expected binary and checksum metadata are present and executable, and run a representative packaged-binary search on each supported CI target.
+  - **Implementation status (August 29, 2026):** The pinned-ripgrep outbound adapter, incremental stdout supervision, result-cap termination, cancellation/timeout cleanup, source hydration, stable failure mapping, and deterministic unit coverage are implemented. The fixed command also disables host ripgrep configuration and parent-ignore discovery. T3 remains open because the current macOS `sandbox-exec` containment profile aborts the bundled binary before it emits output; the adapter fails closed as `SEARCH_BACKEND_UNAVAILABLE` rather than widening containment or falling back to host `rg`. Real contained packaged-binary fixture searches and clean-environment wheel/source-distribution conformance remain required.
 - [x] `T4` — Implement backend-neutral context hydration, Unicode-safe location conversion, deterministic ordering, and complete-object output limiting.
   - [x] `T4-AC1` — Every match returns two bounded before/after lines, matching/context truncation metadata, CRLF/UTF-8 handling, one match per line, and Unicode character columns.
   - [x] `T4-AC2` — Results sort by path/line/column and observe 100-match, 48,000-character/query, and 48,000-character/batch budgets without partial objects; omitted batch entries are explicit.
@@ -185,6 +186,14 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 - [ ] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process-cleanup, pinned-version, checksum, executable-permission, and platform-selection conformance tests pass.
 - [ ] `T3-V2` — Focused integration tests verify actual fixture searches with the packaged binary, including ignore/hidden/explicit-file glob behavior.
 - [ ] `T3-V3` — Clean-environment tests install both the built wheel and source distribution, verify the expected binary and checksum metadata are present and executable, and run a representative packaged-binary search on each supported CI target.
+
+**Implementation status (August 29, 2026):**
+
+- Implemented `PinnedRipgrepWorkspaceSearchBackend` with verified-command construction, incremental JSON-lines collection, bounded matching-line termination, cancellation/timeout cleanup, source loading, context hydration, and stable error mapping.
+- Added deterministic adapter tests for successful hydration, invalid regex/glob diagnostics, transient I/O, cancellation, timeout, malformed output, source containment, output caps, and macOS/Linux cleanup paths.
+- Added `--no-config` and `--no-ignore-parent` to fixed ripgrep arguments so host configuration and ancestor ignore discovery cannot alter search behavior.
+- Full local quality evidence passed on August 29, 2026: formatting, linting, `ty`, import-linter, `pytest` (1,276 passed, 2 skipped, 93.03% coverage), and `uv build`.
+- Do not check T3 complete: on the current macOS host, the existing `sandbox-exec` profile aborts the bundled ripgrep binary before it emits output. The adapter reports `SEARCH_BACKEND_UNAVAILABLE` and does not weaken containment or discover a host binary. Resolve that execution-profile issue and add real contained fixture searches plus clean-environment wheel/source-distribution conformance before closing T3.
 
 **Dependencies:** T1 and T2.
 
