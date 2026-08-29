@@ -69,8 +69,8 @@ class PinnedRipgrepCommandRunner(Protocol):
 class WorkspaceSourceLoader(Protocol):
     """Adapter-local source loading boundary used for context hydration."""
 
-    def load(self, workspace_root: Path, paths: tuple[str, ...]) -> dict[str, str]:
-        """Load UTF-8 source text for already-contained workspace-relative paths."""
+    async def load(self, workspace_root: Path, paths: tuple[str, ...]) -> dict[str, str]:
+        """Asynchronously load UTF-8 source text for contained workspace-relative paths."""
         ...
 
 
@@ -140,18 +140,23 @@ class AsyncioPinnedRipgrepCommandRunner:
 class PosixWorkspaceSourceLoader:
     """Load matched source files after enforcing their workspace containment."""
 
-    def load(self, workspace_root: Path, paths: tuple[str, ...]) -> dict[str, str]:
-        """Return newline-normalized UTF-8 source text for the requested paths."""
-        root = workspace_root.resolve(strict=True)
-        source_text_by_path: dict[str, str] = {}
-        for path in paths:
-            candidate = root / path
-            canonical_path = candidate.resolve(strict=True)
-            if not canonical_path.is_relative_to(root) or not canonical_path.is_file():
-                msg = "matched source path is unavailable inside the workspace"
-                raise OSError(msg)
-            source_text_by_path[path] = canonical_path.read_text(encoding="utf-8-sig", newline=None)
-        return source_text_by_path
+    async def load(self, workspace_root: Path, paths: tuple[str, ...]) -> dict[str, str]:
+        """Load source text without blocking cancellation supervision on the event loop."""
+        return await asyncio.to_thread(_load_source_text, workspace_root, paths)
+
+
+def _load_source_text(workspace_root: Path, paths: tuple[str, ...]) -> dict[str, str]:
+    """Return newline-normalized UTF-8 source text for requested paths."""
+    root = workspace_root.resolve(strict=True)
+    source_text_by_path: dict[str, str] = {}
+    for path in paths:
+        candidate = root / path
+        canonical_path = candidate.resolve(strict=True)
+        if not canonical_path.is_relative_to(root) or not canonical_path.is_file():
+            msg = "matched source path is unavailable inside the workspace"
+            raise OSError(msg)
+        source_text_by_path[path] = canonical_path.read_text(encoding="utf-8-sig", newline=None)
+    return source_text_by_path
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,7 +180,7 @@ class PinnedRipgrepWorkspaceSearchBackend(WorkspaceSearchBackend):
                 timeout_seconds=context.limits.per_query_timeout_seconds,
                 max_matching_lines=context.limits.max_results_per_query,
             )
-            return self._result_from_completed(query, completed, context)
+            return await self._result_from_completed(query, completed, context)
         except SearchScopeResolutionError as err:
             result = _failure(query, err.code)
         except (AppleContainerUnavailableError, PinnedRipgrepUnavailableError, SearchSandboxUnavailableError):
@@ -187,15 +192,17 @@ class PinnedRipgrepWorkspaceSearchBackend(WorkspaceSearchBackend):
         except OSError:
             result = _failure(query, SearchErrorCode.IO_ERROR, transient=True)
         else:
-            return self._result_from_completed(query, completed, context)
+            msg = "search result processing completed without returning an outcome"
+            raise RuntimeError(msg)
         return result
 
-    def _result_from_completed(
+    async def _result_from_completed(
         self,
         query: SearchQuery,
         completed: PinnedRipgrepCommandResult,
         context: WorkspaceSearchContext,
     ) -> SearchQueryResult:
+        """Map completed backend output into a cancellation-aware canonical result."""
         diagnostic_code = _diagnostic_error_code(completed.stderr)
         if diagnostic_code is not None:
             return _failure(query, diagnostic_code)
@@ -206,7 +213,7 @@ class PinnedRipgrepWorkspaceSearchBackend(WorkspaceSearchBackend):
         try:
             locations = tuple(parse_ripgrep_json_events(completed.stdout.splitlines()))
             paths = tuple(sorted({location.path for location in locations}))
-            source_text_by_path = self.source_loader.load(self.workspace_root, paths)
+            source_text_by_path = await self.source_loader.load(self.workspace_root, paths)
             matches = hydrate_search_locations(locations, source_text_by_path, limits=context.limits)
         except (RipgrepJsonEventError, UnicodeError, ValueError, OSError):
             return _failure(query, SearchErrorCode.IO_ERROR, transient=True)

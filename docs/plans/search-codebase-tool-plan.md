@@ -66,12 +66,12 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
   - [x] `T4-AC2` — Results sort by path/line/column and observe 100-match, 48,000-character/query, and 48,000-character/batch budgets without partial objects; omitted batch entries are explicit.
   - [x] `T4-V1` — Context, long-line, ordering, Unicode, and output-limiter unit tests pass.
   - [x] `T4-V2` — Result JSON contract tests cover success, failure, truncation, and omission fixtures.
-- [ ] `T5` — Orchestrate bounded concurrent queries with ordered partial results, deadlines, cancellation, and selective retry.
+- [x] `T5` — Orchestrate bounded concurrent queries with ordered partial results, deadlines, cancellation, and selective retry.
   - [x] `T5-AC1` — Up to eight input queries execute with at most four active searches and return in input order regardless of completion order.
   - [x] `T5-AC2` — Per-query/tool deadlines cancel active work and queued searches; only adapter-classified transient errors retry once, never deterministic validation failures.
   - [x] `T5-V1` — Scheduler tests cover concurrency, request ordering, mixed failures, cancellation, timeout, and retry classification.
-  - [ ] `T5-V2` — Integration tests prove subprocess termination and context-hydration interruption.
-- [ ] `CP2` — Search core is acceptance-tested without model-runtime dependencies.
+  - [x] `T5-V2` — Integration tests prove subprocess termination and context-hydration interruption.
+- [x] `CP2` — Search core is acceptance-tested without model-runtime dependencies.
 
 ### Phase 3: Model-facing tool and product composition
 
@@ -248,7 +248,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 **Task completion:**
 
-- [ ] `T5` — All required acceptance and verification items are resolved.
+- [x] `T5` — All required acceptance and verification items are resolved.
 
 **Description:** Implement the search use case using the established `workspace_reading` scheduler style: bounded active tasks, earliest host/configured deadline, ordered per-query outcomes, cancellation cleanup, and selective transient retry.
 
@@ -260,7 +260,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 **Verification:**
 
 - [x] `T5-V1` — Scheduler tests cover concurrency, request ordering, mixed failures, cancellation, timeout, and retry classification.
-- [ ] `T5-V2` — Integration tests prove subprocess termination and context-hydration interruption.
+- [x] `T5-V2` — Integration tests prove subprocess termination and context-hydration interruption.
 
 **Dependencies:** T1–T4.
 
@@ -275,7 +275,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 ### Checkpoint: Search-core acceptance review
 
-- [ ] `CP2` — Search core is acceptance-tested without model-runtime dependencies.
+- [x] `CP2` — Search core is acceptance-tested without model-runtime dependencies.
 
 ### Phase 3: Model-facing tool and product composition
 

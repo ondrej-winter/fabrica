@@ -59,7 +59,7 @@ class FakeRunner:
 class FakeSourceLoader:
     source_text_by_path: dict[str, str]
 
-    def load(self, workspace_root: Path, paths: tuple[str, ...]) -> dict[str, str]:  # noqa: ARG002
+    async def load(self, workspace_root: Path, paths: tuple[str, ...]) -> dict[str, str]:  # noqa: ARG002
         return {path: self.source_text_by_path[path] for path in paths}
 
 
@@ -422,7 +422,7 @@ def test_posix_source_loader_reads_workspace_relative_utf8_source(tmp_path: Path
     source_file.parent.mkdir()
     source_file.write_text("example\r\n", encoding="utf-8")
 
-    loaded = adapter.PosixWorkspaceSourceLoader().load(tmp_path, ("src/example.py",))
+    loaded = asyncio.run(adapter.PosixWorkspaceSourceLoader().load(tmp_path, ("src/example.py",)))
 
     assert loaded == {"src/example.py": "example\n"}
 
@@ -433,7 +433,7 @@ def test_posix_source_loader_rejects_a_path_outside_the_workspace(tmp_path: Path
     (tmp_path / "linked.py").symlink_to(outside_file)
 
     with pytest.raises(OSError, match="unavailable"):
-        adapter.PosixWorkspaceSourceLoader().load(tmp_path, ("linked.py",))
+        asyncio.run(adapter.PosixWorkspaceSourceLoader().load(tmp_path, ("linked.py",)))
 
 
 def _install_process(monkeypatch: pytest.MonkeyPatch, process: FakeProcess) -> None:
