@@ -75,11 +75,11 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 ### Phase 3: Model-facing tool and product composition
 
-- [ ] `T6` — Add the `search_codebase` registered-tool adapter and bootstrap factory.
-  - [ ] `T6-AC1` — The public `ToolDefinition` advertises only the canonical schema and concise accepted description; adapter-only compatibility normalization, if retained, never reaches the core.
-  - [ ] `T6-AC2` — Adapter maps runtime cancellation/deadlines to search context, serializes stable ordered structured JSON, declares no mutation, and converts malformed top-level arguments to recoverable rejection.
-  - [ ] `T6-V1` — Registered-tool adapter unit tests cover schema, canonical/compatibility inputs, context mapping, and serialized outcomes.
-  - [ ] `T6-V2` — Offline tool-loop composition test invokes the explicitly composed tool after construction without workspace inspection at construction time.
+- [x] `T6` — Add the `search_codebase` registered-tool adapter and bootstrap factory.
+  - [x] `T6-AC1` — The public `ToolDefinition` advertises only the canonical schema and concise accepted description; adapter-only compatibility normalization, if retained, never reaches the core.
+  - [x] `T6-AC2` — Adapter maps runtime cancellation/deadlines to search context, serializes stable ordered structured JSON, declares no mutation, and converts malformed top-level arguments to recoverable rejection.
+  - [x] `T6-V1` — Registered-tool adapter unit tests cover schema, canonical/compatibility inputs, context mapping, and serialized outcomes.
+  - [x] `T6-V2` — Offline tool-loop composition test invokes the explicitly composed tool after construction without workspace inspection at construction time.
 - [ ] `T7` — Complete public exports, documentation, and final validation.
   - [ ] `T7-AC1` — Bootstrap composition and public exports expose the explicit search-tool factory without changing unrelated tool registration.
   - [ ] `T7-AC2` — README explains host composition and intended search-to-read workflow; specs documentation index remains accurate.
@@ -281,19 +281,19 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 **Task completion:**
 
-- [ ] `T6` — All required acceptance and verification items are resolved.
+- [x] `T6` — All required acceptance and verification items are resolved.
 
 **Description:** Add the inbound tool adapter beside `workspace_reading`'s registered adapter and a bootstrap factory. Keep canonical schema/arguments core-facing and localize any Cline compatibility normalization in this adapter only.
 
 **Acceptance criteria:**
 
-- [ ] `T6-AC1` — The public `ToolDefinition` advertises only the canonical schema and concise accepted description; adapter-only compatibility normalization, if retained, never reaches the core.
-- [ ] `T6-AC2` — Adapter maps runtime cancellation/deadlines to search context, serializes stable ordered structured JSON, declares no mutation, and converts malformed top-level arguments to recoverable rejection.
+- [x] `T6-AC1` — The public `ToolDefinition` advertises only the canonical schema and concise accepted description; adapter-only compatibility normalization, if retained, never reaches the core.
+- [x] `T6-AC2` — Adapter maps runtime cancellation/deadlines to search context, serializes stable ordered structured JSON, declares no mutation, and converts malformed top-level arguments to recoverable rejection.
 
 **Verification:**
 
-- [ ] `T6-V1` — Registered-tool adapter unit tests cover schema, canonical/compatibility inputs, context mapping, and serialized outcomes.
-- [ ] `T6-V2` — Offline tool-loop composition test invokes the explicitly composed tool after construction without workspace inspection at construction time.
+- [x] `T6-V1` — Registered-tool adapter unit tests cover schema, canonical/compatibility inputs, context mapping, and serialized outcomes.
+- [x] `T6-V2` — Offline tool-loop composition test invokes the explicitly composed tool after construction without workspace inspection at construction time.
 
 **Dependencies:** T1–T5.
 

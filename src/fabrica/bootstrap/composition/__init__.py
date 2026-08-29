@@ -50,6 +50,7 @@ from fabrica.bootstrap.composition.tool_loop import (
 )
 from fabrica.bootstrap.composition.workspace_editing import create_apply_patch_registered_tool_adapter
 from fabrica.bootstrap.composition.workspace_reading import create_read_files_registered_tool_adapter
+from fabrica.bootstrap.composition.workspace_searching import create_search_codebase_registered_tool_adapter
 
 __all__ = [
     "DEFAULT_CODEX_AUTH_FILE",
@@ -82,6 +83,7 @@ __all__ = [
     "create_pydantic_ai_tool_loop_runtime",
     "create_read_files_registered_tool_adapter",
     "create_read_only_git_context_registered_tools",
+    "create_search_codebase_registered_tool_adapter",
     "create_selected_context_local_agent_runtime",
     "create_skill_augmented_local_agent_command",
     "create_skill_context_augmented_local_agent_command",
