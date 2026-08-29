@@ -827,8 +827,19 @@ SHA-256 verification metadata. Runtime selection may use only the bundled binary
 for macOS Apple Silicon (`arm64`) or Linux (`x86_64`); other OS/architecture
 combinations, including Intel macOS, must fail closed with
 `SEARCH_BACKEND_UNAVAILABLE`. Packaging, startup validation, and conformance tests
-must target that pinned version and support matrix.
+must target that pinned version and support matrix. The repository's default CI
+workflow does not run cross-platform distribution conformance. Before release,
+operators must build the wheel and source distribution on Linux `x86_64` and
+macOS Apple Silicon, then run:
 
+```bash
+FABRICA_DISTRIBUTION_ARTIFACTS='dist/*.whl:dist/*.tar.gz' \
+  uv run pytest tests/integration/features/workspace_searching/test_search_distribution_artifacts.py
+```
+
+The test installs each artifact into an isolated environment, verifies the
+selected executable and checksum metadata, and performs a representative direct
+pinned-ripgrep search.
 Conceptual invocation:
 
 ```bash

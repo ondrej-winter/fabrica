@@ -59,7 +59,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
   - [ ] `T3-AC2` — The adapter passes globs literally to ripgrep as the only grammar authority, applies ignore/hidden/hard-exclude and exact explicit-ignored-file behavior through backend arguments, searches line-oriented Rust-regex semantics, stops at the global matching-line cap without `--max-count=1`, parses incrementally, and terminates subprocesses on cancellation/limit/timeout.
   - [ ] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process-cleanup, pinned-version, checksum, executable-permission, and platform-selection conformance tests pass.
   - [ ] `T3-V2` — Focused integration tests verify actual fixture searches with the packaged binary, including ignore/hidden/explicit-file glob behavior.
-  - [ ] `T3-V3` — Clean-environment tests install both the built wheel and source distribution, verify the expected binary and checksum metadata are present and executable, and run a representative packaged-binary search on each supported CI target.
+  - [ ] `T3-V3` — Clean-environment tests install both the built wheel and source distribution, verify the expected binary and checksum metadata are present and executable, and run a representative packaged-binary search manually on each supported platform.
   - **Implementation status (August 29, 2026):** The pinned-ripgrep outbound adapter, incremental stdout supervision, result-cap termination, cancellation/timeout cleanup, source hydration, stable failure mapping, and deterministic unit coverage are implemented. The fixed command also disables host ripgrep configuration and parent-ignore discovery. T3 remains open because the current macOS `sandbox-exec` containment profile aborts the bundled binary before it emits output; the adapter fails closed as `SEARCH_BACKEND_UNAVAILABLE` rather than widening containment or falling back to host `rg`. Real contained packaged-binary fixture searches and clean-environment wheel/source-distribution conformance remain required.
 - [x] `T4` — Implement backend-neutral context hydration, Unicode-safe location conversion, deterministic ordering, and complete-object output limiting.
   - [x] `T4-AC1` — Every match returns two bounded before/after lines, matching/context truncation metadata, CRLF/UTF-8 handling, one match per line, and Unicode character columns.
@@ -83,7 +83,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 - [ ] `T7` — Complete public exports, documentation, and final validation.
   - [x] `T7-AC1` — Bootstrap composition and public exports expose the explicit search-tool factory without changing unrelated tool registration.
   - [x] `T7-AC2` — README explains host composition and intended search-to-read workflow; specs documentation index remains accurate.
-  - [ ] `T7-AC3` — Build configuration includes the exact platform binaries and checksum metadata in both wheel and source distribution; supported-target CI artifact conformance is deferred.
+  - [ ] `T7-AC3` — Build configuration includes the exact platform binaries and checksum metadata in both wheel and source distribution; clean-install artifact conformance is manually run on Linux `x86_64` and macOS Apple Silicon.
   - [x] `T7-V1` — `uv run ruff format .` and `uv run ruff check .` pass.
   - [x] `T7-V2` — `uv run ty check src tests` and `uv run pytest` pass.
   - [x] `T7-V3` — Import-linter/project checks configured by the repository pass, and the final diff contains only intentional implementation, test, packaging, and docs changes.
@@ -314,20 +314,20 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 - [ ] `T7` — All required acceptance and verification items are resolved.
 
-**Description:** Complete package exports and project-facing documentation, make the required package-data/build-artifact verification available in CI, run the full quality gate, inspect the final diff, and record any approved deviations or deferred decisions.
+**Description:** Complete package exports and project-facing documentation, add manually invoked package-data/build-artifact verification for each supported platform, run the full quality gate, inspect the final diff, and record any approved deviations or deferred decisions.
 
 **Acceptance criteria:**
 
 - [x] `T7-AC1` — Bootstrap composition and public exports expose the explicit search-tool factory without changing unrelated tool registration.
 - [x] `T7-AC2` — README explains host composition and intended search-to-read workflow; specs documentation index remains accurate.
-- [ ] `T7-AC3` — Build configuration includes the exact platform binaries and checksum metadata in both wheel and source distribution; supported-target CI artifact conformance is deferred.
+- [ ] `T7-AC3` — Build configuration includes the exact platform binaries and checksum metadata in both wheel and source distribution; clean-install artifact conformance is manually run on Linux `x86_64` and macOS Apple Silicon.
 
 **Verification:**
 
 - [x] `T7-V1` — `uv run ruff format .` and `uv run ruff check .` pass.
 - [x] `T7-V2` — `uv run ty check src tests` and `uv run pytest` pass.
 - [x] `T7-V3` — Import-linter/project checks configured by the repository pass, and the final diff contains only intentional implementation, test, packaging, and docs changes.
-- [ ] `T7-V4` — `uv build` succeeds, and the clean-environment wheel/source-distribution checks from `T3-V3` pass on every supported CI target.
+- [ ] `T7-V4` — `uv build` succeeds, and the clean-environment wheel/source-distribution checks from `T3-V3` pass manually on every supported platform.
 
 **Dependencies:** T6.
 
@@ -338,7 +338,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 - `src/fabrica/features/workspace_searching/**/__init__.py`
 - `tests/unit/test_bootstrap_api.py`
 - `pyproject.toml` and `uv.lock` for mandatory package-data/build-test configuration.
-- CI workflow/configuration files are deferred; validation remains normal unit and integration testing.
+- `tests/integration/features/workspace_searching/test_search_distribution_artifacts.py` for manually invoked Linux `x86_64` and macOS Apple Silicon distribution conformance.
 
 **Estimated scope:** S — integration/documentation closeout after the core is complete.
 
