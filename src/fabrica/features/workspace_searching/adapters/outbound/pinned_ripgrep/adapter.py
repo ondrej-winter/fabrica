@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from time import monotonic
 from typing import TYPE_CHECKING, Protocol
 
+from fabrica.features.workspace_searching.adapters.outbound.apple_container import AppleContainerUnavailableError
 from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.command import PinnedRipgrepCommandBuilder
 from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.json_parser import (
     RipgrepJsonEventError,
@@ -177,7 +178,7 @@ class PinnedRipgrepWorkspaceSearchBackend(WorkspaceSearchBackend):
             return self._result_from_completed(query, completed, context)
         except SearchScopeResolutionError as err:
             result = _failure(query, err.code)
-        except (PinnedRipgrepUnavailableError, SearchSandboxUnavailableError):
+        except (AppleContainerUnavailableError, PinnedRipgrepUnavailableError, SearchSandboxUnavailableError):
             result = _failure(query, SearchErrorCode.SEARCH_BACKEND_UNAVAILABLE)
         except asyncio.CancelledError:
             result = _failure(query, SearchErrorCode.SEARCH_CANCELLED)

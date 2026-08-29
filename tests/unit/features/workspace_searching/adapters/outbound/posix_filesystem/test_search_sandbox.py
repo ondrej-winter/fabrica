@@ -20,7 +20,7 @@ def test_search_sandbox_rejects_empty_backend_command(tmp_path: Path) -> None:
 
 def test_search_sandbox_rejects_scope_outside_its_workspace(tmp_path: Path) -> None:
     other_workspace = tmp_path.parent / "other-workspace"
-    other_workspace.mkdir()
+    other_workspace.mkdir(exist_ok=True)
     scope = _scope(other_workspace)
 
     with pytest.raises(SearchSandboxUnavailableError, match="must remain inside"):

@@ -65,12 +65,16 @@ packages = ["src/fabrica"]
 artifacts = [
     "src/fabrica/features/workspace_searching/adapters/outbound/ripgrep_binaries/**/*.json",
     "src/fabrica/features/workspace_searching/adapters/outbound/ripgrep_binaries/**/rg",
+    "src/fabrica/features/workspace_searching/adapters/outbound/search_images/**/*.json",
+    "src/fabrica/features/workspace_searching/adapters/outbound/search_images/**/*.oci",
 ]
 
 [tool.hatch.build.targets.sdist]
 artifacts = [
     "src/fabrica/features/workspace_searching/adapters/outbound/ripgrep_binaries/**/*.json",
     "src/fabrica/features/workspace_searching/adapters/outbound/ripgrep_binaries/**/rg",
+    "src/fabrica/features/workspace_searching/adapters/outbound/search_images/**/*.json",
+    "src/fabrica/features/workspace_searching/adapters/outbound/search_images/**/*.oci",
 ]
 
 [tool.ruff]

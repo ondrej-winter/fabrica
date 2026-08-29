@@ -1,12 +1,6 @@
 {
   "version": "15.2.0",
   "artifacts": {
-    "darwin-arm64": {
-      "path": "macos_arm64/rg",
-      "sha256": "a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e",
-      "upstream_archive": "ripgrep-15.2.0-aarch64-apple-darwin.tar.gz",
-      "upstream_archive_sha256": "3750b2e93f37e0c692657da574d7019a101c0084da05a790c83fd335bad973e4"
-    },
     "linux-x86_64": {
       "path": "linux_x86_64/rg",
       "sha256": "e62198eb19b136b88c330af83647b5a962cb99b6b1f066758568f12de1974849",

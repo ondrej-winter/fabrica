@@ -11,11 +11,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from fabrica.features.workspace_searching.adapters.outbound.posix_filesystem.path_resolution import SearchScope
 
-_MACOS_SANDBOX_EXECUTABLE = Path("/usr/bin/sandbox-exec")
 _LINUX_WORKSPACE_MOUNT = Path("/workspace")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class SearchSandboxUnavailableError(Exception):
     """Raised before launch when the host cannot provide search containment."""
 
@@ -45,19 +44,10 @@ class SearchSandbox:
         if not scope.canonical_path.is_relative_to(root):
             msg = "search scope must remain inside the configured workspace"
             raise SearchSandboxUnavailableError(msg)
-        if sys.platform == "darwin":
-            return self._macos_command(backend_argv, root, scope)
         if sys.platform == "linux":
             return self._linux_command(backend_argv, root, scope)
         msg = "workspace search subprocess containment is unsupported on this platform"
         raise SearchSandboxUnavailableError(msg)
-
-    def _macos_command(self, backend_argv: tuple[str, ...], root: Path, scope: SearchScope) -> tuple[str, ...]:
-        if not _MACOS_SANDBOX_EXECUTABLE.is_file():
-            msg = "macOS workspace search containment requires sandbox-exec"
-            raise SearchSandboxUnavailableError(msg)
-        profile = _macos_profile(root, Path(backend_argv[0]).resolve(strict=True))
-        return (str(_MACOS_SANDBOX_EXECUTABLE), "-p", profile, *backend_argv, str(scope.canonical_path))
 
     def _linux_command(self, backend_argv: tuple[str, ...], root: Path, scope: SearchScope) -> tuple[str, ...]:
         bubblewrap = shutil.which("bwrap")
@@ -84,23 +74,6 @@ class SearchSandbox:
             "--",
             *rewritten_argv,
         )
-
-
-def _macos_profile(workspace_root: Path, backend_executable: Path) -> str:
-    escaped_root = _sandbox_escape(str(workspace_root))
-    escaped_backend = _sandbox_escape(str(backend_executable))
-    return (
-        "(version 1) "
-        "(deny default) "
-        "(allow process*) "
-        "(allow sysctl-read) "
-        '(allow file-read* (subpath "/System") (subpath "/usr/lib") '
-        f'(literal "{escaped_backend}") (subpath "{escaped_root}"))'
-    )
-
-
-def _sandbox_escape(value: str) -> str:
-    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 __all__ = ["SearchSandbox", "SearchSandboxUnavailableError"]

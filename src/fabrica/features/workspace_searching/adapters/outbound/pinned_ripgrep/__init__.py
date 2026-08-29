@@ -13,7 +13,7 @@ from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.json_
 )
 from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.manifest import (
     PinnedRipgrepUnavailableError,
-    verified_pinned_ripgrep_executable,
+    verified_linux_pinned_ripgrep_executable,
 )
 
 __all__ = [
@@ -25,5 +25,5 @@ __all__ = [
     "PosixWorkspaceSourceLoader",
     "RipgrepJsonEventError",
     "parse_ripgrep_json_events",
-    "verified_pinned_ripgrep_executable",
+    "verified_linux_pinned_ripgrep_executable",
 ]

@@ -91,10 +91,12 @@ runtime = create_tool_loop_runtime(
 
 Use `search_codebase` first to locate matching workspace-relative files and
 one-based line locations, then pass only the relevant paths and line ranges to
-`read_files` for bounded source context. Search uses the bundled,
-checksum-verified ripgrep executable rather than a host `rg` installation. It
-is read-only, supports bounded batches of textual regular-expression queries,
-and returns ordered structured results with matching and surrounding lines.
+`read_files` for bounded source context. Search never discovers a host `rg`
+installation: Linux uses a checksum-verified Fabrica package-data executable in
+Bubblewrap, while supported macOS Apple Silicon hosts use a locally provisioned,
+digest-verified Fabrica OCI image through Apple Container. It is read-only,
+supports bounded batches of textual regular-expression queries, and returns
+ordered structured results with matching and surrounding lines.
 See [`docs/specs/tools-search-codebase-tool-spec.md`](docs/specs/tools-search-codebase-tool-spec.md)
 for its complete accepted contract, limits, and supported platforms.
 
