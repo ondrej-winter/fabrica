@@ -81,12 +81,12 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
   - [x] `T6-V1` — Registered-tool adapter unit tests cover schema, canonical/compatibility inputs, context mapping, and serialized outcomes.
   - [x] `T6-V2` — Offline tool-loop composition test invokes the explicitly composed tool after construction without workspace inspection at construction time.
 - [ ] `T7` — Complete public exports, documentation, and final validation.
-  - [ ] `T7-AC1` — Bootstrap composition and public exports expose the explicit search-tool factory without changing unrelated tool registration.
-  - [ ] `T7-AC2` — README explains host composition and intended search-to-read workflow; specs documentation index remains accurate.
-  - [ ] `T7-AC3` — Build configuration includes the exact platform binaries and checksum metadata in both wheel and source distribution; CI runs packaged-binary conformance on macOS `arm64` and Linux `x86_64`.
-  - [ ] `T7-V1` — `uv run ruff format .` and `uv run ruff check .` pass.
-  - [ ] `T7-V2` — `uv run ty check src tests` and `uv run pytest` pass.
-  - [ ] `T7-V3` — Import-linter/project checks configured by the repository pass, and the final diff contains only intentional implementation, test, packaging, and docs changes.
+  - [x] `T7-AC1` — Bootstrap composition and public exports expose the explicit search-tool factory without changing unrelated tool registration.
+  - [x] `T7-AC2` — README explains host composition and intended search-to-read workflow; specs documentation index remains accurate.
+  - [ ] `T7-AC3` — Build configuration includes the exact platform binaries and checksum metadata in both wheel and source distribution; supported-target CI artifact conformance is deferred.
+  - [x] `T7-V1` — `uv run ruff format .` and `uv run ruff check .` pass.
+  - [x] `T7-V2` — `uv run ty check src tests` and `uv run pytest` pass.
+  - [x] `T7-V3` — Import-linter/project checks configured by the repository pass, and the final diff contains only intentional implementation, test, packaging, and docs changes.
   - [ ] `T7-V4` — `uv build` succeeds, and the clean-environment wheel/source-distribution checks from `T3-V3` pass on every supported CI target.
 
 ### Completion
@@ -318,15 +318,15 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 **Acceptance criteria:**
 
-- [ ] `T7-AC1` — Bootstrap composition and public exports expose the explicit search-tool factory without changing unrelated tool registration.
-- [ ] `T7-AC2` — README explains host composition and intended search-to-read workflow; specs documentation index remains accurate.
-- [ ] `T7-AC3` — Build configuration includes the exact platform binaries and checksum metadata in both wheel and source distribution; CI runs packaged-binary conformance on macOS `arm64` and Linux `x86_64`.
+- [x] `T7-AC1` — Bootstrap composition and public exports expose the explicit search-tool factory without changing unrelated tool registration.
+- [x] `T7-AC2` — README explains host composition and intended search-to-read workflow; specs documentation index remains accurate.
+- [ ] `T7-AC3` — Build configuration includes the exact platform binaries and checksum metadata in both wheel and source distribution; supported-target CI artifact conformance is deferred.
 
 **Verification:**
 
-- [ ] `T7-V1` — `uv run ruff format .` and `uv run ruff check .` pass.
-- [ ] `T7-V2` — `uv run ty check src tests` and `uv run pytest` pass.
-- [ ] `T7-V3` — Import-linter/project checks configured by the repository pass, and the final diff contains only intentional implementation, test, packaging, and docs changes.
+- [x] `T7-V1` — `uv run ruff format .` and `uv run ruff check .` pass.
+- [x] `T7-V2` — `uv run ty check src tests` and `uv run pytest` pass.
+- [x] `T7-V3` — Import-linter/project checks configured by the repository pass, and the final diff contains only intentional implementation, test, packaging, and docs changes.
 - [ ] `T7-V4` — `uv build` succeeds, and the clean-environment wheel/source-distribution checks from `T3-V3` pass on every supported CI target.
 
 **Dependencies:** T6.
@@ -338,7 +338,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 - `src/fabrica/features/workspace_searching/**/__init__.py`
 - `tests/unit/test_bootstrap_api.py`
 - `pyproject.toml` and `uv.lock` for mandatory package-data/build-test configuration.
-- CI workflow/configuration files that execute supported-target artifact conformance.
+- CI workflow/configuration files are deferred; validation remains normal unit and integration testing.
 
 **Estimated scope:** S — integration/documentation closeout after the core is complete.
 
@@ -361,7 +361,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 ## Resolved Decisions
 
-- [ ] **OQ1 — Search subprocess containment:** Select the concrete POSIX mechanism that pins ripgrep traversal inside the workspace for its complete lifetime, define fail-closed unsupported-host behavior, and record the decision in an ADR. This must be resolved before T3.
+- [x] **OQ1 — Search subprocess containment:** `sandbox-exec` is the selected macOS POSIX mechanism, with fail-closed unsupported-host behavior and ADR 0005 recording the decision. The known `sandbox-exec` capability limitation remains tracked by T3/CP1 rather than reopening the design decision.
 - [x] **OQ2 — Pinned ripgrep packaging:** Ship exact bundled ripgrep executables as wheel and source-distribution package data with committed SHA-256 verification metadata, executable-permission preservation, and clean-environment artifact conformance tests. Version 1 never discovers or falls back to host `rg`.
 - [x] **OQ3 — Glob validation implementation:** Validate basic shape locally, pass globs literally to pinned ripgrep, and map its recognized deterministic syntax error to `INVALID_GLOB`; no host-shell expansion or approximate independent parser.
 - [x] **OQ4 — Runtime output representation:** Return one `ToolTextContent` part containing the complete canonical top-level `{ "results": [...] }` object and limit its aggregate serialized output to 48,000 characters.

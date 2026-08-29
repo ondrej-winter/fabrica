@@ -59,6 +59,45 @@ read-only, restricted to the configured workspace, and can be truncated or
 paged; consult [`docs/specs/tools-read-files-tool-spec.md`](docs/specs/tools-read-files-tool-spec.md)
 for the complete accepted contract and limits.
 
+## Workspace code-search tool composition
+
+Hosts can explicitly add the read-only `search_codebase` tool to a tool-loop
+runtime. Construction requires only the workspace root; it does not inspect the
+workspace or start a subprocess until the model invokes the tool.
+
+```python
+from pathlib import Path
+
+from fabrica.bootstrap import (
+    create_read_files_registered_tool_adapter,
+    create_search_codebase_registered_tool_adapter,
+    create_tool_loop_runtime,
+)
+from fabrica.features.agent_runtime.application.dtos import ToolLoopLimits
+
+workspace_root = Path("/path/to/workspace")
+search_codebase_tool = create_search_codebase_registered_tool_adapter(workspace_root)
+read_files_tool = create_read_files_registered_tool_adapter(
+    workspace_root,
+    external_read_authorized=True,
+    image_input_supported=False,
+)
+runtime = create_tool_loop_runtime(
+    model=model,
+    tools=(search_codebase_tool, read_files_tool),
+    limits=ToolLoopLimits(),
+)
+```
+
+Use `search_codebase` first to locate matching workspace-relative files and
+one-based line locations, then pass only the relevant paths and line ranges to
+`read_files` for bounded source context. Search uses the bundled,
+checksum-verified ripgrep executable rather than a host `rg` installation. It
+is read-only, supports bounded batches of textual regular-expression queries,
+and returns ordered structured results with matching and surrounding lines.
+See [`docs/specs/tools-search-codebase-tool-spec.md`](docs/specs/tools-search-codebase-tool-spec.md)
+for its complete accepted contract, limits, and supported platforms.
+
 You can also run the default tests through `make`:
 
 ```bash
