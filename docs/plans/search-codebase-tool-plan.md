@@ -66,9 +66,9 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
   - [x] `T4-V1` — Context, long-line, ordering, Unicode, and output-limiter unit tests pass.
   - [x] `T4-V2` — Result JSON contract tests cover success, failure, truncation, and omission fixtures.
 - [ ] `T5` — Orchestrate bounded concurrent queries with ordered partial results, deadlines, cancellation, and selective retry.
-  - [ ] `T5-AC1` — Up to eight input queries execute with at most four active searches and return in input order regardless of completion order.
-  - [ ] `T5-AC2` — Per-query/tool deadlines cancel active work and queued searches; only adapter-classified transient errors retry once, never deterministic validation failures.
-  - [ ] `T5-V1` — Scheduler tests cover concurrency, request ordering, mixed failures, cancellation, timeout, and retry classification.
+  - [x] `T5-AC1` — Up to eight input queries execute with at most four active searches and return in input order regardless of completion order.
+  - [x] `T5-AC2` — Per-query/tool deadlines cancel active work and queued searches; only adapter-classified transient errors retry once, never deterministic validation failures.
+  - [x] `T5-V1` — Scheduler tests cover concurrency, request ordering, mixed failures, cancellation, timeout, and retry classification.
   - [ ] `T5-V2` — Integration tests prove subprocess termination and context-hydration interruption.
 - [ ] `CP2` — Search core is acceptance-tested without model-runtime dependencies.
 
@@ -243,12 +243,12 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 **Acceptance criteria:**
 
-- [ ] `T5-AC1` — Up to eight input queries execute with at most four active searches and return in input order regardless of completion order.
-- [ ] `T5-AC2` — Per-query/tool deadlines cancel active work and queued searches; only adapter-classified transient errors retry once, never deterministic validation failures.
+- [x] `T5-AC1` — Up to eight input queries execute with at most four active searches and return in input order regardless of completion order.
+- [x] `T5-AC2` — Per-query/tool deadlines cancel active work and queued searches; only adapter-classified transient errors retry once, never deterministic validation failures.
 
 **Verification:**
 
-- [ ] `T5-V1` — Scheduler tests cover concurrency, request ordering, mixed failures, cancellation, timeout, and retry classification.
+- [x] `T5-V1` — Scheduler tests cover concurrency, request ordering, mixed failures, cancellation, timeout, and retry classification.
 - [ ] `T5-V2` — Integration tests prove subprocess termination and context-hydration interruption.
 
 **Dependencies:** T1–T4.
