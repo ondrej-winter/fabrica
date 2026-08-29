@@ -164,7 +164,7 @@ def test_search_result_models_unicode_character_column_and_ordered_context() -> 
     ("factory", "message"),
     [
         (lambda: SearchContextLine(line=0, text="text"), "one-based"),
-        (lambda: SearchContextLine(line=1, text=" text"), "whitespace"),
+        (lambda: SearchContextLine(line=1, text=cast("str", 1)), "string"),
         (lambda: SearchContextLine(line=1, text="text", text_truncated=cast("bool", 1)), "boolean"),
         (
             lambda: SearchMatch(

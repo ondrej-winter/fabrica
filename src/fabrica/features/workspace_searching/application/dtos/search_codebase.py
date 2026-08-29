@@ -152,7 +152,7 @@ class SearchContextLine:
 
     def __post_init__(self) -> None:
         _validate_one_based_integer(self.line, field_name="line")
-        _validate_text(self.text, field_name="text")
+        _validate_source_text(self.text, field_name="text")
         _validate_boolean(self.text_truncated, field_name="text_truncated")
 
 
@@ -172,7 +172,7 @@ class SearchMatch:
         _validate_workspace_result_path(self.path)
         _validate_one_based_integer(self.line, field_name="line")
         _validate_one_based_integer(self.column, field_name="column")
-        _validate_text(self.text, field_name="text")
+        _validate_source_text(self.text, field_name="text")
         _validate_boolean(self.text_truncated, field_name="text_truncated")
         before = tuple(self.before)
         after = tuple(self.after)
@@ -311,6 +311,12 @@ def _validate_text(value: str, *, field_name: str) -> None:
     if value != value.strip():
         msg = f"{field_name} must not contain leading or trailing whitespace"
         raise ValueError(msg)
+
+
+def _validate_source_text(value: str, *, field_name: str) -> None:
+    if not isinstance(value, str):
+        msg = f"{field_name} must be a string"
+        raise TypeError(msg)
 
 
 def _validate_one_based_integer(value: int, *, field_name: str) -> None:

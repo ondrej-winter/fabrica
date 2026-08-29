@@ -60,11 +60,11 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
   - [ ] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process-cleanup, pinned-version, checksum, executable-permission, and platform-selection conformance tests pass.
   - [ ] `T3-V2` — Focused integration tests verify actual fixture searches with the packaged binary, including ignore/hidden/explicit-file glob behavior.
   - [ ] `T3-V3` — Clean-environment tests install both the built wheel and source distribution, verify the expected binary and checksum metadata are present and executable, and run a representative packaged-binary search on each supported CI target.
-- [ ] `T4` — Implement backend-neutral context hydration, Unicode-safe location conversion, deterministic ordering, and complete-object output limiting.
-  - [ ] `T4-AC1` — Every match returns two bounded before/after lines, matching/context truncation metadata, CRLF/UTF-8 handling, one match per line, and Unicode character columns.
-  - [ ] `T4-AC2` — Results sort by path/line/column and observe 100-match, 48,000-character/query, and 48,000-character/batch budgets without partial objects; omitted batch entries are explicit.
-  - [ ] `T4-V1` — Context, long-line, ordering, Unicode, and output-limiter unit tests pass.
-  - [ ] `T4-V2` — Result JSON contract tests cover success, failure, truncation, and omission fixtures.
+- [x] `T4` — Implement backend-neutral context hydration, Unicode-safe location conversion, deterministic ordering, and complete-object output limiting.
+  - [x] `T4-AC1` — Every match returns two bounded before/after lines, matching/context truncation metadata, CRLF/UTF-8 handling, one match per line, and Unicode character columns.
+  - [x] `T4-AC2` — Results sort by path/line/column and observe 100-match, 48,000-character/query, and 48,000-character/batch budgets without partial objects; omitted batch entries are explicit.
+  - [x] `T4-V1` — Context, long-line, ordering, Unicode, and output-limiter unit tests pass.
+  - [x] `T4-V2` — Result JSON contract tests cover success, failure, truncation, and omission fixtures.
 - [ ] `T5` — Orchestrate bounded concurrent queries with ordered partial results, deadlines, cancellation, and selective retry.
   - [ ] `T5-AC1` — Up to eight input queries execute with at most four active searches and return in input order regardless of completion order.
   - [ ] `T5-AC2` — Per-query/tool deadlines cancel active work and queued searches; only adapter-classified transient errors retry once, never deterministic validation failures.
@@ -207,19 +207,19 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 **Task completion:**
 
-- [ ] `T4` — All required acceptance and verification items are resolved.
+- [x] `T4` — All required acceptance and verification items are resolved.
 
 **Description:** Convert streamed locations into the canonical model-facing matches through shared context hydration, Unicode-safe column normalization, line truncation, deterministic sorting, and per-query/aggregate serialization-budget enforcement.
 
 **Acceptance criteria:**
 
-- [ ] `T4-AC1` — Every match returns two bounded before/after lines, matching/context truncation metadata, CRLF/UTF-8 handling, one match per line, and Unicode character columns.
-- [ ] `T4-AC2` — Results sort by path/line/column and observe 100-match, 48,000-character/query, and 48,000-character/batch budgets without partial objects; omitted batch entries are explicit.
+- [x] `T4-AC1` — Every match returns two bounded before/after lines, matching/context truncation metadata, CRLF/UTF-8 handling, one match per line, and Unicode character columns.
+- [x] `T4-AC2` — Results sort by path/line/column and observe 100-match, 48,000-character/query, and 48,000-character/batch budgets without partial objects; omitted batch entries are explicit.
 
 **Verification:**
 
-- [ ] `T4-V1` — Context, long-line, ordering, Unicode, and output-limiter unit tests pass.
-- [ ] `T4-V2` — Result JSON contract tests cover success, failure, truncation, and omission fixtures.
+- [x] `T4-V1` — Context, long-line, ordering, Unicode, and output-limiter unit tests pass.
+- [x] `T4-V2` — Result JSON contract tests cover success, failure, truncation, and omission fixtures.
 
 **Dependencies:** T1–T3.
 
