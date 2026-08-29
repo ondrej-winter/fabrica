@@ -4,9 +4,9 @@
 
 **Status:** Accepted — ready for implementation planning.
 
-**Acceptance:** Confirmed on August 28, 2026.
+**Acceptance:** Confirmed on August 28, 2026; macOS containment revised on August 29, 2026.
 
-**Revision:** Canonicalized against `.agents/skills/spec-driven-development/SKILL.md` on August 28, 2026.
+**Revision:** Canonicalized against `.agents/skills/spec-driven-development/SKILL.md` on August 28, 2026. The macOS execution mechanism follows ADR 0006.
 
 This document is the canonical source of truth for the accepted `search_codebase` tool contract. Any derived implementation plan and implementation must preserve its objective, requirements, constraints, boundaries, and success criteria. Material changes require this specification to be updated and re-confirmed.
 
@@ -341,11 +341,11 @@ Default symlink behavior:
 
 `glob` optionally limits candidate files within `path`.
 
-Version 1 uses the bundled pinned ripgrep binary as the authoritative
-ripgrep-compatible glob parser. The adapter validates only structural input
-constraints locally, passes each glob literally to that binary, and maps its
-recognized deterministic invalid-glob diagnostic to `INVALID_GLOB`. Host-shell
-expansion must never influence search semantics.
+Version 1 uses the Fabrica-distributed, integrity-verified pinned ripgrep payload
+as the authoritative ripgrep-compatible glob parser. The adapter validates only
+structural input constraints locally, passes each glob literally to that payload,
+and maps its recognized deterministic invalid-glob diagnostic to `INVALID_GLOB`.
+Host-shell expansion must never influence search semantics.
 
 Examples:
 
@@ -820,26 +820,45 @@ requested search path.
 
 ## Ripgrep execution guidance
 
-Version 1 must execute the bundled, pinned ripgrep binary only. It must not
-discover, validate, or fall back to a host-installed ripgrep binary. Ship the
-exact executables as wheel and source-distribution package data with committed
-SHA-256 verification metadata. Runtime selection may use only the bundled binary
-for macOS Apple Silicon (`arm64`) or Linux (`x86_64`); other OS/architecture
-combinations, including Intel macOS, must fail closed with
-`SEARCH_BACKEND_UNAVAILABLE`. Packaging, startup validation, and conformance tests
-must target that pinned version and support matrix. The repository's default CI
-workflow does not run cross-platform distribution conformance. Before release,
-operators must build the wheel and source distribution on Linux `x86_64` and
-macOS Apple Silicon, then run:
+Version 1 must execute only a Fabrica-distributed, integrity-verified pinned
+ripgrep payload. It must not discover, validate, or fall back to a host-installed
+ripgrep binary or a different regex engine.
+
+- On Linux `x86_64`, the payload is the checksum-verified package-data ripgrep
+  executable. Bubblewrap must expose the canonical workspace root only as a
+  read-only mount at `/workspace`.
+- On macOS Apple Silicon running macOS 26 or later, the payload is a
+  digest-verified Fabrica OCI search image executed through the Apple `container`
+  CLI. The container must use a read-only root filesystem and mount only the
+  canonical workspace root read-only at `/workspace`; it must not attach a
+  network.
+- The macOS image must be provisioned locally through a Fabrica-distributed OCI
+  archive or another explicit operator workflow before a search call. A tool call
+  must not perform an automatic registry pull.
+- Other OS/architecture combinations, Intel macOS, unavailable containment
+  runtimes, unhealthy runtime services, or absent/unverifiable payloads must fail
+  closed with `SEARCH_BACKEND_UNAVAILABLE`.
+
+For both backends, the search command must receive only
+`/workspace/<validated-relative-scope>` and must not inherit ambient host paths
+or environment configuration. Packaging, startup validation, and conformance
+tests must target the pinned ripgrep version and this support matrix. The
+repository's default CI workflow does not run cross-platform runtime conformance.
+Before release, operators must validate the Linux Bubblewrap backend on Linux
+`x86_64` and the Apple Container backend on macOS Apple Silicon.
+
+The Linux distribution check is invoked with:
 
 ```bash
 FABRICA_DISTRIBUTION_ARTIFACTS='dist/*.whl:dist/*.tar.gz' \
   uv run pytest tests/integration/features/workspace_searching/test_search_distribution_artifacts.py
 ```
 
-The test installs each artifact into an isolated environment, verifies the
-selected executable and checksum metadata, and performs a representative direct
-pinned-ripgrep search.
+The test installs each artifact into an isolated environment, verifies the Linux
+executable and checksum metadata, and performs a representative direct
+pinned-ripgrep search. macOS release validation must additionally provision the
+Fabrica OCI archive, verify the selected image digest, and run a representative
+contained search through Apple Container.
 Conceptual invocation:
 
 ```bash
@@ -1215,7 +1234,8 @@ before adding a model-callable runtime adapter.
 
 - Always treat `search_codebase` as textual regex search, not semantic search.
 - Always keep the canonical public schema as `{ "queries": [query objects] }`.
-- Always use the bundled, pinned ripgrep binary for Version 1 search execution.
+- Always use the Fabrica-distributed, integrity-verified pinned ripgrep payload
+  for Version 1 search execution.
 - Always evaluate ripgrep-compatible `glob` values in the tool; never permit host
   shell expansion to influence file selection.
 - Always reject empty patterns and invalid regexes explicitly.
@@ -1233,6 +1253,8 @@ before adding a model-callable runtime adapter.
 - Never silently change regex languages because a backend is unavailable.
 - Never discover, validate, or fall back to a host-installed ripgrep binary in
   Version 1.
+- Never pull a macOS search image from a registry during a tool call or mount an
+  ambient host path into its Apple Container execution.
 - Never use Cline's `--max-count=1` per-file behavior.
 - Never buffer unbounded backend output before parsing.
 - Never allow search paths to escape the configured workspace through absolute
@@ -1267,9 +1289,11 @@ before adding a model-callable runtime adapter.
 
 ## Resolved decisions
 
-1. **Search backend distribution:** Version 1 requires the bundled, pinned
-   ripgrep binary only. Host ripgrep discovery, validation, and fallback are out
-   of scope.
+1. **Search backend distribution:** Version 1 requires only a
+   Fabrica-distributed, integrity-verified pinned ripgrep payload. Linux uses a
+   package-data executable in Bubblewrap; macOS Apple Silicon uses a locally
+   provisioned digest-pinned OCI image in Apple Container. Host ripgrep discovery,
+   validation, fallback, and tool-call-time image pulls are out of scope.
 2. **Canonical glob grammar:** `glob` uses documented ripgrep-compatible grammar
    evaluated by the tool. Host-shell expansion is never part of the contract.
 3. **Context truncation metadata:** Every matching or context line includes
@@ -1281,6 +1305,9 @@ before adding a model-callable runtime adapter.
    `workspace_reading` and `workspace_editing`. `agent_runtime` registers its
    application port as a model-callable tool. Extract shared infrastructure only
    after concrete reuse demonstrates the need.
+6. **macOS containment:** ADR 0006 replaces deprecated `sandbox-exec` with Apple
+   Container for macOS Apple Silicon. The macOS backend mounts only the workspace
+   read-only at `/workspace`; Linux retains Bubblewrap.
 
 ## Acceptance and planning gate
 

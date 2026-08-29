@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement the accepted, read-only `search_codebase` tool as the new `workspace_searching` vertical slice. The slice will provide canonical, bounded, deterministic regex source discovery through a bundled pinned ripgrep backend and will be exposed to models through the existing asynchronous registered-tool runtime.
+Implement the accepted, read-only `search_codebase` tool as the new `workspace_searching` vertical slice. The slice will provide canonical, bounded, deterministic regex source discovery through a Fabrica-distributed, integrity-verified pinned ripgrep payload and will be exposed to models through the existing asynchronous registered-tool runtime.
 
 ## Scope
 
@@ -23,14 +23,14 @@ Implement the accepted, read-only `search_codebase` tool as the new `workspace_s
 - The target is the Python 3.13 `src/fabrica` package and POSIX-oriented workspace tooling patterns used by `workspace_reading`.
 - `agent_runtime` registered tools continue to accept structured text content and provide cancellation plus phase deadlines through `ToolExecutionContext`.
 - The implementation will preserve the specification's August 28, 2026 accepted decisions; discrepancies discovered during implementation require spec clarification, not silent changes.
-- Version 1 ships only checksum-verified bundled ripgrep binaries for macOS Apple Silicon (`arm64`) and Linux (`x86_64`). Intel macOS and every other OS/architecture combination fail closed without host-binary discovery or fallback.
+- Version 1 uses a checksum-verified package-data ripgrep executable in Bubblewrap on Linux `x86_64`, and a locally provisioned digest-verified Fabrica OCI search image in Apple Container on macOS Apple Silicon running macOS 26 or later. Intel macOS and every other OS/architecture combination fail closed without host-binary discovery, fallback, or tool-call-time image pulls.
 
 ## Architecture Decisions
 
 - Create `src/fabrica/features/workspace_searching/` as the owning vertical slice. Keep backend invocation in an outbound adapter, core orchestration in application use cases, and model schema normalization/serialization in an inbound registered-tool adapter.
 - Use one backend-neutral `SearchLocation` intermediate contract and a common context hydrator; do not couple context semantics to ripgrep JSON context events.
-- Establish a POSIX subprocess-containment boundary that pins ripgrep traversal inside the workspace for the complete search lifetime; a preflight `resolve()` or file-only descriptor check is insufficient. Select and document the concrete supported mechanism before backend implementation, fail closed when it is unavailable, and extract shared containment infrastructure only after concrete read/search reuse demonstrates a stable boundary.
-- Treat checksum-verified package-data ripgrep binaries as the sole Version 1 execution backend. Runtime selects only the bundled macOS `arm64` or Linux `x86_64` executable; no host discovery or Python-regex fallback is permitted.
+- Establish a platform-specific subprocess-containment boundary that pins ripgrep traversal inside the workspace for the complete search lifetime; a preflight `resolve()` or file-only descriptor check is insufficient. Linux uses Bubblewrap and macOS uses Apple Container as recorded in ADR 0006. Fail closed when the selected runtime or payload is unavailable, and extract shared containment infrastructure only after concrete read/search reuse demonstrates a stable boundary.
+- Treat only Fabrica-distributed, integrity-verified ripgrep payloads as Version 1 execution backends: a Linux package-data executable or a macOS OCI image. No host discovery, Python-regex fallback, or tool-call-time image pull is permitted.
 - Validate only basic glob shape in application code. Pass globs literally to pinned ripgrep as the grammar authority and map its recognized deterministic syntax failure to `INVALID_GLOB`.
 - Serialize the canonical top-level `{ "results": [...] }` object as exactly one `ToolTextContent` part and enforce its 48,000-character aggregate output budget before adapter serialization.
 
@@ -50,17 +50,17 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
   - [x] `T2-AC2` — The selected launch boundary prevents ripgrep from traversing outside the configured workspace for the subprocess lifetime, including after pathname/symlink races; unsupported hosts fail closed before spawning a backend.
   - [x] `T2-V1` — Focused scope and containment-design tests cover the accepted path matrix, launch preconditions, and race/escape regressions.
   - [x] `T2-V2` — POSIX integration tests prove an attempted post-validation escape cannot be searched and unsupported containment capabilities fail closed.
-- [ ] `CP1` — Application contracts and the concrete subprocess-containment design are reviewed against the accepted spec before backend wiring; unresolved containment blocks T3.
+- [x] `CP1` — Application contracts and the concrete subprocess-containment design are reviewed against the accepted spec and ADR 0006 before backend wiring.
 
 ### Phase 2: Pinned backend, context, limits, and scheduling
 
 - [ ] `T3` — Package and validate the pinned ripgrep backend; implement incremental JSON-event parsing into backend-neutral locations.
-  - [ ] `T3-AC1` — Only the packaged pinned binary may execute; unavailable, malformed, permission, transient I/O, and deterministic regex/glob failures map to stable outcomes.
+  - [ ] `T3-AC1` — Only the Fabrica-distributed, integrity-verified platform payload may execute; unavailable, malformed, permission, transient I/O, and deterministic regex/glob failures map to stable outcomes.
   - [ ] `T3-AC2` — The adapter passes globs literally to ripgrep as the only grammar authority, applies ignore/hidden/hard-exclude and exact explicit-ignored-file behavior through backend arguments, searches line-oriented Rust-regex semantics, stops at the global matching-line cap without `--max-count=1`, parses incrementally, and terminates subprocesses on cancellation/limit/timeout.
-  - [ ] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process-cleanup, pinned-version, checksum, executable-permission, and platform-selection conformance tests pass.
-  - [ ] `T3-V2` — Focused integration tests verify actual fixture searches with the packaged binary, including ignore/hidden/explicit-file glob behavior.
-  - [ ] `T3-V3` — Clean-environment tests install both the built wheel and source distribution, verify the expected binary and checksum metadata are present and executable, and run a representative packaged-binary search manually on each supported platform.
-  - **Implementation status (August 29, 2026):** The pinned-ripgrep outbound adapter, incremental stdout supervision, result-cap termination, cancellation/timeout cleanup, source hydration, stable failure mapping, and deterministic unit coverage are implemented. The fixed command also disables host ripgrep configuration and parent-ignore discovery. T3 remains open because the current macOS `sandbox-exec` containment profile aborts the bundled binary before it emits output; the adapter fails closed as `SEARCH_BACKEND_UNAVAILABLE` rather than widening containment or falling back to host `rg`. Real contained packaged-binary fixture searches and clean-environment wheel/source-distribution conformance remain required.
+  - [ ] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process-cleanup, pinned-version, payload-integrity, Linux executable-permission, macOS image-digest, runtime-availability, and platform-selection conformance tests pass.
+  - [ ] `T3-V2` — Focused integration tests verify actual contained fixture searches with the platform payload, including ignore/hidden/explicit-file glob behavior.
+  - [ ] `T3-V3` — Clean-environment tests install the built wheel and source distribution for Linux verification. Separate macOS Apple Silicon conformance provisions the Fabrica OCI archive, verifies the image digest, and runs a representative contained search through Apple Container.
+  - **Implementation status (August 29, 2026):** The Linux-oriented pinned-ripgrep outbound adapter, incremental stdout supervision, result-cap termination, cancellation/timeout cleanup, source hydration, stable failure mapping, and deterministic unit coverage are implemented. The fixed command also disables host ripgrep configuration and parent-ignore discovery. ADR 0006 supersedes the blocked macOS `sandbox-exec` launch profile with Apple Container. T3 remains open until the macOS runtime probe, local OCI-image provisioning and digest verification, fixed read-only container command, workspace scope rewriting, containment regressions, and cross-platform conformance are implemented.
 - [x] `T4` — Implement backend-neutral context hydration, Unicode-safe location conversion, deterministic ordering, and complete-object output limiting.
   - [x] `T4-AC1` — Every match returns two bounded before/after lines, matching/context truncation metadata, CRLF/UTF-8 handling, one match per line, and Unicode character columns.
   - [x] `T4-AC2` — Results sort by path/line/column and observe 100-match, 48,000-character/query, and 48,000-character/batch budgets without partial objects; omitted batch entries are explicit.
@@ -83,11 +83,11 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 - [ ] `T7` — Complete public exports, documentation, and final validation.
   - [x] `T7-AC1` — Bootstrap composition and public exports expose the explicit search-tool factory without changing unrelated tool registration.
   - [x] `T7-AC2` — README explains host composition and intended search-to-read workflow; specs documentation index remains accurate.
-  - [ ] `T7-AC3` — Build configuration includes the exact platform binaries and checksum metadata in both wheel and source distribution; clean-install artifact conformance is manually run on Linux `x86_64` and macOS Apple Silicon.
+  - [ ] `T7-AC3` — Build configuration includes the Linux executable/checksum metadata and the macOS OCI archive/digest metadata; Linux clean-install and macOS Apple Container conformance are manually run on their respective supported platforms.
   - [x] `T7-V1` — `uv run ruff format .` and `uv run ruff check .` pass.
   - [x] `T7-V2` — `uv run ty check src tests` and `uv run pytest` pass.
   - [x] `T7-V3` — Import-linter/project checks configured by the repository pass, and the final diff contains only intentional implementation, test, packaging, and docs changes.
-  - [ ] `T7-V4` — `uv build` succeeds, and the clean-environment wheel/source-distribution checks from `T3-V3` pass on every supported CI target.
+  - [ ] `T7-V4` — `uv build` succeeds, Linux wheel/source-distribution checks pass on Linux `x86_64`, and macOS Apple Container image/runtime conformance passes on macOS Apple Silicon.
 
 ### Completion
 
@@ -174,18 +174,18 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 - [ ] `T3` — All required acceptance and verification items are resolved.
 
-**Description:** Establish a reproducible distribution/startup validation path for the accepted ripgrep version, then implement a POSIX outbound adapter that launches only that binary inside T2's containment boundary, passes globs literally as ripgrep's sole grammar authority, streams JSON events, yields locations, and performs prompt process cleanup.
+**Description:** Establish reproducible distribution/startup validation paths for the accepted ripgrep payloads, then implement an outbound adapter that launches only the Linux executable in Bubblewrap or the macOS OCI image in Apple Container. It must pass globs literally as ripgrep's sole grammar authority, stream JSON events, yield locations, and perform prompt process cleanup.
 
 **Acceptance criteria:**
 
-- [ ] `T3-AC1` — Only the packaged pinned binary may execute; unavailable, malformed, permission, transient I/O, and deterministic regex/glob failures map to stable outcomes.
+- [ ] `T3-AC1` — Only the Fabrica-distributed, integrity-verified platform payload may execute; unavailable, malformed, permission, transient I/O, and deterministic regex/glob failures map to stable outcomes.
 - [ ] `T3-AC2` — The adapter passes globs literally to ripgrep as the only grammar authority, applies ignore/hidden/hard-exclude and exact explicit-ignored-file behavior through backend arguments, searches line-oriented Rust-regex semantics, stops at the global matching-line cap without `--max-count=1`, parses incrementally, and terminates subprocesses on cancellation/limit/timeout.
 
 **Verification:**
 
-- [ ] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process-cleanup, pinned-version, checksum, executable-permission, and platform-selection conformance tests pass.
-- [ ] `T3-V2` — Focused integration tests verify actual fixture searches with the packaged binary, including ignore/hidden/explicit-file glob behavior.
-- [ ] `T3-V3` — Clean-environment tests install both the built wheel and source distribution, verify the expected binary and checksum metadata are present and executable, and run a representative packaged-binary search on each supported CI target.
+- [ ] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process cleanup, pinned-version, Linux checksum/executable-permission, macOS image-digest/runtime-availability, and platform-selection conformance tests pass.
+- [ ] `T3-V2` — Focused integration tests verify actual contained fixture searches with each platform payload, including ignore/hidden/explicit-file glob behavior.
+- [ ] `T3-V3` — Linux clean-environment tests install both built distributions, verify the executable/checksum metadata, and run a representative search. macOS Apple Silicon tests provision the Fabrica OCI archive, verify its selected digest, and run a representative contained Apple Container search.
 
 **Implementation status (August 29, 2026):**
 
@@ -193,7 +193,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 - Added deterministic adapter tests for successful hydration, invalid regex/glob diagnostics, transient I/O, cancellation, timeout, malformed output, source containment, output caps, and macOS/Linux cleanup paths.
 - Added `--no-config` and `--no-ignore-parent` to fixed ripgrep arguments so host configuration and ancestor ignore discovery cannot alter search behavior.
 - Full local quality evidence passed on August 29, 2026: formatting, linting, `ty`, import-linter, `pytest` (1,276 passed, 2 skipped, 93.03% coverage), and `uv build`.
-- Do not check T3 complete: on the current macOS host, the existing `sandbox-exec` profile aborts the bundled ripgrep binary before it emits output. The adapter reports `SEARCH_BACKEND_UNAVAILABLE` and does not weaken containment or discover a host binary. Resolve that execution-profile issue and add real contained fixture searches plus clean-environment wheel/source-distribution conformance before closing T3.
+- Do not check T3 complete: ADR 0006 superseded the blocked macOS `sandbox-exec` design. Implement and verify Apple Container runtime detection, explicitly provisioned local OCI-image availability, digest verification, a fixed read-only workspace mount, `/workspace` scope rewriting, cancellation/timeout cleanup, and real contained fixture searches before closing T3.
 
 **Dependencies:** T1 and T2.
 
@@ -204,6 +204,8 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 - `src/fabrica/features/workspace_searching/adapters/outbound/pinned_ripgrep/adapter.py`
 - `src/fabrica/features/workspace_searching/adapters/outbound/ripgrep_binaries/**`
 - `src/fabrica/features/workspace_searching/adapters/outbound/ripgrep_binaries/sha256.json`
+- `src/fabrica/features/workspace_searching/adapters/outbound/apple_container/**`
+- `src/fabrica/features/workspace_searching/adapters/outbound/search_images/**`
 - `src/fabrica/features/workspace_searching/adapters/outbound/pinned_ripgrep/json_parser.py`
 - `src/fabrica/features/workspace_searching/adapters/outbound/pinned_ripgrep/packaging.py`
 - `tests/unit/features/workspace_searching/adapters/outbound/pinned_ripgrep/test_json_parser.py`
@@ -320,14 +322,14 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 - [x] `T7-AC1` — Bootstrap composition and public exports expose the explicit search-tool factory without changing unrelated tool registration.
 - [x] `T7-AC2` — README explains host composition and intended search-to-read workflow; specs documentation index remains accurate.
-- [ ] `T7-AC3` — Build configuration includes the exact platform binaries and checksum metadata in both wheel and source distribution; clean-install artifact conformance is manually run on Linux `x86_64` and macOS Apple Silicon.
+- [ ] `T7-AC3` — Build configuration includes the Linux executable/checksum metadata and macOS OCI archive/digest metadata; platform conformance is manually run on Linux `x86_64` and macOS Apple Silicon.
 
 **Verification:**
 
 - [x] `T7-V1` — `uv run ruff format .` and `uv run ruff check .` pass.
 - [x] `T7-V2` — `uv run ty check src tests` and `uv run pytest` pass.
 - [x] `T7-V3` — Import-linter/project checks configured by the repository pass, and the final diff contains only intentional implementation, test, packaging, and docs changes.
-- [ ] `T7-V4` — `uv build` succeeds, and the clean-environment wheel/source-distribution checks from `T3-V3` pass manually on every supported platform.
+- [ ] `T7-V4` — `uv build` succeeds, Linux wheel/source-distribution checks pass on Linux `x86_64`, and Apple Container image/runtime conformance passes on macOS Apple Silicon.
 
 **Dependencies:** T6.
 
@@ -337,8 +339,9 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 - `docs/README.md`
 - `src/fabrica/features/workspace_searching/**/__init__.py`
 - `tests/unit/test_bootstrap_api.py`
-- `pyproject.toml` and `uv.lock` for mandatory package-data/build-test configuration.
-- `tests/integration/features/workspace_searching/test_search_distribution_artifacts.py` for manually invoked Linux `x86_64` and macOS Apple Silicon distribution conformance.
+- `pyproject.toml` and `uv.lock` for Linux package-data plus macOS OCI-image packaging/build-test configuration.
+- `tests/integration/features/workspace_searching/test_search_distribution_artifacts.py` for Linux distribution conformance.
+- `tests/integration/features/workspace_searching/test_apple_container_search.py` for manually invoked macOS Apple Silicon runtime/image conformance.
 
 **Estimated scope:** S — integration/documentation closeout after the core is complete.
 
@@ -352,7 +355,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| Vendored ripgrep artifacts are selected or modified incorrectly, or omitted from a release artifact. | High | Commit SHA-256 metadata, include only package-data executables for macOS `arm64` and Linux `x86_64` in wheel and source distribution, fail closed elsewhere, and run clean-environment artifact conformance coverage. |
+| Vendored ripgrep artifacts or the macOS OCI image are selected, modified, or omitted incorrectly. | High | Commit Linux SHA-256 and macOS OCI digest metadata, package both platform payloads intentionally, fail closed when unavailable or unverifiable, and run platform-specific conformance coverage. |
 | A validated path is replaced before or during ripgrep traversal, allowing an escape from the workspace. | High | Select a lifecycle-long POSIX subprocess-containment mechanism before backend wiring, fail closed when unavailable, and prove post-validation pathname/symlink races cannot be searched. |
 | Ripgrep byte offsets, Python Unicode indexing, CRLF handling, and truncation budgets diverge. | High | Centralize conversion/hydration and test Unicode prefixes, CRLF fixtures, and serialized output boundaries. |
 | Killing a subprocess on result caps/cancellation can leak handles or leave child processes. | High | Make lifecycle ownership explicit; test cancellation, timeout, cap stop, and cleanup deterministically. |
@@ -361,8 +364,8 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 ## Resolved Decisions
 
-- [x] **OQ1 — Search subprocess containment:** `sandbox-exec` is the selected macOS POSIX mechanism, with fail-closed unsupported-host behavior and ADR 0005 recording the decision. The known `sandbox-exec` capability limitation remains tracked by T3/CP1 rather than reopening the design decision.
-- [x] **OQ2 — Pinned ripgrep packaging:** Ship exact bundled ripgrep executables as wheel and source-distribution package data with committed SHA-256 verification metadata, executable-permission preservation, and clean-environment artifact conformance tests. Version 1 never discovers or falls back to host `rg`.
+- [x] **OQ1 — Search subprocess containment:** Linux uses Bubblewrap. macOS Apple Silicon on macOS 26 or later uses Apple Container with a read-only `/workspace` mount, as recorded in ADR 0006. Unsupported or unavailable containment fails closed.
+- [x] **OQ2 — Pinned ripgrep packaging:** Ship the Linux executable as wheel/source-distribution package data with SHA-256 metadata. Provision the macOS digest-pinned OCI image explicitly from a Fabrica-distributed archive or equivalent operator workflow; Version 1 never discovers, falls back to, or pulls host/registry `rg` during a tool call.
 - [x] **OQ3 — Glob validation implementation:** Validate basic shape locally, pass globs literally to pinned ripgrep, and map its recognized deterministic syntax error to `INVALID_GLOB`; no host-shell expansion or approximate independent parser.
 - [x] **OQ4 — Runtime output representation:** Return one `ToolTextContent` part containing the complete canonical top-level `{ "results": [...] }` object and limit its aggregate serialized output to 48,000 characters.
-- [x] **OQ5 — Packaging/CI targets:** Support macOS Apple Silicon (`arm64`) and Linux (`x86_64`) only. CI must run pinned-binary conformance coverage on both targets; Intel macOS is out of scope.
+- [x] **OQ5 — Packaging/CI targets:** Support macOS Apple Silicon on macOS 26 or later and Linux `x86_64` only. Linux validates the package-data executable; macOS validates Apple Container runtime plus OCI image conformance. Intel macOS is out of scope.

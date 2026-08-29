@@ -1,7 +1,7 @@
 # 0005. Pin Workspace Search Subprocess Containment
 
 Date: 2026-08-28
-Status: Accepted
+Status: Superseded by [0006](./0006-use-apple-container-for-macos-workspace-search-containment.md)
 
 ## Context
 
@@ -46,3 +46,9 @@ not expose an arbitrary process API.
 | Resolve path then invoke ripgrep directly | A post-validation replacement race can escape the workspace. |
 | Reuse descriptor-only file-open logic | A descriptor protects one opened file, not ripgrep's recursive traversal tree. |
 | Discover a host sandbox or fall back to unsandboxed search | It changes safety guarantees across machines and fails the accepted contract. |
+
+## Supersession note
+
+ADR 0006 supersedes this decision's macOS `sandbox-exec` mechanism. The Linux
+Bubblewrap mechanism and the lifecycle-long containment requirement remain in
+effect.
