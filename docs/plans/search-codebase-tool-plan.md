@@ -55,12 +55,12 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 ### Phase 2: Pinned backend, context, limits, and scheduling
 
 - [ ] `T3` — Package and validate the pinned ripgrep backend; implement incremental JSON-event parsing into backend-neutral locations.
-  - [ ] `T3-AC1` — Only the Fabrica-distributed, integrity-verified platform payload may execute; unavailable, malformed, permission, transient I/O, and deterministic regex/glob failures map to stable outcomes.
-  - [ ] `T3-AC2` — The adapter passes globs literally to ripgrep as the only grammar authority, applies ignore/hidden/hard-exclude and exact explicit-ignored-file behavior through backend arguments, searches line-oriented Rust-regex semantics, stops at the global matching-line cap without `--max-count=1`, parses incrementally, and terminates subprocesses on cancellation/limit/timeout.
-  - [ ] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process-cleanup, pinned-version, payload-integrity, executable-permission, and platform-selection conformance tests pass for both package-data executables.
+  - [x] `T3-AC1` — Only the Fabrica-distributed, integrity-verified platform payload may execute; unavailable, malformed, permission, transient I/O, and deterministic regex/glob failures map to stable outcomes.
+  - [x] `T3-AC2` — The adapter passes globs literally to ripgrep as the only grammar authority, applies ignore/hidden/hard-exclude and exact explicit-ignored-file behavior through backend arguments, searches line-oriented Rust-regex semantics, stops at the global matching-line cap without `--max-count=1`, parses incrementally, and terminates subprocesses on cancellation/limit/timeout.
+  - [x] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process-cleanup, pinned-version, payload-integrity, executable-permission, and platform-selection conformance tests pass for both package-data executables.
   - [ ] `T3-V2` — Focused integration tests verify fixture searches with each platform payload, including ignore/hidden/explicit-file glob behavior and the documented platform containment boundaries.
   - [ ] `T3-V3` — Clean-environment tests install both built distributions, verify each supported platform executable and checksum metadata, and run representative searches. macOS Apple Silicon conformance additionally verifies ordinary symlink-escape rejection without claiming race-proof containment.
-  - **Implementation status (August 30, 2026):** The Linux-oriented pinned-ripgrep outbound adapter, incremental stdout supervision, result-cap termination, cancellation/timeout cleanup, source hydration, stable failure mapping, and deterministic unit coverage are implemented. The fixed command disables host ripgrep configuration and parent-ignore discovery. ADR 0007 replaces the Apple Container approach with a packaged native macOS executable and explicit best-effort pre-launch containment. T3 remains open until that macOS artifact, checksum metadata, platform selection, direct-launch conformance, ordinary symlink-escape regression coverage, and cross-platform distribution validation are implemented.
+  - **Implementation status (August 30, 2026):** Restored the checksum-verified macOS Apple Silicon `rg` package-data payload and manifest metadata. Platform selection now verifies and executes the packaged macOS binary directly with fixed arguments and a prevalidated canonical scope; the obsolete Apple Container adapter, image metadata, and conformance tests were removed. The macOS Apple Silicon artifact, direct representative search, ordinary symlink-escape rejection, and clean wheel/source-distribution installation checks pass locally. The built artifacts contain both platform executables, but Linux Bubblewrap runtime and clean-install conformance must still be run on Linux `x86_64` before closing T3.
 - [x] `T4` — Implement backend-neutral context hydration, Unicode-safe location conversion, deterministic ordering, and complete-object output limiting.
   - [x] `T4-AC1` — Every match returns two bounded before/after lines, matching/context truncation metadata, CRLF/UTF-8 handling, one match per line, and Unicode character columns.
   - [x] `T4-AC2` — Results sort by path/line/column and observe 100-match, 48,000-character/query, and 48,000-character/batch budgets without partial objects; omitted batch entries are explicit.
@@ -178,12 +178,12 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 **Acceptance criteria:**
 
-- [ ] `T3-AC1` — Only the Fabrica-distributed, integrity-verified platform payload may execute; unavailable, malformed, permission, transient I/O, and deterministic regex/glob failures map to stable outcomes.
-- [ ] `T3-AC2` — The adapter passes globs literally to ripgrep as the only grammar authority, applies ignore/hidden/hard-exclude and exact explicit-ignored-file behavior through backend arguments, searches line-oriented Rust-regex semantics, stops at the global matching-line cap without `--max-count=1`, parses incrementally, and terminates subprocesses on cancellation/limit/timeout.
+- [x] `T3-AC1` — Only the Fabrica-distributed, integrity-verified platform payload may execute; unavailable, malformed, permission, transient I/O, and deterministic regex/glob failures map to stable outcomes.
+- [x] `T3-AC2` — The adapter passes globs literally to ripgrep as the only grammar authority, applies ignore/hidden/hard-exclude and exact explicit-ignored-file behavior through backend arguments, searches line-oriented Rust-regex semantics, stops at the global matching-line cap without `--max-count=1`, parses incrementally, and terminates subprocesses on cancellation/limit/timeout.
 
 **Verification:**
 
-- [ ] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process cleanup, pinned-version, checksum/executable-permission, and platform-selection conformance tests pass for both package-data executables.
+- [x] `T3-V1` — Backend argument, glob-diagnostic mapping, parser, process cleanup, pinned-version, checksum/executable-permission, and platform-selection conformance tests pass for both package-data executables.
 - [ ] `T3-V2` — Focused integration tests verify fixture searches with each platform payload, including ignore/hidden/explicit-file glob behavior and documented containment limitations.
 - [ ] `T3-V3` — Clean-environment tests install both built distributions, verify executable/checksum metadata, and run representative searches for Linux `x86_64` and macOS Apple Silicon. macOS tests cover ordinary symlink-escape rejection but do not claim race-proof containment.
 
@@ -193,7 +193,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 - Added deterministic adapter tests for successful hydration, invalid regex/glob diagnostics, transient I/O, cancellation, timeout, malformed output, source containment, output caps, and macOS/Linux cleanup paths.
 - Added `--no-config` and `--no-ignore-parent` to fixed ripgrep arguments so host configuration and ancestor ignore discovery cannot alter search behavior.
 - Full local quality evidence passed on August 29, 2026: formatting, linting, `ty`, import-linter, `pytest` (1,276 passed, 2 skipped, 93.03% coverage), and `uv build`.
-- Do not check T3 complete: ADR 0007 superseded the Apple Container approach. Ship and verify a checksum-verified macOS Apple Silicon ripgrep package-data executable, direct platform selection and launch, ordinary symlink-escape rejection, cancellation/timeout cleanup, and clean-install distribution conformance before closing T3. The direct backend must be described as best-effort pre-launch containment, not lifecycle-long isolation.
+- On August 30, 2026, restored the exact checksum-verified macOS Apple Silicon package-data executable, replaced Apple Container selection with direct verified payload selection, and removed obsolete container/image code. Native macOS representative-search and clean-install wheel/source-distribution conformance pass; ordinary symlink escapes remain rejected by the scope resolver. The wheel and sdist contain both supported executables, but Linux runtime/release conformance remains required. Direct native containment remains best-effort pre-launch validation, not lifecycle-long isolation.
 
 **Dependencies:** T1 and T2.
 

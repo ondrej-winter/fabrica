@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import stat
 from dataclasses import dataclass
 from importlib.resources import files
@@ -34,9 +35,9 @@ class PinnedRipgrepExecutable:
     platform_key: str
 
 
-def verified_linux_pinned_ripgrep_executable() -> PinnedRipgrepExecutable:
-    """Return the packaged Linux ripgrep executable after integrity checks."""
-    platform_key = "linux-x86_64"
+def verified_pinned_ripgrep_executable() -> PinnedRipgrepExecutable:
+    """Return the supported host's packaged ripgrep executable after integrity checks."""
+    platform_key = _platform_key()
     manifest = _load_manifest()
     if manifest.get("version") != _RIPGREP_VERSION:
         msg = "packaged ripgrep manifest version is unsupported"
@@ -57,6 +58,17 @@ def verified_linux_pinned_ripgrep_executable() -> PinnedRipgrepExecutable:
     executable = Path(str(files(_BINARY_PACKAGE).joinpath(relative_path)))
     _verify_executable(executable, expected_sha256)
     return PinnedRipgrepExecutable(path=executable, version=_RIPGREP_VERSION, platform_key=platform_key)
+
+
+def _platform_key() -> str:
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+    if system == "linux" and machine in {"x86_64", "amd64"}:
+        return "linux-x86_64"
+    if system == "darwin" and machine in {"arm64", "aarch64"}:
+        return "darwin-arm64"
+    msg = "packaged ripgrep backend is unavailable for this platform"
+    raise PinnedRipgrepUnavailableError(msg)
 
 
 def _load_manifest() -> dict[str, object]:
@@ -88,4 +100,4 @@ def _verify_executable(executable: Path, expected_sha256: str) -> None:
         raise PinnedRipgrepUnavailableError(msg)
 
 
-__all__ = ["PinnedRipgrepExecutable", "PinnedRipgrepUnavailableError", "verified_linux_pinned_ripgrep_executable"]
+__all__ = ["PinnedRipgrepExecutable", "PinnedRipgrepUnavailableError", "verified_pinned_ripgrep_executable"]

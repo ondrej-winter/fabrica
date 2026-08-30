@@ -1,13 +1,11 @@
 """Build fixed, sandboxed ripgrep commands from canonical search requests."""
 
-import platform
 from dataclasses import dataclass
 from pathlib import Path
 
-from fabrica.features.workspace_searching.adapters.outbound.apple_container import AppleContainerSearchCommandBuilder
 from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.manifest import (
     PinnedRipgrepUnavailableError,
-    verified_linux_pinned_ripgrep_executable,
+    verified_pinned_ripgrep_executable,
 )
 from fabrica.features.workspace_searching.adapters.outbound.posix_filesystem import SearchSandbox, SearchScope
 from fabrica.features.workspace_searching.application.dtos import SearchLimits, SearchQuery
@@ -23,15 +21,12 @@ class PinnedRipgrepCommandBuilder:
 
     def command_for(self, query: SearchQuery, scope: SearchScope, limits: SearchLimits) -> tuple[str, ...]:
         """Return fixed backend arguments enclosed by the workspace sandbox command."""
-        system = platform.system().lower()
-        machine = platform.machine().lower()
-        if system == "linux" and machine in {"x86_64", "amd64"}:
-            executable = verified_linux_pinned_ripgrep_executable()
-            backend_argv = self._backend_argv(str(executable.path), query, scope, limits)
+        executable = verified_pinned_ripgrep_executable()
+        backend_argv = self._backend_argv(str(executable.path), query, scope, limits)
+        if executable.platform_key == "linux-x86_64":
             return SearchSandbox(self.workspace_root).command_for(backend_argv, scope)
-        if system == "darwin" and machine in {"arm64", "aarch64"}:
-            backend_argv = self._backend_argv("rg", query, scope, limits)
-            return AppleContainerSearchCommandBuilder(self.workspace_root).command_for(backend_argv, scope)
+        if executable.platform_key == "darwin-arm64":
+            return (*backend_argv, str(scope.canonical_path))
         msg = "pinned ripgrep backend is unavailable for this platform"
         raise PinnedRipgrepUnavailableError(msg)
 

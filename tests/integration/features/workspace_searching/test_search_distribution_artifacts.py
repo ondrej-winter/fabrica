@@ -2,6 +2,7 @@
 
 import json
 import os
+import platform
 import subprocess
 import sys
 from pathlib import Path
@@ -13,7 +14,10 @@ _EXPECTED_DISTRIBUTION_COUNT = 2
 _REPRESENTATIVE_SEARCH_SOURCE = "needle\n"
 _REPRESENTATIVE_SEARCH_PATTERN = "needle"
 
-pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Linux package-data distribution conformance")
+pytestmark = pytest.mark.skipif(
+    (platform.system(), platform.machine()) not in {("Linux", "x86_64"), ("Darwin", "arm64"), ("Darwin", "aarch64")},
+    reason="supported package-data distribution conformance",
+)
 
 
 def test_built_distributions_include_and_execute_the_verified_pinned_ripgrep_binary(tmp_path: Path) -> None:
@@ -75,10 +79,10 @@ import subprocess
 import sys
 
 from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep import (
-    verified_linux_pinned_ripgrep_executable,
+    verified_pinned_ripgrep_executable,
 )
 
-executable = verified_linux_pinned_ripgrep_executable()
+executable = verified_pinned_ripgrep_executable()
 completed = subprocess.run(
     (str(executable.path), "--json", "--no-config", "--case-sensitive", sys.argv[2], sys.argv[1]),
     capture_output=True,
