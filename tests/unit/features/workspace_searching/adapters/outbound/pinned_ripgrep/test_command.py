@@ -14,18 +14,13 @@ from fabrica.features.workspace_searching.adapters.outbound.posix_filesystem imp
 from fabrica.features.workspace_searching.application.dtos import SearchLimits, SearchQuery
 
 
-def test_linux_pinned_ripgrep_command_for_directory_forwards_literal_glob_and_safe_defaults(
+def test_linux_pinned_ripgrep_command_directly_invokes_the_verified_executable_with_the_canonical_scope(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
         pinned_ripgrep_command,
         "verified_pinned_ripgrep_executable",
         lambda: PinnedRipgrepExecutable(Path("/package/linux_x86_64/rg"), "15.2.0", "linux-x86_64"),
-    )
-    monkeypatch.setattr(
-        pinned_ripgrep_command.SearchSandbox,
-        "command_for",
-        lambda _self, backend_argv, planned_scope: (*backend_argv, str(planned_scope.canonical_path)),
     )
     (tmp_path / "src").mkdir()
     scope = resolve_search_scope(tmp_path, "src")
@@ -48,6 +43,9 @@ def test_linux_pinned_ripgrep_command_for_directory_forwards_literal_glob_and_sa
     assert "--no-ignore" not in backend
     assert "UserService" in backend
     assert "--max-count=1" not in backend
+    assert command[0] == "/package/linux_x86_64/rg"
+    assert command[-1] == str(scope.canonical_path)
+    assert "bwrap" not in command
 
 
 def test_linux_pinned_ripgrep_command_for_explicit_file_overrides_only_ordinary_ignore_rules(
@@ -57,11 +55,6 @@ def test_linux_pinned_ripgrep_command_for_explicit_file_overrides_only_ordinary_
         pinned_ripgrep_command,
         "verified_pinned_ripgrep_executable",
         lambda: PinnedRipgrepExecutable(Path("/package/linux_x86_64/rg"), "15.2.0", "linux-x86_64"),
-    )
-    monkeypatch.setattr(
-        pinned_ripgrep_command.SearchSandbox,
-        "command_for",
-        lambda _self, backend_argv, planned_scope: (*backend_argv, str(planned_scope.canonical_path)),
     )
     ignored_file = tmp_path / "ignored.py"
     ignored_file.write_text("value = 1\n", encoding="utf-8")

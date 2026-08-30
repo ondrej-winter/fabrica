@@ -18,7 +18,6 @@ from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.json_
 )
 from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.manifest import PinnedRipgrepUnavailableError
 from fabrica.features.workspace_searching.adapters.outbound.posix_filesystem import (
-    SearchSandboxUnavailableError,
     SearchScopeResolutionError,
     resolve_search_scope,
 )
@@ -160,7 +159,7 @@ def _load_source_text(workspace_root: Path, paths: tuple[str, ...]) -> dict[str,
 
 @dataclass(frozen=True, slots=True)
 class PinnedRipgrepWorkspaceSearchBackend(WorkspaceSearchBackend):
-    """Search one contained scope using only the checksum-verified ripgrep binary."""
+    """Search one prevalidated scope using only the checksum-verified ripgrep binary."""
 
     workspace_root: Path
     command_runner: PinnedRipgrepCommandRunner = AsyncioPinnedRipgrepCommandRunner()
@@ -182,7 +181,7 @@ class PinnedRipgrepWorkspaceSearchBackend(WorkspaceSearchBackend):
             return await self._result_from_completed(query, completed, context)
         except SearchScopeResolutionError as err:
             result = _failure(query, err.code)
-        except (PinnedRipgrepUnavailableError, SearchSandboxUnavailableError):
+        except PinnedRipgrepUnavailableError:
             result = _failure(query, SearchErrorCode.SEARCH_BACKEND_UNAVAILABLE)
         except asyncio.CancelledError:
             result = _failure(query, SearchErrorCode.SEARCH_CANCELLED)

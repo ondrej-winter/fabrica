@@ -22,6 +22,7 @@ from fabrica.features.workspace_searching.application.ports import WorkspaceSear
 from fabrica.features.workspace_searching.application.use_cases import SearchCodebase
 
 _POLL_INTERVAL_SECONDS = 0.01
+_POST_START_TIMEOUT_SECONDS = 2.0
 
 pytestmark = pytest.mark.skipif(
     sys.platform not in {"darwin", "linux"},
@@ -109,7 +110,7 @@ def test_runner_terminates_a_real_subprocess_after_interruption(tmp_path: Path, 
             adapter.AsyncioPinnedRipgrepCommandRunner().run(
                 (sys.executable, str(script_path), str(started_path), str(pid_path)),
                 cancellation=cancellation,
-                timeout_seconds=0.1 if interruption == "timeout" else 5.0,
+                timeout_seconds=_POST_START_TIMEOUT_SECONDS if interruption == "timeout" else 5.0,
                 max_matching_lines=1,
             )
         )

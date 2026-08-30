@@ -92,11 +92,11 @@ runtime = create_tool_loop_runtime(
 Use `search_codebase` first to locate matching workspace-relative files and
 one-based line locations, then pass only the relevant paths and line ranges to
 `read_files` for bounded source context. Search never discovers a host `rg`
-installation. Linux uses a checksum-verified Fabrica package-data executable in
-Bubblewrap. macOS Apple Silicon uses a checksum-verified Fabrica package-data native
-`rg` executable with no container runtime or OCI-image setup. Direct native macOS
-search uses best-effort pre-launch workspace containment, whereas Linux retains lifecycle-long
-Bubblewrap containment. It is read-only, supports bounded batches of textual
+installation. Linux `x86_64` and macOS Apple Silicon use checksum-verified Fabrica
+package-data native `rg` executables with no container runtime or OCI-image setup.
+Direct native search on both platforms uses best-effort pre-launch workspace
+containment: it rejects ordinary path and symlink escapes but does not defend
+against malicious concurrent filesystem mutation during traversal. It is read-only, supports bounded batches of textual
 regular-expression queries, and returns ordered structured results with matching
 and surrounding lines.
 See [`docs/specs/tools-search-codebase-tool-spec.md`](docs/specs/tools-search-codebase-tool-spec.md)
@@ -114,9 +114,9 @@ checksum metadata and executable permission, and runs a representative search.
 make test-search-distribution
 ```
 
-This host is verified only for its own platform. Linux validation also exercises
-the Bubblewrap backend; macOS validation covers the documented best-effort
-pre-launch containment and must not be represented as race-proof containment.
+This host is verified only for its own platform. Both supported-platform checks
+cover the documented best-effort pre-launch containment and must not be
+represented as race-proof containment.
 
 You can also run the default tests through `make`:
 

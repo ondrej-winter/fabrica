@@ -6,7 +6,7 @@
 
 **Acceptance:** Confirmed on August 28, 2026; macOS execution and containment revised on August 30, 2026.
 
-**Revision:** Canonicalized against `.agents/skills/spec-driven-development/SKILL.md` on August 28, 2026. macOS execution and containment follow ADR 0007.
+**Revision:** Canonicalized against `.agents/skills/spec-driven-development/SKILL.md` on August 28, 2026. Supported-platform execution and containment follow ADR 0008.
 
 This document is the canonical source of truth for the accepted `search_codebase` tool contract. Any derived implementation plan and implementation must preserve its objective, requirements, constraints, boundaries, and success criteria. Material changes require this specification to be updated and re-confirmed.
 
@@ -330,14 +330,13 @@ shared by `read_files`, `search_codebase`, and `apply_patch` where their distinc
 operations permit it. Prefer one descriptor-based POSIX `WorkspacePathResolver`
 rather than three subtly different implementations.
 
-Linux search must preserve lifecycle-long containment through Bubblewrap. macOS
-Apple Silicon direct native ripgrep execution performs best-effort pre-launch
-validation: it rejects known path and symlink escapes, but cannot guarantee that a
-malicious concurrent local process will not replace a pathname or symlink after
-validation and during recursive traversal. Do not represent the macOS behavior as
-race-proof containment. ADR 0007 records the accepted boundary and
-`docs/future-work/descriptor-rooted-macos-search-helper.md` records the deferred
-path to stronger native containment.
+Direct native ripgrep execution on both supported platforms performs best-effort
+pre-launch validation: it rejects known path and symlink escapes, but cannot
+guarantee that a malicious concurrent local process will not replace a pathname or
+symlink after validation and during recursive traversal. Do not represent this
+behavior as race-proof containment. ADR 0008 records the accepted boundary and
+`docs/future-work/descriptor-rooted-search-helper.md` records the deferred path
+to stronger native containment.
 
 Default symlink behavior:
 
@@ -832,28 +831,22 @@ Version 1 must execute only a Fabrica-distributed, integrity-verified pinned
 ripgrep payload. It must not discover, validate, or fall back to a host-installed
 ripgrep binary or a different regex engine.
 
-- On Linux `x86_64`, the payload is the checksum-verified package-data ripgrep
-  executable. Bubblewrap must expose the canonical workspace root only as a
-  read-only mount at `/workspace`.
-- On macOS Apple Silicon, the payload is a checksum-verified Fabrica package-data
-  ripgrep executable. It executes directly with fixed argv, `--no-config`, and
-  `--no-follow`; it requires no Apple Container, OCI image, daemon, registry pull,
-  or host-installed ripgrep.
-- Linux retains lifecycle-long Bubblewrap containment. macOS direct execution
-  provides best-effort pre-launch scope validation only and does not protect
-  against a malicious concurrent filesystem mutation after validation.
-- Other OS/architecture combinations, missing/executable-invalid payloads, or
-  unavailable Linux containment must fail closed with
-  `SEARCH_BACKEND_UNAVAILABLE`.
+- On Linux `x86_64` and macOS Apple Silicon, the payload is the corresponding
+  checksum-verified Fabrica package-data ripgrep executable. It executes directly
+  with fixed argv, `--no-config`, and `--no-follow`; it requires no Bubblewrap,
+  Apple Container, OCI image, daemon, registry pull, or host-installed ripgrep.
+- Both platforms provide best-effort pre-launch scope validation only and do not
+  protect against malicious concurrent filesystem mutation after validation.
+- Other OS/architecture combinations or missing/executable-invalid payloads must
+  fail closed with `SEARCH_BACKEND_UNAVAILABLE`.
 
-The Linux backend must receive only `/workspace/<validated-relative-scope>` and
-must not inherit ambient host paths or environment configuration. The macOS direct
-backend must receive only the validated canonical scope through fixed argv and
-must not inherit ripgrep configuration. Packaging, startup validation, and
-conformance tests must target the pinned ripgrep version and this support matrix.
+Each direct backend must receive only the validated canonical scope through fixed
+argv and must not inherit ripgrep configuration. Packaging, startup validation,
+and conformance tests must target the pinned ripgrep version and this support
+matrix.
 The repository's default CI workflow does not run cross-platform runtime
-conformance. Before release, operators must validate the Linux Bubblewrap backend
-on Linux `x86_64` and the native packaged-ripgrep backend on macOS Apple Silicon.
+conformance. Before release, operators must validate the native packaged-ripgrep
+backend on Linux `x86_64` and macOS Apple Silicon.
 
 The Linux distribution check is invoked with:
 
@@ -864,8 +857,8 @@ FABRICA_DISTRIBUTION_ARTIFACTS='dist/*.whl:dist/*.tar.gz' \
 
 The test installs each artifact into an isolated environment, verifies the
 platform's executable and checksum metadata, and performs a representative direct
-pinned-ripgrep search. macOS release validation must verify the packaged Apple
-Silicon executable, its checksum and executable permission, representative search
+pinned-ripgrep search. Each supported platform's release validation must verify
+its packaged executable, checksum and executable permission, representative search
 behavior, and ordinary symlink-escape rejection. It must not claim race-proof
 containment for direct native traversal.
 Conceptual invocation:
@@ -1300,9 +1293,9 @@ before adding a model-callable runtime adapter.
 
 1. **Search backend distribution:** Version 1 requires only a
    Fabrica-distributed, integrity-verified pinned ripgrep payload. Linux `x86_64`
-   uses a package-data executable in Bubblewrap; macOS Apple Silicon uses a
-   package-data executable directly. Host ripgrep discovery, validation, fallback,
-   container-runtime requirements, and tool-call-time downloads are out of scope.
+   and macOS Apple Silicon use their package-data executables directly. Host
+   ripgrep discovery, validation, fallback, container-runtime requirements, and
+   tool-call-time downloads are out of scope.
 2. **Canonical glob grammar:** `glob` uses documented ripgrep-compatible grammar
    evaluated by the tool. Host-shell expansion is never part of the contract.
 3. **Context truncation metadata:** Every matching or context line includes
@@ -1314,11 +1307,10 @@ before adding a model-callable runtime adapter.
    `workspace_reading` and `workspace_editing`. `agent_runtime` registers its
    application port as a model-callable tool. Extract shared infrastructure only
    after concrete reuse demonstrates the need.
-6. **macOS containment:** ADR 0007 replaces Apple Container with direct native
-   package-data ripgrep for macOS Apple Silicon. macOS provides explicit
-   best-effort pre-launch containment, not race-proof lifecycle-long containment;
-   Linux retains Bubblewrap. A descriptor-rooted native helper remains deferred
-   future work.
+6. **Supported-platform containment:** ADR 0008 uses direct native package-data
+   ripgrep on Linux `x86_64` and macOS Apple Silicon. Both platforms provide
+   explicit best-effort pre-launch containment, not race-proof lifecycle-long
+   containment; a descriptor-rooted native helper remains deferred future work.
 
 ## Acceptance and planning gate
 

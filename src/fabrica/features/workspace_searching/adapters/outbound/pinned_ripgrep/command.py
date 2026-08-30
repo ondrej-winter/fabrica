@@ -1,4 +1,4 @@
-"""Build fixed, sandboxed ripgrep commands from canonical search requests."""
+"""Build fixed direct native ripgrep commands from canonical search requests."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,7 +7,7 @@ from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.manif
     PinnedRipgrepUnavailableError,
     verified_pinned_ripgrep_executable,
 )
-from fabrica.features.workspace_searching.adapters.outbound.posix_filesystem import SearchSandbox, SearchScope
+from fabrica.features.workspace_searching.adapters.outbound.posix_filesystem import SearchScope
 from fabrica.features.workspace_searching.application.dtos import SearchLimits, SearchQuery
 
 _ALWAYS_EXCLUDED_GLOBS = ("!.git/**", "!node_modules/**")
@@ -15,17 +15,15 @@ _ALWAYS_EXCLUDED_GLOBS = ("!.git/**", "!node_modules/**")
 
 @dataclass(frozen=True, slots=True)
 class PinnedRipgrepCommandBuilder:
-    """Construct one contained pinned-ripgrep command without shell interpretation."""
+    """Construct one verified pinned-ripgrep command without shell interpretation."""
 
     workspace_root: Path
 
     def command_for(self, query: SearchQuery, scope: SearchScope, limits: SearchLimits) -> tuple[str, ...]:
-        """Return fixed backend arguments enclosed by the workspace sandbox command."""
+        """Return fixed backend arguments with the validated canonical scope."""
         executable = verified_pinned_ripgrep_executable()
         backend_argv = self._backend_argv(str(executable.path), query, scope, limits)
-        if executable.platform_key == "linux-x86_64":
-            return SearchSandbox(self.workspace_root).command_for(backend_argv, scope)
-        if executable.platform_key == "darwin-arm64":
+        if executable.platform_key in {"linux-x86_64", "darwin-arm64"}:
             return (*backend_argv, str(scope.canonical_path))
         msg = "pinned ripgrep backend is unavailable for this platform"
         raise PinnedRipgrepUnavailableError(msg)

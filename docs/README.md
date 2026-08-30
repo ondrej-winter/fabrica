@@ -20,8 +20,8 @@ This directory contains durable project documentation and current reference note
 
 ### Future work
 
-- `future-work/descriptor-rooted-macos-search-helper.md` records the deferred
-  native-helper option for restoring stronger macOS workspace-search containment
+- `future-work/descriptor-rooted-search-helper.md` records the deferred
+  native-helper option for restoring stronger supported-platform workspace-search containment
   without an external container runtime.
 
 ### Specs

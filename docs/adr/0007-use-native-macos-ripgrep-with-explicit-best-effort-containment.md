@@ -1,7 +1,7 @@
 # 0007. Use Native macOS Ripgrep With Explicit Best-Effort Containment
 
 Date: 2026-08-30
-Status: Accepted
+Status: Superseded by [0008](./0008-use-native-ripgrep-with-best-effort-containment-on-supported-platforms.md)
 
 Supersedes [0006](./0006-use-apple-container-for-macos-workspace-search-containment.md).
 
@@ -54,7 +54,7 @@ package-data executable.
   to concurrent workspace mutation.
 - A future descriptor-rooted native helper may restore stronger macOS containment
   without an external runtime. Its evaluation and acceptance bar are recorded in
-  [`../future-work/descriptor-rooted-macos-search-helper.md`](../future-work/descriptor-rooted-macos-search-helper.md).
+  [`../future-work/descriptor-rooted-search-helper.md`](../future-work/descriptor-rooted-search-helper.md).
 
 ## Alternatives considered
 

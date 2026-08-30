@@ -37,8 +37,8 @@ class SearchScopeResolutionError(Exception):
 def resolve_search_scope(workspace_root: Path, requested_path: str) -> SearchScope:
     """Resolve one existing literal file or directory without permitting workspace escape.
 
-    This resolution provides canonical planning evidence only. The sandbox boundary
-    owns the lifetime-long subprocess traversal guarantee.
+    This resolution provides best-effort pre-launch containment. A malicious local
+    process can still replace paths after validation and during recursive search.
     """
     _validate_requested_path(requested_path)
     root = _resolve_workspace_root(workspace_root)

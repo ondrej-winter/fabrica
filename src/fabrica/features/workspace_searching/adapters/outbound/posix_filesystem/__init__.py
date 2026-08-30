@@ -1,4 +1,4 @@
-"""Fail-closed POSIX scope and subprocess-containment primitives."""
+"""Fail-closed POSIX workspace search-scope resolution primitives."""
 
 from fabrica.features.workspace_searching.adapters.outbound.posix_filesystem.path_resolution import (
     SearchScope,
@@ -6,14 +6,8 @@ from fabrica.features.workspace_searching.adapters.outbound.posix_filesystem.pat
     SearchScopeResolutionError,
     resolve_search_scope,
 )
-from fabrica.features.workspace_searching.adapters.outbound.posix_filesystem.search_sandbox import (
-    SearchSandbox,
-    SearchSandboxUnavailableError,
-)
 
 __all__ = [
-    "SearchSandbox",
-    "SearchSandboxUnavailableError",
     "SearchScope",
     "SearchScopeKind",
     "SearchScopeResolutionError",

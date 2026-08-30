@@ -10,4 +10,5 @@ This directory contains accepted architecture decisions for Fabrica.
 | [0004](./0004-use-bounded-multimodal-read-tool-runtime-contracts.md) | Use Bounded Multimodal Read Tool Runtime Contracts | 2026-08-28 | Accepted |
 | [0005](./0005-pin-workspace-search-subprocess-containment.md) | Pin Workspace Search Subprocess Containment | 2026-08-28 | Superseded by 0006 |
 | [0006](./0006-use-apple-container-for-macos-workspace-search-containment.md) | Use Apple Container for macOS Workspace Search Containment | 2026-08-29 | Superseded by 0007 |
-| [0007](./0007-use-native-macos-ripgrep-with-explicit-best-effort-containment.md) | Use Native macOS Ripgrep With Explicit Best-Effort Containment | 2026-08-30 | Accepted |
+| [0007](./0007-use-native-macos-ripgrep-with-explicit-best-effort-containment.md) | Use Native macOS Ripgrep With Explicit Best-Effort Containment | 2026-08-30 | Superseded by 0008 |
+| [0008](./0008-use-native-ripgrep-with-best-effort-containment-on-supported-platforms.md) | Use Native Ripgrep With Best-Effort Containment on Supported Platforms | 2026-08-30 | Accepted |
