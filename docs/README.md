@@ -18,6 +18,12 @@ This directory contains durable project documentation and current reference note
 
 - `adr/README.md` indexes accepted architecture decisions.
 
+### Future work
+
+- `future-work/descriptor-rooted-macos-search-helper.md` records the deferred
+  native-helper option for restoring stronger macOS workspace-search containment
+  without an external container runtime.
+
 ### Specs
 
 - `specs/README.md` explains the concern-oriented spec taxonomy.

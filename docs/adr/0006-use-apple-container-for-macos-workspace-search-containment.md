@@ -1,9 +1,14 @@
 # 0006. Use Apple Container for macOS Workspace Search Containment
 
 Date: 2026-08-29
-Status: Accepted
+Status: Superseded by [0007](./0007-use-native-macos-ripgrep-with-explicit-best-effort-containment.md)
 
 Supersedes the macOS mechanism in [0005](./0005-pin-workspace-search-subprocess-containment.md).
+
+> **Supersession note:** On August 30, 2026, ADR 0007 replaced this decision.
+> Apple Container imposed an unacceptable end-user setup requirement for ordinary
+> local workspace search. The historical context below explains why this stronger
+> containment approach was selected before that product decision.
 
 ## Context
 

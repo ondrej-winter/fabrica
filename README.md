@@ -92,11 +92,15 @@ runtime = create_tool_loop_runtime(
 Use `search_codebase` first to locate matching workspace-relative files and
 one-based line locations, then pass only the relevant paths and line ranges to
 `read_files` for bounded source context. Search never discovers a host `rg`
-installation: Linux uses a checksum-verified Fabrica package-data executable in
-Bubblewrap, while supported macOS Apple Silicon hosts use a locally provisioned,
-digest-verified Fabrica OCI image through Apple Container. It is read-only,
-supports bounded batches of textual regular-expression queries, and returns
-ordered structured results with matching and surrounding lines.
+installation. Linux uses a checksum-verified Fabrica package-data executable in
+Bubblewrap. The accepted macOS Apple Silicon direction is the same package-only,
+checksum-verified native `rg` experience, with no container runtime or OCI-image
+setup; the current macOS container-based implementation is transitional until
+that native artifact is shipped. Direct native macOS search will use best-effort
+pre-launch workspace containment, whereas Linux retains lifecycle-long
+Bubblewrap containment. It is read-only, supports bounded batches of textual
+regular-expression queries, and returns ordered structured results with matching
+and surrounding lines.
 See [`docs/specs/tools-search-codebase-tool-spec.md`](docs/specs/tools-search-codebase-tool-spec.md)
 for its complete accepted contract, limits, and supported platforms.
 
