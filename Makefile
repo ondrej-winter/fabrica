@@ -1,4 +1,4 @@
-.PHONY: help format lint type import-lint test quality pre-commit test-live-codex test-live-runtime run-live-cli commit-message commit deps-tree deps-outdated deps-audit
+.PHONY: help format lint type import-lint test quality pre-commit test-live-codex test-live-runtime test-search-distribution run-live-cli commit-message commit deps-tree deps-outdated deps-audit
 
 PROMPT ?= Reply with the single word: pong
 FABRICA_GLOBAL_OPTIONS ?= --verbose-diagnostics
@@ -14,6 +14,7 @@ help:
 	@echo "  make pre-commit       Run all configured pre-commit hooks"
 	@echo "  make test-live-codex  Run opt-in live Codex backend test"
 	@echo "  make test-live-runtime Run opt-in live Codex-backed runtime test"
+	@echo "  make test-search-distribution Build and verify search package distributions"
 	@echo "  make run-live-cli     Run explicit live CLI prompt via Codex-backed runtime"
 	@echo "  make commit-message   Propose a Conventional Commit message from staged changes"
 	@echo "  make commit           Interactively commit staged changes after confirmation"
@@ -46,6 +47,11 @@ test-live-codex:
 
 test-live-runtime:
 	FABRICA_RUN_LIVE_CODEX_TESTS=1 uv run pytest -m live_codex tests/integration/features/agent_runtime/test_live_local_agent_runtime.py
+
+test-search-distribution:
+	rm -rf dist
+	uv build
+	FABRICA_DISTRIBUTION_ARTIFACTS='dist/*.whl:dist/*.tar.gz' uv run pytest --no-cov tests/integration/features/workspace_searching/test_search_distribution_artifacts.py
 
 run-live-cli:
 	uv run fabrica $(FABRICA_GLOBAL_OPTIONS) run --prompt "$(PROMPT)"

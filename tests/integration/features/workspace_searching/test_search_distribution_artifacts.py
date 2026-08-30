@@ -49,6 +49,8 @@ def test_built_distributions_include_and_execute_the_verified_pinned_ripgrep_bin
         assert evidence["path"].endswith("/rg")
         assert evidence["version"] == "15.2.0"
         assert evidence["search_event_type"] == "match"
+        assert evidence["checksum_matches_manifest"] is True
+        assert evidence["is_executable"] is True
 
 
 def _distribution_artifact_paths() -> tuple[Path, ...]:
@@ -74,15 +76,23 @@ def _virtual_environment_interpreter(virtual_environment: Path) -> Path:
 
 def _installed_artifact_probe() -> str:
     return """
+import hashlib
 import json
+import os
+import stat
 import subprocess
 import sys
 
 from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep import (
     verified_pinned_ripgrep_executable,
 )
+from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep import manifest as manifest_module
 
 executable = verified_pinned_ripgrep_executable()
+manifest = manifest_module._load_manifest()
+artifact = manifest["artifacts"][executable.platform_key]
+with executable.path.open("rb") as executable_file:
+    actual_sha256 = hashlib.file_digest(executable_file, "sha256").hexdigest()
 completed = subprocess.run(
     (str(executable.path), "--json", "--no-config", "--case-sensitive", sys.argv[2], sys.argv[1]),
     capture_output=True,
@@ -90,7 +100,13 @@ completed = subprocess.run(
     text=True,
 )
 event = next(json.loads(line) for line in completed.stdout.splitlines() if json.loads(line)["type"] == "match")
-print(json.dumps({"path": str(executable.path), "version": executable.version, "search_event_type": event["type"]}))
+print(json.dumps({
+    "path": str(executable.path),
+    "version": executable.version,
+    "search_event_type": event["type"],
+    "checksum_matches_manifest": actual_sha256 == artifact["sha256"],
+    "is_executable": stat.S_ISREG(executable.path.stat().st_mode) and os.access(executable.path, os.X_OK),
+}))
 """
 
 

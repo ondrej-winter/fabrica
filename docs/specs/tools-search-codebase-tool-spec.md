@@ -859,7 +859,7 @@ The Linux distribution check is invoked with:
 
 ```bash
 FABRICA_DISTRIBUTION_ARTIFACTS='dist/*.whl:dist/*.tar.gz' \
-  uv run pytest tests/integration/features/workspace_searching/test_search_distribution_artifacts.py
+  uv run pytest --no-cov tests/integration/features/workspace_searching/test_search_distribution_artifacts.py
 ```
 
 The test installs each artifact into an isolated environment, verifies the

@@ -102,6 +102,22 @@ and surrounding lines.
 See [`docs/specs/tools-search-codebase-tool-spec.md`](docs/specs/tools-search-codebase-tool-spec.md)
 for its complete accepted contract, limits, and supported platforms.
 
+### Search distribution conformance
+
+Before releasing workspace search changes, run the package-data distribution
+conformance target on **both** supported platforms: Linux `x86_64` and macOS
+Apple Silicon. It builds a wheel and source distribution, installs each into an
+isolated environment, verifies the selected packaged `rg` executable against its
+checksum metadata and executable permission, and runs a representative search.
+
+```bash
+make test-search-distribution
+```
+
+This host is verified only for its own platform. Linux validation also exercises
+the Bubblewrap backend; macOS validation covers the documented best-effort
+pre-launch containment and must not be represented as race-proof containment.
+
 You can also run the default tests through `make`:
 
 ```bash
