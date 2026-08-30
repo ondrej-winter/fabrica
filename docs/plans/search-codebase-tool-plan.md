@@ -163,7 +163,7 @@ This dashboard mirrors every detailed task, acceptance criterion, verification i
 
 ### Checkpoint: Core boundary and planner review
 
-- [ ] `CP1` — Application contracts and secure search planning are reviewed against the accepted spec before backend wiring.
+- [x] `CP1` — Application contracts and secure search planning are reviewed against the accepted spec before backend wiring.
 
 ### Phase 2: Pinned backend, context, limits, and scheduling
 
