@@ -1,5 +1,20 @@
 # Spec: Run Commands Tool
 
+## Status
+
+**Status:** Accepted specification — ready for implementation planning.
+
+**Acceptance:** Confirmed by product interview on August 30, 2026.
+
+**Revision:** Audited and canonicalized against
+`.agents/skills/spec-driven-development/SKILL.md`; updated with confirmed
+execution, timeout, output, context, and safety decisions on August 30, 2026.
+
+This document is the canonical source of truth for the `run_commands` tool
+contract. Any material change to its objective, requirements, constraints,
+boundaries, or success criteria requires this specification to be updated and
+re-confirmed.
+
 ## Objective
 
 Define the model-facing and host-facing specification for a `run_commands`
@@ -95,13 +110,13 @@ Primary design goals:
 
 1. Direct execution as the safe, portable default.
 2. Explicit shell interpretation.
-3. Explicit sequential or parallel execution policy.
+3. Parallel execution by default, with explicit sequential execution for dependencies.
 4. Per-command workspace-relative `cwd`.
 5. Filtered environment inheritance.
 6. Non-interactive deterministic execution.
 7. Process-tree timeout and cancellation semantics.
 8. Structured ordered output with bounded context consumption.
-9. Permission and sandbox boundaries outside the executor.
+9. Host-managed default-deny safety policy and sandbox boundaries outside the executor.
 10. No automatic retries.
 
 ## Tool interface
@@ -123,7 +138,8 @@ Canonical model-facing JSON schema:
   "properties": {
     "execution": {
       "type": "string",
-      "enum": ["parallel", "sequential"]
+      "enum": ["parallel", "sequential"],
+      "default": "parallel"
     },
     "commands": {
       "type": "array",
@@ -174,7 +190,7 @@ Canonical model-facing JSON schema:
       }
     }
   },
-  "required": ["execution", "commands"],
+  "required": ["commands"],
   "additionalProperties": false
 }
 ```
@@ -185,6 +201,7 @@ Defaults:
 cwd        = "."
 env        = {}
 timeout_ms = 30000
+execution  = parallel
 stdin      = closed
 retryable  = false
 maxRetries = 0
@@ -293,8 +310,8 @@ Prefer argv execution for ordinary programs because it bypasses shell parsing.
 Use shell execution only when shell features such as pipes, redirection,
 globbing, command substitution, heredocs, or compound commands are required.
 
-Specify whether multiple commands are sequential or parallel. Use parallel only
-for independent commands.
+Commands run in parallel by default. Set execution to sequential only when a
+command depends on an earlier command completing first.
 
 Commands start in the workspace root unless cwd is provided. cwd must remain
 inside the workspace.
@@ -373,8 +390,8 @@ mistakes, but repair behavior must not become part of the domain contract.
 
 ## Execution policy
 
-Array semantics must not be implicit. The request must specify `parallel` or
-`sequential` execution.
+Array semantics default to `parallel`. A request may set `execution` to
+`sequential` only when command order is required.
 
 Before either execution policy starts processes, the tool must build a normalized
 execution plan for the entire request:
@@ -420,37 +437,19 @@ Use `sequential` when execution order matters:
 A → B → C
 ```
 
-Default sequential failure behavior:
+Sequential execution controls start order only. An unsuccessful command does not
+stop later commands: non-zero exits, timeouts, rejections, and spawn failures all
+produce a per-command result and the sequence proceeds to its next eligible
+command. This preserves complete diagnostic coverage for the submitted batch.
 
-```text
-stop_on_error = true  # fixed Version 1 behavior; not a model-controlled field
-```
-
-For sequential execution, any unsuccessful command stops the sequence. This
-includes non-zero exit, timeout, cancellation, spawn failure, permission denial,
-sandbox denial, and invalid per-command planning results. If command A fails,
-commands B and C are skipped. Skipped commands return:
-
-```json
-{
-  "status": "skipped",
-  "success": false,
-  "exit_code": null,
-  "reason": "PREVIOUS_COMMAND_FAILED"
-}
-```
-
+Commands may be `skipped` only when the host prevents their start for a
+batch-wide reason, such as agent cancellation or a batch wall-clock timeout.
 Stable skipped reasons are:
 
-- `PREVIOUS_COMMAND_FAILED`;
-- `PREVIOUS_COMMAND_TIMED_OUT`;
-- `PREVIOUS_COMMAND_CANCELLED`;
-- `PREVIOUS_COMMAND_SPAWN_FAILED`;
-- `PREVIOUS_COMMAND_DENIED`;
 - `BATCH_CANCELLED`;
 - `BATCH_TIMED_OUT`.
 
-If the agent genuinely wants shell-level transactional sequencing, it can use a
+If the agent genuinely wants shell-level short-circuit semantics, it can use a
 single shell command such as `command1 && command2`.
 
 ## Working directory
@@ -516,9 +515,9 @@ TERM
 SYSTEMROOT on Windows
 ```
 
-Additional variables should be supplied explicitly by host policy. For trusted
-developer-local operation, the host may enable `inherit_full_environment = true`,
-but this must be a conscious runtime policy.
+Additional variables should be supplied explicitly by host policy. Version 1
+must not expose full-environment inheritance to callers; the host filters the
+inherited environment and must exclude secrets and credentials by default.
 
 Command-specific environment entries apply only to that command:
 
@@ -814,28 +813,12 @@ stderr chunk
 
 Coalesce adjacent chunks where useful.
 
-A compact final result may return one ordered output field:
+The model-visible final result must return separate `stdout` and `stderr`
+fields. The host may retain ordered stream events separately for richer rendering.
 
-```text
-starting tests...
-[stderr] warning: ...
-test_a PASSED
-test_b FAILED
-```
-
-with metadata:
-
-```json
-{
-  "stdout_chars": 8104,
-  "stderr_chars": 213,
-  "total_output_chars": 8317
-}
-```
-
-Do not return `stdout`, `stderr`, and `combined_output` simultaneously in the
-model-visible final result because that duplicates provider tokens. The host UI
-may retain richer structured stream events separately.
+Do not return a `combined_output` field in the model-visible final result because
+it duplicates provider tokens. Apply the fixed cap and explicit truncation
+metadata independently to `stdout` and `stderr`.
 
 ## Progress streaming
 
@@ -1295,7 +1278,7 @@ Required future acceptance tests include the following scenarios.
 - Parallel commands overlap.
 - Sequential commands do not overlap.
 - Parallel failure does not cancel siblings.
-- Sequential failure skips subsequent commands.
+- Sequential failure does not prevent subsequent commands from running.
 - Result order matches input order.
 
 ### Exit behavior
@@ -1320,7 +1303,7 @@ Required future acceptance tests include the following scenarios.
 - Running command cancelled.
 - Tree terminated.
 - Partial output retained.
-- Queued sequential commands skipped.
+- Queued commands are skipped only after batch cancellation.
 
 ### Output
 
@@ -1417,19 +1400,35 @@ adding a model-callable runtime adapter.
   progress concerns.
 - Future acceptance tests are explicit enough to drive implementation.
 
-## Open questions
+## Deferred future questions
 
-- What exact host policy should decide when direct `argv` commands can be
-  auto-approved?
-- Should shell mode always require approval in Version 1, or can a host opt into a
-  real shell-grammar-based classifier?
-- Which environment variables should Fabrica's default `EnvironmentFilter` allow
-  beyond the minimal cross-platform set?
-- Should `inherit_full_environment` exist only in developer-local profiles, and
-  how should the UI disclose it?
-- What sandbox mechanism should be preferred for local macOS, Linux, and Windows
-  execution if strong containment becomes required?
-- What exact structured event format should the host retain for richer stdout and
-  stderr stream rendering outside the compact final model-visible result?
-- Should future lifecycle APIs expose detached command inspection and termination,
-  or should long-running process management remain outside this tool family?
+The following items are explicitly non-blocking and must not weaken the accepted
+Version 1 contract.
+
+### FQ-01: Preferred strong-containment mechanisms
+
+- **Status:** Non-blocking.
+- **Owner:** Engineering and security review.
+- **Decision needed:** Select preferred sandbox mechanisms for local macOS, Linux,
+  and Windows execution if strong containment becomes required.
+- **Impact:** Does not alter the baseline process-execution interface or its
+  default-deny preflight policy.
+
+### FQ-02: Retained stream-event format
+
+- **Status:** Non-blocking.
+- **Owner:** Engineering.
+- **Decision needed:** Define the host-private ordered stream-event envelope used
+  for richer stdout/stderr rendering outside the model-visible final result.
+- **Impact:** Must not change the separate-stream result contract, output caps,
+  truncation metadata, or cancellation semantics.
+
+### FQ-03: Future detached-process lifecycle APIs
+
+- **Status:** Non-blocking.
+- **Owner:** Product and engineering.
+- **Decision needed:** Decide whether a future tool family exposes detached command
+  inspection and termination or keeps long-running process management outside
+  `run_commands`.
+- **Impact:** Version 1 remains unchanged: no public detached/background process
+  lifecycle management is exposed.

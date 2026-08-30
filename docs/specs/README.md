@@ -27,6 +27,11 @@ ownership, validation expectations, and preserved historical decisions.
   primitive for locating relevant workspace file contents before reading files.
 - `tools-apply-patch-tool-spec.md` defines the context-based workspace file mutation
   primitive for model-callable coding-agent workflows.
+- `tools-run-commands-tool-spec.md` defines the accepted non-interactive process
+  execution primitive for coding-agent verification and project-tooling workflows,
+  including parallel-by-default batching, per-command result isolation, bounded
+  separate-stream output, workspace-contained context, and host-managed
+  default-deny safety policy.
 
 ## Naming convention
 
