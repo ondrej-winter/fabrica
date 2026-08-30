@@ -3,20 +3,16 @@
 Date: 2026-08-30
 Status: Accepted
 
-Supersedes [0007](./0007-use-native-macos-ripgrep-with-explicit-best-effort-containment.md).
-
 ## Context
 
 `search_codebase` must work as an ordinary local developer tool on each supported
-platform. ADR 0007 retained Bubblewrap lifecycle-long workspace containment on
-Linux `x86_64` while moving macOS Apple Silicon to direct execution of Fabrica's
-verified native `ripgrep` package data.
+platform. A package-only runtime model avoids host-runtime dependencies and keeps
+the verified native `ripgrep` payload consistent across supported platforms.
 
-Bubblewrap adds a host-runtime dependency and requires namespace capabilities
-that are unavailable or inconvenient in common local and containerized Linux
-environments. Requiring it makes Linux materially harder to operate than macOS
-without changing the trust model for a developer-controlled workspace enough to
-justify the friction.
+External containment runtimes add installation and capability requirements that
+are unavailable or inconvenient in common local and containerized environments.
+They make workspace search materially harder to operate without changing the
+trust model for a developer-controlled workspace enough to justify the friction.
 
 The project must still preserve pinned Rust-regex semantics, avoid host `rg`
 discovery and shell execution, validate literal workspace-relative scopes, and
