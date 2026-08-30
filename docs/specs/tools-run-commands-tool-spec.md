@@ -611,7 +611,8 @@ Timeout result example:
   "status": "timed_out",
   "success": false,
   "exit_code": null,
-  "output": "...partial command output...",
+  "stdout": "...partial command output...",
+  "stderr": "",
   "duration_ms": 30018
 }
 ```
@@ -623,7 +624,8 @@ Cancellation result example:
   "status": "cancelled",
   "success": false,
   "exit_code": null,
-  "output": "...partial output..."
+  "stdout": "...partial output...",
+  "stderr": ""
 }
 ```
 
@@ -866,6 +868,24 @@ Aggregate limiting should be fair and deterministic:
 The limiter must never remove a failed command's diagnostic output merely because
 a successful sibling produced more output.
 
+## Registered-tool result transport
+
+The command slice owns the fair 96,000-character aggregate output budget,
+separate `stdout` and `stderr` payloads, and all result truncation metadata. The
+agent runtime transports the resulting structured JSON without applying its
+generic `result_text` bound.
+
+The final serialized result must use at most two provider-neutral
+`ToolTextContent` parts. Each part is independently capped at 48,000 characters;
+the two parts together carry the complete bounded structured result. Split only
+at UTF-8-safe text boundaries. The runtime must not duplicate the full structured
+payload in `result_text`; a short non-duplicative summary is permitted only when
+a provider requires one.
+
+The generic runtime must preserve all content parts and must not convert a valid
+multipart command result into `LIMIT_EXCEEDED` solely because the legacy
+`result_text` limit is smaller than the command tool's aggregate output budget.
+
 ## Result contract
 
 Top-level result:
@@ -881,7 +901,8 @@ Top-level result:
       "success": true,
       "exit_code": 0,
       "duration_ms": 4218,
-      "output": "128 passed in 3.72s\n",
+      "stdout": "128 passed in 3.72s\n",
+      "stderr": "",
       "output_truncated": false,
       "total_output_chars": 21,
       "retained_output_chars": 21,
@@ -895,7 +916,8 @@ Top-level result:
       "success": false,
       "exit_code": 1,
       "duration_ms": 811,
-      "output": "src/foo.py:28: F401 ...",
+      "stdout": "",
+      "stderr": "src/foo.py:28: F401 ...",
       "output_truncated": false,
       "total_output_chars": 24,
       "retained_output_chars": 24,
@@ -919,7 +941,8 @@ Every command result must include these common fields:
 - `success`;
 - `exit_code`;
 - `duration_ms`;
-- `output`;
+- `stdout`;
+- `stderr`;
 - `output_truncated`;
 - `total_output_chars`;
 - `retained_output_chars`.
@@ -1317,6 +1340,9 @@ Required future acceptance tests include the following scenarios.
 - Truncation marker.
 - UTF-8 sequence split across chunks.
 - Very long single output chunk.
+- A near-96,000-character aggregate result reaches the model in at most two
+  48,000-character `ToolTextContent` parts without generic runtime truncation or
+  an incorrect `LIMIT_EXCEEDED` result.
 
 ### Environment
 
