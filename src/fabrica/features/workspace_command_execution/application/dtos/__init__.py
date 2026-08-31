@@ -3,6 +3,7 @@
 from fabrica.features.workspace_command_execution.application.dtos.run_commands import (
     DEFAULT_COMMAND_TIMEOUT_MS,
     DEFAULT_MAX_COMMAND_INPUT_CHARS,
+    DEFAULT_MAX_COMMAND_PREVIEW_CHARS,
     DEFAULT_MAX_COMMAND_TIMEOUT_MS,
     DEFAULT_MAX_COMMANDS_PER_CALL,
     CommandError,
@@ -24,6 +25,7 @@ __all__ = [
     "DEFAULT_COMMAND_TIMEOUT_MS",
     "DEFAULT_MAX_COMMANDS_PER_CALL",
     "DEFAULT_MAX_COMMAND_INPUT_CHARS",
+    "DEFAULT_MAX_COMMAND_PREVIEW_CHARS",
     "DEFAULT_MAX_COMMAND_TIMEOUT_MS",
     "CommandError",
     "CommandErrorCode",

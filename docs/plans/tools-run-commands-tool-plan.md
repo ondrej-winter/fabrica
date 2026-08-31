@@ -99,7 +99,7 @@ Async registered-tool contracts
 
 - [x] **RC-01** Extend bounded multipart runtime transport for the canonical serialized-result budget.
 - [x] **RC-02** Create feature-owned DTOs, errors, limits, ports, and validators.
-- [ ] **RC-03** Implement cwd, environment, permission, and sandbox planning.
+- [x] **RC-03** Implement cwd, environment, permission, and sandbox planning.
 - [ ] **RC-04** Implement process supervision, output capture, deadline, timeout, and cancellation behavior.
 - [ ] **RC-05** Implement parallel/sequential scheduling and fair output limiting.
 - [ ] **RC-06** Add the registered-tool adapter and canonical schema.
