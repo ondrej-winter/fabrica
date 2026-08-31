@@ -1,12 +1,35 @@
 # Run Commands Tool — Implementation Plan
 
 **Readiness: Ready for implementation.** The accepted canonical specification
-now defines separate model-visible streams and a bounded multipart runtime
-transport for the 96,000-character aggregate command-result budget.
+defines `execution` normalization and a complete serialized-result budget that
+fits the bounded multipart runtime transport.
 
 **Source of truth:** `docs/specs/tools-run-commands-tool-spec.md` remains the
 canonical product contract. Update this plan after each completed task, scope
 change, or newly discovered blocker.
+
+## Implementation-scoping follow-ups
+
+The following implementation-scoping decisions must be completed during the
+named RC tasks. They do not block the accepted canonical contract:
+
+- Define the host-owned resolution path for `REQUIRE_APPROVAL`, including the
+  command/batch scope, unavailable or rejected approval behavior, and stable
+  result mapping. The process supervisor must remain UI-free.
+- Align plan terminology with the accepted result contract: permission and
+  sandbox denials need distinct stable error codes or outcomes, not new statuses
+  unless the specification changes its stable status set.
+- Identify the source-of-truth `WorkspacePathResolver` reuse or conformance-test
+  strategy so command execution does not become a fourth divergent workspace
+  containment implementation.
+- Define the Version 1 supported-platform and unsupported-platform behavior for
+  the public composition factory, since the planned concrete supervisor is POSIX
+  process-group based.
+- Specify deadline precedence, batch-timeout behavior, termination grace, and
+  the host-owned maximum concurrency limit as explicit DTO/port contracts.
+- Expand the RC verification items into the canonical direct argv, shell,
+  result-status, environment, output, and deterministic POSIX child-tree test
+  matrix from the specification.
 
 ## Confirmed implementation baseline
 
@@ -21,13 +44,17 @@ binding for this implementation plan.
   host configures the sole permitted shell executable; the model must never
   choose a shell executable.
 - The model chooses only `parallel` or `sequential` execution. The host-owned
-  limits configuration exclusively determines maximum process concurrency.
+  limits configuration exclusively determines maximum process concurrency. When
+  omitted, `execution` normalizes to `parallel` before planning.
 - Commands may include environment overrides only for keys authorized by the
   host-provided environment policy. The model must not receive arbitrary parent
   environment inheritance or unrestricted override keys.
 - Permission and sandbox denials must remain command-scoped, use stable distinct
-  statuses, and include a concise host-safe reason. They must not expose policy
-  rules, allowlists, or sandbox internals.
+  error codes or outcomes, and include a concise host-safe reason. They must not
+  expose policy rules, allowlists, or sandbox internals.
+- The 96,000-character limit applies to the complete serialized model-visible
+  JSON result, including metadata and JSON escaping. The limiter reserves result
+  structure first and fairly allocates the remainder to retained output streams.
 
 ## Goal and scope
 
@@ -70,7 +97,7 @@ Async registered-tool contracts
 
 ## Progress tracking
 
-- [ ] **RC-01** Correct canonical result examples and extend bounded multipart runtime transport.
+- [ ] **RC-01** Extend bounded multipart runtime transport for the canonical serialized-result budget.
 - [ ] **RC-02** Create feature-owned DTOs, errors, limits, ports, and validators.
 - [ ] **RC-03** Implement cwd, environment, permission, and sandbox planning.
 - [ ] **RC-04** Implement process supervision, output capture, deadline, timeout, and cancellation behavior.
@@ -104,11 +131,11 @@ Async registered-tool contracts
 **Acceptance criteria**
 
 - [ ] **RC-01-A** The specification has exactly one authoritative output field structure: separate `stdout` and `stderr`, never combined `output`.
-- [ ] **RC-01-B** A bounded structured command result reaches the model in at most two 48,000-character text parts without generic runtime truncation.
+- [ ] **RC-01-B** A complete serialized structured command result of at most 96,000 characters reaches the model in at most two 48,000-character text parts without generic runtime truncation.
 
 **Verification**
 
-- [ ] **RC-01-V** Add runtime DTO and adapter regression tests for multipart output, including a near-96,000-character result with no duplicate full `result_text` and no incorrect `LIMIT_EXCEEDED` status.
+- [ ] **RC-01-V** Add runtime DTO and adapter regression tests for multipart output, including a near-96,000-character serialized result with escape-heavy output, no duplicate full `result_text`, and no incorrect `LIMIT_EXCEEDED` status.
 
 ### RC-02 — Establish feature contracts and validation
 
@@ -122,9 +149,14 @@ Async registered-tool contracts
 - [ ] Define immutable batch, command, planned-command, output, result, status,
   skipped-reason, and limits DTOs.
 - [ ] Define ports for cwd resolution, environment construction, permission,
-  sandbox preflight, process supervision, and optional host-private progress.
-- [ ] Validate execution policy; exactly one of `argv`/`shell`; argv values; NUL
+  approval resolution, sandbox preflight, process supervision, and optional
+  host-private progress.
+- [ ] Normalize omitted execution to `parallel`; validate execution policy; exactly
+  one of `argv`/`shell`; argv values; NUL
   bytes; command input size; cwd syntax; env keys/values; and finite bounded timeouts.
+- [ ] Define the top-level request-rejection versus command-scoped planning-result
+  mapping, the host-owned concurrency limit, and the source-of-truth workspace
+  resolver contract.
 
 **Acceptance criteria**
 
@@ -151,6 +183,8 @@ Async registered-tool contracts
   overrides without mutating `os.environ`.
 - [ ] Require identical permission and sandbox preflight for argv and shell modes;
   never classify safety through command prefixes.
+- [ ] Resolve `REQUIRE_APPROVAL` through an explicit host-owned port before
+  execution, with no approval UI or prompting in the process supervisor.
 
 **Acceptance criteria**
 
@@ -196,22 +230,29 @@ Async registered-tool contracts
 - Mirrored unit tests.
 
 - [ ] Compute one authoritative batch deadline from host deadline, batch timeout, and active per-command timeouts.
+- [ ] Define deadline precedence and termination-grace ownership so the scheduler
+  and supervisor cannot introduce competing timeout layers.
 - [ ] Run eligible commands concurrently in `parallel` mode without sibling cancellation on individual failure.
 - [ ] Run `sequential` commands in order but continue after non-zero exits,
   timeout, rejection, invalid planning, and spawn failure.
 - [ ] Skip unstarted commands only for batch cancellation or batch timeout using
   `BATCH_CANCELLED` or `BATCH_TIMED_OUT`.
-- [ ] Apply per-command and fair aggregate output caps without dropping any result.
+- [ ] Apply per-command and fair serialized-result output allocation without
+  dropping any result, reserving JSON structure and required metadata before
+  retained stream content.
 
 **Acceptance criteria**
 
 - [ ] **RC-05-A** Results always retain request order.
 - [ ] **RC-05-B** Sequential execution controls start order only, not short-circuit behavior.
-- [ ] **RC-05-C** Aggregate limiting preserves every command result.
+- [ ] **RC-05-C** Serialized-result limiting preserves every command result and
+  keeps the complete JSON result within the 96,000-character budget.
 
 **Verification**
 
 - [ ] **RC-05-V** Test out-of-order parallel completion, sequential continuation, batch-wide stop conditions, and fair allocation of oversized output.
+- [ ] **RC-05-V2** Test host concurrency enforcement and the resolved deadline,
+  batch-timeout, cancellation, and queued-command result mappings.
 
 ### RC-06 — Add model-facing adapter and runtime integration
 
@@ -252,6 +293,9 @@ Async registered-tool contracts
 
 - [ ] Add `create_run_commands_registered_tool_adapter(...)` with explicit
   workspace, shell, environment, permission, sandbox, limits, and optional progress dependencies.
+- [ ] Define and test fail-closed behavior when the host requests the POSIX
+  implementation on an unsupported platform, unless a platform-specific
+  supervisor is supplied.
 - [ ] Keep construction inert: no workspace inspection, spawn, policy evaluation,
   or model call before tool invocation.
 - [ ] Re-export the supported factory from `fabrica.bootstrap`.
@@ -289,9 +333,11 @@ Async registered-tool contracts
 | Shell mode bypasses safety controls | Route argv and shell through identical validation, permission, sandbox, deadline, and output controls. |
 | Cwd containment is mistaken for sandboxing | Keep resolver and sandbox ports distinct and document the boundary. |
 | Child processes survive cancellation | Use process groups with TERM-to-KILL cleanup and test descendant cleanup. |
-| Output exhausts memory or model context | Stream to bounded separate buffers, apply per-command then fair batch caps, and transport the complete bounded result in at most two 48,000-character text parts. |
+| Output exhausts memory or model context | Stream to bounded separate buffers, reserve serialized JSON metadata, fairly allocate remaining output capacity, and transport the complete 96,000-character result in at most two 48,000-character text parts. |
 | Sequential behavior regresses to short-circuiting | Test continuation after every unsuccessful command outcome. |
 | Environment leaks secrets | Require a host-supplied environment filter and test secret exclusion. |
+| Approval or path-resolution behavior diverges between tools | Define explicit approval resolution and shared resolver ownership or conformance tests before implementing adapters. |
+| POSIX-only implementation appears cross-platform | Fail closed or require an injected platform-specific supervisor; document and test the public factory behavior. |
 
 ## Deferred follow-up
 

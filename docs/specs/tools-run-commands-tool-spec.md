@@ -8,7 +8,7 @@
 
 **Revision:** Audited and canonicalized against
 `.agents/skills/spec-driven-development/SKILL.md`; updated with confirmed
-execution, timeout, output, context, and safety decisions on August 30, 2026.
+execution, timeout, output, context, and safety decisions on August 31, 2026.
 
 This document is the canonical source of truth for the `run_commands` tool
 contract. Any material change to its objective, requirements, constraints,
@@ -214,8 +214,8 @@ MAX_COMMANDS_PER_CALL      = 8
 MAX_COMMAND_INPUT_CHARS    = 12,000
 DEFAULT_COMMAND_TIMEOUT    = 30 seconds
 MAX_COMMAND_TIMEOUT        = 5 minutes
-MAX_COMMAND_OUTPUT_CHARS   = 48,000
-MAX_BATCH_OUTPUT_CHARS     = 96,000
+MAX_COMMAND_OUTPUT_CHARS    = 48,000
+MAX_SERIALIZED_RESULT_CHARS = 96,000
 ```
 
 The public schema must make direct argv and shell execution first-class and
@@ -225,6 +225,9 @@ mutually exclusive. It must not rely on hidden conventions such as “presence o
 Schema validation alone is not the complete input contract. The host must also
 normalize and validate every command before any process starts:
 
+- absent `execution` must normalize to `parallel`; every downstream policy,
+  scheduler, and result component receives the resulting effective execution
+  policy explicitly;
 - each command must contain exactly one of `argv` or `shell`;
 - the command input length must not exceed `MAX_COMMAND_INPUT_CHARS = 12,000`;
 - for `shell`, command input length is the shell string length;
@@ -839,28 +842,33 @@ Progress events are a UI/runtime concern, not part of the final result. Batch
 events at roughly `PROGRESS_FLUSH_INTERVAL ≈ 50 ms` rather than emitting one
 update per raw stream chunk.
 
-## Aggregate output limiting
+## Serialized result limiting
 
-Recommended aggregate limit:
+Recommended complete serialized model-visible result limit:
 
 ```text
-MAX_BATCH_OUTPUT_CHARS = 96,000
+MAX_SERIALIZED_RESULT_CHARS = 96,000
 ```
 
-Always preserve command status, exit code, duration, error code, and truncation
-metadata before allocating context budget to output.
+The 96,000-character limit applies to the complete serialized JSON result,
+including JSON structure, result metadata, command previews, error values,
+escaping overhead, truncation markers, and retained `stdout` and `stderr` text.
+It is not a 96,000-character payload allowance in addition to serialized-result
+overhead.
 
-If aggregate output exceeds the tool budget, further truncate individual outputs
-using head-and-tail semantics. Never drop an entire command result merely because
-another command was verbose.
+Before allocating retained output, reserve enough serialized capacity for every
+command result object and its required status, exit, duration, error, and
+truncation metadata. If output would exceed the remaining serialized-result
+budget, further truncate individual streams using head-and-tail semantics. Never
+drop an entire command result merely because another command was verbose.
 
-Aggregate limiting should be fair and deterministic:
+Serialized-result limiting should be fair and deterministic:
 
 1. Preserve every command result object and all status, duration, exit, signal,
    error, and truncation metadata.
 2. Reserve a small output allowance for every command that produced output.
-3. Allocate remaining output budget in input order or another documented stable
-   policy.
+3. Allocate the remaining serialized capacity to output in input order or another
+   documented stable policy, accounting for JSON escaping and truncation markers.
 4. When reducing an individual command's retained output, use the same head and
    tail strategy and update `output_truncated`, `retained_output_chars`, and
    `batch_output_truncated`.
@@ -870,21 +878,21 @@ a successful sibling produced more output.
 
 ## Registered-tool result transport
 
-The command slice owns the fair 96,000-character aggregate output budget,
-separate `stdout` and `stderr` payloads, and all result truncation metadata. The
-agent runtime transports the resulting structured JSON without applying its
-generic `result_text` bound.
+The command slice owns the fair 96,000-character complete serialized-result
+budget, separate `stdout` and `stderr` payloads, and all result truncation
+metadata. It must serialize and limit the final model-visible JSON before the
+agent runtime transports it without applying its generic `result_text` bound.
 
-The final serialized result must use at most two provider-neutral
-`ToolTextContent` parts. Each part is independently capped at 48,000 characters;
-the two parts together carry the complete bounded structured result. Split only
-at UTF-8-safe text boundaries. The runtime must not duplicate the full structured
-payload in `result_text`; a short non-duplicative summary is permitted only when
-a provider requires one.
+The final serialized result must be at most 96,000 characters and use at most two
+provider-neutral `ToolTextContent` parts. Each part is independently capped at
+48,000 characters; the two parts together carry the complete bounded structured
+result. Split only at UTF-8-safe text boundaries. The runtime must not duplicate
+the full structured payload in `result_text`; a short non-duplicative summary is
+permitted only when a provider requires one.
 
 The generic runtime must preserve all content parts and must not convert a valid
 multipart command result into `LIMIT_EXCEEDED` solely because the legacy
-`result_text` limit is smaller than the command tool's aggregate output budget.
+`result_text` limit is smaller than the command tool's serialized-result budget.
 
 ## Result contract
 
@@ -1244,14 +1252,15 @@ Change these behaviors for this implementation:
 - do not lose partial output on timeout or cancellation;
 - no competing timeout layers;
 - no unbounded parallel command array;
-- no unlimited aggregate batch output;
+- no unlimited serialized batch result;
 - do not require shell syntax for simple `cwd` or `env` use cases.
 
 Add these requirements beyond current Cline behavior:
 
 - explicit `argv` mode;
 - explicit `shell` mode;
-- explicit parallel/sequential execution;
+- optional `execution` with an explicit normalized `parallel`/`sequential`
+  execution policy;
 - per-command workspace-relative `cwd`;
 - per-command environment;
 - structured status;
@@ -1259,7 +1268,7 @@ Add these requirements beyond current Cline behavior:
 - structured duration;
 - partial timeout/cancellation output;
 - filtered environment provider;
-- aggregate output budget;
+- serialized-result budget;
 - explicit permission evaluator;
 - explicit sandbox boundary;
 - graceful-to-forced process-tree termination.
@@ -1298,6 +1307,7 @@ Required future acceptance tests include the following scenarios.
 
 ### Execution policy
 
+- Omitted `execution` normalizes to `parallel`.
 - Parallel commands overlap.
 - Sequential commands do not overlap.
 - Parallel failure does not cancel siblings.
@@ -1340,9 +1350,11 @@ Required future acceptance tests include the following scenarios.
 - Truncation marker.
 - UTF-8 sequence split across chunks.
 - Very long single output chunk.
-- A near-96,000-character aggregate result reaches the model in at most two
-  48,000-character `ToolTextContent` parts without generic runtime truncation or
-  an incorrect `LIMIT_EXCEEDED` result.
+- A near-96,000-character complete serialized result reaches the model in at
+  most two 48,000-character `ToolTextContent` parts without generic runtime
+  truncation or an incorrect `LIMIT_EXCEEDED` result.
+- Escape-heavy output and maximum required metadata are accounted for before
+  retaining streams, producing valid JSON within the 96,000-character limit.
 
 ### Environment
 
