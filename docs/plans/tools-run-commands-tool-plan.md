@@ -101,7 +101,7 @@ Async registered-tool contracts
 - [x] **RC-02** Create feature-owned DTOs, errors, limits, ports, and validators.
 - [x] **RC-03** Implement cwd, environment, permission, and sandbox planning.
 - [ ] **RC-04** Implement process supervision, output capture, deadline, timeout, and cancellation behavior.
-- [ ] **RC-05** Implement parallel/sequential scheduling and fair output limiting.
+- [x] **RC-05** Implement parallel/sequential scheduling and fair output limiting.
 - [ ] **RC-06** Add the registered-tool adapter and canonical schema.
 - [ ] **RC-07** Add bootstrap composition, public export, and documentation.
 - [ ] **RC-08** Run focused and complete quality validation.
@@ -231,6 +231,15 @@ cleanup coverage, so this milestone remains unchecked.
 
 ### RC-05 — Implement scheduling and fair output limiting
 
+**Implementation note (August 31, 2026):** The slice now includes `RunCommands`,
+which plans the full batch before launch, preserves result order, limits parallel
+starts through host-owned concurrency, continues sequential batches after ordinary
+per-command failures, maps queued batch cancellation/timeouts to stable skipped
+reasons, and maps active batch-timeout outcomes to `BATCH_TIMEOUT`. The canonical
+result formatter and limiter preserve all result metadata, keep stdout/stderr
+separate, and fairly allocate actual JSON-serialized capacity within the 96,000
+character host limit.
+
 **Likely files**
 
 - `src/fabrica/features/workspace_command_execution/application/use_cases/run_commands.py`
@@ -252,15 +261,15 @@ cleanup coverage, so this milestone remains unchecked.
 
 **Acceptance criteria**
 
-- [ ] **RC-05-A** Results always retain request order.
-- [ ] **RC-05-B** Sequential execution controls start order only, not short-circuit behavior.
-- [ ] **RC-05-C** Serialized-result limiting preserves every command result and
+- [x] **RC-05-A** Results always retain request order.
+- [x] **RC-05-B** Sequential execution controls start order only, not short-circuit behavior.
+- [x] **RC-05-C** Serialized-result limiting preserves every command result and
   keeps the complete JSON result within the 96,000-character budget.
 
 **Verification**
 
-- [ ] **RC-05-V** Test out-of-order parallel completion, sequential continuation, batch-wide stop conditions, and fair allocation of oversized output.
-- [ ] **RC-05-V2** Test host concurrency enforcement and the resolved deadline,
+- [x] **RC-05-V** Test out-of-order parallel completion, sequential continuation, batch-wide stop conditions, and fair allocation of oversized output.
+- [x] **RC-05-V2** Test host concurrency enforcement and the resolved deadline,
   batch-timeout, cancellation, and queued-command result mappings.
 
 ### RC-06 — Add model-facing adapter and runtime integration

@@ -10,6 +10,8 @@ from fabrica.features.workspace_command_execution.application.dtos import (
     CommandExecutionLimits,
     CommandResult,
     PlannedCommand,
+    RunCommandsCommand,
+    RunCommandsResult,
 )
 
 
@@ -75,6 +77,12 @@ class CommandSupervisor(Protocol):
     """Owner of process lifecycle, output capture, and cleanup."""
 
     async def run(self, command: PlannedCommand, context: RunCommandsContext) -> CommandResult: ...
+
+
+class RunCommandsPort(Protocol):
+    """Inbound application contract for a complete workspace command batch."""
+
+    async def run(self, command: RunCommandsCommand, context: RunCommandsContext) -> RunCommandsResult: ...
 
 
 class CommandProgressReporter(Protocol):

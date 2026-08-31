@@ -11,6 +11,8 @@ DEFAULT_MAX_COMMAND_INPUT_CHARS = 12_000
 DEFAULT_COMMAND_TIMEOUT_MS = 30_000
 DEFAULT_MAX_COMMAND_TIMEOUT_MS = 300_000
 DEFAULT_MAX_COMMAND_PREVIEW_CHARS = 200
+DEFAULT_MAX_COMMAND_OUTPUT_CHARS = 48_000
+DEFAULT_MAX_SERIALIZED_RESULT_CHARS = 96_000
 
 
 class ExecutionPolicy(StrEnum):
@@ -73,6 +75,8 @@ class CommandExecutionLimits:
     max_command_timeout_ms: int = DEFAULT_MAX_COMMAND_TIMEOUT_MS
     max_concurrent_commands: int = DEFAULT_MAX_COMMANDS_PER_CALL
     batch_timeout_ms: int | None = None
+    max_command_output_chars: int = DEFAULT_MAX_COMMAND_OUTPUT_CHARS
+    max_serialized_result_chars: int = DEFAULT_MAX_SERIALIZED_RESULT_CHARS
 
     def __post_init__(self) -> None:
         for name in (
@@ -81,6 +85,8 @@ class CommandExecutionLimits:
             "default_command_timeout_ms",
             "max_command_timeout_ms",
             "max_concurrent_commands",
+            "max_command_output_chars",
+            "max_serialized_result_chars",
         ):
             _positive_int(getattr(self, name), name)
         if self.max_concurrent_commands > self.max_commands_per_call:

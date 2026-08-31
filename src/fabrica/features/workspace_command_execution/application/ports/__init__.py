@@ -11,6 +11,7 @@ from fabrica.features.workspace_command_execution.application.ports.workspace_co
     CommandSupervisor,
     CommandWorkspaceResolver,
     RunCommandsContext,
+    RunCommandsPort,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "CommandSupervisor",
     "CommandWorkspaceResolver",
     "RunCommandsContext",
+    "RunCommandsPort",
 ]
