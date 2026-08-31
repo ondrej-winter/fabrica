@@ -198,6 +198,15 @@ Async registered-tool contracts
 
 ### RC-04 — Implement non-interactive process supervision
 
+**Implementation note (August 31, 2026):** The slice now includes
+`PosixCommandSupervisor`, which runs direct argv or host-configured shell
+commands with closed stdin, separate stdout/stderr pipes, a new POSIX process
+session, effective command/host deadline checks, and TERM-to-KILL cleanup.
+Focused tests cover direct argv and shell execution, non-zero exits, missing
+executables, timeout, cancellation, and retained partial output. The remaining
+RC-04 verification work is deterministic TERM-to-KILL escalation and child-tree
+cleanup coverage, so this milestone remains unchecked.
+
 **Likely files**
 
 - `src/fabrica/features/workspace_command_execution/adapters/outbound/process_supervisor/adapter.py`
