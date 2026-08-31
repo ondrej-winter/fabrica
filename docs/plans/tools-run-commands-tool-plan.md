@@ -274,6 +274,13 @@ character host limit.
 
 ### RC-06 — Add model-facing adapter and runtime integration
 
+**Implementation note (August 31, 2026):** The slice now includes the
+`run_commands` registered-tool adapter. It exposes the closed canonical schema,
+maps provider-neutral arguments and runtime cancellation/deadline context into
+the application boundary, returns malformed request shapes as recoverable
+`INVALID_ARGUMENTS` outcomes, and returns ordinary command outcomes as bounded
+structured no-mutation multipart text content with separate stdout/stderr.
+
 **Likely files**
 
 - `src/fabrica/features/workspace_command_execution/adapters/inbound/registered_tool/adapter.py`
@@ -282,23 +289,23 @@ character host limit.
   `src/fabrica/features/agent_runtime/application/dtos/tools.py` and
   `src/fabrica/features/agent_runtime/adapters/outbound/registered_tool/adapter.py`.
 
-- [ ] Add `RUN_COMMANDS_TOOL_NAME`, concise description, and closed JSON schema
+- [x] Add `RUN_COMMANDS_TOOL_NAME`, concise description, and closed JSON schema
   with explicit mutually exclusive argv/shell modes.
-- [ ] Convert provider-neutral arguments into feature DTOs and pass cancellation/
+- [x] Convert provider-neutral arguments into feature DTOs and pass cancellation/
   deadlines from `ToolExecutionContext`.
-- [ ] Map request-shape errors to recoverable `INVALID_ARGUMENTS`; preserve
+- [x] Map request-shape errors to recoverable `INVALID_ARGUMENTS`; preserve
   ordinary command failures inside the structured batch result.
-- [ ] Serialize the bounded structured result through the RC-01 multipart contract.
+- [x] Serialize the bounded structured result through the RC-01 multipart contract.
 
 **Acceptance criteria**
 
-- [ ] **RC-06-A** Schema and adapter reject unknown/invalid fields before the use case.
-- [ ] **RC-06-B** Ordinary command failures do not become generic tool failures.
-- [ ] **RC-06-C** Serialization uses separate streams and the bounded multipart response design without duplicating full output.
+- [x] **RC-06-A** Schema and adapter reject unknown/invalid fields before the use case.
+- [x] **RC-06-B** Ordinary command failures do not become generic tool failures.
+- [x] **RC-06-C** Serialization uses separate streams and the bounded multipart response design without duplicating full output.
 
 **Verification**
 
-- [ ] **RC-06-V** Add schema, mapping, cancellation/deadline, separate-stream, and multipart-output-budget regression tests.
+- [x] **RC-06-V** Add schema, mapping, cancellation/deadline, separate-stream, and multipart-output-budget regression tests.
 
 ### RC-07 — Compose, export, and document
 
