@@ -102,7 +102,7 @@ Async registered-tool contracts
 - [x] **RC-03** Implement cwd, environment, permission, and sandbox planning.
 - [x] **RC-04** Implement process supervision, output capture, deadline, timeout, and cancellation behavior.
 - [x] **RC-05** Implement parallel/sequential scheduling and fair output limiting.
-- [ ] **RC-06** Add the registered-tool adapter and canonical schema.
+- [x] **RC-06** Add the registered-tool adapter and canonical schema.
 - [x] **RC-07** Add bootstrap composition, public export, and documentation.
 - [x] **RC-08** Run focused and complete quality validation.
 
