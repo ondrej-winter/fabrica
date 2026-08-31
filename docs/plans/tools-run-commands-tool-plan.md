@@ -103,8 +103,8 @@ Async registered-tool contracts
 - [ ] **RC-04** Implement process supervision, output capture, deadline, timeout, and cancellation behavior.
 - [x] **RC-05** Implement parallel/sequential scheduling and fair output limiting.
 - [ ] **RC-06** Add the registered-tool adapter and canonical schema.
-- [ ] **RC-07** Add bootstrap composition, public export, and documentation.
-- [ ] **RC-08** Run focused and complete quality validation.
+- [x] **RC-07** Add bootstrap composition, public export, and documentation.
+- [x] **RC-08** Run focused and complete quality validation.
 
 ## Ordered tasks
 
@@ -316,40 +316,40 @@ structured no-mutation multipart text content with separate stdout/stderr.
 - `README.md`
 - `tests/integration/features/workspace_command_execution/test_run_commands_tool_composition.py`
 
-- [ ] Add `create_run_commands_registered_tool_adapter(...)` with explicit
+- [x] Add `create_run_commands_registered_tool_adapter(...)` with explicit
   workspace, shell, environment, permission, sandbox, limits, and optional progress dependencies.
-- [ ] Define and test fail-closed behavior when the host requests the POSIX
+- [x] Define and test fail-closed behavior when the host requests the POSIX
   implementation on an unsupported platform, unless a platform-specific
   supervisor is supplied.
-- [ ] Keep construction inert: no workspace inspection, spawn, policy evaluation,
+- [x] Keep construction inert: no workspace inspection, spawn, policy evaluation,
   or model call before tool invocation.
-- [ ] Re-export the supported factory from `fabrica.bootstrap`.
-- [ ] Document host-policy requirements, argv preference, explicit shell mode, and
+- [x] Re-export the supported factory from `fabrica.bootstrap`.
+- [x] Document host-policy requirements, argv preference, explicit shell mode, and
   the tool's role alongside read/search/edit tooling.
 
 **Acceptance criteria**
 
-- [ ] **RC-07-A** Composition cannot silently create a permissive command tool.
-- [ ] **RC-07-B** README examples match the actual public factory signature.
+- [x] **RC-07-A** Composition cannot silently create a permissive command tool.
+- [x] **RC-07-B** README examples match the actual public factory signature.
 
 **Verification**
 
-- [ ] **RC-07-V** Integration-test registration in `create_tool_loop_runtime` and prove factory construction remains inert using fakes.
+- [x] **RC-07-V** Integration-test registration in `create_tool_loop_runtime` and prove factory construction remains inert using fakes.
 
 ### RC-08 — Validate and hand off
 
-- [ ] Run focused unit and integration tests for the new slice and changed shared runtime components.
-- [ ] Run `uv run ruff format .`.
-- [ ] Run `uv run ruff check .`.
-- [ ] Run `uv run ty check src tests`.
-- [ ] Run `uv run lint-imports`.
-- [ ] Run `uv run pytest`.
+- [x] Run focused unit and integration tests for the new slice and changed shared runtime components.
+- [x] Run `uv run ruff format .`.
+- [x] Run `uv run ruff check .`.
+- [x] Run `uv run ty check src tests`.
+- [x] Run `uv run lint-imports`.
+- [x] Run `uv run pytest`.
 
 **Acceptance criteria**
 
-- [ ] **RC-08-A** Validation remains offline and does not require credentials, live network access, or an interactive terminal.
-- [ ] **RC-08-B** Full project quality checks pass.
-- [ ] **RC-08-C** Handoff records the separate-stream multipart transport contract, platform limitations, and deferred work.
+- [x] **RC-08-A** Validation remains offline and does not require credentials, live network access, or an interactive terminal.
+- [x] **RC-08-B** Full project quality checks pass.
+- [x] **RC-08-C** Handoff records the separate-stream multipart transport contract, platform limitations, and deferred work.
 
 ## Risks and mitigations
 

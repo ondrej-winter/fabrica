@@ -89,6 +89,47 @@ runtime = create_tool_loop_runtime(
 )
 ```
 
+## Workspace command-execution tool composition
+
+Hosts can explicitly add the `run_commands` tool to a tool-loop runtime. The
+factory requires host-owned environment, permission, approval, and sandbox policy
+dependencies; it does not supply permissive defaults. On macOS and Linux it uses
+the built-in POSIX process-group supervisor. Other platforms must provide a
+platform-specific `CommandSupervisor` explicitly.
+
+```python
+from pathlib import Path
+
+from fabrica.bootstrap import (
+    RunCommandsToolOptions,
+    create_run_commands_registered_tool_adapter,
+    create_tool_loop_runtime,
+)
+from fabrica.features.agent_runtime.application.dtos import ToolLoopLimits
+
+run_commands_tool = create_run_commands_registered_tool_adapter(
+    Path("/path/to/workspace"),
+    options=RunCommandsToolOptions(
+        shell_executable="/bin/sh",
+        environment_builder=host_environment_builder,
+        permission_evaluator=host_permission_evaluator,
+        approval_resolver=host_approval_resolver,
+        sandbox_preflight=host_sandbox_preflight,
+    ),
+)
+runtime = create_tool_loop_runtime(
+    model=model,
+    tools=(run_commands_tool,),
+    limits=ToolLoopLimits(),
+)
+```
+
+The tool prefers direct `argv` invocation. It permits `shell` only through the
+single host-configured shell executable, and both modes use the same workspace,
+environment, permission, approval, sandbox, deadline, cancellation, and output
+bounds. Construction is inert: workspace resolution, policy evaluation, and
+process execution begin only if the model invokes the tool.
+
 Use `search_codebase` first to locate matching workspace-relative files and
 one-based line locations, then pass only the relevant paths and line ranges to
 `read_files` for bounded source context. Search never discovers a host `rg`
