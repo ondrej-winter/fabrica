@@ -100,7 +100,7 @@ Async registered-tool contracts
 - [x] **RC-01** Extend bounded multipart runtime transport for the canonical serialized-result budget.
 - [x] **RC-02** Create feature-owned DTOs, errors, limits, ports, and validators.
 - [x] **RC-03** Implement cwd, environment, permission, and sandbox planning.
-- [ ] **RC-04** Implement process supervision, output capture, deadline, timeout, and cancellation behavior.
+- [x] **RC-04** Implement process supervision, output capture, deadline, timeout, and cancellation behavior.
 - [x] **RC-05** Implement parallel/sequential scheduling and fair output limiting.
 - [ ] **RC-06** Add the registered-tool adapter and canonical schema.
 - [x] **RC-07** Add bootstrap composition, public export, and documentation.
@@ -203,9 +203,9 @@ Async registered-tool contracts
 commands with closed stdin, separate stdout/stderr pipes, a new POSIX process
 session, effective command/host deadline checks, and TERM-to-KILL cleanup.
 Focused tests cover direct argv and shell execution, non-zero exits, missing
-executables, timeout, cancellation, and retained partial output. The remaining
-RC-04 verification work is deterministic TERM-to-KILL escalation and child-tree
-cleanup coverage, so this milestone remains unchecked.
+executables, timeout, cancellation, and retained partial output. Deterministic
+POSIX regression coverage now verifies TERM-to-KILL escalation and cleanup of a
+TERM-ignoring descendant, completing this milestone.
 
 **Likely files**
 
@@ -214,20 +214,20 @@ cleanup coverage, so this milestone remains unchecked.
 - Potentially a narrow shared extension to `src/fabrica/adapters/outbound/process_group_subprocess/runner.py` only if a genuinely reusable contract emerges.
 - Mirrored unit and POSIX integration tests.
 
-- [ ] Spawn argv without shell parsing; invoke only the host-configured shell for explicit shell mode.
-- [ ] Use `DEVNULL` for stdin, stdout/stderr pipes, isolated process groups, and graceful-to-forced tree termination.
-- [ ] Observe cancellation and the earliest effective deadline while retaining partial separate-stream output.
-- [ ] Map spawn failure, exit code, signal, timeout, cancellation, and infrastructure failure to command-scoped results.
+- [x] Spawn argv without shell parsing; invoke only the host-configured shell for explicit shell mode.
+- [x] Use `DEVNULL` for stdin, stdout/stderr pipes, isolated process groups, and graceful-to-forced tree termination.
+- [x] Observe cancellation and the earliest effective deadline while retaining partial separate-stream output.
+- [x] Map spawn failure, exit code, signal, timeout, cancellation, and infrastructure failure to command-scoped results.
 
 **Acceptance criteria**
 
-- [ ] **RC-04-A** No PTY or interactive input is used.
-- [ ] **RC-04-B** Timeout and cancellation terminate descendants and preserve partial output.
-- [ ] **RC-04-C** Non-zero exits are normal command results.
+- [x] **RC-04-A** No PTY or interactive input is used.
+- [x] **RC-04-B** Timeout and cancellation terminate descendants and preserve partial output.
+- [x] **RC-04-C** Non-zero exits are normal command results.
 
 **Verification**
 
-- [ ] **RC-04-V** Test spawn arguments, TERM-to-KILL escalation, timeout, cancellation, UTF-8 boundaries, and a POSIX child-tree cleanup scenario.
+- [x] **RC-04-V** Test spawn arguments, TERM-to-KILL escalation, timeout, cancellation, UTF-8 boundaries, and a POSIX child-tree cleanup scenario.
 
 ### RC-05 — Implement scheduling and fair output limiting
 

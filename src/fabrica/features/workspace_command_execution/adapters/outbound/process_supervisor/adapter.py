@@ -189,18 +189,34 @@ def _effective_deadline(timeout_ms: int, host_deadline: datetime | None) -> floa
 
 
 async def _terminate_process_group(process: asyncio.subprocess.Process, grace_seconds: float) -> None:
-    if process.returncode is not None or process.pid is None:
+    if process.pid is None:
         return
-    _send_group_signal(process.pid, signal.SIGTERM)
+    process_group_id = process.pid
+    _send_group_signal(process_group_id, signal.SIGTERM)
+    grace_deadline = monotonic() + grace_seconds
+    while _process_group_exists(process_group_id) and monotonic() < grace_deadline:
+        try:
+            await asyncio.wait_for(
+                asyncio.shield(process.wait()),
+                timeout=min(_POLL_INTERVAL_SECONDS, max(0.0, grace_deadline - monotonic())),
+            )
+        except TimeoutError:
+            continue
+    if _process_group_exists(process_group_id):
+        _send_group_signal(process_group_id, signal.SIGKILL)
+    await asyncio.gather(process.wait(), return_exceptions=True)
+
+
+def _process_group_exists(process_group_id: int) -> bool:
     try:
-        await asyncio.wait_for(asyncio.shield(process.wait()), timeout=grace_seconds)
-    except TimeoutError:
-        _send_group_signal(process.pid, signal.SIGKILL)
-        await asyncio.gather(process.wait(), return_exceptions=True)
+        os.killpg(process_group_id, 0)
+    except (PermissionError, ProcessLookupError):
+        return False
+    return True
 
 
 def _send_group_signal(process_group_id: int, sent_signal: signal.Signals) -> None:
-    with suppress(ProcessLookupError):
+    with suppress(PermissionError, ProcessLookupError):
         os.killpg(process_group_id, sent_signal)
 
 
