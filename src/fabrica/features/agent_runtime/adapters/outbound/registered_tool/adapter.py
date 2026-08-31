@@ -145,7 +145,11 @@ class RegisteredToolExecutor:
 
 
 def _outcome_result(request: ToolCallRequest, outcome: RegisteredToolOutcome, limits: ToolLoopLimits) -> ToolCallResult:
-    result_text = outcome.to_bounded_json(max_chars=min(limits.max_tool_result_chars, MAX_TOOL_RESPONSE_TEXT_CHARS))
+    result_text = (
+        None
+        if outcome.content
+        else outcome.to_bounded_json(max_chars=min(limits.max_tool_result_chars, MAX_TOOL_RESPONSE_TEXT_CHARS))
+    )
     if outcome.status is ToolOutcomeStatus.SUCCESS:
         status = ToolCallResultStatus.SUCCESS
     elif outcome.status is ToolOutcomeStatus.REJECTED:

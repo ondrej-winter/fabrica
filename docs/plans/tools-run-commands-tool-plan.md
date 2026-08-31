@@ -97,7 +97,7 @@ Async registered-tool contracts
 
 ## Progress tracking
 
-- [ ] **RC-01** Extend bounded multipart runtime transport for the canonical serialized-result budget.
+- [x] **RC-01** Extend bounded multipart runtime transport for the canonical serialized-result budget.
 - [ ] **RC-02** Create feature-owned DTOs, errors, limits, ports, and validators.
 - [ ] **RC-03** Implement cwd, environment, permission, and sandbox planning.
 - [ ] **RC-04** Implement process supervision, output capture, deadline, timeout, and cancellation behavior.
@@ -119,23 +119,23 @@ Async registered-tool contracts
 - `src/fabrica/features/agent_runtime/adapters/outbound/registered_tool/adapter.py`
 - Mirrored agent-runtime DTO and registered-tool adapter tests.
 
-- [ ] Keep separate `stdout` and `stderr` fields as the only model-visible command
+- [x] Keep separate `stdout` and `stderr` fields as the only model-visible command
   output payloads; remove stale single-`output` examples and field lists.
-- [ ] Extend registered-tool runtime transport to carry the complete bounded
+- [x] Extend registered-tool runtime transport to carry the complete bounded
   structured command result in at most two `ToolTextContent` parts, each capped
   at 48,000 characters.
-- [ ] Ensure a multipart typed outcome does not duplicate its full payload in
+- [x] Ensure a multipart typed outcome does not duplicate its full payload in
   `result_text` or become `LIMIT_EXCEEDED` because of the legacy text-result cap.
-- [ ] Confirm that every command result is retained when the batch output cap is reached.
+- [x] Confirm that every command result is retained when the batch output cap is reached.
 
 **Acceptance criteria**
 
-- [ ] **RC-01-A** The specification has exactly one authoritative output field structure: separate `stdout` and `stderr`, never combined `output`.
-- [ ] **RC-01-B** A complete serialized structured command result of at most 96,000 characters reaches the model in at most two 48,000-character text parts without generic runtime truncation.
+- [x] **RC-01-A** The specification has exactly one authoritative output field structure: separate `stdout` and `stderr`, never combined `output`.
+- [x] **RC-01-B** A complete serialized structured command result of at most 96,000 characters reaches the model in at most two 48,000-character text parts without generic runtime truncation.
 
 **Verification**
 
-- [ ] **RC-01-V** Add runtime DTO and adapter regression tests for multipart output, including a near-96,000-character serialized result with escape-heavy output, no duplicate full `result_text`, and no incorrect `LIMIT_EXCEEDED` status.
+- [x] **RC-01-V** Add runtime DTO and adapter regression tests for multipart output, including a near-96,000-character serialized result with escape-heavy output, no duplicate full `result_text`, and no incorrect `LIMIT_EXCEEDED` status.
 
 ### RC-02 — Establish feature contracts and validation
 

@@ -152,6 +152,47 @@ def test_registered_tool_executor_preserves_typed_ordered_content_parts() -> Non
     assert tuple(type(part) for part in result.content) == (ToolTextContent, ToolImageContent, ToolTextContent)
 
 
+def test_registered_tool_executor_preserves_96000_character_multipart_typed_outcome_without_result_text() -> None:
+    escape_heavy_result = '"' * 96_000
+
+    async def synthetic_tool(
+        _arguments: Mapping[str, ToolArgumentValue],
+        _context: ToolExecutionContext,
+    ) -> RegisteredToolOutcome:
+        return RegisteredToolOutcome.model_continue_success(
+            mutation_guarantee=ToolMutationGuarantee.NO_MUTATION,
+            content=(
+                ToolTextContent(text=escape_heavy_result[:48_000]),
+                ToolTextContent(text=escape_heavy_result[48_000:]),
+            ),
+        )
+
+    result = asyncio.run(
+        RegisteredToolExecutor(
+            (
+                AsyncRegisteredTool(
+                    definition=ToolDefinition(name="run_commands", description="Run synthetic commands"),
+                    handler=synthetic_tool,
+                ),
+            ),
+        ).execute_tool(
+            ToolCallRequest(call_id="call-1", tool_name="run_commands"),
+            ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=1),
+            _NeverCancelledToolCancellationSignal(),
+        ),
+    )
+
+    assert result.status is ToolCallResultStatus.SUCCESS
+    assert result.result_text is None
+    assert tuple(part.text for part in result.content if isinstance(part, ToolTextContent)) == (
+        escape_heavy_result[:48_000],
+        escape_heavy_result[48_000:],
+    )
+    assert sum(len(part.text) for part in result.content if isinstance(part, ToolTextContent)) == len(
+        escape_heavy_result
+    )
+
+
 def test_registered_tool_executor_maps_async_rejection_to_recoverable_result() -> None:
     async def reject_tool(
         _arguments: Mapping[str, ToolArgumentValue],
