@@ -98,7 +98,7 @@ Async registered-tool contracts
 ## Progress tracking
 
 - [x] **RC-01** Extend bounded multipart runtime transport for the canonical serialized-result budget.
-- [ ] **RC-02** Create feature-owned DTOs, errors, limits, ports, and validators.
+- [x] **RC-02** Create feature-owned DTOs, errors, limits, ports, and validators.
 - [ ] **RC-03** Implement cwd, environment, permission, and sandbox planning.
 - [ ] **RC-04** Implement process supervision, output capture, deadline, timeout, and cancellation behavior.
 - [ ] **RC-05** Implement parallel/sequential scheduling and fair output limiting.
