@@ -7,12 +7,11 @@ Define the model-facing and host-facing specification for a read-only
 
 ## Status
 
-**Status:** Accepted and implemented.
-
-**Acceptance:** Confirmed on August 27, 2026.
-
-**Revision:** Audited against `.agents/skills/spec-driven-development/SKILL.md` on
-August 27, 2026.
+- State: Accepted and implemented.
+- Accepted by: Product interview
+- Accepted on: August 27, 2026
+- Revision: Existing accepted specification; template metadata normalized on September 1, 2026.
+- Supersedes: Not applicable.
 
 This document is the canonical source of truth for the implemented `read_files`
 tool contract. The `workspace_reading` slice, its registered-tool adapter, and
@@ -29,7 +28,7 @@ The design goal is a safe, bounded, provider-neutral read primitive that gives
 the model exactly the requested source context with stable line references and
 explicit metadata about any content it did not receive.
 
-## Current context
+## Current Context
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
@@ -56,7 +55,17 @@ explicit metadata about any content it did not receive.
 - Documentation-only changes should be reviewed for clarity and consistency;
   implementation changes will require tests and the project quality gate.
 
-## Desired behavior
+## Scope
+
+### In Scope
+
+- Bounded, read-only workspace file inspection for model-callable workflows.
+
+### Out of Scope
+
+The detailed exclusions already recorded below remain authoritative.
+
+## Desired Behavior
 
 `read_files` must allow a model to:
 
@@ -867,7 +876,7 @@ Add these requirements beyond current Cline behavior:
 - MIME and magic-byte validation;
 - selective retry policy.
 
-## Testing strategy
+## Testing Strategy
 
 Required future acceptance tests include the following scenarios.
 
@@ -956,7 +965,17 @@ Allow:
 - Transient timeout may retry once.
 - Deterministic error does not retry.
 
-## Commands and validation
+## Commands and Validation
+
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format --check .` | Required for implementation changes |
+| Lint | `uv run ruff check .` | Required for implementation changes |
+| Type check | `uv run ty check src tests` | Required for implementation changes |
+| Tests | `uv run pytest` | Required for implementation changes |
+| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
+| Manual acceptance | Confirm the recorded acceptance remains accurate when this contract changes materially. | Required for material contract changes |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 
@@ -967,11 +986,11 @@ Implementation changes should use the project quality gate:
 - Type check: `uv run ty check src tests`
 - Test: `uv run pytest`
 
-Future implementation should start with focused validator, path resolver,
-classification, text-reader, limiter, and result-contract tests before adding a
-model-callable runtime adapter.
+The implementation is covered by focused validator, path resolver,
+classification, text-reader, limiter, result-contract, and model-callable runtime
+adapter tests.
 
-## Boundaries
+## Execution Boundaries
 
 - Always use one canonical `read_files` interface for single and batch reads.
 - Always keep filesystem reads bounded, line-numbered, and explicit about
@@ -999,7 +1018,7 @@ model-callable runtime adapter.
 - Never allow paths to escape the configured workspace through absolute paths,
   parent traversal, or symlinks.
 
-## Success criteria
+## Success Criteria
 
 - The spec defines `read_files` as the single preferred filesystem read primitive
   for coding-agent workflows.
@@ -1047,3 +1066,26 @@ model-callable runtime adapter.
 
 The accepted contract is implemented and remains the durable reference for
 future changes.
+
+## Open Questions
+
+| Question | Impact | Blocking? | Owner | Resolution |
+| --- | --- | --- | --- | --- |
+| No additional unresolved question is recorded by this migration. | None known. | No | Maintainer | Not applicable |
+
+## Acceptance and Planning Gate
+
+The recorded acceptance and implementation status in the Status section make this
+the governing contract for the existing capability. Any derived plan remains
+subordinate to this specification and must not redefine its requirements or
+success criteria.
+
+## Conventions and Constraints
+
+Follow the project architecture, typing, logging, secret-safety, and validation conventions recorded in `.clinerules/`.
+
+## Project Structure
+
+- Specification: This file under `docs/specs/`.
+- Source and test ownership: The detailed architecture section in this specification remains authoritative.
+- Documentation ownership: `docs/specs/` and the relevant documentation indexes.

@@ -2,11 +2,12 @@
 
 ## Status
 
-**Status:** Accepted — ready for implementation planning.
-
-**Acceptance:** Confirmed on August 28, 2026; macOS execution and containment revised on August 30, 2026.
-
-**Revision:** Canonicalized against `.agents/skills/spec-driven-development/SKILL.md` on August 28, 2026. Supported-platform execution and containment follow ADR 0008.
+- State: Accepted and implemented.
+- Accepted by: Product interview
+- Accepted on: August 28, 2026
+- Revision: Existing accepted specification; implementation status audited and
+  template metadata normalized on September 1, 2026.
+- Supersedes: Not applicable.
 
 This document is the canonical source of truth for the accepted `search_codebase` tool contract. Any derived implementation plan and implementation must preserve its objective, requirements, constraints, boundaries, and success criteria. Material changes require this specification to be updated and re-confirmed.
 
@@ -24,7 +25,7 @@ The design goal is a safe, provider-neutral search primitive analogous to
 `ripgrep`, but with a stable agent-facing contract that does not expose backend
 implementation quirks.
 
-## Current context
+## Current Context
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
@@ -51,7 +52,17 @@ implementation quirks.
 - Documentation-only changes should be reviewed for clarity and consistency;
   implementation changes will require tests and the project quality gate.
 
-## Desired behavior
+## Scope
+
+### In Scope
+
+- Bounded, read-only regex source discovery for model-callable workflows.
+
+### Out of Scope
+
+The detailed exclusions already recorded below remain authoritative.
+
+## Desired Behavior
 
 `search_codebase` must allow a model to:
 
@@ -1114,7 +1125,7 @@ Add these requirements beyond current Cline behavior:
 - streaming ripgrep parser;
 - common `ContextHydrator`.
 
-## Testing strategy
+## Testing Strategy
 
 Required future acceptance tests include the following scenarios.
 
@@ -1217,7 +1228,17 @@ Required future acceptance tests include the following scenarios.
 - Transient failure retried once.
 - Invalid regex not retried.
 
-## Commands and validation
+## Commands and Validation
+
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format --check .` | Required for implementation changes |
+| Lint | `uv run ruff check .` | Required for implementation changes |
+| Type check | `uv run ty check src tests` | Required for implementation changes |
+| Tests | `uv run pytest` | Required for implementation changes |
+| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
+| Manual acceptance | Confirm the recorded acceptance remains accurate when this contract changes materially. | Required for material contract changes |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 
@@ -1228,11 +1249,11 @@ Implementation changes should use the project quality gate:
 - Type check: `uv run ty check src tests`
 - Test: `uv run pytest`
 
-Future implementation should start with focused validator, path resolver, search
-planner, backend parser, context hydrator, limiter, and result-contract tests
-before adding a model-callable runtime adapter.
+The implementation is covered by focused validator, path resolver, search
+planner, backend parser, context hydrator, limiter, result-contract, and
+model-callable runtime adapter tests.
 
-## Boundaries
+## Execution Boundaries
 
 - Always treat `search_codebase` as textual regex search, not semantic search.
 - Always keep the canonical public schema as `{ "queries": [query objects] }`.
@@ -1262,7 +1283,7 @@ before adding a model-callable runtime adapter.
 - Never allow search paths to escape the configured workspace through absolute
   paths, parent traversal, or symlinks.
 
-## Success criteria
+## Success Criteria
 
 - The spec defines `search_codebase` as the single preferred textual discovery
   primitive for coding-agent workflows.
@@ -1312,8 +1333,22 @@ before adding a model-callable runtime adapter.
    explicit best-effort pre-launch containment, not race-proof lifecycle-long
    containment; a descriptor-rooted native helper remains deferred future work.
 
-## Acceptance and planning gate
+## Open Questions
 
-The user/maintainer confirmed the resolved decisions on August 28, 2026. Use
-`planning-and-task-breakdown` to create a separate derived implementation plan;
-that plan must not redefine this specification.
+| Question | Impact | Blocking? | Owner | Resolution |
+| --- | --- | --- | --- | --- |
+| No additional unresolved question is recorded by this migration. | None known. | No | Maintainer | Not applicable |
+
+## Acceptance and Planning Gate
+
+The recorded acceptance in the Status section permits derived planning. A plan remains subordinate to this specification and must not redefine its requirements or success criteria.
+
+## Conventions and Constraints
+
+Follow the project architecture, typing, logging, secret-safety, and validation conventions recorded in `.clinerules/`.
+
+## Project Structure
+
+- Specification: This file under `docs/specs/`.
+- Source and test ownership: The detailed architecture section in this specification remains authoritative.
+- Documentation ownership: `docs/specs/` and the relevant documentation indexes.

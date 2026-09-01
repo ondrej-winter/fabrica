@@ -1,5 +1,16 @@
 # Spec: Skills Tool
 
+## Status
+
+- State: Draft — unconfirmed.
+- Implementation status: Partially implemented; selected-skill context, resources, and policy-gated scripts exist, but the model-callable `skills` tool is not implemented.
+- Accepted by: Not applicable until accepted
+- Accepted on: Not applicable until accepted
+- Revision: Template-governance migration on September 1, 2026.
+- Supersedes: Not applicable.
+
+This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
+
 ## Objective
 
 Define the model-facing and host-facing specification for the `skills` agent
@@ -18,7 +29,7 @@ A skill tells the agent how to use its capabilities; it is not itself a
 capability.
 ```
 
-## Current context
+## Current Context
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
@@ -78,7 +89,17 @@ install/download/enable/disable skills. Activation loads procedural
 instructions; ordinary tools implement those instructions later under normal
 permission and sandbox policy.
 
-## Desired behavior
+## Scope
+
+### In Scope
+
+- Configured procedural-skill discovery and activation without capability expansion.
+
+### Out of Scope
+
+The detailed exclusions already recorded below remain authoritative.
+
+## Desired Behavior
 
 `skills` must allow a model to:
 
@@ -824,7 +845,7 @@ Add these requirements beyond current Cline behavior:
 - atomic activation;
 - activation audit events.
 
-## Testing strategy
+## Testing Strategy
 
 Required future acceptance tests include the following scenarios.
 
@@ -908,7 +929,17 @@ XML-like arguments must remain ordinary argument data.
 - Active instructions remain available.
 - Same revision preserved.
 
-## Commands and validation
+## Commands and Validation
+
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format --check .` | Required for implementation changes |
+| Lint | `uv run ruff check .` | Required for implementation changes |
+| Type check | `uv run ty check src tests` | Required for implementation changes |
+| Tests | `uv run pytest` | Required for implementation changes |
+| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
+| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 
@@ -923,7 +954,7 @@ Future implementation should start with focused registry, parser, resolver,
 policy, activator, active-set, and resource-resolver tests before adding a
 model-callable runtime adapter.
 
-## Boundaries
+## Execution Boundaries
 
 - Always use `skills` as an activation primitive, not an execution primitive.
 - Always advertise concise skill descriptions, not only names.
@@ -943,7 +974,7 @@ model-callable runtime adapter.
 - Never automatically load all resource files during activation.
 - Never mutate active skill roots during an ordinary agent task.
 
-## Success criteria
+## Success Criteria
 
 - The spec defines `skills` as an agent orchestration primitive for activating
   configured procedural instructions.
@@ -965,7 +996,11 @@ model-callable runtime adapter.
   atomicity, audit events, and stable error codes are specified.
 - Future acceptance tests are explicit enough to drive implementation.
 
-## Open questions
+## Open Questions
+
+| Question | Impact | Blocking? | Owner | Resolution |
+| --- | --- | --- | --- | --- |
+| See the detailed questions below; each requires maintainer triage before acceptance. | Requirement and implementation planning. | To be determined | Maintainer | Unresolved |
 
 - Should Version 1 reuse and evolve existing selected skill context DTOs, or add a
   separate activation DTO family to keep legacy selection-time context injection
@@ -979,3 +1014,17 @@ model-callable runtime adapter.
   command sandbox mount resolver for read-only script execution?
 - How should plugin-provided skills express trust and revision when their
   definitions are not simple local files?
+
+## Acceptance and Planning Gate
+
+This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+
+## Conventions and Constraints
+
+Follow the project architecture, typing, logging, secret-safety, and validation conventions recorded in `.clinerules/`.
+
+## Project Structure
+
+- Specification: This file under `docs/specs/`.
+- Source and test ownership: The detailed architecture section in this specification remains authoritative.
+- Documentation ownership: `docs/specs/` and the relevant documentation indexes.

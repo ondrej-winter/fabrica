@@ -1,5 +1,16 @@
 # Spec: Apply Patch Tool
 
+## Status
+
+- State: Draft — unconfirmed.
+- Implementation status: Substantially implemented; the implementation predates formal specification acceptance.
+- Accepted by: Not applicable until accepted
+- Accepted on: Not applicable until accepted
+- Revision: Template-governance migration on September 1, 2026.
+- Supersedes: Not applicable.
+
+This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
+
 ## Objective
 
 Define the model-facing and host-facing specification for an `apply_patch`
@@ -22,7 +33,7 @@ Version 1 intentionally optimizes for safety and deterministic behavior over
 implementation simplicity and broad portability. Unsupported cases must fail
 before mutation rather than silently degrade to weaker guarantees.
 
-## Current context
+## Current Context
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
@@ -951,7 +962,7 @@ Implementation must preserve hexagonal boundaries: domain and application code
 must not perform filesystem I/O directly, and adapter-specific filesystem or UI
 approval details must not leak into stable application ports or DTOs.
 
-## Testing strategy
+## Testing Strategy
 
 Future acceptance tests must cover at least these scenarios.
 
@@ -1054,7 +1065,17 @@ Future acceptance tests must cover at least these scenarios.
 - Concurrent `apply_patch` calls are serialized per workspace.
 - Planning, approval, staging, and commit/rollback deadlines are enforced.
 
-## Commands and validation
+## Commands and Validation
+
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format --check .` | Required for implementation changes |
+| Lint | `uv run ruff check .` | Required for implementation changes |
+| Type check | `uv run ty check src tests` | Required for implementation changes |
+| Tests | `uv run pytest` | Required for implementation changes |
+| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
+| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 
@@ -1070,7 +1091,7 @@ planner, authorization, result-contract, and runtime-status tests before adding 
 real filesystem committer. Filesystem integration tests should follow once the
 application contracts are stable.
 
-## Boundaries
+## Execution Boundaries
 
 - Always prefer context-based, minimal, reviewable patches over shell text
   rewrites.
@@ -1099,7 +1120,7 @@ application contracts are stable.
 - Never collapse partial, rollback-failed, or indeterminate outcomes into generic
   `IO_ERROR`.
 
-## Success criteria
+## Success Criteria
 
 - The spec defines `apply_patch` as the single preferred model-facing filesystem
   mutation primitive for coding-agent workflows, while allowing operation-specific
@@ -1128,9 +1149,45 @@ application contracts are stable.
   retryability, and per-path evidence for post-commit failures.
 - Future acceptance tests are explicit enough to drive implementation.
 
-## Open questions
+## Open Questions
+
+| Question | Impact | Blocking? | Owner | Resolution |
+| --- | --- | --- | --- | --- |
+| See the detailed questions below; each requires maintainer triage before acceptance. | Requirement and implementation planning. | To be determined | Maintainer | Unresolved |
 
 None for v1. New behavior such as Windows support, fuzzy matching, non-UTF-8
 encodings, symlink mutation, standalone empty-directory operations, richer
 metadata preservation, executable-mode syntax, cross-device moves, or public
 two-step preview/commit tokens requires a new spec revision.
+
+## Scope
+
+### In Scope
+
+- The bounded, journaled workspace patch-mutation tool contract.
+
+### Out of Scope
+
+The detailed exclusions already recorded below remain authoritative.
+
+## Acceptance and Planning Gate
+
+This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+
+## Conventions and Constraints
+
+Follow the project architecture, typing, logging, secret-safety, and validation conventions recorded in `.clinerules/`.
+
+## Assumptions
+
+- The existing detailed requirements remain valid unless explicitly superseded by an accepted revision.
+
+## Desired Behavior
+
+The detailed behavioral contract in this specification defines the required observable outcomes and failure behavior.
+
+## Project Structure
+
+- Specification: This file under `docs/specs/`.
+- Source and test ownership: The detailed architecture section in this specification remains authoritative.
+- Documentation ownership: `docs/specs/` and the relevant documentation indexes.

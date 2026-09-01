@@ -1,5 +1,16 @@
 # Spec: Model Usage and Cost Evidence
 
+## Status
+
+- State: Draft — unconfirmed.
+- Implementation status: Baseline contract implemented; broader provider-neutral evidence requirements remain unconfirmed.
+- Accepted by: Not applicable until accepted
+- Accepted on: Not applicable until accepted
+- Revision: Template-governance migration on September 1, 2026.
+- Supersedes: Not applicable.
+
+This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
+
 ## Objective
 
 Add a provider-agnostic usage and cost evidence model for Fabrica model calls so
@@ -16,7 +27,7 @@ The goal is not exact cost accounting in v1. The goal is an application-level
 contract that can represent token counts, quota or rate-limit evidence, evidence
 source attribution, and pricing confidence independently of any single backend.
 
-## Current context
+## Current Context
 
 - Runtime result DTOs live in
   `src/fabrica/features/agent_runtime/application/dtos/runtime.py` and expose
@@ -50,7 +61,17 @@ source attribution, and pricing confidence independently of any single backend.
 - Provider-specific raw payloads are not needed for the v1 application contract
   and should not be persisted by default.
 
-## Desired behavior
+## Scope
+
+### In Scope
+
+- Provider-neutral model usage and pricing evidence exposed through application boundaries.
+
+### Out of Scope
+
+The detailed exclusions already recorded below remain authoritative.
+
+## Desired Behavior
 
 Fabrica should expose normalized model usage evidence through an application-level
 contract that can be attached to model-call results when available and omitted
@@ -139,7 +160,17 @@ embedding Codex-specific assumptions.
 - Do not add Codex-only token fields directly into generic runtime result DTOs as
   the permanent model.
 
-## Commands and validation
+## Commands and Validation
+
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format --check .` | Required for implementation changes |
+| Lint | `uv run ruff check .` | Required for implementation changes |
+| Type check | `uv run ty check src tests` | Required for implementation changes |
+| Tests | `uv run pytest` | Required for implementation changes |
+| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
+| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
 
 - Format: `uv run ruff format .`
 - Lint: `uv run ruff check .`
@@ -154,7 +185,7 @@ Manual verification, if live probing is implemented later, must be explicit and
 opt-in. It must use redacted output and must not be part of the default local or
 CI validation path.
 
-## Project structure
+## Project Structure
 
 - Spec: `docs/specs/model-usage-and-cost-evidence-spec.md`.
 - Generic usage and cost evidence DTO location:
@@ -176,7 +207,7 @@ CI validation path.
 The usage evidence DTOs now live in `shared_kernel` because both `agent_runtime`
 and `codex_transport` use them as provider-neutral boundary concepts.
 
-## Conventions
+## Conventions and Constraints
 
 - Preserve hexagonal boundaries: generic usage evidence belongs at an application
   boundary, while provider payload extraction belongs in provider-specific
@@ -197,7 +228,7 @@ and `codex_transport` use them as provider-neutral boundary concepts.
 - Treat pricing claims as evidence-bearing statements with status, source, and
   confidence, not as implicit arithmetic hidden inside a transport adapter.
 
-## Testing strategy
+## Testing Strategy
 
 - Unit-test generic usage DTO validation:
   - token counts accept non-negative integers;
@@ -228,7 +259,7 @@ and `codex_transport` use them as provider-neutral boundary concepts.
   DTO tests for optional usage evidence if runtime results are changed.
 - Keep all default tests offline and deterministic.
 
-## Boundaries
+## Execution Boundaries
 
 - Always collect token or quota evidence even when exact cost is unknown.
 - Always attach source attribution and confidence to evidence that may influence
@@ -249,7 +280,7 @@ and `codex_transport` use them as provider-neutral boundary concepts.
 - Never scrape billing pages or store account-private billing evidence in source
   artifacts.
 
-## Success criteria
+## Success Criteria
 
 - The spec defines provider-agnostic usage evidence separately from Codex-specific
   backend details.
@@ -295,3 +326,13 @@ and `codex_transport` use them as provider-neutral boundary concepts.
 5. Add one OpenAI-style synthetic conventional provider mapping test or fixture
    to validate that the generic contract is not Codex-shaped.
 6. Attach usage evidence and cost evidence tuples to `LocalAgentRunResult`.
+
+## Open Questions
+
+| Question | Impact | Blocking? | Owner | Resolution |
+| --- | --- | --- | --- | --- |
+| No additional unresolved question is recorded by this migration. | None known. | No | Maintainer | Not applicable |
+
+## Acceptance and Planning Gate
+
+This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.

@@ -1,5 +1,16 @@
 # Spec: Agent Runtime
 
+## Status
+
+- State: Draft — unconfirmed.
+- Implementation status: Substantially implemented; the implementation predates formal specification acceptance.
+- Accepted by: Not applicable until accepted
+- Accepted on: Not applicable until accepted
+- Revision: Template-governance migration on September 1, 2026.
+- Supersedes: Not applicable.
+
+This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
+
 ## Objective
 
 Define the direction for a local Python agent runtime that can run developer
@@ -14,7 +25,7 @@ private-backend request details, and live validation rules belong in
 `docs/specs/codex-transport-spec.md`. Provider-neutral usage and pricing evidence
 belongs in `docs/specs/model-usage-and-cost-evidence-spec.md`.
 
-## Current context
+## Current Context
 
 - Project: `fabrica`, a Python 3.13 application scaffold for local agent
   runtime experiments.
@@ -44,7 +55,17 @@ belongs in `docs/specs/model-usage-and-cost-evidence-spec.md`.
   viability and runtime composition concerns. Local script execution must remain
   policy-controlled and bound to immutable approved script bytes.
 
-## Desired behavior
+## Scope
+
+### In Scope
+
+- The provider-agnostic local agent runtime direction and its explicit tool boundaries.
+
+### Out of Scope
+
+The detailed exclusions already recorded below remain authoritative.
+
+## Desired Behavior
 
 Fabrica should expose a local Python agent runtime that can:
 
@@ -91,7 +112,7 @@ Fabrica should expose a local Python agent runtime that can:
 - RAG or vector search for skills.
 - Multi-provider polish before the Codex support path proves viable.
 
-## Project structure
+## Project Structure
 
 - Spec: `docs/specs/agent-runtime-spec.md`.
 - Codex support spec: `docs/specs/codex-transport-spec.md`.
@@ -108,7 +129,7 @@ Fabrica should expose a local Python agent runtime that can:
 - Integration tests: under `tests/integration/features/agent_runtime/`, with
   live or credential-backed tests skipped unless explicitly opted in.
 
-## Conventions
+## Conventions and Constraints
 
 - Keep dependencies pointing inward toward domain and application code.
 - Define application-owned ports before depending on concrete adapters.
@@ -131,7 +152,7 @@ Fabrica should expose a local Python agent runtime that can:
   cookies, raw auth headers, credential files, personal data, or sensitive
   request/response bodies.
 
-## Testing strategy
+## Testing Strategy
 
 - Unit-test runtime orchestration against fake model transports and fake tools.
 - Unit-test DTO mappings and result normalization without provider credentials.
@@ -147,7 +168,17 @@ Fabrica should expose a local Python agent runtime that can:
 - Add regression tests for runtime contracts when provider behavior changes the
   normalized result shape.
 
-## Commands and validation
+## Commands and Validation
+
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format --check .` | Required for implementation changes |
+| Lint | `uv run ruff check .` | Required for implementation changes |
+| Type check | `uv run ty check src tests` | Required for implementation changes |
+| Tests | `uv run pytest` | Required for implementation changes |
+| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
+| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 Implementation changes should use the project quality gate:
@@ -160,7 +191,7 @@ Implementation changes should use the project quality gate:
 Live backend validation, when intentionally performed, must be manual or
 explicitly opt-in. It must not be part of the default local or CI test suite.
 
-## Success criteria
+## Success Criteria
 
 - The spec clearly distinguishes runtime responsibilities from provider support
   responsibilities.
@@ -172,7 +203,11 @@ explicitly opt-in. It must not be part of the default local or CI test suite.
 - Future tool, PydanticAI, and Agent Skills hardening work has clear boundaries
   for where code and tests belong.
 
-## Open questions
+## Open Questions
+
+| Question | Impact | Blocking? | Owner | Resolution |
+| --- | --- | --- | --- | --- |
+| See the detailed questions below; each requires maintainer triage before acceptance. | Requirement and implementation planning. | To be determined | Maintainer | Unresolved |
 
 - What is the smallest stable runtime result contract that supports model output,
   tool calls, usage evidence, and redacted observations without overfitting to
@@ -183,3 +218,13 @@ explicitly opt-in. It must not be part of the default local or CI test suite.
   DTOs become too thin to justify?
 - What additional approval, isolation, and sandbox policy is sufficient before
   Agent Skill scripts are exposed beyond constrained local subprocess execution?
+
+## Acceptance and Planning Gate
+
+This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+
+## Execution Boundaries
+
+- Always: Preserve the explicit safety and ownership constraints in this specification.
+- Ask first: Expand scope, introduce dependencies, or change public contracts.
+- Never: Bypass documented security, privacy, or architecture boundaries.

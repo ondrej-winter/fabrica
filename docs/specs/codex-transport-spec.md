@@ -1,5 +1,16 @@
 # Spec: Codex Transport
 
+## Status
+
+- State: Draft — unconfirmed.
+- Implementation status: Substantially implemented; the implementation predates formal specification acceptance.
+- Accepted by: Not applicable until accepted
+- Accepted on: Not applicable until accepted
+- Revision: Template-governance migration on September 1, 2026.
+- Supersedes: Not applicable.
+
+This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
+
 > Status note: this spec preserves findings from the original transport spike.
 > Later implementation and observation notes found that the private Codex backend
 > request path requires `stream: true`; older non-streaming MVP assumptions should
@@ -23,7 +34,7 @@ The broader runtime direction is owned by `docs/specs/agent-runtime-spec.md`.
 Provider-neutral usage and pricing evidence is owned by
 `docs/specs/model-usage-and-cost-evidence-spec.md`.
 
-## Current context
+## Current Context
 
 - Source idea: subscription-backed Codex transport for local Python agent runtime
   experiments.
@@ -62,7 +73,17 @@ Provider-neutral usage and pricing evidence is owned by
 - Authentication failures can be handled safely by reloading credentials and
   instructing the user to run `codex login`.
 
-## Desired behavior
+## Scope
+
+### In Scope
+
+- Subscription-backed Codex transport support behind a replaceable outbound adapter.
+
+### Out of Scope
+
+The detailed exclusions already recorded below remain authoritative.
+
+## Desired Behavior
 
 Codex transport support should:
 
@@ -147,7 +168,7 @@ viable only if the support path demonstrates:
 - RAG or vector search for skills.
 - Multi-provider polish before Codex transport viability is known.
 
-## Project structure
+## Project Structure
 
 - Spec: `docs/specs/codex-transport-spec.md`.
 - Runtime spec: `docs/specs/agent-runtime-spec.md`.
@@ -162,7 +183,7 @@ viable only if the support path demonstrates:
 - Opt-in live integration tests: under `tests/integration/features/codex_transport/`,
   skipped by default unless an explicit environment flag or marker is provided.
 
-## Conventions
+## Conventions and Constraints
 
 - Keep dependencies pointing inward toward domain and application code.
 - Keep Codex auth-file details, backend headers, request payloads, response
@@ -181,7 +202,7 @@ viable only if the support path demonstrates:
 - Prefer stable, low-cardinality operational context such as status codes,
   duration, retry count, backend component, and redacted account identifiers.
 
-## Testing strategy
+## Testing Strategy
 
 - Unit-test credential parsing with temporary files and synthetic auth payloads
   only.
@@ -200,7 +221,17 @@ viable only if the support path demonstrates:
 - Add regression tests for any observed backend shape, auth, or rate-limit
   behavior that becomes part of the normalized result contract.
 
-## Commands and validation
+## Commands and Validation
+
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format --check .` | Required for implementation changes |
+| Lint | `uv run ruff check .` | Required for implementation changes |
+| Type check | `uv run ty check src tests` | Required for implementation changes |
+| Tests | `uv run pytest` | Required for implementation changes |
+| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
+| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 Implementation changes should use the project quality gate:
@@ -213,7 +244,7 @@ Implementation changes should use the project quality gate:
 Live backend validation, when intentionally performed, must be manual or
 explicitly opt-in. It must not be part of the default local or CI test suite.
 
-## Boundaries
+## Execution Boundaries
 
 - Always isolate the unofficial Codex backend behind an outbound adapter.
 - Always treat local Codex credentials as secrets.
@@ -234,7 +265,7 @@ explicitly opt-in. It must not be part of the default local or CI test suite.
 - Never couple the application core to private Codex CLI internals, ChatGPT
   backend headers, OpenAI transport schemas, or PydanticAI implementation details.
 
-## Success criteria
+## Success Criteria
 
 - The spec defines the Codex-specific support needed by the Python agent runtime.
 - The spec identifies assumptions that must be validated before deeper runtime
@@ -247,7 +278,11 @@ explicitly opt-in. It must not be part of the default local or CI test suite.
 - The spec provides enough project-structure guidance to start implementation
   without guessing where code and tests belong.
 
-## Open questions
+## Open Questions
+
+| Question | Impact | Blocking? | Owner | Resolution |
+| --- | --- | --- | --- | --- |
+| See the detailed questions below; each requires maintainer triage before acceptance. | Requirement and implementation planning. | To be determined | Maintainer | Unresolved |
 
 - Which observed request headers are strictly required for a direct Python
   transport versus incidental to Codex CLI behavior? Initial candidates are
@@ -263,3 +298,7 @@ explicitly opt-in. It must not be part of the default local or CI test suite.
 - What exact normalized result contract should represent Codex-specific usage
   limits, public-API-style quota failures, auth failures, backend-shape
   mismatches, and transport errors?
+
+## Acceptance and Planning Gate
+
+This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.

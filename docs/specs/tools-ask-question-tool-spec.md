@@ -1,5 +1,16 @@
 # Spec: Ask Question Tool
 
+## Status
+
+- State: Draft — unconfirmed.
+- Implementation status: Not implemented.
+- Accepted by: Not applicable until accepted
+- Accepted on: Not applicable until accepted
+- Revision: Template-governance migration on September 1, 2026.
+- Supersedes: Not applicable.
+
+This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
+
 ## Objective
 
 Define the model-facing and host-facing specification for the `ask_question`
@@ -26,7 +37,7 @@ ask_question suspends the agent because information is missing; it must never
 fabricate that information simply to keep the run moving.
 ```
 
-## Current context
+## Current Context
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
@@ -82,7 +93,17 @@ The tool changes run state from `RUNNING` to `WAITING_FOR_USER` and later back t
 `RUNNING` when the user answers, or to a terminal state when the run is cancelled
 or terminated.
 
-## Desired behavior
+## Scope
+
+### In Scope
+
+- The interactive agent orchestration contract for one pending user question.
+
+### Out of Scope
+
+The detailed exclusions already recorded below remain authoritative.
+
+## Desired Behavior
 
 `ask_question` must allow a model to:
 
@@ -764,7 +785,7 @@ Add these requirements beyond current Cline behavior:
 - synchronization-barrier semantics;
 - persisted-suspension option retained as a future architectural choice.
 
-## Testing strategy
+## Testing Strategy
 
 Required future acceptance tests include the following scenarios.
 
@@ -830,7 +851,17 @@ run is destroyed.
 - Interactive transport unavailable returns `SESSION_NOT_INTERACTIVE`.
 - Runtime never silently selects the first option.
 
-## Commands and validation
+## Commands and Validation
+
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format --check .` | Required for implementation changes |
+| Lint | `uv run ruff check .` | Required for implementation changes |
+| Type check | `uv run ty check src tests` | Required for implementation changes |
+| Tests | `uv run pytest` | Required for implementation changes |
+| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
+| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 
@@ -845,7 +876,7 @@ Future implementation should start with focused schema, interaction-manager,
 state-transition, cancellation, idempotency, synchronization, and headless-mode
 tests before adding concrete UI, CLI, or remote transports.
 
-## Boundaries
+## Execution Boundaries
 
 - Always use `ask_question` only when material uncertainty cannot be resolved
   from available conversation, workspace, or tool context.
@@ -870,7 +901,7 @@ tests before adding concrete UI, CLI, or remote transports.
 - Never represent cancellation as an empty user answer.
 - Never duplicate the same answer unnecessarily in model context.
 
-## Success criteria
+## Success Criteria
 
 - The spec defines `ask_question` as a synchronous human-input orchestration
   primitive for material user-only information.
@@ -893,7 +924,11 @@ tests before adding concrete UI, CLI, or remote transports.
   `InteractionTransport` responsibilities.
 - Future acceptance tests are explicit enough to drive implementation.
 
-## Open questions
+## Open Questions
+
+| Question | Impact | Blocking? | Owner | Resolution |
+| --- | --- | --- | --- | --- |
+| See the detailed questions below; each requires maintainer triage before acceptance. | Requirement and implementation planning. | To be determined | Maintainer | Unresolved |
 
 - Should `options` remain required, matching Cline's current 2–5 options rule, or
   become optional with 2–5 options only when present?
@@ -918,3 +953,17 @@ tests before adding concrete UI, CLI, or remote transports.
   the reason in well-phrased question text?
 - Should the schema support a `recommended_option`, or should agents express
   recommendations in question text to avoid UI bias?
+
+## Acceptance and Planning Gate
+
+This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+
+## Conventions and Constraints
+
+Follow the project architecture, typing, logging, secret-safety, and validation conventions recorded in `.clinerules/`.
+
+## Project Structure
+
+- Specification: This file under `docs/specs/`.
+- Source and test ownership: The detailed architecture section in this specification remains authoritative.
+- Documentation ownership: `docs/specs/` and the relevant documentation indexes.

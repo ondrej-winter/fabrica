@@ -1,5 +1,16 @@
 # Spec: Submit and Exit Tool
 
+## Status
+
+- State: Draft — unconfirmed.
+- Implementation status: Not implemented.
+- Accepted by: Not applicable until accepted
+- Accepted on: Not applicable until accepted
+- Revision: Template-governance migration on September 1, 2026.
+- Supersedes: Not applicable.
+
+This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
+
 ## Objective
 
 Define the model-facing and host-facing specification for the
@@ -29,7 +40,7 @@ submit_and_exit
 COMPLETED
 ```
 
-## Current context
+## Current Context
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
@@ -89,7 +100,17 @@ submit_and_exit
 Unlike `ask_question`, `submit_and_exit` is terminal. It transitions a run from
 `RUNNING` to `COMPLETED` only after the terminal submission is accepted.
 
-## Desired behavior
+## Scope
+
+### In Scope
+
+- The terminal agent-run completion contract and completion-record lifecycle.
+
+### Out of Scope
+
+The detailed exclusions already recorded below remain authoritative.
+
+## Desired Behavior
 
 `submit_and_exit` must allow a model to:
 
@@ -830,7 +851,7 @@ composition-root concerns.
 - Deterministic cancellation race.
 - Final response rendered directly from the completion record.
 
-## Testing strategy
+## Testing Strategy
 
 Required future acceptance tests include the following scenarios.
 
@@ -889,7 +910,17 @@ If the sole-call rule is adopted:
 - Executor acknowledgement is not shown as duplicate final answer.
 - No additional model turn is required.
 
-## Commands and validation
+## Commands and Validation
+
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format --check .` | Required for implementation changes |
+| Lint | `uv run ruff check .` | Required for implementation changes |
+| Type check | `uv run ty check src tests` | Required for implementation changes |
+| Tests | `uv run pytest` | Required for implementation changes |
+| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
+| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 
@@ -905,7 +936,7 @@ state-machine, terminal-guard, completion-guard, idempotency, persistence-failur
 cancellation-race, and presentation tests before wiring concrete runtime or UI
 adapters.
 
-## Boundaries
+## Execution Boundaries
 
 - Always use `submit_and_exit` only after all useful work is complete or the task
   cannot proceed meaningfully.
@@ -925,7 +956,7 @@ adapters.
 - Never create more than one accepted completion record for a run.
 - Never show executor acknowledgement prose as duplicate final output.
 
-## Success criteria
+## Success Criteria
 
 - The spec defines `submit_and_exit` as the terminal run-completion orchestration
   primitive.
@@ -948,7 +979,11 @@ adapters.
   runtime failures is explicit.
 - Future acceptance tests are explicit enough to drive implementation.
 
-## Open questions
+## Open Questions
+
+| Question | Impact | Blocking? | Owner | Resolution |
+| --- | --- | --- | --- | --- |
+| See the detailed questions below; each requires maintainer triage before acceptance. | Requirement and implementation planning. | To be determined | Maintainer | Unresolved |
 
 - Should verification evidence remain a model declaration with optional runtime
   policy guards, should the runtime validate recent evidence, or should the schema
@@ -975,3 +1010,17 @@ adapters.
   derive them from command history and verification-class tool results?
 - Should a blocked result always use `submit_and_exit`, or should some blocked
   conditions map to non-completion run states?
+
+## Acceptance and Planning Gate
+
+This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+
+## Conventions and Constraints
+
+Follow the project architecture, typing, logging, secret-safety, and validation conventions recorded in `.clinerules/`.
+
+## Project Structure
+
+- Specification: This file under `docs/specs/`.
+- Source and test ownership: The detailed architecture section in this specification remains authoritative.
+- Documentation ownership: `docs/specs/` and the relevant documentation indexes.

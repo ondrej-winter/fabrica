@@ -2,13 +2,13 @@
 
 ## Status
 
-**Status:** Accepted and implemented on August 31, 2026.
-
-**Acceptance:** Confirmed by product interview on August 30, 2026.
-
-**Revision:** Audited and canonicalized against
-`.agents/skills/spec-driven-development/SKILL.md`; updated with confirmed
-execution, timeout, output, context, and safety decisions on August 31, 2026.
+- State: Accepted and implemented.
+- Accepted by: Product interview
+- Accepted on: August 30, 2026
+- Revision: Existing accepted specification; template metadata normalized on
+  September 1, 2026, preserving the confirmed execution, timeout, output,
+  context, and safety decisions recorded on August 31, 2026.
+- Supersedes: Not applicable.
 
 This document is the canonical source of truth for the `run_commands` tool
 contract. Any material change to its objective, requirements, constraints,
@@ -33,7 +33,7 @@ Use direct process execution as the normal primitive; treat shell interpretation
 as an explicitly requested capability.
 ```
 
-## Current context
+## Current Context
 
 - Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
@@ -78,7 +78,17 @@ tests / type checks / lint / build
 - Documentation-only changes should be reviewed for clarity and consistency;
   implementation changes will require tests and the project quality gate.
 
-## Desired behavior
+## Scope
+
+### In Scope
+
+- The non-interactive workspace command-execution tool contract.
+
+### Out of Scope
+
+The detailed exclusions already recorded below remain authoritative.
+
+## Desired Behavior
 
 `run_commands` must allow a model to:
 
@@ -1273,7 +1283,7 @@ Add these requirements beyond current Cline behavior:
 - explicit sandbox boundary;
 - graceful-to-forced process-tree termination.
 
-## Testing strategy
+## Testing Strategy
 
 Required future acceptance tests include the following scenarios.
 
@@ -1371,7 +1381,17 @@ Required future acceptance tests include the following scenarios.
 - Sandbox denial returned correctly.
 - cwd validation is not treated as sandboxing.
 
-## Commands and validation
+## Commands and Validation
+
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format --check .` | Required for implementation changes |
+| Lint | `uv run ruff check .` | Required for implementation changes |
+| Type check | `uv run ty check src tests` | Required for implementation changes |
+| Tests | `uv run pytest` | Required for implementation changes |
+| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
+| Manual acceptance | Confirm the recorded acceptance remains accurate when this contract changes materially. | Required for material contract changes |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 
@@ -1382,11 +1402,11 @@ Implementation changes should use the project quality gate:
 - Type check: `uv run ty check src tests`
 - Test: `uv run pytest`
 
-Future implementation should start with focused validator, planner, permission,
-environment, output collector, result limiter, and process supervisor tests before
-adding a model-callable runtime adapter.
+The implementation is covered by focused validator, planner, permission,
+environment, output collector, result limiter, process supervisor, and
+model-callable runtime adapter tests.
 
-## Boundaries
+## Execution Boundaries
 
 - Always prefer direct `argv` execution for ordinary programs.
 - Always require explicit `shell` mode for shell interpretation.
@@ -1410,7 +1430,7 @@ adding a model-callable runtime adapter.
 - Never drop an entire command result because another command exhausted the output
   budget.
 
-## Success criteria
+## Success Criteria
 
 - The spec defines `run_commands` as the preferred non-interactive process
   execution primitive for coding-agent verification and project-tooling workflows.
@@ -1470,3 +1490,23 @@ Version 1 contract.
   `run_commands`.
 - **Impact:** Version 1 remains unchanged: no public detached/background process
   lifecycle management is exposed.
+
+## Open Questions
+
+| Question | Impact | Blocking? | Owner | Resolution |
+| --- | --- | --- | --- | --- |
+| No additional unresolved question is recorded by this migration. | None known. | No | Maintainer | Not applicable |
+
+## Acceptance and Planning Gate
+
+The recorded acceptance in the Status section permits derived planning. A plan remains subordinate to this specification and must not redefine its requirements or success criteria.
+
+## Conventions and Constraints
+
+Follow the project architecture, typing, logging, secret-safety, and validation conventions recorded in `.clinerules/`.
+
+## Project Structure
+
+- Specification: This file under `docs/specs/`.
+- Source and test ownership: The detailed architecture section in this specification remains authoritative.
+- Documentation ownership: `docs/specs/` and the relevant documentation indexes.

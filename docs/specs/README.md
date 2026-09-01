@@ -6,6 +6,29 @@ by concern rather than by the original end-to-end idea that introduced the work.
 Use these specs to understand current intent, safety boundaries, implementation
 ownership, validation expectations, and preserved historical decisions.
 
+## Specification governance
+
+Every `*-spec.md` is a canonical requirements artifact and follows the local
+`spec-driven-development` template. Each specification must record its status,
+acceptance evidence, revision, assumptions, desired behavior, explicit scope,
+validation, structure, constraints, execution boundaries, success criteria, and
+open-question ownership.
+
+- **Accepted** specifications may be handed to planning. A derived plan belongs
+  under `docs/plans/` by default and must not redefine the specification.
+- **Draft — unconfirmed** specifications are useful design records but are not
+  implementation-ready. Resolve blocking questions and record a human acceptance
+  in the spec's **Status** section before planning.
+- Do not infer acceptance from implementation, a merged change, or the absence
+  of questions. Record the accepting person or role and date explicitly.
+- Update and re-confirm a specification when its accepted objective, scope,
+  behavior, constraints, boundaries, or success criteria changes materially.
+
+Existing detailed sections such as **Non-goals**, **Boundaries**, and **Resolved
+decisions** remain part of their specification. The template's normalized
+governance sections make their planning and acceptance state explicit rather than
+replacing those technical details.
+
 ## Current specs
 
 - `agent-runtime-spec.md` defines the local Python agent runtime direction and its
@@ -32,7 +55,7 @@ ownership, validation expectations, and preserved historical decisions.
   including parallel-by-default batching, per-command result isolation, bounded
   separate-stream output, workspace-contained context, and host-managed
   default-deny safety policy.
-- `tools-fetch-web-content-tool-spec.md` defines the desired read-only public-web
+- `tools-fetch-web-content-tool-spec.md` defines the implemented read-only public-web
   retrieval primitive for known URLs, including SSRF-safe destination and redirect
   validation, bounded textual-content extraction, structured result metadata, and
   explicit untrusted-content handling.

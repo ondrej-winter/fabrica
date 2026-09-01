@@ -1,5 +1,16 @@
 # Spec: Commit Workflows
 
+## Status
+
+- State: Draft — unconfirmed.
+- Implementation status: Substantially implemented; the implementation predates formal specification acceptance.
+- Accepted by: Not applicable until accepted
+- Accepted on: Not applicable until accepted
+- Revision: Template-governance migration on September 1, 2026.
+- Supersedes: Not applicable.
+
+This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
+
 This spec is the canonical source of truth for Fabrica's developer-facing commit
 workflows. It defines the read-only `fabrica commit-message` preview workflow and
 the explicitly confirmed mutating `fabrica commit` workflow.
@@ -10,7 +21,7 @@ pre-commit execution. This spec owns the user workflows, safety boundaries,
 interaction model, and application orchestration expectations for commit-message
 generation and confirmed commit creation.
 
-## Purpose
+## Objective
 
 Fabrica commit workflows help a developer turn currently staged git changes into
 a specific, evidence-backed Conventional Commit message.
@@ -357,7 +368,7 @@ and translates external I/O before calling application ports.
   commands under its own control.
 - Do not expose arbitrary git command execution.
 
-## Testing strategy
+## Testing Strategy
 
 Automated tests must remain deterministic and offline. They must not call live
 Codex backends, read real user skill directories, or depend on a developer's
@@ -419,7 +430,17 @@ ambient staged git state.
   - git commit failure creates no successful commit and returns a non-zero CLI
     result.
 
-## Validation
+## Commands and Validation
+
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format --check .` | Required for implementation changes |
+| Lint | `uv run ruff check .` | Required for implementation changes |
+| Type check | `uv run ty check src tests` | Required for implementation changes |
+| Tests | `uv run pytest` | Required for implementation changes |
+| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
+| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 Implementation changes should use the project quality gate:
@@ -435,7 +456,7 @@ Implementation changes should use the project quality gate:
 - Focused integration tests during iteration:
   `uv run pytest tests/integration/features/developer_workflow/`
 
-## Success criteria
+## Success Criteria
 
 - The spec reads as the canonical source of truth, not as a proposal, diff,
   migration note, or implementation diary.
@@ -466,3 +487,51 @@ Implementation changes should use the project quality gate:
   available.
 - Non-goals, safety boundaries, project structure, validation commands, testing
   strategy, and related documentation ownership are explicit.
+
+## Scope
+
+### In Scope
+
+- Read-only commit-message recommendation and explicitly approved commit creation workflows.
+
+### Out of Scope
+
+The detailed exclusions already recorded below remain authoritative.
+
+## Open Questions
+
+| Question | Impact | Blocking? | Owner | Resolution |
+| --- | --- | --- | --- | --- |
+| No additional unresolved question is recorded by this migration. | None known. | No | Maintainer | Not applicable |
+
+## Acceptance and Planning Gate
+
+This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+
+## Conventions and Constraints
+
+Follow the project architecture, typing, logging, secret-safety, and validation conventions recorded in `.clinerules/`.
+
+## Execution Boundaries
+
+- Always: Preserve the explicit safety and ownership constraints in this specification.
+- Ask first: Expand scope, introduce dependencies, or change public contracts.
+- Never: Bypass documented security, privacy, or architecture boundaries.
+
+## Current Context
+
+The detailed workflow, architecture, and safety context in this specification remains authoritative.
+
+## Assumptions
+
+- The existing detailed requirements remain valid unless explicitly superseded by an accepted revision.
+
+## Desired Behavior
+
+The detailed behavioral contract in this specification defines the required observable outcomes and failure behavior.
+
+## Project Structure
+
+- Specification: This file under `docs/specs/`.
+- Source and test ownership: The detailed architecture section in this specification remains authoritative.
+- Documentation ownership: `docs/specs/` and the relevant documentation indexes.
