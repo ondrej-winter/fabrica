@@ -115,12 +115,12 @@ acceptance and verification items are complete.
 - [x] FWC-02 — Application DTOs, limits, errors, and ports.
 - [x] FWC-03 — URL, DNS, and public-destination policy.
 - [x] FWC-04 — Content classification, decoding, extraction, and per-request limits.
-- [ ] FWC-05 — Streaming HTTPX transport and manual redirects.
+- [x] FWC-05 — Streaming HTTPX transport and manual redirects.
 - [ ] FWC-06 — Batch orchestration, retries, and aggregate output limiting.
 - [ ] FWC-07 — Registered-tool adapter and canonical schema.
 - [ ] FWC-08 — Bootstrap composition and host access policy.
 - [ ] FWC-09 — Acceptance coverage, documentation, and full validation.
-- [ ] FWC-CP1 — Contract/policy checkpoint before transport implementation.
+- [x] FWC-CP1 — Contract/policy checkpoint before transport implementation.
 - [ ] FWC-CP2 — Runtime-composition checkpoint before handoff.
 
 ## Ordered implementation tasks
@@ -342,10 +342,10 @@ are stable.
 
 **Checkpoint**
 
-- [ ] Confirm URL validation, DNS classification, extraction, and output limiting
+- [x] Confirm URL validation, DNS classification, extraction, and output limiting
   are independently testable and contain no HTTP client calls.
-- [ ] Confirm all accepted error codes have an intended producing component.
-- [ ] Confirm no implementation claims connection-level DNS pinning or complete
+- [x] Confirm all accepted error codes have an intended producing component.
+- [x] Confirm no implementation claims connection-level DNS pinning or complete
   DNS-rebinding protection.
 
 ---
@@ -394,9 +394,9 @@ are stable.
 
 **Verification**
 
-- [ ] Offline HTTPX transport tests cover status, redirect, stream closure, and
+- [x] Offline HTTPX transport tests cover status, redirect, stream closure, and
   failure mapping.
-- [ ] Tests cover lying/missing `Content-Length` and compressed data that expands
+- [x] Tests cover lying/missing `Content-Length` and compressed data that expands
   above the decoded-byte limit.
 
 ---
