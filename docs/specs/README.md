@@ -32,6 +32,10 @@ ownership, validation expectations, and preserved historical decisions.
   including parallel-by-default batching, per-command result isolation, bounded
   separate-stream output, workspace-contained context, and host-managed
   default-deny safety policy.
+- `tools-fetch-web-content-tool-spec.md` defines the desired read-only public-web
+  retrieval primitive for known URLs, including SSRF-safe destination and redirect
+  validation, bounded textual-content extraction, structured result metadata, and
+  explicit untrusted-content handling.
 
 ## Naming convention
 

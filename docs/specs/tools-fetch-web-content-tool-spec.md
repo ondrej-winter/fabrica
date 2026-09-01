@@ -1,9 +1,24 @@
 # Spec: Fetch Web Content Tool
 
+## Status
+
+- State: Accepted — ready for implementation planning.
+- Accepted by: Product/runtime owner.
+- Accepted on: September 1, 2026.
+- Revision: Accepted after resolving Version 1 protocol, transport, destination
+  classification, and HTML-normalization decisions on September 1, 2026.
+- Supersedes: Original draft added August 28, 2026.
+
+This document is the canonical source of truth for the proposed
+`fetch_web_content` tool contract. Any derived implementation plan and
+implementation must preserve its objective, requirements, constraints,
+boundaries, and success criteria. Material changes require this specification to
+be updated and re-confirmed.
+
 ## Objective
 
 Define the model-facing and host-facing specification for a read-only
-`fetch_web_content` public HTTP retrieval tool.
+`fetch_web_content` public HTTPS retrieval tool.
 
 The tool is for autonomous coding agents that already know one or more public
 URLs and need bounded, normalized web content for reasoning. It must retrieve
@@ -49,14 +64,48 @@ agent reasons over returned untrusted content
 - The primary caller is a model-driven coding agent operating inside a host
   runtime that can provide network policy, DNS resolution, HTTP client behavior,
   timeout configuration, cancellation signals, and retry policy.
-- Version 1 retrieves only public HTTP(S) resources with `GET`.
+- Version 1 retrieves only public HTTPS resources with `GET`.
 - Version 1 does not support authentication, cookies, model-controlled headers,
   request bodies, JavaScript execution, browser automation, web search, or
   private/internal network access.
-- The host can configure stricter network policy, such as requiring HTTPS or
-  disabling public web access entirely.
+- The host can disable public web access entirely.
 - Documentation-only changes should be reviewed for clarity and consistency;
   implementation changes will require tests and the project quality gate.
+
+## Scope
+
+### In scope
+
+- A model-callable, GET-only primitive for retrieving known public HTTPS URLs.
+- Public-destination, redirect, response-size, and output-bound policy
+  requirements.
+- Normalization of supported textual content and structured, untrusted results.
+- Future ownership boundaries and acceptance criteria for an implementation.
+
+### Out of scope
+
+- Implementing or registering the capability in this revision.
+- Authentication, cookies, model-controlled headers, request bodies, or non-GET
+  HTTP methods.
+- Private or internal network access, browser automation, JavaScript execution,
+  and web search.
+- PDF, Office-document, image, audio, video, archive, or other binary-content
+  support.
+
+## Conventions and constraints
+
+- The public interface must remain provider-neutral and must not expose HTTP-client
+  implementation details through application ports or DTOs.
+- Network I/O, DNS, content parsing, and Markdown conversion belong in adapters or
+  infrastructure; domain and application code remain free of direct network I/O.
+- External content is untrusted data. It must not be treated as model, system,
+  developer, or tool instructions.
+- Default automated tests must be deterministic and must not rely on live external
+  services.
+- Version 1 uses the existing `httpx` HTTP client, standard-library `ipaddress`
+  destination classification, and `markdownify` with standard-library
+  `html.parser` for HTML normalization. Add `markdownify` as an explicit runtime
+  dependency when implementing the tool.
 
 ## Desired behavior
 
@@ -182,7 +231,7 @@ requested the page.
 Recommended concise description:
 
 ```text
-Fetch one or more known public HTTP(S) URLs and return normalized, bounded
+Fetch one or more known public HTTPS URLs and return normalized, bounded
 untrusted web content.
 
 Each request requires a url and may include max_chars. Use one call for multiple
@@ -230,11 +279,10 @@ result's truncation fields and include `batch_content_truncated = true`.
 
 Version 1 supports only `GET`. Do not expose a model-controlled `method` field.
 
-Allowed protocols:
+Allowed protocol:
 
 ```text
 https:
-http:
 ```
 
 Reject protocols such as:
@@ -254,13 +302,11 @@ Default HTTPS policy:
 
 ```text
 https → allowed
-http  → allowed but marked insecure
+http  → rejected with UNSUPPORTED_PROTOCOL
 ```
 
-The host may configure `require_https = true`. When enabled, reject plain HTTP
-URLs before DNS resolution. Even when plain HTTP is allowed, HTTPS-to-HTTP
-redirects should be rejected by default with `INSECURE_REDIRECT` unless host
-policy explicitly allows downgrade.
+Reject plain HTTP URLs before DNS resolution. Reject any redirect to HTTP with
+`INSECURE_REDIRECT`.
 
 URLs containing embedded credentials must be rejected:
 
@@ -308,8 +354,9 @@ fc00::/7
 fe80::/10
 ```
 
-Use a mature IP classification implementation rather than maintaining an
-incomplete hand-written list.
+Use Python's standard-library `ipaddress` module and allow only addresses that
+the destination policy classifies as globally routable. Do not maintain a
+hand-written deny list as the primary policy mechanism.
 
 Do not merely reject hostname strings such as `localhost`. The implementation
 must resolve the hostname and validate every resolved address against the network
@@ -323,32 +370,18 @@ For DNS answers with multiple A or AAAA records:
 - preserve enough diagnostic metadata for host logs without exposing sensitive
   local network details unnecessarily.
 
-## DNS rebinding protection
+## DNS validation boundary
 
-Validation must not be:
+Before every initial request and every redirect request, resolve the hostname and
+validate every resolved address against the destination policy. The V1 `httpx`
+implementation may perform its own connection-time DNS resolution after this
+validation; therefore, V1 does not claim connection-level address pinning or a
+complete DNS-rebinding guarantee.
 
-```text
-resolve host
-→ check IP
-→ fetch host with a second independent DNS resolution
-```
-
-because DNS can change between validation and connection.
-
-Preferred design:
-
-```text
-resolve
-→ validate every resolved address
-→ connect to a validated address
-→ preserve original Host header and TLS SNI
-```
-
-or use an HTTP client that provides equivalent destination validation and address
-pinning.
-
-If the connection target changes from the validated destination because of DNS
-rebinding or client behavior, fail with `DNS_REBINDING_DETECTED`.
+Connection-level pinning that preserves the original HTTP `Host` header and TLS
+SNI while connecting only to a validated address is deferred hardening. It must
+be designed and accepted separately before being represented as a security
+guarantee.
 
 ## Redirect handling
 
@@ -364,7 +397,7 @@ protocol
 embedded credentials
 DNS resolution
 destination IP policy
-HTTPS downgrade policy
+HTTPS-only policy
 ```
 
 Recommended redirect limit:
@@ -540,16 +573,15 @@ HTML parser
     ↓
 remove script/style/noscript and comments
     ↓
-main-content / readability extraction
-    ↓
 HTML → Markdown
     ↓
 whitespace normalization
 ```
 
-If main-content extraction fails or produces implausibly little content, fall back
-to sanitized body conversion. Do not discard documentation merely because it does
-not resemble a news article.
+Version 1 uses `markdownify` with Beautiful Soup's standard-library
+`html.parser` backend. It does not perform mandatory readability or
+main-content extraction: preserving technical-documentation structure is more
+important than aggressively removing navigation or page chrome.
 
 HTML output should be Markdown rather than flattened text. Preserve semantically
 useful elements: title, headings, paragraphs, lists, links, inline code,
@@ -629,9 +661,9 @@ MAX_MAX_CONTENT_CHARS     = 48,000
 ```
 
 Apply content extraction first, then output limiting. For documentation pages,
-prefer main-content extraction followed by the first N characters. Do not
-automatically use command-output head-and-tail truncation because web page tails
-often contain footers, legal links, navigation, and related articles.
+prefer normalized HTML-to-Markdown conversion followed by the first N characters.
+Do not automatically use command-output head-and-tail truncation because web
+page tails often contain footers, legal links, navigation, and related articles.
 
 Never truncate silently. Return structured metadata:
 
@@ -801,13 +833,12 @@ Define stable error codes:
 - `INVALID_INPUT`;
 - `INVALID_URL`;
 - `UNSUPPORTED_PROTOCOL`;
+- `INSECURE_REDIRECT`;
 - `URL_CREDENTIALS_NOT_ALLOWED`;
 - `DNS_FAILED`;
 - `DESTINATION_NOT_ALLOWED`;
-- `DNS_REBINDING_DETECTED`;
 - `TOO_MANY_REDIRECTS`;
 - `INVALID_REDIRECT`;
-- `INSECURE_REDIRECT`;
 - `CONNECTION_FAILED`;
 - `TLS_ERROR`;
 - `FETCH_TIMEOUT`;
@@ -861,7 +892,22 @@ next URL       ↓
           structured result
 ```
 
-## Architecture and project structure
+## Architecture
+
+## Project structure
+
+- Specification: `docs/specs/tools-fetch-web-content-tool-spec.md`.
+- Specification index: `docs/specs/README.md`.
+- Runtime tool contracts and DTOs: future ownership under
+  `src/fabrica/features/agent_runtime/application/` when exposed as a
+  model-callable runtime tool.
+- HTTP, DNS, destination validation, MIME sniffing, decoding, and extraction:
+  future adapter or infrastructure ownership, not domain or application core.
+- Unit tests: future mirrored coverage under `tests/unit/`.
+- Integration tests: future controllable-server and DNS/test-double coverage under
+  `tests/integration/`; default suites must remain offline.
+
+The detailed component boundaries below refine this ownership model.
 
 Recommended component boundaries:
 
@@ -891,10 +937,11 @@ OutputLimiter
 FetchResult
 ```
 
-`HttpFetcher` owns HTTP(S) connection behavior, validated DNS target connection,
-host-controlled headers, timeout, cancellation, streaming, status metadata, and
-decoded body byte limits. It should know nothing about Markdown extraction or
-LLMs.
+`HttpFetcher` owns `httpx` HTTPS connection behavior, host-controlled headers,
+timeout, cancellation, streaming, status metadata, and decoded body byte limits.
+It receives a destination that `UrlPolicy` and `DnsResolver` have validated, but
+V1 does not require it to pin the connection to a previously validated address.
+It should know nothing about Markdown extraction or LLMs.
 
 `ContentExtractor` owns content transformation by type:
 
@@ -908,10 +955,11 @@ XML        → normalized XML text
 
 It should know nothing about DNS, redirects, or HTTP permission policy.
 
-`UrlPolicy` owns allowed protocols, credential prohibition, hostname policy,
-destination IP policy, redirect policy, and HTTPS downgrade policy. Centralize
-SSRF and redirect checks instead of spreading destination validation across fetch
-and redirect code.
+`UrlPolicy` owns the HTTPS-only protocol policy, credential prohibition, hostname
+policy, destination IP policy, and redirect policy. It uses standard-library
+`ipaddress` to allow only globally routable resolved addresses. Centralize SSRF
+and redirect checks instead of spreading destination validation across fetch and
+redirect code.
 
 Likely future implementation ownership:
 
@@ -968,7 +1016,7 @@ still a capability.
 Recommended policy:
 
 ```text
-public HTTP(S) fetch
+public HTTPS fetch
     → auto-approvable if host enables web access
 
 private/internal destinations
@@ -1038,7 +1086,7 @@ Required future acceptance tests include the following scenarios.
 ### URLs
 
 - HTTPS.
-- HTTP.
+- HTTP rejected before DNS resolution.
 - Invalid URL.
 - `file://` rejected.
 - `ftp://` rejected.
@@ -1060,7 +1108,8 @@ hostnames resolving private.
 - Multiple public A/AAAA records.
 - Mixed public/private resolution.
 - DNS failure.
-- DNS rebinding attempt.
+- A hostname that resolves to a different address between requests is validated
+  again before each request; connection-level pinning is out of scope for V1.
 
 ### Redirects
 
@@ -1071,7 +1120,7 @@ hostnames resolving private.
 - Absolute `Location`.
 - Redirect to private IP rejected.
 - Redirect to localhost rejected.
-- HTTPS-to-HTTP downgrade rejected by default.
+- HTTPS-to-HTTP redirect rejected.
 - Redirect loop rejected by redirect limit.
 
 ### HTTP status
@@ -1111,7 +1160,7 @@ hostnames resolving private.
 - Script/style removal.
 - Malformed HTML.
 - Documentation page.
-- Readability extraction fallback.
+- Navigation/chrome retained when needed to preserve documentation structure.
 
 ### JSON
 
@@ -1170,41 +1219,50 @@ must remain ordinary untrusted content in the result.
 
 ## Commands and validation
 
-Documentation-only changes should be reviewed for clarity and consistency.
-
-Implementation changes should use the project quality gate:
-
-- Format: `uv run ruff format .`
-- Lint: `uv run ruff check .`
-- Type check: `uv run ty check src tests`
-- Test: `uv run pytest`
+| Check | Command or procedure | Applicability |
+| --- | --- | --- |
+| Format | `uv run ruff format .` | Required for implementation changes. |
+| Lint | `uv run ruff check .` | Required for implementation changes. |
+| Type check | `uv run ty check src tests` | Required for implementation changes. |
+| Tests | `uv run pytest` | Required for implementation changes. |
+| Documentation | Review this specification for template alignment, consistency, and accurate lifecycle status. | Required for this documentation revision. |
+| Migration or compatibility | Not applicable; the capability is not implemented and this project does not prioritize backward compatibility. | Not applicable. |
+| Manual acceptance | Confirm the accepted HTTPS-only, `httpx`, `ipaddress`, and `markdownify`/`html.parser` decisions remain represented accurately. | Required before implementation planning. |
 
 Future implementation should start with focused tests for input validation, URL
 policy, destination policy, redirect policy, content classification, extraction,
 output limiting, timeout/cancellation distinction, and structured result mapping.
 
-## Boundaries
+## Execution boundaries
 
-- Always use the canonical `{ "requests": [...] }` schema with required `url` and
+### Always
+
+- Use the canonical `{ "requests": [...] }` schema with required `url` and
   optional `max_chars`.
-- Always keep `fetch_web_content` GET-only and public-web-only.
-- Always reject embedded URL credentials.
-- Always validate every resolved destination address against SSRF policy.
-- Always prevent DNS rebinding through destination validation and connection
-  pinning or an equivalent HTTP-client guarantee.
-- Always validate every redirect destination with the complete URL and destination
+- Keep `fetch_web_content` GET-only and public-web-only.
+- Reject embedded URL credentials.
+- Validate every resolved destination address against SSRF policy.
+- Validate every resolved destination address before each initial request and
+  redirect request; do not claim connection-level DNS-rebinding protection in V1.
+- Validate every redirect destination with the complete URL and destination
   pipeline.
-- Always enforce decoded/decompressed body limits through streaming.
-- Always return structured per-request results in input order.
-- Always mark fetched content as `untrusted_web_content`.
-- Ask before allowing HTTP when the host deployment needs HTTPS-only behavior.
-- Ask before adding support for new content families such as PDF, Office
+- Enforce decoded/decompressed body limits through streaming.
+- Return structured per-request results in input order.
+- Mark fetched content as `untrusted_web_content`.
+
+### Ask first
+
+- Relax the HTTPS-only policy.
+- Add support for new content families such as PDF, Office
   documents, images, browser-rendered pages, or authenticated APIs.
-- Never add model-controlled methods, headers, cookies, auth, bodies, TLS
+
+### Never
+
+- Add model-controlled methods, headers, cookies, auth, bodies, TLS
   settings, proxy settings, or arbitrary API-client behavior.
-- Never use user approval as a substitute for SSRF protection.
-- Never let fetched content become agent instructions.
-- Never silently truncate output.
+- Use user approval as a substitute for SSRF protection.
+- Let fetched content become agent instructions.
+- Silently truncate output.
 
 ## Success criteria
 
@@ -1215,9 +1273,10 @@ output limiting, timeout/cancellation distinction, and structured result mapping
 - The tool boundary explicitly excludes general HTTP-client behavior,
   authentication, cookies, model-controlled headers, JavaScript, browser
   automation, and web search.
-- The network policy includes protocol restrictions, credential rejection, HTTPS
-  preference, SSRF protection, hostname resolution, all-address validation, DNS
-  rebinding protection, and redirect-by-redirect validation.
+- The network policy includes HTTPS-only protocol enforcement, credential
+  rejection, SSRF protection, hostname resolution, all-address validation through
+  standard-library `ipaddress`, and redirect-by-redirect validation. It explicitly
+  defers connection-level DNS-rebinding protection.
 - The fetching model includes host-controlled headers, no cookie jar, streamed
   decoded-size enforcement, timeout/cancellation distinction, selective retry,
   and manual redirect handling.
@@ -1234,15 +1293,11 @@ output limiting, timeout/cancellation distinction, and structured result mapping
   limiting.
 - Future acceptance tests are explicit enough to drive implementation.
 
-## Open questions
+## Resolved decisions
 
-- Which Python HTTP stack can provide validated-address connection pinning while
-  preserving Host and TLS SNI without leaking transport details into application
-  ports?
-- Which mature IP classification library should be used for IPv4, IPv6, and
-  IPv4-mapped IPv6 destination policy?
-- Which HTML readability and HTML-to-Markdown libraries best preserve
-  documentation structure, code blocks, tables, and links under the project's
-  dependency policy?
-- Should the host default eventually require HTTPS for all deployments, or should
-  public HTTP remain allowed but marked insecure for developer-local use?
+| Decision | Impact | Owner | Resolution |
+| --- | --- | --- | --- |
+| Protocol policy | Public security posture and redirect behavior. | Product/runtime owner | Version 1 is HTTPS-only. Reject initial HTTP URLs and redirects to HTTP. |
+| HTTP stack | Transport implementation and dependency scope. | Product/runtime owner | Reuse the existing `httpx` dependency. Validate DNS results before every initial and redirect request; defer connection-level address pinning. |
+| Destination classification | SSRF policy implementation. | Product/runtime owner | Use standard-library `ipaddress` with an allow-only-globally-routable policy. |
+| HTML normalization | Documentation-content fidelity and dependencies. | Product/runtime owner | Use `markdownify` with standard-library `html.parser`; require fixtures for headings, code blocks, links, and tables; defer readability extraction, `lxml`, and custom conversion. |
