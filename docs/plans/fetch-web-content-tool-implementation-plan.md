@@ -114,7 +114,7 @@ acceptance and verification items are complete.
 - [x] FWC-01 — Dependency and feature-slice skeleton.
 - [x] FWC-02 — Application DTOs, limits, errors, and ports.
 - [x] FWC-03 — URL, DNS, and public-destination policy.
-- [ ] FWC-04 — Content classification, decoding, extraction, and per-request limits.
+- [x] FWC-04 — Content classification, decoding, extraction, and per-request limits.
 - [ ] FWC-05 — Streaming HTTPX transport and manual redirects.
 - [ ] FWC-06 — Batch orchestration, retries, and aggregate output limiting.
 - [ ] FWC-07 — Registered-tool adapter and canonical schema.
@@ -330,9 +330,9 @@ are stable.
 
 **Verification**
 
-- [ ] Fixtures cover headings, code blocks, tables, relative links, malformed HTML,
+- [x] Fixtures cover headings, code blocks, tables, relative links, malformed HTML,
   script/style removal, JSON, XML, Markdown, and plain text.
-- [ ] MIME/sniffing and charset test matrices pass.
+- [x] MIME/sniffing and charset test matrices pass.
 
 ---
 
