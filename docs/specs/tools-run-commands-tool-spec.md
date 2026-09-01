@@ -2,7 +2,7 @@
 
 ## Status
 
-**Status:** Accepted specification — ready for implementation planning.
+**Status:** Accepted and implemented on August 31, 2026.
 
 **Acceptance:** Confirmed by product interview on August 30, 2026.
 
