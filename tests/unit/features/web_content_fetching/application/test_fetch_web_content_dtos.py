@@ -28,6 +28,7 @@ from fabrica.features.web_content_fetching.application.dtos import (
     FetchWebContentLimits,
     FetchWebContentRequest,
     FetchWebContentResult,
+    ProcessedWebContent,
 )
 
 
@@ -187,6 +188,7 @@ def test_fetch_result_dtos_reject_inconsistent_result_states(factory: Callable[[
         ),
         (lambda: FetchAttemptSuccess("", 200, "text/plain", b"body"), "final_url"),
         (lambda: FetchAttemptFailure(cast("FetchError", "invalid")), "FetchError"),
+        (lambda: FetchError(cast("FetchErrorCode", "invalid")), "FetchErrorCode"),
         (
             lambda: FetchAttemptFailure(FetchError(FetchErrorCode.CONNECTION_FAILED), retryable=cast("bool", 1)),
             "boolean",
@@ -199,6 +201,105 @@ def test_fetch_result_dtos_reject_inconsistent_result_states(factory: Callable[[
     ],
 )
 def test_fetch_attempt_dtos_reject_invalid_transport_outcomes(factory: Callable[[], object], message: str) -> None:
+    with pytest.raises((TypeError, ValueError), match=message):
+        factory()
+
+
+@pytest.mark.parametrize(
+    ("factory", "message"),
+    [
+        (
+            lambda: ProcessedWebContent(
+                media_type="",
+                content_format=FetchContentFormat.TEXT,
+                content="",
+                content_chars=0,
+                returned_chars=0,
+                truncated=False,
+            ),
+            "media_type",
+        ),
+        (
+            lambda: ProcessedWebContent(
+                media_type="text/plain",
+                content_format=cast("FetchContentFormat", "text"),
+                content="",
+                content_chars=0,
+                returned_chars=0,
+                truncated=False,
+            ),
+            "FetchContentFormat",
+        ),
+        (
+            lambda: ProcessedWebContent(
+                media_type="text/plain",
+                content_format=FetchContentFormat.TEXT,
+                content="x",
+                content_chars=-1,
+                returned_chars=1,
+                truncated=False,
+            ),
+            "sizes",
+        ),
+        (
+            lambda: ProcessedWebContent(
+                media_type="text/plain",
+                content_format=FetchContentFormat.TEXT,
+                content="x",
+                content_chars=1,
+                returned_chars=0,
+                truncated=False,
+            ),
+            "returned_chars",
+        ),
+        (
+            lambda: ProcessedWebContent(
+                media_type="text/plain",
+                content_format=FetchContentFormat.TEXT,
+                content=cast("str", 1),
+                content_chars=0,
+                returned_chars=0,
+                truncated=False,
+            ),
+            "content must be a string",
+        ),
+        (
+            lambda: ProcessedWebContent(
+                media_type="text/plain",
+                content_format=FetchContentFormat.TEXT,
+                content="x",
+                content_chars=0,
+                returned_chars=1,
+                truncated=False,
+            ),
+            "shorter",
+        ),
+        (
+            lambda: ProcessedWebContent(
+                media_type="text/plain",
+                content_format=FetchContentFormat.TEXT,
+                content="",
+                content_chars=0,
+                returned_chars=0,
+                truncated=cast("bool", 1),
+            ),
+            "boolean",
+        ),
+        (
+            lambda: ProcessedWebContent(
+                media_type="text/plain",
+                content_format=FetchContentFormat.TEXT,
+                content="",
+                content_chars=0,
+                returned_chars=0,
+                truncated=False,
+                parse_warning=cast("str", 1),
+            ),
+            "parse_warning",
+        ),
+    ],
+)
+def test_processed_web_content_rejects_inconsistent_values(factory: Callable[[], object], message: str) -> None:
     with pytest.raises((TypeError, ValueError), match=message):
         factory()
 

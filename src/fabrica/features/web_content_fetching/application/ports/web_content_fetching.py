@@ -10,10 +10,12 @@ if TYPE_CHECKING:
 
     from fabrica.features.web_content_fetching.application.dtos import (
         FetchAttemptOutcome,
+        FetchError,
         FetchWebContentCommand,
         FetchWebContentLimits,
         FetchWebContentRequest,
         FetchWebContentResult,
+        ProcessedWebContent,
     )
 
 
@@ -70,10 +72,26 @@ class WebContentAttemptFetcher(Protocol):
         ...
 
 
+class WebContentProcessor(Protocol):
+    """Outbound port for normalizing a fully downloaded textual response."""
+
+    def process(
+        self,
+        body: bytes,
+        *,
+        content_type: str,
+        final_url: str,
+        max_chars: int,
+    ) -> ProcessedWebContent | FetchError:
+        """Return a processor-owned normalized value or a stable fetch error."""
+        ...
+
+
 __all__ = [
     "FetchCancellationSignal",
     "FetchWebContentContext",
     "FetchWebContentPort",
     "PublicDnsResolver",
     "WebContentAttemptFetcher",
+    "WebContentProcessor",
 ]

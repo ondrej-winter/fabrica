@@ -178,6 +178,45 @@ class FetchError:
 
 
 @dataclass(frozen=True, slots=True)
+class ProcessedWebContent:
+    """Application-owned normalized content produced from a successful response."""
+
+    media_type: str
+    content_format: FetchContentFormat
+    content: str
+    content_chars: int
+    returned_chars: int
+    truncated: bool
+    parse_warning: str | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.media_type, str) or not self.media_type:
+            msg = "media_type must be a non-empty string"
+            raise ValueError(msg)
+        if not isinstance(self.content_format, FetchContentFormat):
+            msg = "content_format must be a FetchContentFormat"
+            raise TypeError(msg)
+        if not isinstance(self.content, str):
+            msg = "content must be a string"
+            raise TypeError(msg)
+        if self.content_chars < 0 or self.returned_chars < 0:
+            msg = "content sizes must not be negative"
+            raise ValueError(msg)
+        if self.returned_chars != len(self.content):
+            msg = "returned_chars must equal the content length"
+            raise ValueError(msg)
+        if self.content_chars < self.returned_chars:
+            msg = "content_chars must not be shorter than returned_chars"
+            raise ValueError(msg)
+        if not isinstance(self.truncated, bool):
+            msg = "truncated must be a boolean"
+            raise TypeError(msg)
+        if self.parse_warning is not None and not isinstance(self.parse_warning, str):
+            msg = "parse_warning must be a string when provided"
+            raise TypeError(msg)
+
+
+@dataclass(frozen=True, slots=True)
 class FetchSuccess:
     """Normalized successful public-web fetch result."""
 

@@ -2,28 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from fabrica.features.web_content_fetching.adapters.outbound.content_processing.classification import (
     classify_web_content,
 )
 from fabrica.features.web_content_fetching.adapters.outbound.content_processing.decoding import decode_web_content
 from fabrica.features.web_content_fetching.adapters.outbound.content_processing.extraction import extract_web_content
 from fabrica.features.web_content_fetching.adapters.outbound.content_processing.output_limiting import limit_web_content
-from fabrica.features.web_content_fetching.application.dtos import FetchContentFormat, FetchError
-
-
-@dataclass(frozen=True, slots=True)
-class ProcessedWebContent:
-    """Delivery-ready individual response content and extraction metadata."""
-
-    media_type: str
-    content_format: FetchContentFormat
-    content: str
-    content_chars: int
-    returned_chars: int
-    truncated: bool
-    parse_warning: str | None = None
+from fabrica.features.web_content_fetching.application.dtos import FetchError, ProcessedWebContent
 
 
 def process_web_content(

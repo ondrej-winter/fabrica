@@ -6,6 +6,7 @@ from fabrica.features.web_content_fetching.application.ports.web_content_fetchin
     FetchWebContentPort,
     PublicDnsResolver,
     WebContentAttemptFetcher,
+    WebContentProcessor,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "FetchWebContentPort",
     "PublicDnsResolver",
     "WebContentAttemptFetcher",
+    "WebContentProcessor",
 ]

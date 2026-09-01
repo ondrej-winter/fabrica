@@ -24,6 +24,7 @@ from fabrica.features.web_content_fetching.application.dtos.fetch_web_content im
     FetchWebContentLimits,
     FetchWebContentRequest,
     FetchWebContentResult,
+    ProcessedWebContent,
     SafeFetchMetadataValue,
 )
 
@@ -51,5 +52,6 @@ __all__ = [
     "FetchWebContentLimits",
     "FetchWebContentRequest",
     "FetchWebContentResult",
+    "ProcessedWebContent",
     "SafeFetchMetadataValue",
 ]
