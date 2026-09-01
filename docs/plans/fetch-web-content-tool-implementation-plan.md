@@ -113,7 +113,7 @@ acceptance and verification items are complete.
 
 - [x] FWC-01 — Dependency and feature-slice skeleton.
 - [x] FWC-02 — Application DTOs, limits, errors, and ports.
-- [ ] FWC-03 — URL, DNS, and public-destination policy.
+- [x] FWC-03 — URL, DNS, and public-destination policy.
 - [ ] FWC-04 — Content classification, decoding, extraction, and per-request limits.
 - [ ] FWC-05 — Streaming HTTPX transport and manual redirects.
 - [ ] FWC-06 — Batch orchestration, retries, and aggregate output limiting.
@@ -277,9 +277,9 @@ acceptance and verification items are complete.
 
 **Verification**
 
-- [ ] Unit matrix covers all URL and SSRF cases in the specification.
-- [ ] Mixed public/private DNS resolution is rejected.
-- [ ] DNS is re-resolved for independently validated follow-up requests.
+- [x] Unit matrix covers all URL and SSRF cases in the specification.
+- [x] Mixed public/private DNS resolution is rejected.
+- [x] DNS is re-resolved for independently validated follow-up requests.
 
 ---
 
