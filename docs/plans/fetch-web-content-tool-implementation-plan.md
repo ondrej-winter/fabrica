@@ -111,7 +111,7 @@ Update this dashboard and the matching detailed task when work is completed,
 blocked, re-sequenced, or expanded. A task is complete only after all of its
 acceptance and verification items are complete.
 
-- [ ] FWC-01 — Dependency and feature-slice skeleton.
+- [x] FWC-01 — Dependency and feature-slice skeleton.
 - [ ] FWC-02 — Application DTOs, limits, errors, and ports.
 - [ ] FWC-03 — URL, DNS, and public-destination policy.
 - [ ] FWC-04 — Content classification, decoding, extraction, and per-request limits.
