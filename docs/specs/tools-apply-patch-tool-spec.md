@@ -2,11 +2,10 @@
 
 ## Status
 
-- State: Draft — unconfirmed.
-- Implementation status: Substantially implemented; the implementation predates formal specification acceptance.
-- Accepted by: Not applicable until accepted
-- Accepted on: Not applicable until accepted
-- Revision: Template-governance migration on September 1, 2026.
+- State: Accepted.
+- Accepted by: Ondřej Winter
+- Accepted on: September 1, 2026
+- Revision: Accepted on September 1, 2026.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
@@ -1151,10 +1150,6 @@ application contracts are stable.
 
 ## Open Questions
 
-| Question | Impact | Blocking? | Owner | Resolution |
-| --- | --- | --- | --- | --- |
-| See the detailed questions below; each requires maintainer triage before acceptance. | Requirement and implementation planning. | To be determined | Maintainer | Unresolved |
-
 None for v1. New behavior such as Windows support, fuzzy matching, non-UTF-8
 encodings, symlink mutation, standalone empty-directory operations, richer
 metadata preservation, executable-mode syntax, cross-device moves, or public
@@ -1172,7 +1167,8 @@ The detailed exclusions already recorded below remain authoritative.
 
 ## Acceptance and Planning Gate
 
-This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+This accepted specification is ready to guide implementation planning. Material
+changes require an updated specification and renewed maintainer acceptance.
 
 ## Conventions and Constraints
 
