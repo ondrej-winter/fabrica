@@ -43,5 +43,7 @@ This directory contains durable project documentation and current reference note
   model-callable coding-agent workflows.
 - `specs/tools-search-codebase-tool-spec.md` defines read-only regex-based workspace source
   discovery for model-callable coding-agent workflows.
+- `specs/tools-fetch-web-content-tool-spec.md` defines bounded, SSRF-safe public HTTPS
+  retrieval for model-callable coding-agent workflows.
 - `specs/tools-apply-patch-tool-spec.md` defines context-based workspace file mutation,
   including its fail-closed POSIX safety and recovery contract.
