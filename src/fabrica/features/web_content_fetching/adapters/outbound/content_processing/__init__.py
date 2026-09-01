@@ -16,6 +16,7 @@ from fabrica.features.web_content_fetching.adapters.outbound.content_processing.
 )
 from fabrica.features.web_content_fetching.adapters.outbound.content_processing.processor import (
     ProcessedWebContent,
+    WebContentProcessingAdapter,
     process_web_content,
 )
 
@@ -25,6 +26,7 @@ __all__ = [
     "LimitedWebContent",
     "ProcessedWebContent",
     "WebContentKind",
+    "WebContentProcessingAdapter",
     "classify_web_content",
     "decode_web_content",
     "extract_web_content",

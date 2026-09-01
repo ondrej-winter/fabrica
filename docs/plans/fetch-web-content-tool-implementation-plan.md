@@ -116,9 +116,9 @@ acceptance and verification items are complete.
 - [x] FWC-03 — URL, DNS, and public-destination policy.
 - [x] FWC-04 — Content classification, decoding, extraction, and per-request limits.
 - [x] FWC-05 — Streaming HTTPX transport and manual redirects.
-- [ ] FWC-06 — Batch orchestration, retries, and aggregate output limiting.
-- [ ] FWC-07 — Registered-tool adapter and canonical schema.
-- [ ] FWC-08 — Bootstrap composition and host access policy.
+- [x] FWC-06 — Batch orchestration, retries, and aggregate output limiting.
+- [x] FWC-07 — Registered-tool adapter and canonical schema.
+- [x] FWC-08 — Bootstrap composition and host access policy.
 - [ ] FWC-09 — Acceptance coverage, documentation, and full validation.
 - [x] FWC-CP1 — Contract/policy checkpoint before transport implementation.
 - [ ] FWC-CP2 — Runtime-composition checkpoint before handoff.
@@ -448,11 +448,11 @@ are stable.
 
 **Verification**
 
-- [ ] Scheduler tests cover ordering, concurrency cap, partial failures,
+- [x] Scheduler tests cover ordering, concurrency cap, partial failures,
   cancellation, and deadline behavior.
-- [ ] Retry tests distinguish retryable and non-retryable outcomes.
-- [ ] Aggregate-limit tests preserve every result object and required metadata.
-- [ ] Worst-case eight-request payload tests cover long URLs, redirect histories,
+- [x] Retry tests distinguish retryable and non-retryable outcomes.
+- [x] Aggregate-limit tests preserve every result object and required metadata.
+- [x] Worst-case eight-request payload tests cover long URLs, redirect histories,
   errors, escaped content, multipart boundaries, and runtime observation limits.
 
 ---
@@ -495,9 +495,9 @@ are stable.
 
 **Verification**
 
-- [ ] Schema closure tests pass.
-- [ ] Argument mapping/rejection and phase-deadline forwarding tests pass.
-- [ ] Multipart JSON serialization boundary tests pass.
+- [x] Schema closure tests pass.
+- [x] Argument mapping/rejection and phase-deadline forwarding tests pass.
+- [x] Multipart JSON serialization boundary tests pass.
 
 ---
 
@@ -539,10 +539,10 @@ are stable.
 
 **Verification**
 
-- [ ] Composition integration test uses fake DNS and mock/local HTTP transport,
+- [x] Composition integration test uses fake DNS and mock/local HTTP transport,
   not public internet access.
-- [ ] Host-disabled behavior is covered.
-- [ ] Curated bootstrap export tests pass.
+- [x] Host-disabled behavior is covered.
+- [x] Curated bootstrap export tests pass.
 
 ---
 

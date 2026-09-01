@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from fabrica.features.web_content_fetching.adapters.outbound.content_processing.classification import (
     classify_web_content,
 )
@@ -40,4 +42,25 @@ def process_web_content(
     )
 
 
-__all__ = ["ProcessedWebContent", "process_web_content"]
+@dataclass(frozen=True, slots=True)
+class WebContentProcessingAdapter:
+    """Adapt the pure content-processing function to the application port."""
+
+    def process(
+        self,
+        body: bytes,
+        *,
+        content_type: str,
+        final_url: str,
+        max_chars: int,
+    ) -> ProcessedWebContent | FetchError:
+        """Normalize one downloaded response through the pure processing pipeline."""
+        return process_web_content(
+            body,
+            content_type=content_type,
+            final_url=final_url,
+            max_chars=max_chars,
+        )
+
+
+__all__ = ["ProcessedWebContent", "WebContentProcessingAdapter", "process_web_content"]
