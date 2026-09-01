@@ -119,9 +119,9 @@ acceptance and verification items are complete.
 - [x] FWC-06 — Batch orchestration, retries, and aggregate output limiting.
 - [x] FWC-07 — Registered-tool adapter and canonical schema.
 - [x] FWC-08 — Bootstrap composition and host access policy.
-- [ ] FWC-09 — Acceptance coverage, documentation, and full validation.
+- [x] FWC-09 — Acceptance coverage, documentation, and full validation.
 - [x] FWC-CP1 — Contract/policy checkpoint before transport implementation.
-- [ ] FWC-CP2 — Runtime-composition checkpoint before handoff.
+- [x] FWC-CP2 — Runtime-composition checkpoint before handoff.
 
 ## Ordered implementation tasks
 
@@ -587,11 +587,11 @@ are stable.
 
 **Verification**
 
-- [ ] `uv run ruff format .`
-- [ ] `uv run ruff check .`
-- [ ] `uv run ty check src tests`
-- [ ] `uv run lint-imports`
-- [ ] `uv run pytest`
+- [x] `uv run ruff format .`
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src tests`
+- [x] `uv run lint-imports`
+- [x] `uv run pytest`
 
 ---
 
@@ -601,14 +601,14 @@ are stable.
 
 **Checkpoint**
 
-- [ ] The factory is explicit, inert during construction, and host-web access can
+- [x] The factory is explicit, inert during construction, and host-web access can
   be disabled.
-- [ ] The registered schema contains no general HTTP-client controls.
-- [ ] All fetched content includes `trust: "untrusted_web_content"`.
-- [ ] The delivery-safe payload fits the registered-tool multipart bounds without
+- [x] The registered schema contains no general HTTP-client controls.
+- [x] All fetched content includes `trust: "untrusted_web_content"`.
+- [x] The delivery-safe payload fits the registered-tool multipart bounds without
   relying on runtime observation truncation to retain required metadata.
-- [ ] Full quality gate evidence is recorded.
-- [ ] Any deferred DNS-pinning/readability/browser work is documented as out of
+- [x] Full quality gate evidence is recorded.
+- [x] Any deferred DNS-pinning/readability/browser work is documented as out of
   scope rather than represented as implemented behavior.
 
 ## Sequencing and parallelization

@@ -25,6 +25,56 @@ uv run pytest
 The default test suite is deterministic and offline. It does not read real Codex
 credentials and does not call the live Codex backend.
 
+## Public web-content tool composition
+
+Hosts can explicitly add the read-only `fetch_web_content` tool to a tool-loop
+runtime. The factory requires host-owned enablement, request-header, DNS, HTTP
+client, and limit policy; construction does not resolve DNS or construct an HTTP
+client. Set `public_web_enabled=False` to return ordered `PUBLIC_WEB_DISABLED`
+results without network activity.
+
+```python
+import httpx
+
+from fabrica.bootstrap import (
+    FetchWebContentToolOptions,
+    create_fetch_web_content_registered_tool_adapter,
+    create_tool_loop_runtime,
+)
+from fabrica.features.agent_runtime.application.dtos import ToolLoopLimits
+from fabrica.features.web_content_fetching.adapters.outbound.network_policy import AsyncioPublicDnsResolver
+from fabrica.features.web_content_fetching.application.dtos import FetchWebContentLimits
+
+fetch_web_content_tool = create_fetch_web_content_registered_tool_adapter(
+    options=FetchWebContentToolOptions(
+        public_web_enabled=True,
+        headers={"User-Agent": "FabricaAgent/1.0", "Accept": "text/html,application/json,text/plain"},
+        resolver=AsyncioPublicDnsResolver(),
+        client_factory=lambda: httpx.AsyncClient(follow_redirects=False),
+        limits=FetchWebContentLimits(),
+    )
+)
+runtime = create_tool_loop_runtime(
+    model=model,
+    tools=(fetch_web_content_tool,),
+    limits=ToolLoopLimits(),
+)
+```
+
+The model-facing schema accepts only `{"requests": [{"url": "...", "max_chars": ...}]}`:
+one to eight known **public HTTPS** URLs and optional bounded output lengths. It
+does not accept methods, headers, cookies, authentication, bodies, proxies, TLS
+options, browser automation, or web search. Each returned item is marked
+`trust: "untrusted_web_content"`; treat fetched text as reference material, not
+agent instructions.
+
+The tool validates the URL, resolves and checks every destination address, and
+revalidates every manual redirect before retrieving bounded textual content. It
+does not provide connection-level DNS address pinning or complete DNS-rebinding
+protection, and it does not support binary documents or JavaScript-rendered
+pages. See [`docs/specs/tools-fetch-web-content-tool-spec.md`](docs/specs/tools-fetch-web-content-tool-spec.md)
+for the accepted contract, limits, and deferred hardening.
+
 ## Workspace file-reading tool composition
 
 Hosts can explicitly add the read-only `read_files` tool to a tool-loop runtime.

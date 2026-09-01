@@ -84,6 +84,19 @@ def test_readme_uses_current_bootstrap_runtime_helper_names() -> None:
     assert "create_pydantic_ai_registered_tool_loop_runtime" not in readme
 
 
+def test_readme_documents_fetch_web_content_composition_and_safety_boundary() -> None:
+    """Keep public-web onboarding aligned with the explicit composition contract."""
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "FetchWebContentToolOptions" in readme
+    assert "create_fetch_web_content_registered_tool_adapter" in readme
+    assert "public_web_enabled=False" in readme
+    assert "PUBLIC_WEB_DISABLED" in readme
+    assert "untrusted_web_content" in readme
+    assert "connection-level DNS address pinning" in readme
+    assert "fetch_web_content" in readme
+
+
 def test_bootstrap_option_defaults_preserve_safe_composition_contract() -> None:
     """Document safety-relevant defaults for bootstrap option DTOs."""
     script_policy = bootstrap.SkillScriptPolicyEvaluationOptions()
