@@ -75,6 +75,13 @@ class ToolExecutionRuntimeDisposition(StrEnum):
     STOP_RUNTIME = "stop_runtime"
 
 
+class ToolBatchPolicy(StrEnum):
+    """Whether a registered tool may share one model response with other calls."""
+
+    ALLOW_MIXED = "allow_mixed"
+    REQUIRE_SOLO = "require_solo"
+
+
 @dataclass(frozen=True, slots=True)
 class ToolTextContent:
     """Provider-neutral bounded text content returned by a registered tool."""
@@ -195,6 +202,7 @@ class ToolExecutionContext:
     argument_digest: str
     cancellation: ToolCancellationSignal
     phase_deadlines: tuple[ToolExecutionPhaseDeadline, ...] = field(default_factory=tuple)
+    opaque_values: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _validate_tool_identifier(self.call_id, field_name="tool call id", max_chars=MAX_TOOL_CALL_ID_CHARS)
@@ -204,6 +212,7 @@ class ToolExecutionContext:
             msg = "tool execution phase deadlines must be unique by phase"
             raise ValueError(msg)
         object.__setattr__(self, "phase_deadlines", tuple(self.phase_deadlines))
+        object.__setattr__(self, "opaque_values", MappingProxyType(dict(self.opaque_values)))
 
     def phase_deadline(self, phase: str) -> datetime | None:
         """Return the deadline for a named phase when one was provided."""
@@ -370,6 +379,7 @@ class ToolDefinition:
     name: str
     description: str
     argument_schema: Mapping[str, ToolArgumentSchemaValue] = field(default_factory=dict)
+    batch_policy: ToolBatchPolicy = ToolBatchPolicy.ALLOW_MIXED
 
     def __post_init__(self) -> None:
         _validate_tool_identifier(self.name, field_name="tool name", max_chars=MAX_TOOL_NAME_CHARS)

@@ -97,6 +97,30 @@ def test_tool_definition_and_request_copy_mapping_fields() -> None:
         cast("dict[str, object]", request.arguments)["note_id"] = "changed"
 
 
+def test_tool_execution_context_rejects_duplicate_phase_deadlines_and_copies_opaque_values() -> None:
+    cancellation = NeverCancelledSignal()
+    deadline = ToolExecutionPhaseDeadline("tool", datetime.now(UTC))
+
+    with pytest.raises(ValueError, match="unique"):
+        ToolExecutionContext(
+            call_id="call-1",
+            argument_digest="sha256:" + "0" * 64,
+            cancellation=cancellation,
+            phase_deadlines=(deadline, deadline),
+        )
+
+    opaque_values = {"host.owner": object()}
+    context = ToolExecutionContext(
+        call_id="call-1",
+        argument_digest="sha256:" + "0" * 64,
+        cancellation=cancellation,
+        opaque_values=opaque_values,
+    )
+    opaque_values.clear()
+
+    assert set(context.opaque_values) == {"host.owner"}
+
+
 @pytest.mark.parametrize(
     ("factory", "message"),
     [

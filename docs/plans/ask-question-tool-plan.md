@@ -73,7 +73,7 @@ both features.
 - [x] AQ-00 Resolve the orchestration boundary, interaction ownership context, and solo-call mechanism.
 - [x] AQ-01 Create the `user_interaction` application contracts and schema DTOs.
 - [x] AQ-02 Implement the in-memory interaction manager and transport port.
-- [ ] AQ-03 Expose `ask_question` through a `user_interaction` registered-tool adapter.
+- [x] AQ-03 Expose `ask_question` through a `user_interaction` registered-tool adapter.
 - [ ] AQ-04 Integrate solo-call validation and lifecycle coordination in `agent_runtime`.
 - [ ] AQ-05 Add explicit interactive composition and host response entry points.
 - [ ] AQ-06 Add unit and integration acceptance coverage.
