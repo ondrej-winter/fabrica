@@ -1,9 +1,9 @@
 # Implementation Plan: Complete Production `apply_patch` Enablement
 
 ## Status
-- Readiness: **AP-03 implementation in progress.** Production composition remains
-  unavailable until AP-06 wires the supervised POSIX mutation adapters and AP-05
-  adds startup recovery gating.
+- Readiness: **AP-03 complete.** Production composition remains unavailable until
+  AP-06 wires the supervised POSIX mutation adapters and AP-05 adds startup
+  recovery gating.
 - Created: September 1, 2026.
 - Source specification: `docs/specs/tools-apply-patch-tool-spec.md`.
 - Scope: remaining work only. The existing `workspace_editing` parser, matcher,
@@ -56,7 +56,7 @@ patch-input limit and the generic runtime's lower string-argument limit.
 
 - [x] AP-01 Define and approve production capability evidence, native-operation boundaries, and helper ownership architecture.
 - [x] AP-02 Implement descriptor-rooted native no-replace mutation operations.
-- [ ] AP-03 Implement supervised helper-process commit and cleanup ownership.
+- [x] AP-03 Implement supervised helper-process commit and cleanup ownership.
 - [ ] AP-04 Propagate runtime cancellation and phase deadlines into patch execution.
 - [ ] AP-05 Add startup recovery orchestration and workspace mutation gating.
 - [ ] AP-06 Add explicit production bootstrap composition.
@@ -195,6 +195,14 @@ probe remains unsupported, so production mutation is still fail-closed.
 
 ### AP-03 — Implement supervised helper-process commit and cleanup ownership
 
+**Status: Complete (2026-09-02).** Each visible preparation, file staging,
+commit, and rollback phase now executes in a short-lived helper. The helper
+reloads and validates the durable journal before work; the parent requires IPC
+plus matching durable terminal evidence, then terminates any still-live helper
+and joins it before returning. Missing IPC or unproven durable evidence is
+reported as `INDETERMINATE_COMMIT_STATE` or `RECOVERY_REQUIRED`; production
+composition remains deferred to AP-06.
+
 **Likely files**
 
 - New helper-process modules under
@@ -219,20 +227,23 @@ probe remains unsupported, so production mutation is still fail-closed.
 
 **Acceptance criteria**
 
-- [ ] Timeout or cancellation after derived-directory creation never reports
+- [x] Timeout or cancellation after derived-directory creation never reports
       `no_mutation` unless cleanup is proven.
-- [ ] Communication loss, helper crash, and uncertain termination yield
+- [x] Communication loss, helper crash, and uncertain termination yield
       `INDETERMINATE_COMMIT_STATE` or `RECOVERY_REQUIRED` as appropriate.
-- [ ] The parent never reports successful mutation before it has journal-backed
-       evidence of the helper's terminal result.
-- [ ] Rollback retains externally changed directories/files and reports their
+- [x] The parent never reports successful mutation before it has journal-backed
+      evidence of the helper's terminal result.
+- [x] Rollback retains externally changed directories/files and reports their
       per-path outcomes.
 
 **Verification**
 
-- [ ] Deterministic tests cover normal commit, helper crash, timeout before and
+- [x] Deterministic tests cover normal commit, helper crash, timeout before and
       after commit point, communication loss, successful rollback, and failed or
-      retained cleanup.
+      retained cleanup. The helper-supervisor tests prove durable terminal-state
+      validation, missing IPC recovery gating, and parent termination/join
+      ownership; existing POSIX preparation and commit integration suites cover
+      durable normal commit, rollback, and retained external directory effects.
 
 ### AP-04 — Propagate runtime cancellation and phase deadlines
 

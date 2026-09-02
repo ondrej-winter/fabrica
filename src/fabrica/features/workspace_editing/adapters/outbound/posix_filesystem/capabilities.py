@@ -195,8 +195,8 @@ def _supervised_helper_ownership_probe() -> PosixPatchCapabilityProbe:
         )
     return PosixPatchCapabilityProbe(
         name="supervised_helper_ownership",
-        status=PosixPatchCapabilityStatus.UNSUPPORTED,
-        detail="supervised mutation ownership is not exposed until production composition selects this adapter",
+        status=PosixPatchCapabilityStatus.SUPPORTED,
+        detail="per-operation helper IPC and parent termination/join ownership are available",
     )
 
 

@@ -48,18 +48,30 @@ def test_capability_evidence_reports_unsupported_and_failed_probe_names() -> Non
     assert evidence.unsupported_reasons == ("native_no_replace", "workspace_root")
 
 
-def test_collecting_current_workspace_evidence_remains_fail_closed_until_helper_ownership_exists(
+def test_collecting_current_workspace_evidence_reports_supervised_helper_ownership(
     tmp_path: Path,
 ) -> None:
     evidence = collect_posix_patch_workspace_capability_evidence(tmp_path)
 
     assert evidence.workspace_device == tmp_path.stat().st_dev
     assert evidence.backend
-    assert evidence.production_ready is False
-    assert "supervised_helper_ownership" in evidence.unsupported_reasons
+    helper_probe = next(probe for probe in evidence.probes if probe.name == "supervised_helper_ownership")
+    assert helper_probe.status is PosixPatchCapabilityStatus.SUPPORTED
     if sys.platform == "darwin":
         native_probe = next(probe for probe in evidence.probes if probe.name == "native_no_replace")
         assert native_probe.status is PosixPatchCapabilityStatus.SUPPORTED
+
+
+def test_helper_ownership_probe_rejects_hosts_without_supervision_primitives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(capabilities, "supervised_helper_ownership_available", lambda: False)
+
+    evidence = collect_posix_patch_workspace_capability_evidence(tmp_path)
+
+    helper_probe = next(probe for probe in evidence.probes if probe.name == "supervised_helper_ownership")
+    assert helper_probe.status is PosixPatchCapabilityStatus.UNSUPPORTED
+    assert "supervised_helper_ownership" in evidence.unsupported_reasons
 
 
 def test_collecting_missing_workspace_reports_a_failed_root_probe(tmp_path: Path) -> None:

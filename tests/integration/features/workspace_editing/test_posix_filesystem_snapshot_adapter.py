@@ -12,7 +12,10 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import PosixPatchWorkspaceSnapshotAdapter
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import (
+    PosixPatchWorkspaceSnapshotAdapter,
+    capabilities,
+)
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import adapter as posix_snapshot_adapter
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.adapter import (
     _list_extended_attribute_names,
@@ -54,7 +57,11 @@ def test_posix_snapshot_adapter_collects_source_destination_and_directory_eviden
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
-def test_posix_snapshot_adapter_fails_closed_without_production_capability(tmp_path: Path) -> None:
+def test_posix_snapshot_adapter_fails_closed_without_production_capability(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(capabilities, "supervised_helper_ownership_available", lambda: False)
+
     result = run(PosixPatchWorkspaceSnapshotAdapter(tmp_path).verify_workspace_capabilities())
 
     assert result is not None
