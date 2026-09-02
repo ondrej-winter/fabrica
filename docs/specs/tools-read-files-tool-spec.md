@@ -8,16 +8,18 @@ Define the model-facing and host-facing specification for a read-only
 ## Status
 
 - State: Accepted and implemented.
+- Implementation status: Implemented and validated before specification
+  reconfirmation.
 - Accepted by: Product interview
-- Accepted on: August 27, 2026
-- Revision: Existing accepted specification; template metadata normalized on September 1, 2026.
+- Accepted on: September 2, 2026
+- Revision: Accepted after implementation-conformance audit on September 2, 2026.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the implemented `read_files`
 tool contract. The `workspace_reading` slice, its registered-tool adapter, and
 its bootstrap composition must preserve these requirements, constraints,
-boundaries, and success criteria. Update and re-confirm this specification if
-they change materially.
+boundaries, and success criteria. Material changes require this specification to
+be updated and re-confirmed.
 
 The tool is for autonomous coding agents that need one preferred primitive for
 reading known workspace files, reading inclusive line ranges, paging through
@@ -47,7 +49,7 @@ explicit metadata about any content it did not receive.
 - The Python implementation follows Fabrica's feature-slice and hexagonal
   architecture conventions.
 - Canonical model-facing paths are workspace-relative, not absolute.
-- The host can provide a canonical workspace root, model image-capability
+- The host provides a canonical workspace root, model image-capability
   information, cancellation signals, timeout configuration, and retry policy.
 - Version 1 supports UTF-8 and UTF-8 BOM text only. UTF-16 LE/BE is explicitly
   rejected with `UNSUPPORTED_ENCODING` until a later accepted revision adds
@@ -212,11 +214,6 @@ Reject by default:
 - symlink escapes;
 - paths that resolve outside the workspace.
 
-The runtime host or composition root may authorize external reads per invocation
-with a host-owned capability or policy such as `allow_external_reads = true`.
-This decision must be made from explicit policy and audit context; it must not be
-controlled by the model or implemented inside the read-files core.
-
 Symlinks may be followed only when the final canonical target remains inside the
 permitted workspace. Containment must be checked against the final
 filesystem-resolved path, not only the lexical path.
@@ -228,18 +225,9 @@ after validation. Prefer descriptor-relative, no-follow filesystem APIs when the
 platform supports them. Otherwise, revalidate the opened object immediately and
 fail closed if its identity or containment changed.
 
-Unicode-normalized filename fallback is disabled by default. A host may enable it
-only through an explicit compatibility setting. When enabled, it may be supported
-carefully:
-
-1. attempt exact path resolution;
-2. only if it fails, optionally attempt Unicode-normalized matching;
-3. accept only a unique candidate;
-4. report the actual resolved path.
-
-The implementation must never heuristically choose among multiple similar
-filenames. If Unicode-normalized matching yields multiple candidates, reject the
-request as ambiguous rather than selecting a candidate.
+Version 1 uses exact path-component matching only. It does not implement a
+Unicode-normalized filename fallback, so the tool must never choose among
+similar-looking filenames heuristically.
 
 ## Range semantics
 
@@ -331,25 +319,41 @@ remains `true` and `truncated_lines` identifies every partially returned line.
 
 ## Structured result contract
 
-Top-level result:
+The registered tool returns ordered provider-neutral content parts, not one JSON
+batch envelope. Each requested file contributes one JSON text part in request
+order. A successful image contributes its JSON metadata part followed immediately
+by one native image-content part. Text and failure outcomes contribute only their
+JSON part.
+
+Text outcome JSON part:
 
 ```json
 {
-  "results": [
-    {
-      "path": "src/foo.py",
-      "success": true,
-      "type": "text",
-      "content": "1 | ...\n2 | ...",
-      "start_line": 1,
-      "end_line": 120,
-      "complete": false,
-      "next_start_line": 121,
-      "total_lines": 873,
-      "total_lines_exact": true,
-      "truncated_lines": []
-    }
-  ]
+  "path": "src/foo.py",
+  "success": true,
+  "type": "text",
+  "content": "1 | ...\n2 | ...",
+  "start_line": 1,
+  "end_line": 120,
+  "complete": false,
+  "next_start_line": 121,
+  "total_lines": 873,
+  "total_lines_exact": true,
+  "truncated_lines": []
+}
+```
+
+Failure JSON part:
+
+```json
+{
+  "path": "src/missing.py",
+  "success": false,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "File does not exist",
+    "metadata": {}
+  }
 }
 ```
 
@@ -489,37 +493,10 @@ Implementations should associate each request with its original index and place
 completed results into that index before formatting the response.
 
 Partial failures must not fail the entire batch. If A succeeds, B fails, and C
-succeeds, the result must contain success for A, failure for B, and success for C
-in the original request order.
-
-Example:
-
-```json
-{
-  "results": [
-    {
-      "path": "src/a.py",
-      "success": true,
-      "type": "text",
-      "content": "..."
-    },
-    {
-      "path": "src/missing.py",
-      "success": false,
-      "error": {
-        "code": "NOT_FOUND",
-        "message": "File does not exist"
-      }
-    },
-    {
-      "path": "src/c.py",
-      "success": true,
-      "type": "text",
-      "content": "..."
-    }
-  ]
-}
-```
+succeeds, their corresponding JSON parts must appear as success for A, failure
+for B, and success for C in the original request order. An image's native
+image-content part follows its own metadata JSON part before the next requested
+file's parts begin.
 
 ## File classification
 
@@ -561,15 +538,15 @@ Recommended v1 formats:
 - GIF;
 - WebP.
 
-If the active model supports image input, an image result should be:
+If the active model supports image input, an image result consists of a JSON
+metadata part followed immediately by a native image-content part:
 
 ```json
 {
   "path": "screenshots/error.png",
   "success": true,
   "type": "image",
-  "media_type": "image/png",
-  "data": "<binary content block>"
+  "media_type": "image/png"
 }
 ```
 
@@ -671,7 +648,8 @@ maxRetries = 1
 
 Only transient failures should be retried, such as temporary I/O errors,
 network-mounted filesystem interruptions, or resource-temporarily-unavailable
-errors.
+errors. A `READ_TIMEOUT` is terminal for the invocation and is not retried because
+the same per-file and tool deadline budgets still apply.
 
 Do not retry deterministic failures:
 
@@ -679,7 +657,9 @@ Do not retry deterministic failures:
 - `NOT_A_FILE`;
 - `PATH_OUTSIDE_WORKSPACE`;
 - `INVALID_RANGE`;
-- `UNSUPPORTED_BINARY_FILE`.
+- `UNSUPPORTED_BINARY_FILE`;
+- `READ_TIMEOUT`;
+- `READ_CANCELLED`.
 
 ## Error codes
 
@@ -822,9 +802,8 @@ Implementation ownership follows the same pattern as `apply_patch` and its
 - Runtime registered-tool adapter: an adapter or composition component that
   exposes the `workspace_reading` inbound port through `agent_runtime` without
   leaking filesystem or provider details into the runtime core.
-- Bootstrap/composition: supplies the workspace root, per-invocation external-read
-  capability or policy, cancellation/deadline configuration, and model/provider
-  image-capability information.
+- Bootstrap/composition: supplies the workspace root, cancellation/deadline
+  configuration, and model/provider image-capability information.
 - Unit tests: mirrored under `tests/unit/features/workspace_reading/` for
   validator, path resolver, classifier, limiter, formatter, and text/image reader
   behavior.
@@ -929,7 +908,6 @@ Reject:
 - absolute paths;
 - symlink escaping workspace;
 - a file replaced by an escaping symlink between validation and open;
-- ambiguous Unicode-normalized fallback candidates;
 - directory path.
 
 Allow:
@@ -962,7 +940,8 @@ Allow:
 ### Timeouts and retries
 
 - Blocked read times out.
-- Transient timeout may retry once.
+- Transient I/O failure may retry once.
+- `READ_TIMEOUT` does not retry.
 - Deterministic error does not retry.
 
 ## Commands and Validation
@@ -997,15 +976,11 @@ adapter tests.
   truncation.
 - Always resolve paths relative to a configured workspace root and verify final
   canonical containment for the filesystem object actually opened and read.
-- Always reject ambiguous Unicode-normalized path fallback results rather than
-  guessing a filename.
 - Always keep image provider adaptation outside the core reader contract.
 - Always return independent per-file results in request order, irrespective of
   concurrent completion order.
-- Always keep external-read authorization in the runtime host or composition root;
-  the core receives only an already-authorized capability or policy.
-- Always keep Unicode-normalized path fallback disabled unless the host explicitly
-  enables its compatibility setting.
+- Always use exact path-component matching; do not add Unicode-normalized filename
+  fallback without an accepted revision and focused test coverage.
 - Always enforce the 50,000-line metadata scan ceiling, including for narrow reads
   of otherwise small files.
 - Ask before adding non-UTF-8 encodings, broad compatibility input shapes in the
@@ -1024,15 +999,14 @@ adapter tests.
   for coding-agent workflows.
 - The public tool interface is the canonical `{ "files": [...] }` schema with
   workspace-relative paths and optional inclusive one-based line bounds.
-- The path model includes workspace containment, absolute-path rejection,
-  traversal rejection, symlink escape protection, and optional host-controlled
-  external-read permission.
+- The path model includes workspace containment, exact path-component matching,
+  absolute-path rejection, traversal rejection, and symlink escape protection.
 - The text output model includes default line numbers, UTF-8/UTF-8-BOM decoding,
   explicit rejection of UTF-16 LE/BE, streaming, file-size limits, per-line
   limits, per-file output limits, structured truncation metadata, pagination, and
   total-line exactness metadata bounded by a 50,000-line metadata scan ceiling.
-- The batch model includes partial success, request-order preservation, bounded
-  batch size, and bounded concurrency.
+- The batch model includes partial success, request-order-preserving multipart
+  output, bounded batch size, and bounded concurrency.
 - The image model includes supported formats, model capability checks, image size
   limits, provider-neutral `ImageContent`, adapter-owned native multimodal
   delivery, and magic-byte validation.
@@ -1041,31 +1015,34 @@ adapter tests.
 - The `workspace_reading` slice owns the capability and separates validation, path
   resolution, classification, text/image reading, output limiting, formatting,
   and provider adaptation; `agent_runtime` exposes it as a model-callable tool.
-- Unit and integration coverage verifies the accepted behavior.
+- Unit and integration coverage verifies the implemented behavior.
 
 ## Resolved decisions
 
 1. **Version 1 text encoding:** Support UTF-8 and UTF-8 BOM only. Reject UTF-16
    LE/BE with `UNSUPPORTED_ENCODING` until a later accepted revision adds support.
-2. **External-read authorization:** The runtime host or composition root owns
-   per-invocation external-read authorization. The read-files core receives only
-   an already-authorized capability or policy.
-3. **Unicode-normalized fallback:** Disable it by default. Permit it only through
-   an explicit host compatibility setting, and reject ambiguous matches.
+2. **Workspace-only paths:** Version 1 accepts only workspace-relative paths and
+   does not implement external-read authorization or Unicode-normalized filename
+   fallback.
+3. **Registered-tool result transport:** The registered tool returns ordered
+   provider-neutral content parts. Each file has one JSON metadata or outcome part;
+   a successful image has one immediately following native image-content part.
 4. **Native image content:** The core returns provider-neutral `ImageContent`
    containing verified bytes and metadata. Provider adapters create native
    multimodal message parts; base64 is never model-visible result text.
-5. **Total-line cost policy:** Always honor `MAX_METADATA_SCAN_LINES = 50,000`.
+5. **Retry policy:** Retry only adapter-classified transient `IO_ERROR` outcomes;
+   `READ_TIMEOUT` and `READ_CANCELLED` are terminal.
+6. **Total-line cost policy:** Always honor `MAX_METADATA_SCAN_LINES = 50,000`.
    Return exact totals only when EOF is reached within that bounded scan.
-6. **Implementation ownership:** The dedicated
+7. **Implementation ownership:** The dedicated
    `src/fabrica/features/workspace_reading/` slice mirrors the
    `workspace_editing` ownership pattern for `apply_patch`. `agent_runtime`
    exposes its application port as the model-callable tool, and developer
    workflows consume that runtime registration rather than owning filesystem
    behavior.
 
-The accepted contract is implemented and remains the durable reference for
-future changes.
+This accepted contract reflects the implemented behavior and remains the durable
+reference for future changes.
 
 ## Open Questions
 
