@@ -31,6 +31,12 @@ MAX_TOOL_ARGUMENT_NESTING_DEPTH = 8
 MAX_TOOL_ARGUMENT_MAPPING_ENTRIES = 100
 MAX_TOOL_ARGUMENT_SEQUENCE_ENTRIES = 100
 MAX_TOOL_ARGUMENT_STRING_CHARS = 20_000
+# The workspace-editing public contract accepts a 256 KiB canonical patch body.
+# This exception remains deliberately scoped to one top-level argument of one
+# explicitly named tool; all other argument strings retain the generic bound.
+APPLY_PATCH_TOOL_NAME = "apply_patch"
+APPLY_PATCH_INPUT_ARGUMENT_NAME = "input"
+MAX_APPLY_PATCH_INPUT_CHARS = 262_144
 # A registered tool may return one textual structured-result part plus one binary
 # image part for each member of a 20-file batch.
 MAX_TOOL_CONTENT_PARTS = 40
@@ -387,7 +393,7 @@ class ToolCallRequest:
     def __post_init__(self) -> None:
         _validate_tool_identifier(self.call_id, field_name="tool call id", max_chars=MAX_TOOL_CALL_ID_CHARS)
         _validate_tool_identifier(self.tool_name, field_name="tool name", max_chars=MAX_TOOL_NAME_CHARS)
-        object.__setattr__(self, "arguments", _normalize_tool_arguments(self.arguments))
+        object.__setattr__(self, "arguments", _normalize_tool_arguments(self.arguments, tool_name=self.tool_name))
 
 
 @dataclass(frozen=True, slots=True)
@@ -533,19 +539,19 @@ def _validate_fatal_outcome(outcome: RegisteredToolOutcome) -> None:
         raise ValueError(msg)
 
 
-def canonical_tool_arguments_json(arguments: Mapping[str, ToolArgumentValue]) -> str:
+def canonical_tool_arguments_json(arguments: Mapping[str, ToolArgumentValue], *, tool_name: str | None = None) -> str:
     """Return deterministic compact JSON for normalized tool arguments."""
     return json.dumps(
-        _json_serializable_tool_argument_value(_normalize_tool_arguments(arguments)),
+        _json_serializable_tool_argument_value(_normalize_tool_arguments(arguments, tool_name=tool_name)),
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,
     )
 
 
-def canonical_tool_arguments_digest(arguments: Mapping[str, ToolArgumentValue]) -> str:
+def canonical_tool_arguments_digest(arguments: Mapping[str, ToolArgumentValue], *, tool_name: str | None = None) -> str:
     """Return a SHA-256 digest for canonical normalized tool arguments."""
-    canonical_json = canonical_tool_arguments_json(arguments)
+    canonical_json = canonical_tool_arguments_json(arguments, tool_name=tool_name)
     return f"sha256:{sha256(canonical_json.encode('utf-8')).hexdigest()}"
 
 
@@ -553,7 +559,9 @@ def _compact_json(payload: Mapping[str, object]) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
-def _normalize_tool_arguments(arguments: Mapping[str, ToolArgumentValue]) -> Mapping[str, ToolArgumentValue]:
+def _normalize_tool_arguments(
+    arguments: Mapping[str, ToolArgumentValue], *, tool_name: str | None = None
+) -> Mapping[str, ToolArgumentValue]:
     if not isinstance(arguments, Mapping):
         msg = "tool arguments must be a mapping"
         raise TypeError(msg)
@@ -568,8 +576,17 @@ def _normalize_tool_arguments(arguments: Mapping[str, ToolArgumentValue]) -> Map
         if len(key) > MAX_TOOL_ARGUMENT_STRING_CHARS:
             msg = "tool argument keys exceed the safe string bound"
             raise ValueError(msg)
-        normalized[key] = _normalize_tool_argument_value(value, depth=1)
+        normalized[key] = _normalize_top_level_tool_argument_value(key, value, tool_name=tool_name)
     return MappingProxyType(normalized)
+
+
+def _normalize_top_level_tool_argument_value(key: str, value: object, *, tool_name: str | None) -> ToolArgumentValue:
+    if tool_name == APPLY_PATCH_TOOL_NAME and key == APPLY_PATCH_INPUT_ARGUMENT_NAME and isinstance(value, str):
+        if len(value) > MAX_APPLY_PATCH_INPUT_CHARS:
+            msg = "apply_patch input exceeds the accepted character limit"
+            raise ValueError(msg)
+        return value
+    return _normalize_tool_argument_value(value, depth=1)
 
 
 def _normalize_tool_argument_value(value: object, *, depth: int) -> ToolArgumentValue:

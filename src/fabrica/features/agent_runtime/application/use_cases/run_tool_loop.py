@@ -159,7 +159,7 @@ class RunToolLoop:
 
         result = await self._execute_tool_call(tool_call, limits, cancellation)
         call_ledger[tool_call.call_id] = _ToolCallLedgerEntry(
-            argument_digest=canonical_tool_arguments_digest(tool_call.arguments),
+            argument_digest=canonical_tool_arguments_digest(tool_call.arguments, tool_name=tool_call.tool_name),
             tool_name=tool_call.tool_name,
             result=result,
         )

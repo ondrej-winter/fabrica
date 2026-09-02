@@ -59,7 +59,7 @@ patch-input limit and the generic runtime's lower string-argument limit.
 - [x] AP-04 Propagate runtime cancellation and phase deadlines into patch execution.
 - [x] AP-05 Add startup recovery orchestration and workspace mutation gating.
 - [x] AP-06 Add explicit production bootstrap composition.
-- [ ] AP-07 Align the public schema and runtime argument bounds with the spec.
+- [x] AP-07 Align the public schema and runtime argument bounds with the spec.
 - [ ] AP-08 Add production-path integration and acceptance tests.
 - [ ] AP-09 Update documentation and run the full quality gate.
 
@@ -388,6 +388,11 @@ gate evidence.
 
 ### AP-07 — Align public schema and runtime argument bounds
 
+**Status: complete (September 2, 2026).** The public schema now declares a
+non-empty 262,144-character `input`, and runtime normalization permits that
+exception only for the top-level `apply_patch.input` argument. All other tool
+arguments remain subject to the generic 20,000-character string limit.
+
 **Likely files**
 
 - `src/fabrica/features/workspace_editing/adapters/inbound/registered_tool/adapter.py`
@@ -409,13 +414,13 @@ gate evidence.
 
 **Acceptance criteria**
 
-- [ ] Model-facing schema matches the accepted public interface.
-- [ ] Patches up to 262,144 characters reach canonical patch validation.
-- [ ] Empty and oversized input return deterministic typed outcomes.
+- [x] Model-facing schema matches the accepted public interface.
+- [x] Patches up to 262,144 characters reach canonical patch validation.
+- [x] Empty and oversized input return deterministic typed outcomes.
 
 **Verification**
 
-- [ ] Boundary tests cover lengths 0, 1, 20,000, 20,001, 262,144, and 262,145.
+- [x] Boundary tests cover lengths 0, 1, 20,000, 20,001, 262,144, and 262,145.
 
 ### AP-08 — Add production-path integration and acceptance coverage
 

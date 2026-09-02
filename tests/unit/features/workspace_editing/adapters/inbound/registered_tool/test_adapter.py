@@ -39,7 +39,14 @@ def test_apply_patch_registered_tool_exposes_canonical_schema_and_description() 
     assert tool.definition.name == APPLY_PATCH_TOOL_NAME
     assert tool.definition.argument_schema == {
         "type": "object",
-        "properties": {"input": {"type": "string", "description": "Raw canonical apply-patch body."}},
+        "properties": {
+            "input": {
+                "type": "string",
+                "description": "Raw canonical apply-patch body.",
+                "minLength": 1,
+                "maxLength": 262_144,
+            }
+        },
         "required": ("input",),
         "additionalProperties": False,
     }

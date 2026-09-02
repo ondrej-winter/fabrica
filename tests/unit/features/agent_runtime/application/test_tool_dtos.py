@@ -9,6 +9,7 @@ import pytest
 
 from fabrica.features.agent_runtime.application.dtos import (
     DEFAULT_MAX_TOOL_CALLS_PER_TURN,
+    MAX_APPLY_PATCH_INPUT_CHARS,
     MAX_TOOL_ARGUMENT_NESTING_DEPTH,
     MAX_TOOL_ARGUMENT_SEQUENCE_ENTRIES,
     MAX_TOOL_ARGUMENT_STRING_CHARS,
@@ -216,6 +217,36 @@ def test_tool_argument_digest_uses_canonical_json() -> None:
     assert canonical_tool_arguments_digest(left) == canonical_tool_arguments_digest(right)
     with pytest.raises(ValueError, match="finite"):
         canonical_tool_arguments_json({"bad": float("inf")})
+
+
+@pytest.mark.parametrize("input_length", [0, 1, 20_000, 20_001, 262_144])
+def test_tool_call_request_accepts_apply_patch_input_through_public_limit(input_length: int) -> None:
+    request = ToolCallRequest(
+        call_id="call-1",
+        tool_name="apply_patch",
+        arguments={"input": "x" * input_length},
+    )
+
+    assert request.arguments["input"] == "x" * input_length
+    assert canonical_tool_arguments_digest(request.arguments, tool_name=request.tool_name).startswith("sha256:")
+
+
+def test_tool_call_request_rejects_apply_patch_input_over_public_limit() -> None:
+    with pytest.raises(ValueError, match="apply_patch input exceeds"):
+        ToolCallRequest(
+            call_id="call-1",
+            tool_name="apply_patch",
+            arguments={"input": "x" * (MAX_APPLY_PATCH_INPUT_CHARS + 1)},
+        )
+
+
+def test_tool_call_request_retains_generic_string_limit_for_other_tools() -> None:
+    with pytest.raises(ValueError, match="tool argument strings exceed"):
+        ToolCallRequest(
+            call_id="call-1",
+            tool_name="lookup_note",
+            arguments={"input": "x" * (MAX_TOOL_ARGUMENT_STRING_CHARS + 1)},
+        )
 
 
 def test_tool_call_request_normalizes_bounded_immutable_recursive_json_arguments() -> None:

@@ -14,6 +14,7 @@ from fabrica.features.agent_runtime.adapters.outbound.registered_tool import (
     SkillAssociatedRegisteredTool,
 )
 from fabrica.features.agent_runtime.application.dtos import (
+    MAX_APPLY_PATCH_INPUT_CHARS,
     RegisteredToolOutcome,
     RuntimeObservation,
     SelectedSkill,
@@ -117,6 +118,42 @@ def test_registered_tool_executor_runs_async_typed_tool_with_execution_context()
     assert '"status":"success"' in result.result_text
     assert contexts[0].call_id == "call-1"
     assert contexts[0].argument_digest.startswith("sha256:")
+
+
+def test_registered_tool_executor_passes_maximum_apply_patch_input_to_handler() -> None:
+    received_inputs: list[str] = []
+
+    async def synthetic_tool(
+        arguments: Mapping[str, ToolArgumentValue], _context: ToolExecutionContext
+    ) -> RegisteredToolOutcome:
+        received_inputs.append(arguments["input"] if isinstance(arguments["input"], str) else "")
+        return RegisteredToolOutcome.model_continue_success(
+            mutation_guarantee=ToolMutationGuarantee.NO_MUTATION,
+            result_text="ok",
+        )
+
+    request = ToolCallRequest(
+        call_id="call-1",
+        tool_name="apply_patch",
+        arguments={"input": "x" * MAX_APPLY_PATCH_INPUT_CHARS},
+    )
+    result = asyncio.run(
+        RegisteredToolExecutor(
+            (
+                AsyncRegisteredTool(
+                    definition=ToolDefinition(name="apply_patch", description="Apply a synthetic patch"),
+                    handler=synthetic_tool,
+                ),
+            ),
+        ).execute_tool(
+            request,
+            ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=100),
+            _NeverCancelledToolCancellationSignal(),
+        ),
+    )
+
+    assert result.status is ToolCallResultStatus.SUCCESS
+    assert received_inputs == ["x" * MAX_APPLY_PATCH_INPUT_CHARS]
 
 
 def test_registered_tool_executor_preserves_typed_ordered_content_parts() -> None:

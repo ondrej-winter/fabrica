@@ -54,7 +54,14 @@ APPLY_PATCH_TOOL_DEFINITION = ToolDefinition(
     description=APPLY_PATCH_TOOL_DESCRIPTION,
     argument_schema={
         "type": "object",
-        "properties": {"input": {"type": "string", "description": "Raw canonical apply-patch body."}},
+        "properties": {
+            "input": {
+                "type": "string",
+                "description": "Raw canonical apply-patch body.",
+                "minLength": 1,
+                "maxLength": 262_144,
+            }
+        },
         "required": ("input",),
         "additionalProperties": False,
     },

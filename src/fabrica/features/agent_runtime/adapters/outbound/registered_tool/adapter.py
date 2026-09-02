@@ -113,7 +113,7 @@ class RegisteredToolExecutor:
                     request.arguments,
                     ToolExecutionContext(
                         call_id=request.call_id,
-                        argument_digest=canonical_tool_arguments_digest(request.arguments),
+                        argument_digest=canonical_tool_arguments_digest(request.arguments, tool_name=request.tool_name),
                         cancellation=cancellation,
                     ),
                 )
