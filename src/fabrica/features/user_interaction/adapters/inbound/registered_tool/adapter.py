@@ -1,13 +1,16 @@
 """Expose live human input as the model-facing ``ask_question`` tool."""
 
+import asyncio
 import json
 from collections.abc import Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 
 from fabrica.features.agent_runtime.application.dtos import (
     RegisteredToolOutcome,
     ToolArgumentValue,
     ToolBatchPolicy,
+    ToolCancellationSignal,
     ToolDefinition,
     ToolExecutionContext,
     ToolMutationGuarantee,
@@ -83,7 +86,12 @@ class AskQuestionRegisteredToolAdapter:
             )
 
         try:
-            result = await self.interaction_manager.ask(owner, question)
+            result = await _ask_until_resolved_or_cancelled(
+                interaction_manager=self.interaction_manager,
+                owner=owner,
+                question=question,
+                cancellation=context.cancellation,
+            )
         except InteractionManagerError as err:
             return RegisteredToolOutcome.recoverable_rejection(error_code=err.code, error_message=str(err))
         return _result_to_outcome(result)
@@ -121,3 +129,26 @@ def _result_to_outcome(result: InteractionResult) -> RegisteredToolOutcome:
         mutation_guarantee=ToolMutationGuarantee.NO_MUTATION,
         content=(ToolTextContent(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)),),
     )
+
+
+async def _ask_until_resolved_or_cancelled(
+    *,
+    interaction_manager: InteractionManager,
+    owner: InteractionOwner,
+    question: InteractionQuestion,
+    cancellation: ToolCancellationSignal,
+) -> InteractionResult:
+    """Resolve a question or map external runtime cancellation to cancellation."""
+    ask_task = asyncio.create_task(interaction_manager.ask(owner, question))
+    cancellation_task = asyncio.create_task(cancellation.wait_until_cancelled())
+    try:
+        done, _pending = await asyncio.wait((ask_task, cancellation_task), return_when=asyncio.FIRST_COMPLETED)
+        if ask_task in done:
+            return await ask_task
+        await interaction_manager.cancel_owner(owner)
+        return await ask_task
+    finally:
+        if not cancellation_task.done():
+            cancellation_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await cancellation_task

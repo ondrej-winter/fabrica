@@ -74,8 +74,8 @@ both features.
 - [x] AQ-01 Create the `user_interaction` application contracts and schema DTOs.
 - [x] AQ-02 Implement the in-memory interaction manager and transport port.
 - [x] AQ-03 Expose `ask_question` through a `user_interaction` registered-tool adapter.
-- [ ] AQ-04 Integrate solo-call validation and lifecycle coordination in `agent_runtime`. *(In progress: solo batch validation and opaque context propagation implemented; lifecycle hooks remain for AQ-05 composition.)*
-- [ ] AQ-05 Add explicit interactive composition and host response entry points.
+- [ ] AQ-04 Integrate solo-call validation and lifecycle coordination in `agent_runtime`. *(In progress: solo batch validation, opaque context propagation, and external-cancellation mapping are implemented; generic terminal hooks remain deferred.)*
+- [ ] AQ-05 Add explicit interactive composition and host response entry points. *(In progress: opt-in composition and per-run host API implemented; acceptance coverage pending.)*
 - [ ] AQ-06 Add unit and integration acceptance coverage.
 - [ ] AQ-07 Update documentation and run the full quality gate.
 

@@ -48,6 +48,11 @@ from fabrica.bootstrap.composition.tool_loop import (
     create_pydantic_ai_tool_loop_runtime,
     create_tool_loop_runtime,
 )
+from fabrica.bootstrap.composition.user_interaction import (
+    InteractiveToolLoopRun,
+    InteractiveToolLoopRuntime,
+    create_interactive_tool_loop_runtime,
+)
 from fabrica.bootstrap.composition.web_content_fetching import (
     FetchWebContentToolOptions,
     create_fetch_web_content_registered_tool_adapter,
@@ -70,6 +75,8 @@ __all__ = [
     "DenyByDefaultSkillScriptApprovalLookup",
     "EvidenceRecordingCommitMessageRuntime",
     "FetchWebContentToolOptions",
+    "InteractiveToolLoopRun",
+    "InteractiveToolLoopRuntime",
     "ModelDrivenSkillRuntime",
     "ModelDrivenSkillRuntimeOptions",
     "PreCommitToolOptions",
@@ -89,6 +96,7 @@ __all__ = [
     "create_commit_message_workflow",
     "create_confirmed_commit_workflow",
     "create_fetch_web_content_registered_tool_adapter",
+    "create_interactive_tool_loop_runtime",
     "create_model_driven_skill_runtime",
     "create_pre_commit_registered_tool_adapters",
     "create_production_workspace_editing_composition",
