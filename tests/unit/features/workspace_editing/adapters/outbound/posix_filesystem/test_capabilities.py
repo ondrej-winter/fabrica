@@ -1,5 +1,6 @@
 """Tests for fail-closed POSIX production capability evidence."""
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -47,13 +48,18 @@ def test_capability_evidence_reports_unsupported_and_failed_probe_names() -> Non
     assert evidence.unsupported_reasons == ("native_no_replace", "workspace_root")
 
 
-def test_collecting_current_workspace_evidence_remains_fail_closed_until_native_slices_exist(tmp_path: Path) -> None:
+def test_collecting_current_workspace_evidence_remains_fail_closed_until_helper_ownership_exists(
+    tmp_path: Path,
+) -> None:
     evidence = collect_posix_patch_workspace_capability_evidence(tmp_path)
 
     assert evidence.workspace_device == tmp_path.stat().st_dev
     assert evidence.backend
     assert evidence.production_ready is False
     assert "supervised_helper_ownership" in evidence.unsupported_reasons
+    if sys.platform == "darwin":
+        native_probe = next(probe for probe in evidence.probes if probe.name == "native_no_replace")
+        assert native_probe.status is PosixPatchCapabilityStatus.SUPPORTED
 
 
 def test_collecting_missing_workspace_reports_a_failed_root_probe(tmp_path: Path) -> None:
@@ -89,7 +95,7 @@ def test_platform_specific_probe_selection_is_explicit(monkeypatch: pytest.Monke
     assert next(probe for probe in linux_evidence.probes if probe.name == "platform_scope").status is (
         PosixPatchCapabilityStatus.SUPPORTED
     )
-    assert "linux_renameat2_no_replace" in linux_evidence.unsupported_reasons
+    assert "native_no_replace" in linux_evidence.unsupported_reasons
 
     monkeypatch.setattr(capabilities.sys, "platform", "freebsd")
 

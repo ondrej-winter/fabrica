@@ -15,8 +15,12 @@ from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.commi
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.journal import (
     PosixPatchJournalAndPreparationAdapter,
 )
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.native_operations import (
+    NativePatchOperationError,
+)
 
 __all__ = [
+    "NativePatchOperationError",
     "PosixPatchCapabilityProbe",
     "PosixPatchCapabilityStatus",
     "PosixPatchCommitAdapter",

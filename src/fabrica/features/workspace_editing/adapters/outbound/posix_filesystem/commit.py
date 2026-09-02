@@ -9,6 +9,11 @@ from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
 
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.native_operations import (
+    rename_no_replace,
+    rename_replace,
+    unlink_file,
+)
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
@@ -146,7 +151,8 @@ class PosixPatchCommitAdapter:
         if step.operation is PatchCommitOperation.WRITE_FILE:
             _commit_write(self._workspace_root(), stage_root, action)
         elif step.operation is PatchCommitOperation.DELETE_FILE:
-            (self._workspace_root() / step.path).unlink()
+            unlink_file(self._workspace_root(), step.path)
+            _fsync_directory((self._workspace_root() / step.path).parent)
         elif step.operation is PatchCommitOperation.MOVE_FILE:
             _commit_move(self._workspace_root(), stage_root, action)
         outcome = _committed_outcome(self._workspace_root(), action)
@@ -579,8 +585,12 @@ def _action_for_step(plan: PatchPlan, action_index: int | None) -> PatchAction:
 
 
 def _commit_write(root: Path, stage_root: Path, action: PatchAction) -> None:
+    staged_path = _stage_path(stage_root, action).relative_to(root).as_posix()
+    if action.kind is PatchActionKind.ADD:
+        rename_no_replace(root, staged_path, action.path)
+    else:
+        rename_replace(root, staged_path, action.path)
     destination = root / action.path
-    _stage_path(stage_root, action).replace(destination)
     _fsync_file(destination)
     _fsync_directory(destination.parent)
 
@@ -589,9 +599,10 @@ def _commit_move(root: Path, stage_root: Path, action: PatchAction) -> None:
     if action.destination_path is None:
         msg = "move actions must include a destination path"
         raise ValueError(msg)
-    (root / action.path).unlink()
+    staged_path = _stage_path(stage_root, action).relative_to(root).as_posix()
+    rename_no_replace(root, staged_path, action.destination_path)
+    unlink_file(root, action.path)
     destination = root / action.destination_path
-    _stage_path(stage_root, action).replace(destination)
     _fsync_file(destination)
     _fsync_directory(destination.parent)
     _fsync_directory((root / action.path).parent)

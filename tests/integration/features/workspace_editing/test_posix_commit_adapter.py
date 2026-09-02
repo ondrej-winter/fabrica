@@ -104,6 +104,35 @@ def test_posix_commit_adapter_persists_committed_journal_with_path_outcomes(tmp_
     ]
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="AP-02 native no-replace commit backend is implemented for macOS")
+def test_posix_commit_adapter_rejects_destination_created_at_native_commit_point_without_overwriting(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("planned",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+    destination = tmp_path / "generated" / "add.py"
+
+    native_rename = posix_commit_module.rename_no_replace
+
+    def create_racing_destination_before_native_rename(
+        workspace_root: Path,
+        source_path: str,
+        destination_path: str,
+    ) -> None:
+        destination.write_text("external\n", encoding="utf-8")
+        native_rename(workspace_root, source_path, destination_path)
+
+    monkeypatch.setattr(posix_commit_module, "rename_no_replace", create_racing_destination_before_native_rename)
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.RECOVERY_REQUIRED
+    assert destination.read_text(encoding="utf-8") == "external\n"
+
+
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
 def test_posix_commit_adapter_rejects_journal_digest_mismatch_before_staging(tmp_path: Path) -> None:
     actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added = True",)),)

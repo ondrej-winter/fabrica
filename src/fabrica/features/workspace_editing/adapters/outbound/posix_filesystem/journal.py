@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.native_operations import create_directory
 from fabrica.features.workspace_editing.application.dtos import (
     PatchActionKind,
     PatchDirectoryOutcome,
@@ -84,10 +85,8 @@ class PosixPatchJournalAndPreparationAdapter:
         preparing = await self.transition(journal, PatchJournalState.PREPARING)
         created: list[PatchDirectoryOutcome] = []
         for planned_directory in plan.created_directories:
-            absolute = self._workspace_root() / planned_directory.path
             try:
-                absolute.mkdir(mode=0o777, exist_ok=False)
-                directory_stat = absolute.lstat()
+                directory_stat = create_directory(self._workspace_root(), planned_directory.path, mode=0o777)
             except FileExistsError:
                 result = _rejected(
                     "DIRECTORY_CREATION_UNSAFE",

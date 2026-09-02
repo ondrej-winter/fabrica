@@ -1,11 +1,9 @@
 # Implementation Plan: Complete Production `apply_patch` Enablement
 
 ## Status
-
-- Readiness: **AP-01 complete; ready for AP-02 native-operation implementation**.
-  Production mutation remains fail-closed until AP-02 and AP-03 prove the
-  selected native no-replace backend and supervised helper ownership design for
-  the actual workspace.
+- Readiness: **AP-02 complete; ready for AP-03 supervised helper-process
+  ownership implementation**. Production mutation remains fail-closed until
+  AP-03 proves supervised ownership for the actual workspace.
 - Created: September 1, 2026.
 - Source specification: `docs/specs/tools-apply-patch-tool-spec.md`.
 - Scope: remaining work only. The existing `workspace_editing` parser, matcher,
@@ -57,7 +55,7 @@ patch-input limit and the generic runtime's lower string-argument limit.
 ## Progress Tracking
 
 - [x] AP-01 Define and approve production capability evidence, native-operation boundaries, and helper ownership architecture.
-- [ ] AP-02 Implement descriptor-rooted native no-replace mutation operations.
+- [x] AP-02 Implement descriptor-rooted native no-replace mutation operations.
 - [ ] AP-03 Implement supervised helper-process commit and cleanup ownership.
 - [ ] AP-04 Propagate runtime cancellation and phase deadlines into patch execution.
 - [ ] AP-05 Add startup recovery orchestration and workspace mutation gating.
@@ -147,6 +145,14 @@ native and helper primitives.
 
 ### AP-02 — Implement descriptor-rooted native no-replace mutation operations
 
+**Status: Complete (2026-09-02).** The adapter-private macOS Apple Silicon
+backend binds `renameatx_np` with `RENAME_EXCL | RENAME_NOFOLLOW_ANY`, proves
+no-replace behavior inside the actual workspace, and uses descriptor-rooted,
+no-follow parent traversal for native directory creation, no-replace Add/Move
+materialization, and deletion. Linux remains explicitly unsupported pending a
+tested `renameat2(..., RENAME_NOREPLACE)` backend. AP-03's helper-ownership
+probe remains unsupported, so production mutation is still fail-closed.
+
 **Likely files**
 
 - `src/fabrica/features/workspace_editing/adapters/outbound/posix_filesystem/adapter.py`
@@ -170,22 +176,22 @@ native and helper primitives.
 
 **Acceptance criteria**
 
-- [ ] Add and Move never overwrite paths created after planning.
-- [ ] Parent replacement, symlink substitution, source changes, and destination
-      races reject safely.
-- [ ] Journal updates remain durable before every visible effect.
+- [x] Add and Move never overwrite paths created after planning.
+- [x] Parent replacement, symlink substitution, source changes, and destination
+       races reject safely.
+- [x] Journal updates remain durable before every visible effect.
 
 **Verification**
 
-- [ ] Fault-injection/race tests cover destination creation and parent changes
-      after approval.
-- [ ] Existing POSIX commit, snapshot, and journal integration suites pass.
+- [x] Fault-injection/race tests cover destination creation and parent changes
+       after approval.
+- [x] Existing POSIX commit, snapshot, and journal integration suites pass.
 
 ### Checkpoint A — Native safety proof
 
-- [ ] The selected local POSIX backend passes the complete required capability
-      probe, including no-replace semantics.
-- [ ] No unsafe fallback path remains reachable in production composition.
+- [x] The selected local POSIX backend passes the complete required capability
+       probe, including no-replace semantics.
+- [x] No unsafe fallback path remains reachable in production composition.
 
 ### AP-03 — Implement supervised helper-process commit and cleanup ownership
 

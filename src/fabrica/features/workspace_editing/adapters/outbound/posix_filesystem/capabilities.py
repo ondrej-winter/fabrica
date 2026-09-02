@@ -10,6 +10,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.native_operations import (
+    NativePatchOperationError,
+    native_no_replace_backend_available,
+    prove_native_no_replace,
+)
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
@@ -87,7 +93,7 @@ def collect_posix_patch_workspace_capability_evidence(
             _platform_scope_probe(),
             _capture("descriptor_rooted_traversal", lambda: _directory_fd_probe(resolved_root)),
             _no_follow_probe(),
-            _native_no_replace_probe(),
+            _capture("native_no_replace", lambda: _native_no_replace_probe(resolved_root)),
             _supervised_helper_ownership_probe(),
         ),
     )
@@ -155,17 +161,26 @@ def _no_follow_probe() -> PosixPatchCapabilityProbe:
     )
 
 
-def _native_no_replace_probe() -> PosixPatchCapabilityProbe:
-    if sys.platform == "darwin":
-        detail = "AP-02 has not yet proven renameatx_np with RENAME_EXCL and RENAME_NOFOLLOW_ANY"
-        name = "macos_renameatx_np_no_replace"
-    elif sys.platform == "linux":
-        detail = "AP-02 has not yet proven renameat2 with RENAME_NOREPLACE"
-        name = "linux_renameat2_no_replace"
-    else:
-        detail = "no selected native no-replace backend exists for this platform"
-        name = "native_no_replace"
-    return PosixPatchCapabilityProbe(name, PosixPatchCapabilityStatus.UNSUPPORTED, detail)
+def _native_no_replace_probe(workspace_root: Path) -> PosixPatchCapabilityProbe:
+    if not native_no_replace_backend_available():
+        return PosixPatchCapabilityProbe(
+            "native_no_replace",
+            PosixPatchCapabilityStatus.UNSUPPORTED,
+            "selected native no-replace backend is unavailable on this platform",
+        )
+    try:
+        prove_native_no_replace(workspace_root)
+    except NativePatchOperationError as err:
+        return PosixPatchCapabilityProbe(
+            "native_no_replace",
+            PosixPatchCapabilityStatus.UNSUPPORTED,
+            f"{type(err).__name__}: errno={err.errno}",
+        )
+    return PosixPatchCapabilityProbe(
+        "native_no_replace",
+        PosixPatchCapabilityStatus.SUPPORTED,
+        "renameatx_np proved RENAME_EXCL and RENAME_NOFOLLOW_ANY no-replace semantics",
+    )
 
 
 def _supervised_helper_ownership_probe() -> PosixPatchCapabilityProbe:
