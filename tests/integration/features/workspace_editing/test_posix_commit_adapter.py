@@ -648,10 +648,7 @@ class _InjectedCommitInterruptionError(Exception):
 
 
 def _prepared_plan_and_journal(tmp_path: Path, actions: tuple[PatchAction, ...]):
-    snapshot = PosixPatchWorkspaceSnapshotAdapter(
-        tmp_path,
-        require_production_capabilities=False,
-    ).build_planning_snapshot(actions)
+    snapshot = PosixPatchWorkspaceSnapshotAdapter(tmp_path).build_planning_snapshot(actions)
     assert not hasattr(snapshot, "status")
     planned = PlanPatch().plan(actions, snapshot)
     assert planned.plan is not None

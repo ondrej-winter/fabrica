@@ -79,7 +79,9 @@ def run_probe(workspace: Path) -> dict[str, object]:
             "workspace": {
                 "path": str(workspace),
                 "filesystem_type": _filesystem_type(workspace),
+                "device": workspace.stat().st_dev,
             },
+            "selected_backend": _selected_backend(),
             "capabilities": {name: probe.to_json() for name, probe in capabilities.items()},
             "fail_closed": bool(unsupported or not supported_platform),
             "unsupported_reasons": unsupported if supported_platform else ["unsupported_platform", *unsupported],
@@ -301,6 +303,14 @@ def _decision(capabilities: Mapping[str, CapabilityProbe], *, supported_platform
     if any(probe.status != "supported" for probe in capabilities.values()):
         return "fail_closed_unsupported_filesystem"
     return "standard_library_primitives_sufficient"
+
+
+def _selected_backend() -> str:
+    if sys.platform == "darwin":
+        return "darwin_renameatx_np_supervised_helper_v1"
+    if sys.platform == "linux":
+        return "linux_renameat2_supervised_helper_v1"
+    return "unselected"
 
 
 def main() -> int:

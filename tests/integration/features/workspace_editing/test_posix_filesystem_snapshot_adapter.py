@@ -43,10 +43,7 @@ def test_posix_snapshot_adapter_collects_source_destination_and_directory_eviden
         PatchAction(index=1, kind=PatchActionKind.ADD, path="generated/new.py", added_lines=("value = 2",)),
     )
 
-    snapshot = PosixPatchWorkspaceSnapshotAdapter(
-        tmp_path,
-        require_production_capabilities=False,
-    ).build_planning_snapshot(actions)
+    snapshot = PosixPatchWorkspaceSnapshotAdapter(tmp_path).build_planning_snapshot(actions)
 
     assert not hasattr(snapshot, "status")
     assert snapshot.evidence_by_path["src/old.py"].exists is True
@@ -64,6 +61,10 @@ def test_posix_snapshot_adapter_fails_closed_without_production_capability(tmp_p
     assert result.status is PatchResultStatus.REJECTED
     assert result.error is not None
     assert result.error.code == "UNSUPPORTED_FILESYSTEM_GUARANTEE"
+    assert result.error.metadata["backend"]
+    assert result.error.metadata["filesystem_type"]
+    assert result.error.metadata["workspace_device"] == tmp_path.stat().st_dev
+    assert "supervised_helper_ownership" in str(result.error.metadata["unsupported_reasons"])
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
@@ -95,10 +96,7 @@ def test_posix_snapshot_adapter_rejects_unsafe_paths_without_mutation(
 ) -> None:
     setup(tmp_path)
 
-    result = PosixPatchWorkspaceSnapshotAdapter(
-        tmp_path,
-        require_production_capabilities=False,
-    ).build_planning_snapshot((action,))
+    result = PosixPatchWorkspaceSnapshotAdapter(tmp_path).build_planning_snapshot((action,))
 
     assert isinstance(result, PatchResult)
     assert result.status is PatchResultStatus.REJECTED
@@ -113,10 +111,9 @@ def test_posix_snapshot_adapter_rejects_multiple_hard_links(tmp_path: Path) -> N
     source.write_text("x\n", encoding="utf-8")
     os.link(source, alias)
 
-    result = PosixPatchWorkspaceSnapshotAdapter(
-        tmp_path,
-        require_production_capabilities=False,
-    ).build_planning_snapshot((PatchAction(index=0, kind=PatchActionKind.UPDATE, path="source.py"),))
+    result = PosixPatchWorkspaceSnapshotAdapter(tmp_path).build_planning_snapshot(
+        (PatchAction(index=0, kind=PatchActionKind.UPDATE, path="source.py"),)
+    )
 
     assert isinstance(result, PatchResult)
     assert result.status is PatchResultStatus.REJECTED
@@ -134,10 +131,7 @@ def test_posix_snapshot_adapter_rejects_cross_device_move_before_mutation(
     source_device = source.stat().st_dev
     monkeypatch.setattr(posix_snapshot_adapter, "_destination_parent_device", lambda _root, _path: source_device + 1)
 
-    result = PosixPatchWorkspaceSnapshotAdapter(
-        tmp_path,
-        require_production_capabilities=False,
-    ).build_planning_snapshot(
+    result = PosixPatchWorkspaceSnapshotAdapter(tmp_path).build_planning_snapshot(
         (PatchAction(index=0, kind=PatchActionKind.MOVE, path="source.py", destination_path="generated/new.py"),)
     )
 
@@ -154,10 +148,7 @@ def test_posix_snapshot_adapter_accepts_same_device_move_with_missing_destinatio
     source = tmp_path / "source.py"
     source.write_text("original\n", encoding="utf-8")
 
-    snapshot = PosixPatchWorkspaceSnapshotAdapter(
-        tmp_path,
-        require_production_capabilities=False,
-    ).build_planning_snapshot(
+    snapshot = PosixPatchWorkspaceSnapshotAdapter(tmp_path).build_planning_snapshot(
         (PatchAction(index=0, kind=PatchActionKind.MOVE, path="source.py", destination_path="generated/new.py"),)
     )
 
@@ -243,10 +234,7 @@ def test_posix_snapshot_adapter_rejects_fifo_file_paths_without_mutation(
     os.mkfifo(fifo_path)
     original_stat = fifo_path.lstat()
 
-    result = PosixPatchWorkspaceSnapshotAdapter(
-        tmp_path,
-        require_production_capabilities=False,
-    ).build_planning_snapshot((action,))
+    result = PosixPatchWorkspaceSnapshotAdapter(tmp_path).build_planning_snapshot((action,))
 
     assert isinstance(result, PatchResult)
     assert result.status is PatchResultStatus.REJECTED
@@ -273,10 +261,7 @@ def test_posix_snapshot_adapter_rejects_unix_socket_paths_without_mutation(actio
             unix_socket.bind(str(socket_path))
             original_stat = socket_path.lstat()
 
-            result = PosixPatchWorkspaceSnapshotAdapter(
-                workspace_root,
-                require_production_capabilities=False,
-            ).build_planning_snapshot((action,))
+            result = PosixPatchWorkspaceSnapshotAdapter(workspace_root).build_planning_snapshot((action,))
 
             assert isinstance(result, PatchResult)
             assert result.status is PatchResultStatus.REJECTED
@@ -296,10 +281,7 @@ def test_posix_snapshot_adapter_rejects_unix_socket_parent_without_mutation() ->
             unix_socket.bind(str(socket_path))
             original_stat = socket_path.lstat()
 
-            result = PosixPatchWorkspaceSnapshotAdapter(
-                workspace_root,
-                require_production_capabilities=False,
-            ).build_planning_snapshot(
+            result = PosixPatchWorkspaceSnapshotAdapter(workspace_root).build_planning_snapshot(
                 (PatchAction(index=0, kind=PatchActionKind.ADD, path="socket-parent/new.py", added_lines=("new",)),)
             )
 
@@ -318,10 +300,7 @@ def test_posix_snapshot_adapter_rejects_fifo_parent_without_mutation(tmp_path: P
     fifo_parent = tmp_path / "fifo-parent"
     os.mkfifo(fifo_parent)
 
-    result = PosixPatchWorkspaceSnapshotAdapter(
-        tmp_path,
-        require_production_capabilities=False,
-    ).build_planning_snapshot(
+    result = PosixPatchWorkspaceSnapshotAdapter(tmp_path).build_planning_snapshot(
         (PatchAction(index=0, kind=PatchActionKind.ADD, path="fifo-parent/new.py", added_lines=("new",)),)
     )
 
@@ -350,10 +329,7 @@ def test_posix_snapshot_adapter_rejects_existing_path_aliases_without_mutation(
     if actual_name == requested_name:
         requested_name = existing_name if actual_name != existing_name else unicodedata.normalize("NFD", existing_name)
 
-    result = PosixPatchWorkspaceSnapshotAdapter(
-        tmp_path,
-        require_production_capabilities=False,
-    ).build_planning_snapshot(
+    result = PosixPatchWorkspaceSnapshotAdapter(tmp_path).build_planning_snapshot(
         (PatchAction(index=0, kind=PatchActionKind.ADD, path=requested_name, added_lines=("replacement",)),)
     )
 
@@ -368,10 +344,7 @@ def test_posix_snapshot_adapter_rejects_existing_path_aliases_without_mutation(
 def test_posix_snapshot_adapter_rejects_parent_directory_alias_without_mutation(tmp_path: Path) -> None:
     (tmp_path / "Source").mkdir()
 
-    result = PosixPatchWorkspaceSnapshotAdapter(
-        tmp_path,
-        require_production_capabilities=False,
-    ).build_planning_snapshot(
+    result = PosixPatchWorkspaceSnapshotAdapter(tmp_path).build_planning_snapshot(
         (PatchAction(index=0, kind=PatchActionKind.ADD, path="source/new.py", added_lines=("new",)),)
     )
 
@@ -526,10 +499,7 @@ def test_posix_snapshot_adapter_rejects_unsupported_metadata_on_destination_pare
 
     monkeypatch.setattr(posix_snapshot_adapter, "_reject_unsupported_metadata", reject_parent_metadata)
 
-    result = PosixPatchWorkspaceSnapshotAdapter(
-        tmp_path,
-        require_production_capabilities=False,
-    ).build_planning_snapshot(
+    result = PosixPatchWorkspaceSnapshotAdapter(tmp_path).build_planning_snapshot(
         (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/new.py", added_lines=("new",)),)
     )
 

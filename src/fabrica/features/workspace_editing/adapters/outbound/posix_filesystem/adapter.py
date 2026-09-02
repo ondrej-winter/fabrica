@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.capabilities import (
+    collect_posix_patch_workspace_capability_evidence,
+)
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
@@ -41,22 +44,23 @@ class PosixPatchWorkspaceSnapshotAdapter:
     """Build side-effect-free path evidence using POSIX filesystem facts."""
 
     workspace_root: Path
-    require_production_capabilities: bool = True
 
     async def verify_workspace_capabilities(self) -> PatchResult | None:
-        """Fail closed until production no-replace rename and helper ownership exist."""
-        if sys.platform not in {"darwin", "linux"} or self.require_production_capabilities:
-            return _rejected(
-                "UNSUPPORTED_FILESYSTEM_GUARANTEE",
-                "workspace filesystem mutation guarantees are not available",
-            )
-        try:
-            root_stat = self.workspace_root.stat()
-        except OSError as err:
-            return _rejected("IO_ERROR", f"could not stat workspace root: {err.strerror}")
-        if not stat.S_ISDIR(root_stat.st_mode):
-            return _rejected("PARENT_PATH_NOT_DIRECTORY", "workspace root must be a directory")
-        return None
+        """Return a fail-closed rejection unless actual workspace evidence is complete."""
+        evidence = collect_posix_patch_workspace_capability_evidence(self.workspace_root)
+        if evidence.production_ready:
+            return None
+        return _rejected(
+            "UNSUPPORTED_FILESYSTEM_GUARANTEE",
+            "workspace filesystem mutation guarantees are not available",
+            metadata={
+                "backend": evidence.backend,
+                "filesystem_type": evidence.filesystem_type,
+                "platform": evidence.platform,
+                "unsupported_reasons": ",".join(evidence.unsupported_reasons),
+                "workspace_device": evidence.workspace_device,
+            },
+        )
 
     async def snapshot_plan_inputs(self, plan: PatchPlan) -> PatchResult | None:
         """Revalidate a planned patch against current side-effect-free path facts."""
@@ -359,8 +363,8 @@ def _digest_bytes(content: bytes) -> str:
     return "sha256:" + sha256(content).hexdigest()
 
 
-def _rejected(code: str, message: str) -> PatchResult:
-    error = patch_error(code, message=message)
+def _rejected(code: str, message: str, *, metadata: dict[str, str | int | None] | None = None) -> PatchResult:
+    error = patch_error(code, message=message, metadata=metadata)
     return PatchResult(
         status=PatchResultStatus.REJECTED,
         mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,

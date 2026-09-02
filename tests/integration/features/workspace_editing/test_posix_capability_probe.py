@@ -26,6 +26,11 @@ def test_posix_capability_probe_reports_fail_closed_decision(tmp_path: Path) -> 
     assert report["schema_version"] == 1
     assert report["supported_platform"] is True
     assert report["workspace"]["filesystem_type"]
+    assert isinstance(report["workspace"]["device"], int)
+    assert report["selected_backend"] in {
+        "darwin_renameatx_np_supervised_helper_v1",
+        "linux_renameat2_supervised_helper_v1",
+    }
     assert report["capabilities"]["workspace_root_dir_fd_traversal"]["status"] == "supported"
     assert report["capabilities"]["no_follow_open"]["status"] == "supported"
     assert report["capabilities"]["exclusive_create_no_replace"]["status"] == "supported"
@@ -70,6 +75,7 @@ def test_posix_capability_probe_cli_emits_json_evidence(tmp_path: Path) -> None:
 
     assert report["platform"]["python_version"]
     assert report["workspace"]["path"] == str(tmp_path.resolve())
+    assert report["workspace"]["device"] == tmp_path.stat().st_dev
     assert "stdlib_no_replace_rename" in report["unsupported_reasons"]
     assert "bounded_in_process_cleanup" in report["unsupported_reasons"]
 

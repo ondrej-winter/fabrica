@@ -2,10 +2,10 @@
 
 ## Status
 
-- Readiness: **Ready for AP-01 design investigation**. Production mutation remains
-  fail-closed until AP-01 records a proven native no-replace backend and helper
-  ownership design for the actual workspace, or explicitly marks that workspace
-  unsupported.
+- Readiness: **AP-01 complete; ready for AP-02 native-operation implementation**.
+  Production mutation remains fail-closed until AP-02 and AP-03 prove the
+  selected native no-replace backend and supervised helper ownership design for
+  the actual workspace.
 - Created: September 1, 2026.
 - Source specification: `docs/specs/tools-apply-patch-tool-spec.md`.
 - Scope: remaining work only. The existing `workspace_editing` parser, matcher,
@@ -56,7 +56,7 @@ patch-input limit and the generic runtime's lower string-argument limit.
 
 ## Progress Tracking
 
-- [ ] AP-01 Define and approve production capability evidence, native-operation boundaries, and helper ownership architecture.
+- [x] AP-01 Define and approve production capability evidence, native-operation boundaries, and helper ownership architecture.
 - [ ] AP-02 Implement descriptor-rooted native no-replace mutation operations.
 - [ ] AP-03 Implement supervised helper-process commit and cleanup ownership.
 - [ ] AP-04 Propagate runtime cancellation and phase deadlines into patch execution.
@@ -91,6 +91,13 @@ fail-closed default until both are complete and tested.
 
 ### AP-01 — Define production capability evidence, native-operation boundaries, and helper ownership architecture
 
+**Status: Complete (2026-09-02).** ADR 0009 records the selected macOS and
+Linux backend boundaries plus the per-operation supervised-helper protocol.
+Adapter-private actual-workspace evidence now records platform, architecture,
+filesystem/device, selected backend, and primitive-level unsupported or failed
+reasons. It remains intentionally fail-closed until AP-02 and AP-03 prove the
+native and helper primitives.
+
 **Likely files**
 
 - `src/fabrica/features/workspace_editing/application/ports/workspace_mutation.py`
@@ -122,21 +129,21 @@ fail-closed default until both are complete and tested.
 
 **Acceptance criteria**
 
-- [ ] A reviewable backend and helper-ownership decision exists before native code
+- [x] A reviewable backend and helper-ownership decision exists before native code
       is added. It explicitly labels each candidate platform as guaranteed or
       unsupported.
-- [ ] Production enablement depends on verified backend capability evidence, not
+- [x] Production enablement depends on verified backend capability evidence, not
        merely on macOS/Linux detection, filesystem naming, or a feature flag.
-- [ ] Unsupported platform/filesystem/backend combinations return
+- [x] Unsupported platform/filesystem/backend combinations return
       `UNSUPPORTED_FILESYSTEM_GUARANTEE` before mutation.
-- [ ] Capability evidence is collected against the actual workspace and records
-       enough platform, filesystem/device, primitive, backend, and probe-failure
-       detail to explain unsupported status and guide an operator.
+- [x] Capability evidence is collected against the actual workspace and records
+      enough platform, filesystem/device, primitive, backend, and probe-failure
+      detail to explain unsupported status and guide an operator.
 
 **Verification**
 
-- [ ] Capability-probe tests cover supported, unsupported, and failed probes.
-- [ ] Existing fail-closed snapshot tests still pass.
+- [x] Capability-probe tests cover supported, unsupported, and failed probes.
+- [x] Existing fail-closed snapshot tests still pass.
 
 ### AP-02 — Implement descriptor-rooted native no-replace mutation operations
 
