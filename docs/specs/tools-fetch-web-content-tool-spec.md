@@ -41,8 +41,8 @@ The runtime retrieves and normalizes content; the agent performs the reasoning.
 - Workspace file reading is owned by `docs/specs/tools-read-files-tool-spec.md`.
 - Workspace source discovery is owned by `docs/specs/tools-search-codebase-tool-spec.md`.
 - Process execution is owned by `docs/specs/tools-run-commands-tool-spec.md`.
-- This spec defines the desired `fetch_web_content` tool contract only. It does
-  not implement the tool.
+- This spec defines the implemented `fetch_web_content` tool contract. The
+  implementation lives in the `web_content_fetching` feature slice.
 - `fetch_web_content` should be preferred over ordinary `curl`, `wget`, or ad hoc
   HTTP scripts when the agent needs to retrieve known public web content for
   reasoning, because this tool provides SSRF protection, redirect validation,
@@ -80,11 +80,10 @@ agent reasons over returned untrusted content
 - Public-destination, redirect, response-size, and output-bound policy
   requirements.
 - Normalization of supported textual content and structured, untrusted results.
-- Future ownership boundaries and acceptance criteria for an implementation.
+- Implemented ownership boundaries and acceptance criteria.
 
 ### Out of scope
 
-- Implementing or registering the capability in this revision.
 - Authentication, cookies, model-controlled headers, request bodies, or non-GET
   HTTP methods.
 - Private or internal network access, browser automation, JavaScript execution,
@@ -849,7 +848,12 @@ Define stable error codes:
 - `UNSUPPORTED_ENCODING`;
 - `INVALID_JSON`;
 - `CONTENT_EXTRACTION_FAILED`;
-- `INTERNAL_FETCH_ERROR`.
+- `INTERNAL_FETCH_ERROR`;
+- `PUBLIC_WEB_DISABLED`.
+
+`PUBLIC_WEB_DISABLED` is a host-policy outcome returned when public-web access
+is disabled. It must return ordered per-request failures without DNS resolution
+or HTTP activity.
 
 No-match or low-quality page extraction is not automatically an error. A
 successful HTTP response with little useful textual content may still return
@@ -898,14 +902,18 @@ next URL       ↓
 
 - Specification: `docs/specs/tools-fetch-web-content-tool-spec.md`.
 - Specification index: `docs/specs/README.md`.
-- Runtime tool contracts and DTOs: future ownership under
-  `src/fabrica/features/agent_runtime/application/` when exposed as a
-  model-callable runtime tool.
+- Runtime registration adapter:
+  `src/fabrica/features/web_content_fetching/adapters/inbound/registered_tool/`.
+- Application DTOs, ports, use case, result formatting, and output limiting:
+  `src/fabrica/features/web_content_fetching/application/`.
 - HTTP, DNS, destination validation, MIME sniffing, decoding, and extraction:
-  future adapter or infrastructure ownership, not domain or application core.
-- Unit tests: future mirrored coverage under `tests/unit/`.
-- Integration tests: future controllable-server and DNS/test-double coverage under
-  `tests/integration/`; default suites must remain offline.
+  `src/fabrica/features/web_content_fetching/adapters/outbound/`; these concerns
+  remain outside the domain and application core.
+- Composition root:
+  `src/fabrica/bootstrap/composition/web_content_fetching.py`.
+- Unit tests: `tests/unit/features/web_content_fetching/`.
+- Integration tests: `tests/integration/features/web_content_fetching/`; default
+  suites remain offline and use controllable dependencies.
 
 The detailed component boundaries below refine this ownership model.
 
@@ -961,20 +969,23 @@ policy, destination IP policy, and redirect policy. It uses standard-library
 and redirect checks instead of spreading destination validation across fetch and
 redirect code.
 
-Likely future implementation ownership:
+Implemented ownership:
 
 - Spec: `docs/specs/tools-fetch-web-content-tool-spec.md`.
-- Runtime tool contracts and DTOs: under
-  `src/fabrica/features/agent_runtime/application/` if exposed as a model-callable
-  runtime tool.
+- Registered-tool adapter:
+  `src/fabrica/features/web_content_fetching/adapters/inbound/registered_tool/`.
+- Application DTOs, ports, use case, result formatting, and output limiting:
+  `src/fabrica/features/web_content_fetching/application/`.
 - DNS, HTTP, MIME sniffing, charset decoding, parser integration, and Markdown
-  conversion: adapter or infrastructure code, not domain or application core.
-- Unit tests: mirrored under `tests/unit/` for input validation, URL policy,
-  destination policy, redirect handling, classification, extraction, output
-  limiting, and result mapping.
-- Integration tests: under `tests/integration/` for real HTTP behavior using local
-  controllable servers and DNS/test doubles where needed. Default automated tests
-  must not rely on live external services.
+  conversion: `src/fabrica/features/web_content_fetching/adapters/outbound/`, not
+  domain or application core.
+- Composition root:
+  `src/fabrica/bootstrap/composition/web_content_fetching.py`.
+- Unit tests cover input validation, URL policy, destination policy, redirect
+  handling, classification, extraction, output limiting, and result mapping under
+  `tests/unit/features/web_content_fetching/`.
+- Integration tests live under `tests/integration/features/web_content_fetching/`.
+  Default automated tests do not rely on live external services.
 
 Implementation must preserve hexagonal boundaries: domain and application code
 must not perform network I/O directly, and provider-specific tool-call schemas
