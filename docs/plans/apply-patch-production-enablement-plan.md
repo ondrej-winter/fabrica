@@ -1,8 +1,7 @@
 # Implementation Plan: Complete Production `apply_patch` Enablement
 
-- Readiness: **AP-04 complete.** Production composition remains unavailable until
-  AP-06 wires the supervised POSIX mutation adapters and AP-05 adds startup
-  recovery gating.
+- Readiness: **AP-06 complete.** The explicit production composition performs
+  capability and recovery gating before exposing supervised POSIX mutation.
 - Created: September 1, 2026.
 - Source specification: `docs/specs/tools-apply-patch-tool-spec.md`.
 - Scope: remaining work only. The existing `workspace_editing` parser, matcher,
@@ -59,7 +58,7 @@ patch-input limit and the generic runtime's lower string-argument limit.
 - [x] AP-03 Implement supervised helper-process commit and cleanup ownership.
 - [x] AP-04 Propagate runtime cancellation and phase deadlines into patch execution.
 - [x] AP-05 Add startup recovery orchestration and workspace mutation gating.
-- [ ] AP-06 Add explicit production bootstrap composition.
+- [x] AP-06 Add explicit production bootstrap composition.
 - [ ] AP-07 Align the public schema and runtime argument bounds with the spec.
 - [ ] AP-08 Add production-path integration and acceptance tests.
 - [ ] AP-09 Update documentation and run the full quality gate.
@@ -342,6 +341,14 @@ unrelated read-only tools.
        read shows safe terminal evidence.
 
 ### AP-06 — Add explicit production bootstrap composition
+
+**Status: complete (September 2, 2026).**
+`create_production_workspace_editing_composition()` now builds the capability-
+enforcing POSIX adapters, supervised mutation ports, protected-path policy,
+mandatory host approval, durable journal/recovery gate, and registered tool from
+one workspace root. Failed capability or recovery gates retain caller-provided
+read-only tools while omitting `apply_patch` and returning immutable structured
+gate evidence.
 
 **Likely files**
 

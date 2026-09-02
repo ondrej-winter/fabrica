@@ -51,7 +51,12 @@ from fabrica.bootstrap.composition.workspace_command_execution import (
     RunCommandsToolOptions,
     create_run_commands_registered_tool_adapter,
 )
-from fabrica.bootstrap.composition.workspace_editing import create_apply_patch_registered_tool_adapter
+from fabrica.bootstrap.composition.workspace_editing import (
+    ProductionWorkspaceEditingComposition,
+    ProductionWorkspaceEditingOptions,
+    create_apply_patch_registered_tool_adapter,
+    create_production_workspace_editing_composition,
+)
 from fabrica.bootstrap.composition.workspace_reading import create_read_files_registered_tool_adapter
 from fabrica.bootstrap.composition.workspace_searching import create_search_codebase_registered_tool_adapter
 
@@ -65,6 +70,8 @@ __all__ = [
     "ModelDrivenSkillRuntime",
     "ModelDrivenSkillRuntimeOptions",
     "PreCommitToolOptions",
+    "ProductionWorkspaceEditingComposition",
+    "ProductionWorkspaceEditingOptions",
     "RunCommandsToolOptions",
     "SkillContextAugmentationOptions",
     "SkillScriptExecutionOptions",
@@ -81,6 +88,7 @@ __all__ = [
     "create_fetch_web_content_registered_tool_adapter",
     "create_model_driven_skill_runtime",
     "create_pre_commit_registered_tool_adapters",
+    "create_production_workspace_editing_composition",
     "create_pydantic_ai_model_driven_skill_runtime",
     "create_pydantic_ai_runtime",
     "create_pydantic_ai_tool_loop_runtime",
