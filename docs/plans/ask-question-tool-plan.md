@@ -71,7 +71,7 @@ both features.
 ## Progress Tracking
 
 - [x] AQ-00 Resolve the orchestration boundary, interaction ownership context, and solo-call mechanism.
-- [ ] AQ-01 Create the `user_interaction` application contracts and schema DTOs.
+- [x] AQ-01 Create the `user_interaction` application contracts and schema DTOs.
 - [ ] AQ-02 Implement the in-memory interaction manager and transport port.
 - [ ] AQ-03 Expose `ask_question` through a `user_interaction` registered-tool adapter.
 - [ ] AQ-04 Integrate solo-call validation and lifecycle coordination in `agent_runtime`.
@@ -185,17 +185,17 @@ must not import each other. The composition root alone depends on both features.
 
 **Acceptance criteria**
 
-- [ ] Invalid question, option-count, whitespace, duplicate-option, and invalid
+- [x] Invalid question, option-count, whitespace, duplicate-option, and invalid
       result combinations cannot be constructed.
-- [ ] Interaction-owner values cannot be confused with question IDs, injected by
+- [x] Interaction-owner values cannot be confused with question IDs, injected by
       model-facing arguments, or created by a host answer/cancellation request.
-- [ ] Stable codes include `INVALID_INPUT`, `QUESTION_ALREADY_PENDING`,
+- [x] Stable codes include `INVALID_INPUT`, `QUESTION_ALREADY_PENDING`,
       `INTERACTION_PUBLISH_FAILED`, `SESSION_NOT_INTERACTIVE`,
       `INTERACTION_NOT_FOUND`, and `INTERNAL_INTERACTION_ERROR`.
 
 **Verification**
 
-- [ ] `uv run pytest tests/unit/features/user_interaction/application/test_interaction_dtos.py`
+- [x] `uv run pytest tests/unit/features/user_interaction/application/test_interaction_dtos.py`
 
 ### AQ-02 — Implement interaction lifecycle and transport boundary
 
