@@ -2,11 +2,11 @@
 
 ## Status
 
-- State: Draft — unconfirmed.
+- State: Accepted.
 - Implementation status: Not implemented.
-- Accepted by: Not applicable until accepted
-- Accepted on: Not applicable until accepted
-- Revision: Template-governance migration on September 1, 2026.
+- Accepted by: Maintainer (interactive approval)
+- Accepted on: September 2, 2026
+- Revision: Version 1 interaction-contract decisions recorded on September 2, 2026.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
@@ -98,10 +98,14 @@ or terminated.
 ### In Scope
 
 - The interactive agent orchestration contract for one pending user question.
+- Version 1 live-session publication, waiting, answer resolution, cancellation,
+  and duplicate-response replay semantics.
 
 ### Out of Scope
 
-The detailed exclusions already recorded below remain authoritative.
+- Durable pending-interaction storage, restart recovery, interaction expiry,
+  Skip/dismissed results, strict option-only answers, multi-selection, and answer
+  attachments.
 
 ## Desired Behavior
 
@@ -109,11 +113,11 @@ The detailed exclusions already recorded below remain authoritative.
 
 - ask one focused logical question when a material uncertainty cannot be resolved
   from the current conversation, workspace, or available tools;
-- provide concise suggested answer options when useful;
+- provide 2–5 concise, meaningful suggested answer options;
 - suspend the current run until a user response, cancellation, or termination is
   received;
-- resume with a structured answer result that preserves the user's response
-  exactly;
+- resume with a structured answer result that preserves the user's non-empty
+  response text exactly;
 - preserve linkage between each question and answer through an explicit
   `question_id`;
 - fail safely in non-interactive sessions rather than fabricating an answer.
@@ -149,7 +153,7 @@ Keep this name. It is clearer than alternatives such as `ask_user`,
 `request_input`, `clarify`, or `followup`, and it matches Cline's public
 operation.
 
-Canonical provisional model-facing JSON schema:
+Canonical Version 1 model-facing JSON schema:
 
 ```json
 {
@@ -172,7 +176,7 @@ Canonical provisional model-facing JSON schema:
       }
     }
   },
-  "required": ["question"],
+  "required": ["question", "options"],
   "additionalProperties": false
 }
 ```
@@ -190,16 +194,11 @@ Example with suggestions:
 }
 ```
 
-Example without suggestions, if optional options are accepted for v1:
-
-```json
-{
-  "question": "What hostname should the production API use?"
-}
-```
-
-The schema above deliberately keeps `options` optional as a provisional contract.
-Whether v1 requires options, as Cline currently does, remains an open question.
+`question` and every option must contain at least one non-whitespace character.
+Option uniqueness is determined from their exact submitted strings. Options are
+required in Version 1 to provide a consistently actionable interaction UI, but
+they are suggestions rather than an enum: the user may submit arbitrary non-empty
+free text.
 
 ## Current Cline behavior
 
@@ -241,9 +240,8 @@ suggested answer buttons
 free-text response
 ```
 
-This is more expressive than strict multiple choice and should remain
-representable. Unless v1 later decides otherwise, options should not be treated as
-an enum.
+This is more expressive than strict multiple choice and is required in Version 1.
+Options must not be treated as an enum.
 
 For example, the user may answer:
 
@@ -327,9 +325,8 @@ conversation, workspace, or available tools.
 
 Before asking, investigate information that can be determined autonomously.
 
-Provide concise suggested answers when useful. Suggestions do not necessarily
-constrain the user's final answer; the user may respond with free text when the
-host supports it.
+Provide 2–5 concise suggested answers. Suggestions do not constrain the user's
+final answer; the user may respond with non-empty free text.
 
 Do not ask for confirmation of ordinary reversible implementation decisions.
 Do not use this tool for tool permission, destructive-action approval, or
@@ -339,6 +336,11 @@ Plan → Execute approval.
 ## Result contract
 
 Return structured results rather than magic strings.
+
+Every result contains an opaque `question_id` with the `q_` prefix and at most
+120 characters. The runtime generates it before publication and uses it as the
+publication idempotency key. Version 1 statuses are exactly `answered` and
+`cancelled`.
 
 Answered with free text:
 
@@ -378,9 +380,10 @@ Cancellation result:
 This distinguishes cancellation from a user answer. Do not represent cancellation
 as an empty string.
 
-Potential status values are `answered`, `cancelled`, and `dismissed`. A future
-`expired` status may be added if persisted interaction expiry is introduced.
-Human non-response is not an error.
+For `answered`, `answer` is a non-empty string and `selected_option` is either
+the zero-based index of an exactly selected suggestion or `null`. For
+`cancelled`, `answer` and `selected_option` are both `null`. Human non-response
+is not an error. Version 1 has no `dismissed`, `expired`, or skipped result.
 
 ## Question IDs and linkage
 
@@ -408,24 +411,30 @@ The eventual response contains the same ID:
 ```
 
 Do not rely solely on "currently pending question". An ID protects against stale
-frontend responses, reconnected clients, session resume, duplicated UI events,
-and cancellation races.
+frontend events, duplicate UI submissions, and cancellation races within the
+live host process. Version 1 does not recover pending interactions after a host
+or runtime restart.
 
-Answer handling must be idempotent. The first valid answer transitions from
-`PENDING` to `ANSWERED`. Subsequent duplicate submissions for the same
-`question_id` are ignored or acknowledged as already resolved. They must not
-enter the conversation twice.
+Answer handling must be atomic and idempotent. The interaction manager must
+compare and set a pending interaction to its first terminal resolution:
+`PENDING → ANSWERED` for a valid non-empty answer or `PENDING → CANCELLED` for
+run/session termination. A later submission for the same `question_id` must
+receive an idempotent acknowledgment containing that committed result, regardless
+of whether its submitted answer text matches. It must not create another
+transcript entry or another model-context message.
 
-## Interaction state machine
+## Interaction and run state machines
 
-Recommended runtime state machine:
+The runtime run state and the interaction-record state are distinct.
+
+`RunStateMachine` owns the run lifecycle:
 
 ```text
 RUNNING
    │
    │ ask_question
    ▼
-PENDING_QUESTION
+WAITING_FOR_USER
    │
    ├── user answers
    │      ▼
@@ -435,10 +444,22 @@ PENDING_QUESTION
    │      ▼
    │    CANCELLED
    │
-   └── session terminated
+   └── session or host terminated
           ▼
-        TERMINATED
+        CANCELLED
 ```
+
+The interaction manager owns the in-memory interaction lifecycle:
+
+```text
+PENDING
+   ├── valid non-empty answer → ANSWERED
+   └── run/session/host termination → CANCELLED
+```
+
+Only the atomic transition from `PENDING` is permitted. `ANSWERED` and
+`CANCELLED` retain their committed result long enough to acknowledge duplicate or
+late submissions. Version 1 does not persist this record for process recovery.
 
 The UI should expose a pending state such as `turn_phase = awaiting_user` or,
 matching Cline terminology more closely, `awaiting_followup`. After the user
@@ -454,15 +475,17 @@ answer = await ask_question(...)
 ```
 
 The model does not continue reasoning with an imaginary answer. No dependent tool
-call should execute until the answer arrives.
+call may execute until the answer arrives.
 
 Unlike independent tools such as `read_files`, `search_codebase`, or
 `fetch_web_content`, `ask_question` should not participate in ordinary parallel
 tool execution. It forms a synchronization barrier.
 
-If a model response contains `ask_question(...)` plus a later substantive tool
-call, the recommended host behavior is that no later substantive tool calls from
-that response execute until the question resolves.
+`ask_question` must be the sole tool call in its model response. If a response
+contains `ask_question` and any other tool call, the runtime tool-call batch
+validator must reject the whole batch with `ASK_QUESTION_MUST_BE_SOLO` before any
+tool handler executes. `AskQuestionTool` cannot enforce this safely because the
+current runtime executes a validated batch before inspecting its results.
 
 ## Timeouts and retries
 
@@ -489,6 +512,11 @@ maxRetries = 0
 ```
 
 Repeating the same question because of infrastructure retry is unacceptable UX.
+The transport must therefore accept `question_id` as its publication idempotency
+key. If publication acknowledgement is ambiguous, the interaction manager retains
+the registered pending interaction rather than creating a second question. A
+definitive publication failure cancels and removes that interaction before
+returning `INTERACTION_PUBLISH_FAILED`.
 
 ## Pending-question concurrency
 
@@ -526,33 +554,30 @@ option zero is dangerous. Return `SESSION_NOT_INTERACTIVE` instead.
 
 ## Cancellation and session lifecycle
 
-If the user cancels the run while a question is pending, transition from
-`PENDING_QUESTION` to `CANCELLED`. The waiting operation must settle so the
-runtime can unwind and no promise, coroutine, or resolver leaks indefinitely after
-the owning run is destroyed.
+If the user cancels the run while a question is pending, transition the run from
+`WAITING_FOR_USER` to `CANCELLED` and atomically resolve the interaction from
+`PENDING` to `CANCELLED`. The waiting operation must settle so the runtime can
+unwind and no promise, coroutine, or resolver leaks indefinitely after the owning
+run is destroyed.
 
 Cancellation should produce a structured `cancelled` result with `answer: null`,
 not an empty string.
 
-Frontend disconnects, reconnects, duplicate responses, stale answers, session
-termination, and run cancellation belong to the session interaction layer. The
-tool schema should not be overloaded to encode every session-management concern.
+Version 1 is live-session only. A frontend may reconnect while the same host
+process retains the interaction manager's pending record. A host or runtime
+restart terminates the pending interaction; it must not attempt suspended-run
+recovery. Duplicate responses, stale answers, session termination, and run
+cancellation belong to the session interaction layer. The tool schema should not
+be overloaded to encode every session-management concern.
 
 ## Empty answers
 
 If free-text answers are supported, empty or whitespace-only submissions should
 not resolve the pending question by default. The UI keeps the question pending.
 
-This avoids ambiguous results. A specific `Skip` action, if supported, should
-have separate semantics, such as:
-
-```json
-{
-  "question_id": "q_01J...",
-  "status": "dismissed",
-  "answer": null
-}
-```
+This avoids ambiguous results. Version 1 provides no `Skip` or
+"continue without answer" action; only an answer or cancellation can resolve the
+interaction.
 
 ## UI and transcript representation
 
@@ -646,15 +671,17 @@ implementation discretion.
 Stable infrastructure and tool error codes should include:
 
 - `INVALID_INPUT`;
+- `ASK_QUESTION_MUST_BE_SOLO`;
 - `QUESTION_ALREADY_PENDING`;
 - `INTERACTION_PUBLISH_FAILED`;
 - `SESSION_NOT_INTERACTIVE`;
 - `INTERACTION_NOT_FOUND`;
-- `STALE_RESPONSE`;
-- `ASK_CANCELLED`;
 - `INTERNAL_INTERACTION_ERROR`.
 
-Human non-response is not an error.
+`INTERACTION_NOT_FOUND` must cover unknown, wrong-run, and wrong-session IDs
+without disclosing whether another session owns the ID. A resolved interaction is
+not stale: it returns its committed result idempotently. Human non-response is not
+an error.
 
 ## Recommended internal architecture
 
@@ -682,7 +709,9 @@ state transitions
 answer validation
 idempotency
 cancellation
-session lifecycle
+atomic first-resolution-wins transition
+live-session lifecycle
+committed-result replay
 ```
 
 `InteractionTransport` responsibilities:
@@ -691,7 +720,8 @@ session lifecycle
 display question
 display options
 receive user input
-signal disconnect/reconnect
+publish idempotently by question ID
+signal live-session disconnect/reconnect
 ```
 
 Potential transport implementations include `VsCodeInteractionTransport`,
@@ -707,18 +737,18 @@ askQuestion(input, runContext):
     if interactionManager.hasPending(runContext.runId):
         return QUESTION_ALREADY_PENDING
 
-    interaction = createInteraction(input)
+    interaction = createInteraction(input, questionId=generateQuestionId())
 
     interactionManager.register(interaction)
 
     try:
-        transport.publish(interaction)
+        transport.publish(interaction, idempotencyKey=interaction.questionId)
 
         response = await interaction.wait()
 
         return response
     finally:
-        interactionManager.clear(interaction.id)
+        interactionManager.retainCommittedResultThenClearPending(interaction.id)
 ```
 
 The human wait itself has no ordinary tool timeout.
@@ -767,8 +797,10 @@ Change these behaviors for this implementation:
 - do not serialize structured questions into opaque JSON text when the host
   protocol can carry structured data;
 - do not duplicate answers unnecessarily in both tool result and transcript;
-- do not assume 2–5 options are necessarily mandatory until that open question is
-  resolved;
+- require 2–5 unique, meaningful suggestions in every Version 1 call while
+  preserving non-empty free-text answers;
+- reject a mixed tool-call batch before execution instead of attempting deferred
+  execution after a question;
 - do not couple `ask_question` and `submit_and_exit` without architectural reason.
 
 Add these requirements beyond current Cline behavior:
@@ -777,7 +809,7 @@ Add these requirements beyond current Cline behavior:
 - explicit interaction state machine;
 - structured answer result;
 - selected-option metadata;
-- stale-response protection;
+- unknown-ID protection without ownership disclosure;
 - idempotent answer processing;
 - clear cancellation status;
 - explicit non-interactive failure;
@@ -797,9 +829,8 @@ Required future acceptance tests include the following scenarios.
 - Duplicate options rejected.
 - Empty option rejected.
 - Too many options rejected.
-
-Exact option cardinality and whether missing options is valid depend on the open
-question about required options.
+- Missing `options` rejected.
+- Whitespace-only question or option rejected.
 
 ### Interaction
 
@@ -813,7 +844,7 @@ question about required options.
 
 ### Free text
 
-If free text is enabled:
+Free text is required alongside suggestions:
 
 - Click suggested option.
 - Type exact suggested option.
@@ -829,10 +860,14 @@ All should yield explicit `answered` state.
 - Session cancellation.
 - Run cancellation.
 - Frontend disconnect.
-- Frontend reconnect.
+- Frontend reconnect within the same live host process.
 - Duplicate answer.
-- Stale answer.
+- Duplicate answer with different text replays the committed result.
+- Unknown or wrong-owner question ID returns `INTERACTION_NOT_FOUND` without
+  ownership disclosure.
 - Session termination.
+- Host or runtime restart terminates the in-memory pending interaction and does
+  not resume the run.
 
 No pending promise, coroutine, or resolver may leak indefinitely after the owning
 run is destroyed.
@@ -841,9 +876,17 @@ run is destroyed.
 
 - One pending question accepted.
 - Second ask rejected with `QUESTION_ALREADY_PENDING`.
-- Question plus dependent tool call respects synchronization-barrier semantics.
-- Duplicate frontend response is ignored or acknowledged without duplicating
+- A model response containing `ask_question` plus another tool call is rejected
+  with `ASK_QUESTION_MUST_BE_SOLO` before any call executes.
+- Duplicate frontend response replays the committed result without duplicating
   conversation state.
+
+### Publication
+
+- Publication uses `question_id` as an idempotency key.
+- Lost publication acknowledgement does not create a second visible question.
+- Definitive publication failure clears the pending interaction and returns
+  `INTERACTION_PUBLISH_FAILED`.
 
 ### Headless mode
 
@@ -885,15 +928,17 @@ tests before adding concrete UI, CLI, or remote transports.
   is received.
 - Always use explicit `question_id` linkage between question publication and
   answer handling.
-- Always treat `ask_question` as a blocking synchronization barrier.
+- Always require 2–5 unique, meaningful suggestions while allowing arbitrary
+  non-empty free-text answers.
+- Always treat `ask_question` as a blocking synchronization barrier and as the
+  sole tool call in its model response.
 - Always keep the human-wait phase free from ordinary tool timeouts.
 - Always fail safely with `SESSION_NOT_INTERACTIVE` when no interaction channel
   exists.
 - Always keep permission approval and Plan → Execute mode transitions separate
   from `ask_question`.
-- Ask before making options mandatory, enforcing strict option-only choice,
-  adding persisted suspension, adding expiry, adding skip behavior, supporting
-  multiple selection, or allowing answer attachments.
+- Ask before adding persisted suspension or restart recovery, expiry, skip
+  behavior, strict option-only choice, multiple selection, or answer attachments.
 - Never fabricate an answer, select the first option automatically, or continue
   with an imaginary response.
 - Never auto-retry the same question as ordinary infrastructure retry.
@@ -906,20 +951,20 @@ tests before adding concrete UI, CLI, or remote transports.
 - The spec defines `ask_question` as a synchronous human-input orchestration
   primitive for material user-only information.
 - The public name remains `ask_question`.
-- The provisional input schema includes a bounded non-empty `question` and bounded
-  2–5 unique non-empty `options` when options are present.
-- The spec clearly preserves the open question about whether options are required.
+- The Version 1 input schema requires a bounded non-empty `question` and bounded
+  2–5 unique non-empty `options`.
 - One focused question, question quality, and suggested-answer semantics are
   specified.
 - The result contract is structured and includes `question_id`, status, answer,
   and selected-option metadata.
-- The interaction state machine, blocking behavior, no-human-wait-timeout rule,
-  no-retry rule, one-pending-question rule, and synchronization-barrier semantics
-  are specified.
+- Separate run and interaction state machines, standalone-call batch rejection,
+  no-human-wait timeout, no-retry, one-pending-question, and synchronization
+  semantics are specified.
 - Headless mode fails with `SESSION_NOT_INTERACTIVE` and never fabricates a first
   option answer.
-- Cancellation, empty answers, stale responses, duplicate answers, transcript
-  representation, answer provenance, and answer deduplication are specified.
+- Cancellation, empty answers, idempotent committed-result replay, live-session
+  restart termination, transcript representation, answer provenance, and answer
+  deduplication are specified.
 - The architecture separates `AskQuestionTool`, `InteractionManager`, and
   `InteractionTransport` responsibilities.
 - Future acceptance tests are explicit enough to drive implementation.
@@ -928,19 +973,10 @@ tests before adding concrete UI, CLI, or remote transports.
 
 | Question | Impact | Blocking? | Owner | Resolution |
 | --- | --- | --- | --- | --- |
-| See the detailed questions below; each requires maintainer triage before acceptance. | Requirement and implementation planning. | To be determined | Maintainer | Unresolved |
+| Future interaction extensions listed below do not block Version 1 implementation planning. | Future product scope. | No | Maintainer | Deferred |
 
-- Should `options` remain required, matching Cline's current 2–5 options rule, or
-  become optional with 2–5 options only when present?
-- Should options be suggestions plus free text, strict single choice, or controlled
-  per question with a future `response_mode` field?
-- Should pending interactions persist across process restarts through stored run
-  state, pending question metadata, question IDs, and checkpoints, or is a live
-  suspended run sufficient for v1?
 - How long may a question remain pending: indefinitely, until session close, for a
   fixed duration such as 24 hours, or through configurable expiration?
-- Should the UI provide a `Skip` or `Continue without answer` action, and should
-  that map to `dismissed` with `answer: null`?
 - Should multiple-selection answers be supported in a future schema?
 - Should answers support attachments such as files or images, or remain text-only
   until the general message and input resource model is settled?
@@ -956,7 +992,9 @@ tests before adding concrete UI, CLI, or remote transports.
 
 ## Acceptance and Planning Gate
 
-This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+This accepted specification is ready for implementation planning. Future-scope
+questions above do not redefine the accepted Version 1 contract unless a
+maintainer updates and re-confirms this specification.
 
 ## Conventions and Constraints
 
