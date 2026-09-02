@@ -60,7 +60,7 @@ patch-input limit and the generic runtime's lower string-argument limit.
 - [x] AP-05 Add startup recovery orchestration and workspace mutation gating.
 - [x] AP-06 Add explicit production bootstrap composition.
 - [x] AP-07 Align the public schema and runtime argument bounds with the spec.
-- [ ] AP-08 Add production-path integration and acceptance tests.
+- [x] AP-08 Add production-path integration and acceptance tests.
 - [ ] AP-09 Update documentation and run the full quality gate.
 
 Keep these checkboxes current during implementation. After every completed task
@@ -424,6 +424,16 @@ arguments remain subject to the generic 20,000-character string limit.
 
 ### AP-08 — Add production-path integration and acceptance coverage
 
+**Status: complete (September 2, 2026).** Existing focused unit and POSIX
+integration suites cover capability evidence, native no-replace races,
+supervised-helper terminal handling, cancellation/deadline mapping, recovery
+gating, and the 256 KiB runtime normalization exception. The composed
+apply-patch tool-loop coverage now also proves exact duplicate delivery replays
+the terminal result without reapplying the patch, while conflicting reuse of a
+`call_id` is rejected before handler execution. Injected-use-case composition
+fixtures are explicitly labeled non-production; there are no fixtures that set
+`require_production_capabilities=False` in the current tree.
+
 **Likely files**
 
 - `tests/unit/features/workspace_editing/`
@@ -444,15 +454,18 @@ arguments remain subject to the generic 20,000-character string limit.
 
 **Acceptance criteria**
 
-- [ ] Every remaining critical success criterion in the accepted specification
+- [x] Every remaining critical success criterion in the accepted specification
       has a direct regression test.
-- [ ] Capability-dependent tests skip only when the real primitive is absent;
+- [x] Capability-dependent tests skip only when the real primitive is absent;
       they never turn an unsupported production path into success.
 
 **Verification**
 
-- [ ] Focused workspace-editing unit and integration suites pass.
-- [ ] Targeted runtime tool-loop integration suite passes.
+- [x] Focused workspace-editing unit and integration suites pass (September 2,
+      2026; 25 behavioral tests passed; focused invocation exits non-zero only
+      because the repository-wide 93% coverage threshold applies to subsets).
+- [x] Targeted runtime tool-loop integration suite passes (September 2, 2026;
+      included in the focused composed tool-loop execution above).
 
 ### AP-09 — Documentation and final validation
 

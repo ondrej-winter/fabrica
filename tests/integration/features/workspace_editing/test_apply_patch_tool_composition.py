@@ -1,4 +1,4 @@
-"""Offline integration tests for explicit apply-patch tool-loop composition."""
+"""Offline, non-production tests for injected apply-patch tool-loop composition."""
 
 import asyncio
 import json
@@ -59,6 +59,28 @@ class ApplyPatchToolAwareModel:
                 ),
             )
         return ToolAwareModelResponse(output_text=f"final:{tool_results[0].result_text}")
+
+
+@dataclass(slots=True)
+class _ScriptedApplyPatchToolAwareModel:
+    """Return a fixed sequence of model responses for runtime-ledger scenarios."""
+
+    responses: list[ToolAwareModelResponse]
+    calls: list[tuple[LocalAgentRunCommand, tuple[ToolDefinition, ...], tuple[ToolCallResult, ...]]] = field(
+        default_factory=list,
+    )
+
+    async def run_turn(
+        self,
+        command: LocalAgentRunCommand,
+        available_tools: tuple[ToolDefinition, ...],
+        tool_results: tuple[ToolCallResult, ...] = (),
+        cancellation: ToolCancellationSignal | None = None,
+    ) -> ToolAwareModelResponse:
+        """Return the next deterministic model response."""
+        del cancellation
+        self.calls.append((command, available_tools, tool_results))
+        return self.responses.pop(0)
 
 
 def test_apply_patch_tool_helper_composes_explicit_use_case_without_mutating_during_construction() -> None:
@@ -126,6 +148,66 @@ def test_apply_patch_tool_loop_stops_after_fatal_mutation_state() -> None:
     assert result.tool_results[0].status is ToolCallResultStatus.TOOL_FAILURE
     assert result.output_text is None
     assert len(model.calls) == 1
+
+
+def test_apply_patch_tool_loop_replays_duplicate_delivery_without_reapplying_patch() -> None:
+    patch_input = "*** Begin Patch\n*** End Patch"
+    duplicate_call = ToolCallRequest(
+        call_id="call-1",
+        tool_name=APPLY_PATCH_TOOL_NAME,
+        arguments={"input": patch_input},
+    )
+    model = _ScriptedApplyPatchToolAwareModel(
+        responses=[
+            ToolAwareModelResponse(tool_calls=(duplicate_call,)),
+            ToolAwareModelResponse(tool_calls=(duplicate_call,)),
+            ToolAwareModelResponse(output_text="done"),
+        ]
+    )
+    use_case = _FakeApplyPatch(_committed_result())
+    tool = create_apply_patch_registered_tool_adapter(use_case)
+    runtime = create_tool_loop_runtime(model=model, tools=(tool,), limits=ToolLoopLimits(max_tool_iterations=2))
+
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Apply the patch once.")))
+
+    assert result.status is ToolLoopRunStatus.SUCCESS
+    assert result.output_text == "done"
+    assert len(result.tool_results) == EXPECTED_TOOL_LOOP_TURN_COUNT
+    assert result.tool_results[0] == result.tool_results[1]
+    assert len(use_case.calls) == 1
+    assert use_case.calls[0][0] == patch_input
+    assert model.calls[2][2] == result.tool_results
+
+
+def test_apply_patch_tool_loop_rejects_conflicting_duplicate_call_id_before_reapplying_patch() -> None:
+    initial_call = ToolCallRequest(
+        call_id="call-1",
+        tool_name=APPLY_PATCH_TOOL_NAME,
+        arguments={"input": "*** Begin Patch\n*** End Patch"},
+    )
+    conflicting_call = ToolCallRequest(
+        call_id="call-1",
+        tool_name=APPLY_PATCH_TOOL_NAME,
+        arguments={"input": "*** Begin Patch\n*** Add File: new.py\n+value = 1\n*** End Patch"},
+    )
+    model = _ScriptedApplyPatchToolAwareModel(
+        responses=[
+            ToolAwareModelResponse(tool_calls=(initial_call,)),
+            ToolAwareModelResponse(tool_calls=(conflicting_call,)),
+        ]
+    )
+    use_case = _FakeApplyPatch(_committed_result())
+    tool = create_apply_patch_registered_tool_adapter(use_case)
+    runtime = create_tool_loop_runtime(model=model, tools=(tool,), limits=ToolLoopLimits(max_tool_iterations=2))
+
+    result = asyncio.run(runtime.run(LocalAgentRunCommand(prompt="Apply the patch once.")))
+
+    assert result.status is ToolLoopRunStatus.INVALID_TOOL_REQUEST
+    assert len(result.tool_results) == 1
+    assert len(use_case.calls) == 1
+    assert use_case.calls[0][0] == initial_call.arguments["input"]
+    assert result.observations[-1].message == "tool loop rejected duplicate tool call id with conflicting request"
+    assert result.observations[-1].metadata == {"tool_call_id": "call-1"}
 
 
 def _committed_result() -> PatchResult:
