@@ -1,4 +1,6 @@
-"""Application-owned ports for live user interactions.
+"""Application-owned ports for live user interactions."""
 
-Interaction transport and manager port contracts are introduced by AQ-02.
-"""
+from fabrica.features.user_interaction.application.ports.interaction_manager import InteractionManager
+from fabrica.features.user_interaction.application.ports.interaction_transport import InteractionTransport
+
+__all__ = ["InteractionManager", "InteractionTransport"]

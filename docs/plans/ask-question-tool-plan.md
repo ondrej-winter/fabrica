@@ -72,7 +72,7 @@ both features.
 
 - [x] AQ-00 Resolve the orchestration boundary, interaction ownership context, and solo-call mechanism.
 - [x] AQ-01 Create the `user_interaction` application contracts and schema DTOs.
-- [ ] AQ-02 Implement the in-memory interaction manager and transport port.
+- [x] AQ-02 Implement the in-memory interaction manager and transport port.
 - [ ] AQ-03 Expose `ask_question` through a `user_interaction` registered-tool adapter.
 - [ ] AQ-04 Integrate solo-call validation and lifecycle coordination in `agent_runtime`.
 - [ ] AQ-05 Add explicit interactive composition and host response entry points.
@@ -224,28 +224,28 @@ must not import each other. The composition root alone depends on both features.
 
 **Acceptance criteria**
 
-- [ ] Only one question can be pending for a run.
-- [ ] Duplicate answer submissions return the first committed result without a
+- [x] Only one question can be pending for a run.
+- [x] Duplicate answer submissions return the first committed result without a
       second publication or model-context event.
-- [ ] Cancellation settles every waiter without leaking a task or resolver.
+- [x] Cancellation settles every waiter without leaking a task or resolver.
 - [ ] External cancellation, host/session termination, and task cancellation use
       the AQ-00 terminal-result mapping and do not leave pending records.
-- [ ] No persistence or restart recovery is introduced.
+- [x] No persistence or restart recovery is introduced.
 
 **Verification**
 
-- [ ] Focused tests cover answer/cancellation races, publication failure, empty
+- [x] Focused tests cover answer/cancellation races, publication failure, empty
       answers, duplicate replay, and unknown-ID protection.
 
 ### Checkpoint A — Slice boundary
 
-- [ ] `user_interaction` application code has no framework, terminal, WebSocket,
+- [x] `user_interaction` application code has no framework, terminal, WebSocket,
       HTTP, or UI imports.
 - [ ] Its public application exports are sufficient for the interactive bootstrap
       wrapper according to AQ-00. `agent_runtime` uses only neutral contracts;
       neither feature imports the other's private modules or forms a dependency
       cycle.
-- [ ] `uv run lint-imports`
+- [x] `uv run lint-imports`
 
 ### AQ-03 — Add the `ask_question` registered-tool adapter
 
