@@ -35,6 +35,7 @@ class ToolExecutor(Protocol):
         request: ToolCallRequest,
         limits: ToolLoopLimits,
         cancellation: ToolCancellationSignal,
+        opaque_context: Mapping[str, object] | None = None,
     ) -> ToolCallResult:
-        """Execute one normalized tool request and return a bounded application result."""
+        """Execute one normalized request with runtime-owned opaque context."""
         ...

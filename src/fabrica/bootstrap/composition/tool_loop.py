@@ -1,5 +1,6 @@
 """Composition helpers for tool-loop and model-driven skill runtimes."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from fabrica.bootstrap.composition.skill_context import (
@@ -60,6 +61,7 @@ class ToolLoopRuntime:
         command: LocalAgentRunCommand,
         *,
         cancellation: ToolCancellationSignal | None = None,
+        opaque_tool_context: Mapping[str, object] | None = None,
     ) -> ToolLoopRunResult:
         """Run the composed tool loop with registered tool definitions."""
         return await self.runner.run(
@@ -67,6 +69,7 @@ class ToolLoopRuntime:
             available_tools=self.available_tools,
             limits=self.limits,
             cancellation=cancellation,
+            opaque_tool_context=opaque_tool_context,
         )
 
 

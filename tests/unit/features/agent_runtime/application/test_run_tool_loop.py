@@ -1,12 +1,14 @@
 """Tests for bounded tool-loop orchestration."""
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     RuntimeObservation,
     ToolAwareModelResponse,
+    ToolBatchPolicy,
     ToolCallRequest,
     ToolCallResult,
     ToolCallResultStatus,
@@ -51,15 +53,18 @@ class FakeToolExecutor:
     results_by_call_id: dict[str, ToolCallResult] = field(default_factory=dict)
     error: ToolExecutionError | None = None
     calls: list[tuple[ToolCallRequest, ToolLoopLimits]] = field(default_factory=list)
+    opaque_contexts: list[Mapping[str, object]] = field(default_factory=list)
 
     async def execute_tool(
         self,
         request: ToolCallRequest,
         limits: ToolLoopLimits,
         cancellation: ToolCancellationSignal,
+        opaque_context: Mapping[str, object] | None = None,
     ) -> ToolCallResult:
         del cancellation
         self.calls.append((request, limits))
+        self.opaque_contexts.append(opaque_context or {})
         if self.error is not None:
             raise self.error
         return self.results_by_call_id[request.call_id]
@@ -138,6 +143,54 @@ def test_run_tool_loop_executes_all_calls_at_per_turn_limit() -> None:
     assert result.status is ToolLoopRunStatus.SUCCESS
     assert result.tool_results == (first_result, second_result)
     assert executor.calls == [(first_call, limits), (second_call, limits)]
+
+
+def test_run_tool_loop_rejects_solo_tool_in_mixed_batch_before_execution() -> None:
+    command = LocalAgentRunCommand(prompt="Ask then inspect")
+    question_call = ToolCallRequest(call_id="call-question", tool_name="ask_question")
+    lookup_call = ToolCallRequest(call_id="call-lookup", tool_name="lookup_note")
+    model = FakeToolAwareModel(responses=[ToolAwareModelResponse(tool_calls=(question_call, lookup_call))])
+    executor = FakeToolExecutor()
+    tools = (
+        ToolDefinition(name="ask_question", description="Ask the user", batch_policy=ToolBatchPolicy.REQUIRE_SOLO),
+        ToolDefinition(name="lookup_note", description="Lookup a note"),
+    )
+
+    result = asyncio.run(RunToolLoop(model=model, tool_executor=executor).run(command, available_tools=tools))
+
+    assert result.status is ToolLoopRunStatus.INVALID_TOOL_REQUEST
+    assert executor.calls == []
+    assert result.observations[-1] == RuntimeObservation(
+        message="tool loop rejected a solo-only tool in a mixed batch",
+        metadata={"tool_name": "ask_question", "error_code": "ASK_QUESTION_MUST_BE_SOLO"},
+    )
+
+
+def test_run_tool_loop_forwards_opaque_context_without_exposing_it_to_the_model() -> None:
+    command = LocalAgentRunCommand(prompt="Use a tool")
+    tool = ToolDefinition(name="lookup_note", description="Lookup a note")
+    tool_call = ToolCallRequest(call_id="call-1", tool_name="lookup_note")
+    model = FakeToolAwareModel(
+        responses=[ToolAwareModelResponse(tool_calls=(tool_call,)), ToolAwareModelResponse(output_text="done")]
+    )
+    executor = FakeToolExecutor(
+        results_by_call_id={
+            "call-1": ToolCallResult(call_id="call-1", tool_name="lookup_note", status=ToolCallResultStatus.SUCCESS)
+        }
+    )
+    opaque_context = {"host.owner": object()}
+
+    result = asyncio.run(
+        RunToolLoop(model=model, tool_executor=executor).run(
+            command,
+            available_tools=(tool,),
+            opaque_tool_context=opaque_context,
+        )
+    )
+
+    assert result.status is ToolLoopRunStatus.SUCCESS
+    assert executor.opaque_contexts == [opaque_context]
+    assert model.calls == [(command, (tool,), ()), (command, (tool,), result.tool_results)]
 
 
 def test_run_tool_loop_rejects_excessive_tool_calls_before_execution() -> None:

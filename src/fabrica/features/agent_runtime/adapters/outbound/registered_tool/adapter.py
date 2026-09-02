@@ -96,6 +96,7 @@ class RegisteredToolExecutor:
         request: ToolCallRequest,
         limits: ToolLoopLimits,
         cancellation: ToolCancellationSignal,
+        opaque_context: Mapping[str, object] | None = None,
     ) -> ToolCallResult:
         """Execute one explicitly registered tool request."""
         tool = self._tools.get(request.tool_name)
@@ -115,6 +116,7 @@ class RegisteredToolExecutor:
                         call_id=request.call_id,
                         argument_digest=canonical_tool_arguments_digest(request.arguments, tool_name=request.tool_name),
                         cancellation=cancellation,
+                        opaque_values=opaque_context or {},
                     ),
                 )
                 return _outcome_result(request, outcome, limits)

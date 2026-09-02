@@ -110,6 +110,7 @@ def test_registered_tool_executor_runs_async_typed_tool_with_execution_context()
             ToolCallRequest(call_id="call-1", tool_name="async_lookup_note", arguments={"note_id": "abc"}),
             ToolLoopLimits(max_tool_iterations=1, max_tool_result_chars=100),
             _NeverCancelledToolCancellationSignal(),
+            {"host.owner": "opaque-owner"},
         ),
     )
 
@@ -118,6 +119,7 @@ def test_registered_tool_executor_runs_async_typed_tool_with_execution_context()
     assert '"status":"success"' in result.result_text
     assert contexts[0].call_id == "call-1"
     assert contexts[0].argument_digest.startswith("sha256:")
+    assert contexts[0].opaque_values == {"host.owner": "opaque-owner"}
 
 
 def test_registered_tool_executor_passes_maximum_apply_patch_input_to_handler() -> None:

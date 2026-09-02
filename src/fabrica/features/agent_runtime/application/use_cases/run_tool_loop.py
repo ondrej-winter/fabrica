@@ -1,11 +1,13 @@
 """Use case for running a bounded application-owned tool loop."""
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     RuntimeObservation,
+    ToolBatchPolicy,
     ToolCallRequest,
     ToolCallResult,
     ToolCallResultStatus,
@@ -39,10 +41,12 @@ class RunToolLoop:
         available_tools: tuple[ToolDefinition, ...] = (),
         limits: ToolLoopLimits | None = None,
         cancellation: ToolCancellationSignal | None = None,
+        opaque_tool_context: Mapping[str, object] | None = None,
     ) -> ToolLoopRunResult:
         """Run model turns and requested tools until final output or a safe stop condition."""
         active_limits = limits or ToolLoopLimits()
         active_cancellation = cancellation or _NeverCancelledToolCancellationSignal()
+        active_opaque_tool_context = opaque_tool_context or {}
         tool_results: tuple[ToolCallResult, ...] = ()
         observations: tuple[RuntimeObservation, ...] = ()
         call_ledger: dict[str, _ToolCallLedgerEntry] = {}
@@ -94,6 +98,7 @@ class RunToolLoop:
                 model_response.tool_calls,
                 limits=active_limits,
                 call_ledger=call_ledger,
+                available_tools=available_tools,
             )
             if validation_failure is not None:
                 return ToolLoopRunResult(
@@ -108,6 +113,7 @@ class RunToolLoop:
                         tool_call,
                         active_limits,
                         active_cancellation,
+                        active_opaque_tool_context,
                         call_ledger,
                     )
                     for tool_call in model_response.tool_calls
@@ -129,9 +135,12 @@ class RunToolLoop:
         tool_call: ToolCallRequest,
         limits: ToolLoopLimits,
         cancellation: ToolCancellationSignal,
+        opaque_context: Mapping[str, object],
     ) -> ToolCallResult:
         try:
-            return (await self._tool_executor.execute_tool(tool_call, limits, cancellation)).bounded(limits)
+            return (await self._tool_executor.execute_tool(tool_call, limits, cancellation, opaque_context)).bounded(
+                limits
+            )
         except ToolExecutionError as err:
             return ToolCallResult(
                 call_id=tool_call.call_id,
@@ -151,13 +160,14 @@ class RunToolLoop:
         tool_call: ToolCallRequest,
         limits: ToolLoopLimits,
         cancellation: ToolCancellationSignal,
+        opaque_context: Mapping[str, object],
         call_ledger: dict[str, "_ToolCallLedgerEntry"],
     ) -> ToolCallResult:
         entry = call_ledger.get(tool_call.call_id)
         if entry is not None:
             return entry.result
 
-        result = await self._execute_tool_call(tool_call, limits, cancellation)
+        result = await self._execute_tool_call(tool_call, limits, cancellation, opaque_context)
         call_ledger[tool_call.call_id] = _ToolCallLedgerEntry(
             argument_digest=canonical_tool_arguments_digest(tool_call.arguments, tool_name=tool_call.tool_name),
             tool_name=tool_call.tool_name,
@@ -201,6 +211,7 @@ def _validate_tool_call_batch(
     *,
     limits: ToolLoopLimits,
     call_ledger: dict[str, _ToolCallLedgerEntry],
+    available_tools: tuple[ToolDefinition, ...],
 ) -> _ToolCallBatchValidationFailure | None:
     if len(tool_calls) > limits.max_tool_calls_per_turn:
         return _ToolCallBatchValidationFailure(
@@ -225,7 +236,25 @@ def _validate_tool_call_batch(
                 return _conflicting_duplicate_call_id_failure(tool_call.call_id)
         seen_call_ids.add(tool_call.call_id)
 
+    if len(tool_calls) > 1:
+        tool_definitions = {definition.name: definition for definition in available_tools}
+        for tool_call in tool_calls:
+            definition = tool_definitions.get(tool_call.tool_name)
+            if definition is not None and definition.batch_policy is ToolBatchPolicy.REQUIRE_SOLO:
+                return _solo_tool_batch_failure(tool_call.tool_name)
+
     return None
+
+
+def _solo_tool_batch_failure(tool_name: str) -> _ToolCallBatchValidationFailure:
+    error_code = "ASK_QUESTION_MUST_BE_SOLO" if tool_name == "ask_question" else "TOOL_MUST_BE_SOLO"
+    return _ToolCallBatchValidationFailure(
+        status=ToolLoopRunStatus.INVALID_TOOL_REQUEST,
+        observation=RuntimeObservation(
+            message="tool loop rejected a solo-only tool in a mixed batch",
+            metadata={"tool_name": tool_name, "error_code": error_code},
+        ),
+    )
 
 
 def _duplicate_call_id_failure(call_id: str, *, duplicate_scope: str) -> _ToolCallBatchValidationFailure:
