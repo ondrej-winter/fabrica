@@ -16,8 +16,10 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchRecoveryAction,
     PatchRecoveryDecision,
     PatchRecoveryStatus,
+    WorkspaceMutationStartupGate,
     is_legal_patch_journal_transition,
 )
+from fabrica.features.workspace_editing.application.errors import patch_error
 
 SHA256_A = "sha256:" + "a" * 64
 SHA256_B = "sha256:" + "b" * 64
@@ -28,6 +30,7 @@ def test_journal_states_cover_legal_mutation_lifecycle_transitions() -> None:
         frozenset(
             {
                 PatchJournalTransition(PatchJournalState.PLANNED, PatchJournalState.PREPARING),
+                PatchJournalTransition(PatchJournalState.PLANNED, PatchJournalState.ROLLED_BACK),
                 PatchJournalTransition(PatchJournalState.PREPARING, PatchJournalState.PREPARED),
                 PatchJournalTransition(PatchJournalState.PREPARING, PatchJournalState.ROLLING_BACK),
                 PatchJournalTransition(PatchJournalState.PREPARED, PatchJournalState.COMMITTING),
@@ -100,4 +103,19 @@ def test_recovery_decision_invariants_match_mutation_guarantees() -> None:
             action=PatchRecoveryAction.REQUIRE_OPERATOR_RECOVERY,
             status=PatchRecoveryStatus.RECOVERY_REQUIRED,
             mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
+        )
+
+
+def test_workspace_mutation_startup_gate_requires_error_evidence_when_disabled() -> None:
+    enabled = WorkspaceMutationStartupGate(mutation_enabled=True, recovered_journal_digests=(SHA256_A,))
+
+    assert enabled.mutation_enabled
+    assert enabled.recovered_journal_digests == (SHA256_A,)
+
+    with pytest.raises(ValueError, match="disabled workspace"):
+        WorkspaceMutationStartupGate(mutation_enabled=False)
+    with pytest.raises(ValueError, match="enabled workspace"):
+        WorkspaceMutationStartupGate(
+            mutation_enabled=True,
+            error=patch_error("UNSUPPORTED_FILESYSTEM_GUARANTEE", message="unexpected"),
         )

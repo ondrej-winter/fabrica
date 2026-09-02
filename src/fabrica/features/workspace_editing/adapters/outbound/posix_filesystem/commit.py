@@ -177,6 +177,10 @@ class PosixPatchCommitAdapter:
             if directory.final_state is PatchDirectoryOutcomeState.RETAINED_EXTERNAL_CONTENT
         )
         if path_recovery_required:
+            _write_record(
+                self._record_path(journal),
+                _recovered_journal(journal, PatchJournalState.RECOVERY_REQUIRED, directory_outcomes, path_outcomes),
+            )
             error = patch_error(
                 "RECOVERY_REQUIRED",
                 message="rollback retained a file path whose current state could not be proven safe to replace",
@@ -191,6 +195,10 @@ class PosixPatchCommitAdapter:
                 error=error,
             )
         if uncertain:
+            _write_record(
+                self._record_path(journal),
+                _recovered_journal(journal, PatchJournalState.RECOVERY_REQUIRED, directory_outcomes, path_outcomes),
+            )
             error = patch_error(
                 "ROLLBACK_FAILED",
                 message="rollback could not prove all reversible directory effects were removed safely",
@@ -205,6 +213,10 @@ class PosixPatchCommitAdapter:
                 error=error,
             )
         if retained:
+            _write_record(
+                self._record_path(journal),
+                _recovered_journal(journal, PatchJournalState.RECOVERY_REQUIRED, directory_outcomes, path_outcomes),
+            )
             error = patch_error(
                 "CREATED_DIRECTORY_RETAINED",
                 message="rollback retained independently changed directory content",
@@ -221,6 +233,10 @@ class PosixPatchCommitAdapter:
         error = patch_error(
             "COMMIT_FAILED_ROLLED_BACK",
             message="interrupted patch preparation was rolled back safely",
+        )
+        _write_record(
+            self._record_path(journal),
+            _recovered_journal(journal, PatchJournalState.ROLLED_BACK, directory_outcomes, path_outcomes),
         )
         return PatchResult(
             status=PatchResultStatus.COMMIT_FAILED_ROLLED_BACK,
@@ -270,6 +286,10 @@ class PosixPatchCommitAdapter:
         """Perform safe startup recovery or report operator-gated recovery."""
         decision = await self.inspect(journal)
         if decision.action is PatchRecoveryAction.NO_ACTION:
+            _write_record(
+                self._record_path(journal),
+                _journal_with_state(journal, PatchJournalState.ROLLED_BACK),
+            )
             error = patch_error(
                 "COMMIT_FAILED_ROLLED_BACK",
                 message="interrupted patch journal had no visible effects",
@@ -411,6 +431,23 @@ def _journal_with_state(journal: PatchJournalRecord, state: PatchJournalState) -
         state=state,
         created_directories=journal.created_directories,
         path_outcomes=journal.path_outcomes,
+        rollback_entries=journal.rollback_entries,
+        metadata=journal.metadata,
+    )
+
+
+def _recovered_journal(
+    journal: PatchJournalRecord,
+    state: PatchJournalState,
+    directory_outcomes: tuple[PatchDirectoryOutcome, ...],
+    path_outcomes: tuple[PatchPathOutcome, ...],
+) -> PatchJournalRecord:
+    return PatchJournalRecord(
+        journal_digest=journal.journal_digest,
+        plan_digest=journal.plan_digest,
+        state=state,
+        created_directories=directory_outcomes,
+        path_outcomes=path_outcomes,
         rollback_entries=journal.rollback_entries,
         metadata=journal.metadata,
     )

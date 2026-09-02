@@ -43,6 +43,7 @@ from fabrica.features.workspace_editing.application.dtos.recovery import (
     PatchRecoveryDecision,
     PatchRecoveryStatus,
     PatchRollbackEntry,
+    WorkspaceMutationStartupGate,
     is_legal_patch_journal_transition,
 )
 
@@ -86,6 +87,7 @@ __all__ = [
     "PatchRollbackEntry",
     "PatchRuntimeMapping",
     "SafePatchMetadataValue",
+    "WorkspaceMutationStartupGate",
     "canonical_patch_result_json",
     "is_legal_patch_journal_transition",
 ]

@@ -8,6 +8,7 @@ from types import MappingProxyType
 from fabrica.features.workspace_editing.application.dtos.patch import (
     PatchActionKind,
     PatchDirectoryOutcome,
+    PatchError,
     PatchMutationGuarantee,
     PatchPathEvidence,
     PatchPathOutcome,
@@ -44,6 +45,24 @@ class PatchRecoveryStatus(StrEnum):
     CLEAN = "clean"
     ROLLED_BACK = "rolled_back"
     RECOVERY_REQUIRED = "recovery_required"
+
+
+@dataclass(frozen=True, slots=True)
+class WorkspaceMutationStartupGate:
+    """Structured startup evidence that determines whether apply-patch may be exposed."""
+
+    mutation_enabled: bool
+    recovered_journal_digests: tuple[str, ...] = field(default_factory=tuple)
+    error: PatchError | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "recovered_journal_digests", tuple(self.recovered_journal_digests))
+        if self.mutation_enabled and self.error is not None:
+            msg = "an enabled workspace mutation gate cannot include an error"
+            raise ValueError(msg)
+        if not self.mutation_enabled and self.error is None:
+            msg = "a disabled workspace mutation gate must include an error"
+            raise ValueError(msg)
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +130,7 @@ class PatchRecoveryDecision:
 LEGAL_PATCH_JOURNAL_TRANSITIONS = frozenset(
     {
         PatchJournalTransition(PatchJournalState.PLANNED, PatchJournalState.PREPARING),
+        PatchJournalTransition(PatchJournalState.PLANNED, PatchJournalState.ROLLED_BACK),
         PatchJournalTransition(PatchJournalState.PREPARING, PatchJournalState.PREPARED),
         PatchJournalTransition(PatchJournalState.PREPARING, PatchJournalState.ROLLING_BACK),
         PatchJournalTransition(PatchJournalState.PREPARED, PatchJournalState.COMMITTING),
@@ -157,5 +177,6 @@ __all__ = [
     "PatchRecoveryDecision",
     "PatchRecoveryStatus",
     "PatchRollbackEntry",
+    "WorkspaceMutationStartupGate",
     "is_legal_patch_journal_transition",
 ]

@@ -502,6 +502,7 @@ def test_posix_commit_adapter_startup_recovery_rolls_back_prepared_journal(tmp_p
     assert decision.status is PatchRecoveryStatus.ROLLED_BACK
     assert result.status is PatchResultStatus.COMMIT_FAILED_ROLLED_BACK
     assert not (tmp_path / "src" / "generated").exists()
+    assert run(PosixPatchJournalAndPreparationAdapter(tmp_path).list_incomplete()) == ()
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")

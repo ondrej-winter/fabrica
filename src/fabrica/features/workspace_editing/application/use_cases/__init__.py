@@ -8,6 +8,7 @@ from fabrica.features.workspace_editing.application.use_cases.plan_patch import 
     PlanPatch,
     PlanPatchResult,
 )
+from fabrica.features.workspace_editing.application.use_cases.recover_workspace_mutation import RecoverWorkspaceMutation
 
 __all__ = [
     "ApplyPatch",
@@ -18,4 +19,5 @@ __all__ = [
     "PatchPlanningSnapshot",
     "PlanPatch",
     "PlanPatchResult",
+    "RecoverWorkspaceMutation",
 ]

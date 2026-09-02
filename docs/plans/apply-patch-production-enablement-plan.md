@@ -58,7 +58,7 @@ patch-input limit and the generic runtime's lower string-argument limit.
 - [x] AP-02 Implement descriptor-rooted native no-replace mutation operations.
 - [x] AP-03 Implement supervised helper-process commit and cleanup ownership.
 - [x] AP-04 Propagate runtime cancellation and phase deadlines into patch execution.
-- [ ] AP-05 Add startup recovery orchestration and workspace mutation gating.
+- [x] AP-05 Add startup recovery orchestration and workspace mutation gating.
 - [ ] AP-06 Add explicit production bootstrap composition.
 - [ ] AP-07 Align the public schema and runtime argument bounds with the spec.
 - [ ] AP-08 Add production-path integration and acceptance tests.
@@ -284,6 +284,17 @@ when durable cleanup evidence is unsafe.
 
 ### AP-05 — Add startup recovery orchestration and workspace mutation gating
 
+**Status: complete (September 2, 2026).** `RecoverWorkspaceMutation` verifies
+workspace capabilities, processes incomplete journals in stable digest order,
+permits only the recovery port to act, and re-reads durable incomplete-journal
+state before enabling mutation. It returns immutable structured gate evidence:
+capability failures retain `UNSUPPORTED_FILESYSTEM_GUARANTEE`; unresolved
+journals retain `RECOVERY_REQUIRED` with journal state and operator guidance.
+POSIX recovery now persists `ROLLED_BACK` or `RECOVERY_REQUIRED` terminal state,
+including a `PLANNED` journal with no visible effects. AP-06 must consume this
+gate when composing public tools, omitting `apply_patch` while preserving
+unrelated read-only tools.
+
 **Likely files**
 
 - New use case under
@@ -308,24 +319,27 @@ when durable cleanup evidence is unsafe.
 
 **Acceptance criteria**
 
-- [ ] An unresolved incomplete journal prevents `apply_patch` from being exposed
-      for that workspace.
-- [ ] Recovery never resumes forward commit.
-- [ ] Recovery only removes plan-created directories when identity and emptiness
-      prove that removal is safe.
-- [ ] A recovery-blocked host retains read-only tools and reports
-       `RECOVERY_REQUIRED` with structured recovery guidance.
+- [x] An unresolved incomplete journal produces disabled startup-gate evidence;
+       AP-06 will use it to omit `apply_patch` for that workspace.
+- [x] Recovery never resumes forward commit.
+- [x] Recovery only removes plan-created directories when identity and emptiness
+       prove that removal is safe.
+- [x] A recovery-blocked gate reports `RECOVERY_REQUIRED` with structured
+       recovery guidance; AP-06 will retain read-only tool composition.
 
 **Verification**
 
-- [ ] Integration fixtures cover each recoverable and unrecoverable journal
-      state, including external modifications.
+- [x] Unit and POSIX integration fixtures cover deterministic ordering,
+       capability rejection, safe recovery, unresolved durable journals,
+       external directory/file modifications, and terminal journal persistence.
 
 ### Checkpoint B — Recovery-gated mutation lifecycle
 
-- [ ] A capability-proven workspace performs startup recovery before public
-      mutation registration.
-- [ ] The recovery gate unblocks only after safe terminal evidence exists.
+- [x] The reusable startup gate performs capability verification and recovery
+       before it reports mutation enabled; AP-06 will invoke it before public
+       mutation registration.
+- [x] The recovery gate unblocks only after a second durable incomplete-journal
+       read shows safe terminal evidence.
 
 ### AP-06 — Add explicit production bootstrap composition
 
