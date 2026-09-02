@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from fabrica.features.agent_runtime.application.dtos import (
     RegisteredToolOutcome,
@@ -14,12 +14,17 @@ from fabrica.features.agent_runtime.application.dtos import (
 from fabrica.features.agent_runtime.application.ports import AsyncRegisteredTool
 from fabrica.features.workspace_editing.application.dtos import (
     DEFAULT_MAX_PATCH_OUTPUT_CHARS,
+    PatchExecutionContext,
+    PatchExecutionPhase,
     PatchLimits,
     PatchMutationGuarantee,
     PatchResult,
     PatchResultStatus,
     PatchRuntimeMapping,
 )
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 APPLY_PATCH_TOOL_NAME = "apply_patch"
 APPLY_PATCH_TOOL_DESCRIPTION = """Apply context-based patches to UTF-8 text files in the workspace.
@@ -59,7 +64,12 @@ APPLY_PATCH_TOOL_DEFINITION = ToolDefinition(
 class PatchApplier(Protocol):
     """Application-compatible apply-patch boundary consumed by this adapter."""
 
-    async def apply(self, patch_text: str, limits: PatchLimits | None = None) -> PatchResult:
+    async def apply(
+        self,
+        patch_text: str,
+        limits: PatchLimits | None = None,
+        execution: PatchExecutionContext | None = None,
+    ) -> PatchResult:
         """Apply one canonical patch body."""
         ...
 
@@ -77,14 +87,13 @@ class ApplyPatchRegisteredToolAdapter:
         context: ToolExecutionContext,
     ) -> RegisteredToolOutcome:
         """Run one canonical patch request and return a typed runtime outcome."""
-        del context
         input_value = arguments.get("input")
         if not isinstance(input_value, str):
             return RegisteredToolOutcome.recoverable_rejection(
                 error_code="INVALID_ARGUMENTS",
                 error_message="apply_patch requires a string `input` argument",
             )
-        result = await self.use_case.apply(input_value, self.limits)
+        result = await self.use_case.apply(input_value, self.limits, _patch_execution_context(context))
         return patch_result_to_tool_outcome(result, limits=self.limits)
 
 
@@ -141,6 +150,15 @@ def patch_result_to_tool_outcome(result: PatchResult, *, limits: PatchLimits | N
 
 def _tool_mutation_guarantee(guarantee: PatchMutationGuarantee) -> ToolMutationGuarantee:
     return ToolMutationGuarantee(guarantee.value)
+
+
+def _patch_execution_context(context: ToolExecutionContext) -> PatchExecutionContext:
+    deadlines: dict[PatchExecutionPhase, datetime] = {}
+    for phase in PatchExecutionPhase:
+        deadline = context.phase_deadline(phase.value)
+        if deadline is not None:
+            deadlines[phase] = deadline
+    return PatchExecutionContext(cancellation=context.cancellation, phase_deadlines=deadlines)
 
 
 __all__ = [

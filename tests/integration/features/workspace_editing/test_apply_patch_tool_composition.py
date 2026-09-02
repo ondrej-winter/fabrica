@@ -18,6 +18,7 @@ from fabrica.features.agent_runtime.application.dtos import (
 )
 from fabrica.features.workspace_editing.adapters.inbound.registered_tool import APPLY_PATCH_TOOL_NAME
 from fabrica.features.workspace_editing.application.dtos import (
+    PatchExecutionContext,
     PatchLimits,
     PatchMutationGuarantee,
     PatchResult,
@@ -86,7 +87,11 @@ def test_apply_patch_tool_helper_composes_explicit_use_case_without_mutating_dur
     assert tool_result_payload["status"] == "success"
     assert result.output_text is not None
     assert result.output_text.startswith("final:")
-    assert use_case.calls == (("*** Begin Patch\n*** End Patch", PatchLimits(max_output_chars=500)),)
+    assert len(use_case.calls) == 1
+    patch_text, patch_limits, execution = use_case.calls[0]
+    assert patch_text == "*** Begin Patch\n*** End Patch"
+    assert patch_limits == PatchLimits(max_output_chars=500)
+    assert execution is not None
     assert model.calls[0][1] == runtime.available_tools
     assert model.calls[1][2] == result.tool_results
 
@@ -157,8 +162,13 @@ def _indeterminate_result() -> PatchResult:
 @dataclass(slots=True)
 class _FakeApplyPatch:
     result: PatchResult
-    calls: tuple[tuple[str, PatchLimits | None], ...] = ()
+    calls: tuple[tuple[str, PatchLimits | None, PatchExecutionContext | None], ...] = ()
 
-    async def apply(self, patch_text: str, limits: PatchLimits | None = None) -> PatchResult:
-        self.calls = (*self.calls, (patch_text, limits))
+    async def apply(
+        self,
+        patch_text: str,
+        limits: PatchLimits | None = None,
+        execution: PatchExecutionContext | None = None,
+    ) -> PatchResult:
+        self.calls = (*self.calls, (patch_text, limits, execution))
         return self.result

@@ -1,7 +1,6 @@
 # Implementation Plan: Complete Production `apply_patch` Enablement
 
-## Status
-- Readiness: **AP-03 complete.** Production composition remains unavailable until
+- Readiness: **AP-04 complete.** Production composition remains unavailable until
   AP-06 wires the supervised POSIX mutation adapters and AP-05 adds startup
   recovery gating.
 - Created: September 1, 2026.
@@ -22,8 +21,9 @@ does not yet prove two required guarantees:
    host never returns while unmanaged mutation may continue.
 
 The current bootstrap helper accepts an injected `PatchApplier`; it does not
-assemble production dependencies, perform startup recovery, or bind the runtime
-execution context's cancellation and phase deadlines to the patch lifecycle.
+assemble production dependencies or perform startup recovery. The registered-tool
+adapter binds runtime cancellation and supplied phase deadlines to the patch
+lifecycle, but production composition remains deferred.
 
 The public tool schema also needs to be reconciled with the accepted 256 KiB
 patch-input limit and the generic runtime's lower string-argument limit.
@@ -57,7 +57,7 @@ patch-input limit and the generic runtime's lower string-argument limit.
 - [x] AP-01 Define and approve production capability evidence, native-operation boundaries, and helper ownership architecture.
 - [x] AP-02 Implement descriptor-rooted native no-replace mutation operations.
 - [x] AP-03 Implement supervised helper-process commit and cleanup ownership.
-- [ ] AP-04 Propagate runtime cancellation and phase deadlines into patch execution.
+- [x] AP-04 Propagate runtime cancellation and phase deadlines into patch execution.
 - [ ] AP-05 Add startup recovery orchestration and workspace mutation gating.
 - [ ] AP-06 Add explicit production bootstrap composition.
 - [ ] AP-07 Align the public schema and runtime argument bounds with the spec.
@@ -247,6 +247,14 @@ composition remains deferred to AP-06.
 
 ### AP-04 — Propagate runtime cancellation and phase deadlines
 
+**Status: Complete (2026-09-02).** The registered-tool adapter now translates
+the runtime-owned cancellation signal and supplied lifecycle phase deadlines
+into a workspace-editing-owned execution context. `ApplyPatch` observes those
+controls at lease, planning, approval, staging, and pre-commit checkpoints. A
+pre-journal interruption returns a recoverable no-mutation result; an
+interruption after journaling performs rollback and preserves fatal escalation
+when durable cleanup evidence is unsafe.
+
 **Likely files**
 
 - `src/fabrica/features/workspace_editing/adapters/inbound/registered_tool/adapter.py`
@@ -263,14 +271,16 @@ composition remains deferred to AP-06.
 
 **Acceptance criteria**
 
-- [ ] Runtime cancellation and deadlines affect the actual patch lifecycle.
-- [ ] Pre-visible-effect timeout is a recoverable, no-mutation result.
-- [ ] Post-commit-point uncertainty is fatal and never downgraded to rejection.
+- [x] Runtime cancellation and supplied deadlines affect the actual patch lifecycle.
+- [x] Pre-visible-effect timeout is a recoverable, no-mutation result.
+- [x] Post-commit-point uncertainty remains fatal through the existing terminal-result mapping.
 
 **Verification**
 
-- [ ] Deterministic clock/cancellation unit tests cover every phase.
-- [ ] Tool-loop integration tests verify outcome status and runtime disposition.
+- [x] Deterministic cancellation and planning-deadline unit tests cover pre-journal
+      rejection and post-journal rollback behavior; adapter tests verify context translation.
+- [x] Existing composed tool-loop tests verify recoverable rejection and fatal
+      terminal mutation disposition; focused workspace-editing tests pass.
 
 ### AP-05 — Add startup recovery orchestration and workspace mutation gating
 

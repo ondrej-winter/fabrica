@@ -10,7 +10,6 @@ def test_workspace_editing_ports_are_application_owned_protocols_without_adapter
 
     assert {
         "PatchApprovalRequester",
-        "PatchCancellationSignal",
         "PatchClock",
         "PatchCommitter",
         "PatchJournalStore",

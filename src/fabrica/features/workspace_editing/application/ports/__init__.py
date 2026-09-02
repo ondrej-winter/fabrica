@@ -3,7 +3,6 @@
 from fabrica.features.workspace_editing.application.ports.workspace_mutation import (
     PatchApprovalRequester,
     PatchAsyncResource,
-    PatchCancellationSignal,
     PatchCleanupStack,
     PatchClock,
     PatchCommitter,
@@ -19,7 +18,6 @@ from fabrica.features.workspace_editing.application.ports.workspace_mutation imp
 __all__ = [
     "PatchApprovalRequester",
     "PatchAsyncResource",
-    "PatchCancellationSignal",
     "PatchCleanupStack",
     "PatchClock",
     "PatchCommitter",

@@ -2,9 +2,11 @@
 
 from asyncio import run
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from fabrica.features.agent_runtime.application.dtos import (
     ToolExecutionContext,
+    ToolExecutionPhaseDeadline,
     ToolExecutionRuntimeDisposition,
     ToolMutationGuarantee,
     ToolOutcomeStatus,
@@ -18,6 +20,8 @@ from fabrica.features.workspace_editing.adapters.inbound.registered_tool import 
 )
 from fabrica.features.workspace_editing.adapters.inbound.registered_tool.adapter import patch_result_to_tool_outcome
 from fabrica.features.workspace_editing.application.dtos import (
+    PatchExecutionContext,
+    PatchExecutionPhase,
     PatchLimits,
     PatchMutationGuarantee,
     PatchResult,
@@ -49,7 +53,12 @@ def test_apply_patch_registered_tool_passes_string_input_to_use_case() -> None:
 
     outcome = run(adapter.handle({"input": "*** Begin Patch\n*** End Patch"}, _context()))
 
-    assert use_case.calls == (("*** Begin Patch\n*** End Patch", PatchLimits(max_output_chars=500)),)
+    assert len(use_case.calls) == 1
+    patch_text, limits, execution = use_case.calls[0]
+    assert patch_text == "*** Begin Patch\n*** End Patch"
+    assert limits == PatchLimits(max_output_chars=500)
+    assert execution is not None
+    assert execution.deadline_for(PatchExecutionPhase.PLANNING) == datetime(2026, 9, 2, tzinfo=UTC)
     assert outcome.status is ToolOutcomeStatus.SUCCESS
     assert outcome.mutation_guarantee is ToolMutationGuarantee.COMMITTED
     assert outcome.result_text is not None
@@ -134,10 +143,15 @@ def _committed_result() -> PatchResult:
 @dataclass(slots=True)
 class _FakeApplyPatch:
     result: PatchResult
-    calls: tuple[tuple[str, PatchLimits | None], ...] = ()
+    calls: tuple[tuple[str, PatchLimits | None, PatchExecutionContext | None], ...] = ()
 
-    async def apply(self, patch_text: str, limits: PatchLimits | None = None) -> PatchResult:
-        self.calls = (*self.calls, (patch_text, limits))
+    async def apply(
+        self,
+        patch_text: str,
+        limits: PatchLimits | None = None,
+        execution: PatchExecutionContext | None = None,
+    ) -> PatchResult:
+        self.calls = (*self.calls, (patch_text, limits, execution))
         return self.result
 
 
@@ -146,6 +160,12 @@ def _context() -> ToolExecutionContext:
         call_id="call-1",
         argument_digest=PLAN_DIGEST,
         cancellation=_NeverCancelledToolCancellationSignal(),
+        phase_deadlines=(
+            ToolExecutionPhaseDeadline(
+                phase=PatchExecutionPhase.PLANNING.value,
+                deadline_at=datetime(2026, 9, 2, tzinfo=UTC),
+            ),
+        ),
     )
 
 

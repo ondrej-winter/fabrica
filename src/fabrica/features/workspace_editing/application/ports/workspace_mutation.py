@@ -31,14 +31,6 @@ class PatchMutationLeaseManager(Protocol):
         ...
 
 
-class PatchCancellationSignal(Protocol):
-    """Cancellation boundary observed by long-running patch phases."""
-
-    def throw_if_cancelled(self) -> None:
-        """Raise a caller-owned cancellation error when the current call is cancelled."""
-        ...
-
-
 class PatchClock(Protocol):
     """Outbound port for deterministic patch deadlines and timestamps."""
 
@@ -154,7 +146,6 @@ class PatchAsyncResource(Protocol):
 __all__ = [
     "PatchApprovalRequester",
     "PatchAsyncResource",
-    "PatchCancellationSignal",
     "PatchCleanupStack",
     "PatchClock",
     "PatchCommitter",

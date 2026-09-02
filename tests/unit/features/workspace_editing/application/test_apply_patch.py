@@ -1,13 +1,17 @@
 """Tests for apply-patch application orchestration."""
 
 from asyncio import run
+from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from types import TracebackType
 from typing import Self
 
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
+    PatchExecutionContext,
+    PatchExecutionPhase,
     PatchJournalRecord,
     PatchJournalState,
     PatchMutationGuarantee,
@@ -186,6 +190,48 @@ def test_apply_patch_returns_hunk_match_rejection_before_planning_snapshot() -> 
     assert "snapshot" not in harness.events
 
 
+def test_apply_patch_returns_recoverable_no_mutation_result_when_cancelled_before_planning() -> None:
+    harness = _Harness()
+    cancellation = _MutableCancellation(cancelled=True)
+
+    result = run(harness.use_case.apply(_add_file_patch(), execution=_execution(cancellation)))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.mutation_guarantee is PatchMutationGuarantee.NO_MUTATION
+    assert result.error is not None
+    assert result.error.code == "PLANNING_TIMEOUT"
+    assert harness.events == ["lease_enter", "lease_exit"]
+
+
+def test_apply_patch_returns_recoverable_no_mutation_result_when_planning_deadline_expires() -> None:
+    deadline = datetime(2026, 9, 2, tzinfo=UTC)
+    harness = _Harness(clock=_FixedClock(datetime(2026, 9, 2, 0, 0, 1, tzinfo=UTC)))
+
+    result = run(
+        harness.use_case.apply(_add_file_patch(), execution=_execution(_MutableCancellation(), deadline=deadline))
+    )
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.mutation_guarantee is PatchMutationGuarantee.NO_MUTATION
+    assert result.error is not None
+    assert result.error.code == "PLANNING_TIMEOUT"
+    assert harness.events == ["lease_enter", "capability", "lease_exit"]
+
+
+def test_apply_patch_rolls_back_when_cancelled_after_journaled_preparation() -> None:
+    cancellation = _MutableCancellation()
+    harness = _Harness(preparation_stager_callback=lambda: setattr(cancellation, "cancelled", True))
+
+    result = run(harness.use_case.apply(_add_file_patch(), execution=_execution(cancellation)))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.mutation_guarantee is PatchMutationGuarantee.NO_MUTATION
+    assert result.error is not None
+    assert result.error.code == "STAGING_TIMEOUT"
+    assert harness.events[-4:] == ["journal_create", "prepare_directories", "rollback", "lease_exit"]
+    assert "prepare_files" not in harness.events
+
+
 @dataclass(slots=True)
 class _Harness:
     text_by_path: dict[str, bytes] = field(default_factory=dict)
@@ -195,6 +241,8 @@ class _Harness:
     policy_result: PatchResult | None = None
     post_staging_policy_result: PatchResult | None = None
     file_staging_result: PatchResult | None = None
+    preparation_stager_callback: Callable[[], None] | None = None
+    clock: "_FixedClock" = field(default_factory=lambda: _FixedClock(datetime(2026, 9, 2, tzinfo=UTC)))
     commit_result_plan_digest: str | None = None
     events: list[str] = field(default_factory=list)
     committed_plan: PatchPlan | None = None
@@ -219,10 +267,10 @@ class _Harness:
             policy_evaluator=_PolicyEvaluator(self.events, self.policy_result, self.post_staging_policy_result),
             approval_requester=_ApprovalRequester(self.events),
             journal_store=self.journal_store,
-            preparation_stager=_Stager(self.events, "prepare_directories"),
+            preparation_stager=_Stager(self.events, "prepare_directories", callback=self.preparation_stager_callback),
             file_stager=_Stager(self.events, "prepare_files", self.file_staging_result),
             committer=self.committer,
-            cancellation=_Cancellation(),
+            clock=self.clock,
         )
 
 
@@ -334,10 +382,13 @@ class _Stager:
     events: list[str]
     event: str
     result: PatchResult | None = None
+    callback: Callable[[], None] | None = None
 
     async def prepare(self, plan: PatchPlan, journal: PatchJournalRecord) -> PatchResult | None:
         _ = plan, journal
         self.events.append(self.event)
+        if self.callback is not None:
+            self.callback()
         return self.result
 
 
@@ -368,9 +419,30 @@ class _Committer:
         )
 
 
-class _Cancellation:
-    def throw_if_cancelled(self) -> None:
-        return None
+@dataclass(slots=True)
+class _MutableCancellation:
+    cancelled: bool = False
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self.cancelled
+
+
+def _execution(cancellation: _MutableCancellation, *, deadline: datetime | None = None) -> PatchExecutionContext:
+    deadlines = {} if deadline is None else {PatchExecutionPhase.PLANNING: deadline}
+    return PatchExecutionContext(cancellation=cancellation, phase_deadlines=deadlines)
+
+
+@dataclass(frozen=True, slots=True)
+class _FixedClock:
+    current: datetime
+
+    def now(self) -> datetime:
+        return self.current
+
+
+def _add_file_patch() -> str:
+    return "*** Begin Patch\n*** Add File: src/new.py\n+value = 1\n*** End Patch"
 
 
 def _rejected(code: str, message: str) -> PatchResult:

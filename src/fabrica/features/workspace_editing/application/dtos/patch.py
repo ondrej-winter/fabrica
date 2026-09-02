@@ -3,8 +3,10 @@
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 from types import MappingProxyType
+from typing import Protocol
 
 DEFAULT_MAX_PATCH_INPUT_CHARS = 262_144
 DEFAULT_MAX_PATCH_OUTPUT_CHARS = 4_000
@@ -89,6 +91,49 @@ class PatchErrorPhase(StrEnum):
     ROLLBACK = "rollback"
     CLEANUP = "cleanup"
     RECOVERY = "recovery"
+
+
+class PatchExecutionPhase(StrEnum):
+    """Runtime-controlled checkpoints in the apply-patch lifecycle."""
+
+    LEASE = "lease"
+    PLANNING = "planning"
+    APPROVAL = "approval"
+    STAGING = "staging"
+    COMMIT = "commit"
+    ROLLBACK = "rollback"
+
+
+class PatchCancellationSignal(Protocol):
+    """Runtime cancellation state observed at patch lifecycle checkpoints."""
+
+    @property
+    def is_cancelled(self) -> bool:
+        """Return whether the current patch call has been cancelled."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class PatchExecutionContext:
+    """Runtime-owned cancellation and phase-deadline controls for one patch call."""
+
+    cancellation: PatchCancellationSignal
+    phase_deadlines: Mapping[PatchExecutionPhase, datetime] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        normalized_deadlines = dict(self.phase_deadlines)
+        for phase, deadline in normalized_deadlines.items():
+            if not isinstance(phase, PatchExecutionPhase):
+                msg = "patch execution deadlines must use patch execution phases"
+                raise TypeError(msg)
+            if deadline.tzinfo is None or deadline.utcoffset() is None:
+                msg = "patch execution phase deadlines must be timezone-aware"
+                raise ValueError(msg)
+        object.__setattr__(self, "phase_deadlines", MappingProxyType(normalized_deadlines))
+
+    def deadline_for(self, phase: PatchExecutionPhase) -> datetime | None:
+        """Return the deadline for a patch lifecycle phase when the host supplied one."""
+        return self.phase_deadlines.get(phase)
 
 
 class PatchDirectoryPlannedEffect(StrEnum):
