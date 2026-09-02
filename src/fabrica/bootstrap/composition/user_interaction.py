@@ -1,5 +1,6 @@
 """Opt-in composition for live human interaction in a tool-loop run."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from secrets import token_urlsafe
 
@@ -40,15 +41,12 @@ class InteractiveToolLoopRun:
         *,
         cancellation: ToolCancellationSignal | None = None,
     ) -> ToolLoopRunResult:
-        """Run until completion, cancelling and releasing this owner's interactions."""
-        try:
-            return await self._runtime.run(
-                command,
-                cancellation=cancellation,
-                opaque_tool_context={INTERACTION_OWNER_CONTEXT_KEY: self.owner},
-            )
-        finally:
-            await self._interaction_manager.release_owner(self.owner)
+        """Run until completion with this run's opaque interaction authorization."""
+        return await self._runtime.run(
+            command,
+            cancellation=cancellation,
+            opaque_tool_context={INTERACTION_OWNER_CONTEXT_KEY: self.owner},
+        )
 
     async def submit_answer(self, submission: AnswerSubmission) -> InteractionResult:
         """Submit a structured answer authorized for this run only."""
@@ -101,9 +99,15 @@ def create_interactive_tool_loop_runtime(
     """Create an opt-in interactive runtime from explicit model and host transport."""
     manager = InMemoryInteractionManager(transport)
     executor = RegisteredToolExecutor((create_ask_question_registered_tool(manager),))
+
+    async def release_interaction_owner(opaque_context: Mapping[str, object]) -> None:
+        owner = opaque_context.get(INTERACTION_OWNER_CONTEXT_KEY)
+        if isinstance(owner, InteractionOwner):
+            await manager.release_owner(owner)
+
     return InteractiveToolLoopRuntime(
         _runtime=ToolLoopRuntime(
-            runner=RunToolLoop(model=model, tool_executor=executor),
+            runner=RunToolLoop(model=model, tool_executor=executor, terminal_hooks=(release_interaction_owner,)),
             available_tools=executor.tool_definitions,
         ),
         _interaction_manager=manager,

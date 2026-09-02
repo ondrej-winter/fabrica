@@ -4,6 +4,8 @@ import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+import pytest
+
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     RuntimeObservation,
@@ -191,6 +193,69 @@ def test_run_tool_loop_forwards_opaque_context_without_exposing_it_to_the_model(
     assert result.status is ToolLoopRunStatus.SUCCESS
     assert executor.opaque_contexts == [opaque_context]
     assert model.calls == [(command, (tool,), ()), (command, (tool,), result.tool_results)]
+
+
+def test_run_tool_loop_invokes_terminal_hooks_with_opaque_context_after_completion() -> None:
+    async def scenario() -> None:
+        received_contexts: list[Mapping[str, object]] = []
+
+        async def record_terminal_context(opaque_context: Mapping[str, object]) -> None:
+            received_contexts.append(opaque_context)
+
+        opaque_context = {"host.owner": object()}
+        result = await RunToolLoop(
+            model=FakeToolAwareModel(responses=[ToolAwareModelResponse(output_text="done")]),
+            tool_executor=FakeToolExecutor(),
+            terminal_hooks=(record_terminal_context,),
+        ).run(LocalAgentRunCommand(prompt="Finish"), opaque_tool_context=opaque_context)
+
+        assert result.status is ToolLoopRunStatus.SUCCESS
+        assert received_contexts == [opaque_context]
+
+    asyncio.run(scenario())
+
+
+def test_run_tool_loop_invokes_terminal_hooks_before_reraising_task_cancellation() -> None:
+    async def scenario() -> None:
+        started = asyncio.Event()
+        cleaned_up = asyncio.Event()
+
+        @dataclass
+        class BlockingToolExecutor:
+            async def execute_tool(
+                self,
+                request: ToolCallRequest,
+                limits: ToolLoopLimits,
+                cancellation: ToolCancellationSignal,
+                opaque_context: Mapping[str, object] | None = None,
+            ) -> ToolCallResult:
+                del request, limits, cancellation, opaque_context
+                started.set()
+                await asyncio.Event().wait()
+                raise AssertionError
+
+        async def record_cleanup(opaque_context: Mapping[str, object]) -> None:
+            assert opaque_context == {"host.owner": "owner-1"}
+            cleaned_up.set()
+
+        task = asyncio.create_task(
+            RunToolLoop(
+                model=FakeToolAwareModel(
+                    responses=[ToolAwareModelResponse(tool_calls=(ToolCallRequest("call-1", "lookup_note"),))]
+                ),
+                tool_executor=BlockingToolExecutor(),
+                terminal_hooks=(record_cleanup,),
+            ).run(LocalAgentRunCommand(prompt="Wait"), opaque_tool_context={"host.owner": "owner-1"})
+        )
+        await started.wait()
+
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert cleaned_up.is_set()
+
+    asyncio.run(scenario())
 
 
 def test_run_tool_loop_rejects_excessive_tool_calls_before_execution() -> None:

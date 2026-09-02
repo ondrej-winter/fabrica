@@ -1,7 +1,7 @@
 """Application DTOs for bounded tool-loop runtime orchestration."""
 
 import json
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -48,6 +48,7 @@ type ToolArgumentSchemaValue = (
 type ToolArgumentValue = (
     str | int | float | bool | tuple[ToolArgumentValue, ...] | Mapping[str, ToolArgumentValue] | None
 )
+type ToolLoopTerminalHook = Callable[[Mapping[str, object]], Awaitable[None]]
 
 
 class ToolMutationGuarantee(StrEnum):

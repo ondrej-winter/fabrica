@@ -17,6 +17,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolLoopLimits,
     ToolLoopRunResult,
     ToolLoopRunStatus,
+    ToolLoopTerminalHook,
     canonical_tool_arguments_digest,
 )
 from fabrica.features.agent_runtime.application.ports import (
@@ -30,9 +31,16 @@ from fabrica.features.agent_runtime.application.ports import (
 class RunToolLoop:
     """Orchestrate a bounded prompt-model-tool loop through injected ports."""
 
-    def __init__(self, model: ToolAwareAgentModel, tool_executor: ToolExecutor) -> None:
+    def __init__(
+        self,
+        model: ToolAwareAgentModel,
+        tool_executor: ToolExecutor,
+        *,
+        terminal_hooks: tuple[ToolLoopTerminalHook, ...] = (),
+    ) -> None:
         self._model = model
         self._tool_executor = tool_executor
+        self._terminal_hooks = tuple(terminal_hooks)
 
     async def run(
         self,
@@ -51,82 +59,86 @@ class RunToolLoop:
         observations: tuple[RuntimeObservation, ...] = ()
         call_ledger: dict[str, _ToolCallLedgerEntry] = {}
 
-        for iteration in range(active_limits.max_tool_iterations + 1):
-            try:
-                model_response = await self._model.run_turn(
-                    command,
-                    tuple(available_tools),
-                    tool_results,
-                    active_cancellation,
-                )
-            except ToolAwareAgentModelError as err:
-                return ToolLoopRunResult(
-                    status=ToolLoopRunStatus.MODEL_ERROR,
-                    tool_results=tool_results,
-                    observations=(
-                        *observations,
-                        RuntimeObservation(
-                            message="tool-aware model dependency failed",
-                            metadata={"category": err.category, **err.metadata},
-                        ),
-                    ),
-                )
-
-            observations = (*observations, *model_response.observations)
-            if model_response.output_text is not None:
-                return ToolLoopRunResult(
-                    status=ToolLoopRunStatus.SUCCESS,
-                    output_text=model_response.output_text,
-                    tool_results=tool_results,
-                    observations=observations,
-                )
-
-            if iteration >= active_limits.max_tool_iterations:
-                return ToolLoopRunResult(
-                    status=ToolLoopRunStatus.MAX_ITERATIONS_EXCEEDED,
-                    tool_results=tool_results,
-                    observations=(
-                        *observations,
-                        RuntimeObservation(
-                            message="tool loop stopped at max iterations",
-                            metadata={"max_tool_iterations": active_limits.max_tool_iterations},
-                        ),
-                    ),
-                )
-
-            validation_failure = _validate_tool_call_batch(
-                model_response.tool_calls,
-                limits=active_limits,
-                call_ledger=call_ledger,
-                available_tools=available_tools,
-            )
-            if validation_failure is not None:
-                return ToolLoopRunResult(
-                    status=validation_failure.status,
-                    tool_results=tool_results,
-                    observations=(*observations, validation_failure.observation),
-                )
-
-            turn_results = tuple(
-                [
-                    await self._execute_or_replay_tool_call(
-                        tool_call,
-                        active_limits,
+        try:
+            for iteration in range(active_limits.max_tool_iterations + 1):
+                try:
+                    model_response = await self._model.run_turn(
+                        command,
+                        tuple(available_tools),
+                        tool_results,
                         active_cancellation,
-                        active_opaque_tool_context,
-                        call_ledger,
                     )
-                    for tool_call in model_response.tool_calls
-                ],
-            )
-            tool_results = (*tool_results, *turn_results)
-            observations = (
-                *observations,
-                *(observation for result in turn_results for observation in result.observations),
-            )
-            stop_status = _first_stop_status(turn_results)
-            if stop_status is not None:
-                return ToolLoopRunResult(status=stop_status, tool_results=tool_results, observations=observations)
+                except ToolAwareAgentModelError as err:
+                    return ToolLoopRunResult(
+                        status=ToolLoopRunStatus.MODEL_ERROR,
+                        tool_results=tool_results,
+                        observations=(
+                            *observations,
+                            RuntimeObservation(
+                                message="tool-aware model dependency failed",
+                                metadata={"category": err.category, **err.metadata},
+                            ),
+                        ),
+                    )
+
+                observations = (*observations, *model_response.observations)
+                if model_response.output_text is not None:
+                    return ToolLoopRunResult(
+                        status=ToolLoopRunStatus.SUCCESS,
+                        output_text=model_response.output_text,
+                        tool_results=tool_results,
+                        observations=observations,
+                    )
+
+                if iteration >= active_limits.max_tool_iterations:
+                    return ToolLoopRunResult(
+                        status=ToolLoopRunStatus.MAX_ITERATIONS_EXCEEDED,
+                        tool_results=tool_results,
+                        observations=(
+                            *observations,
+                            RuntimeObservation(
+                                message="tool loop stopped at max iterations",
+                                metadata={"max_tool_iterations": active_limits.max_tool_iterations},
+                            ),
+                        ),
+                    )
+
+                validation_failure = _validate_tool_call_batch(
+                    model_response.tool_calls,
+                    limits=active_limits,
+                    call_ledger=call_ledger,
+                    available_tools=available_tools,
+                )
+                if validation_failure is not None:
+                    return ToolLoopRunResult(
+                        status=validation_failure.status,
+                        tool_results=tool_results,
+                        observations=(*observations, validation_failure.observation),
+                    )
+
+                turn_results = tuple(
+                    [
+                        await self._execute_or_replay_tool_call(
+                            tool_call,
+                            active_limits,
+                            active_cancellation,
+                            active_opaque_tool_context,
+                            call_ledger,
+                        )
+                        for tool_call in model_response.tool_calls
+                    ],
+                )
+                tool_results = (*tool_results, *turn_results)
+                observations = (
+                    *observations,
+                    *(observation for result in turn_results for observation in result.observations),
+                )
+                stop_status = _first_stop_status(turn_results)
+                if stop_status is not None:
+                    return ToolLoopRunResult(status=stop_status, tool_results=tool_results, observations=observations)
+        finally:
+            for terminal_hook in self._terminal_hooks:
+                await terminal_hook(active_opaque_tool_context)
 
         return ToolLoopRunResult(status=ToolLoopRunStatus.MAX_ITERATIONS_EXCEEDED, tool_results=tool_results)
 
