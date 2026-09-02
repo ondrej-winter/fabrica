@@ -31,6 +31,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolMutationGuarantee,
     ToolTextContent,
 )
+from fabrica.features.agent_runtime.application.ports import RegisteredToolRejectionError
 from fabrica.features.agent_runtime.application.use_cases import PrepareSkillTools
 
 
@@ -300,6 +301,25 @@ def test_registered_tool_executor_maps_value_error_to_invalid_arguments() -> Non
     assert result.status is ToolCallResultStatus.INVALID_ARGUMENTS
     assert result.error_message == "registered tool rejected arguments"
     assert "private validation detail" not in str(result)
+
+
+def test_registered_tool_executor_preserves_sanitized_recoverable_rejection() -> None:
+    def reject_execution(_arguments: Mapping[str, ToolArgumentValue]) -> str:
+        raise RegisteredToolRejectionError(
+            error_code="OVERSIZED_OUTPUT",
+            error_message="result is too large; use a narrower tool",
+        )
+
+    result = _execute_tool_with_handler(reject_execution)
+
+    assert result.status is ToolCallResultStatus.REJECTED
+    assert result.error_message == "result is too large; use a narrower tool"
+    assert result.observations == (
+        RuntimeObservation(
+            message="registered tool rejected execution",
+            metadata={"tool_name": "lookup_note", "category": "OVERSIZED_OUTPUT"},
+        ),
+    )
 
 
 def test_registered_tool_executor_maps_missing_argument_to_invalid_arguments() -> None:

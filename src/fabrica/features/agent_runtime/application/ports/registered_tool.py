@@ -10,6 +10,16 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolExecutionContext,
 )
 
+
+class RegisteredToolRejectionError(Exception):
+    """Signal a sanitized, recoverable rejection from a synchronous tool handler."""
+
+    def __init__(self, *, error_code: str, error_message: str) -> None:
+        super().__init__(error_message)
+        self.error_code = error_code
+        self.error_message = error_message
+
+
 RegisteredToolHandler = Callable[[Mapping[str, ToolArgumentValue]], str]
 AsyncRegisteredToolHandler = Callable[
     [Mapping[str, ToolArgumentValue], ToolExecutionContext],

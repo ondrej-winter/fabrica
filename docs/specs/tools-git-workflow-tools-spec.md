@@ -2,11 +2,11 @@
 
 ## Status
 
-- State: Draft — unconfirmed.
-- Implementation status: Substantially implemented; the implementation predates formal specification acceptance.
-- Accepted by: Not applicable until accepted
-- Accepted on: Not applicable until accepted
-- Revision: Template-governance migration on September 1, 2026.
+- State: Accepted and implemented.
+- Implementation status: Implemented and validated before formal specification acceptance.
+- Accepted by: Product interview
+- Accepted on: September 2, 2026
+- Revision: Accepted after implementation-conformance audit on September 2, 2026.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
@@ -80,6 +80,13 @@ Typical workflows should start with cheap summary tools, then request narrower
 diff tools only when needed. For example, an agent should inspect changed-file
 lists before requesting a full diff, and should request a file-specific diff when
 the full diff exceeds configured bounds.
+
+Each tool call observes repository state independently. A file-diff tool
+revalidates its requested path against the repository state at the time it runs;
+when staged, worktree, or ref-range state changes after an earlier changed-file
+call, the file-diff tool may return a safe no-matching-changes failure. Callers
+must refresh changed-file context before retrying rather than assuming that a
+previous list result reserves a path or establishes a transaction.
 
 ## Tool and adapter model
 
@@ -393,6 +400,11 @@ The result:
 - suggests `git_commit_changed_files` followed by `git_commit_file_diff` when the
   full diff is too large.
 
+For a model-callable oversized full-diff failure, the safe caller-visible error
+message is: `commit diff is too large; use git_commit_changed_files then
+git_commit_file_diff`. It must not include raw stderr, paths, raw diff text, or
+other adapter diagnostics.
+
 Argument schema matches `git_commit_details`.
 
 #### `git_commit_file_diff`
@@ -474,6 +486,11 @@ The result:
 - fails before returning output when the range diff exceeds configured bounds;
 - suggests `git_ref_changed_files` followed by `git_ref_file_diff` when the full
   diff is too large.
+
+For a model-callable oversized full-diff failure, the safe caller-visible error
+message is: `ref diff is too large; use git_ref_changed_files then
+git_ref_file_diff`. It must not include raw stderr, paths, raw diff text, or
+other adapter diagnostics.
 
 Argument schema matches `git_ref_changed_files`.
 
@@ -660,6 +677,14 @@ results. Diff-producing read-only tools are subject to both git diff bounds and
 the runtime tool-loop result limit. Mutating adapters that return subprocess
 output must bound stdout and stderr before exposing them to the application or
 tool layer.
+
+Registered git context tools must reject, rather than truncate, a formatted
+model-callable result that exceeds the default tool-loop text bound. The default
+registered git context result bound is 4,000 characters and applies to every
+formatted result, including status summaries, changed-file lists, commit logs,
+commit details, ahead/behind results, merge-base results, and diffs. The safe
+caller-visible rejection message is `read-only git context result exceeds the
+tool output bound`; it must not contain a partial result or raw diagnostics.
 
 Default bounds:
 
@@ -897,7 +922,7 @@ The detailed exclusions already recorded below remain authoritative.
 
 ## Acceptance and Planning Gate
 
-This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+This accepted specification is ready for implementation planning and conformance work. Material changes require an updated and re-confirmed specification.
 
 ## Conventions and Constraints
 

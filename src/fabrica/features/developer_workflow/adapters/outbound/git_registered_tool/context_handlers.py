@@ -2,13 +2,15 @@
 
 from collections.abc import Mapping
 
-from fabrica.features.agent_runtime.application.dtos import ToolArgumentValue
+from fabrica.features.agent_runtime.application.dtos import DEFAULT_MAX_TOOL_RESULT_CHARS, ToolArgumentValue
+from fabrica.features.agent_runtime.application.ports import RegisteredToolRejectionError
 from fabrica.features.developer_workflow.application.dtos import (
     GitBranchAheadBehind,
     GitCommitDetails,
     GitCommitLog,
     GitContextChangedFileList,
     GitContextDiff,
+    GitContextFailureCategory,
     GitContextLogCount,
     GitMergeBase,
     GitStatusSummary,
@@ -21,89 +23,94 @@ from fabrica.features.developer_workflow.application.ports import (
 )
 
 _GIT_CONTEXT_TOOL_FAILURE_MESSAGE = "read-only git context could not be loaded"
+_GIT_CONTEXT_OVERSIZED_OUTPUT_CODE = "oversized_output"
+_GIT_CONTEXT_OVERSIZED_OUTPUT_MESSAGE = "read-only git context result exceeds the tool output bound"
+_COMMIT_DIFF_RECOVERY_MESSAGE = "commit diff is too large; use git_commit_changed_files then git_commit_file_diff"
+_REF_DIFF_RECOVERY_MESSAGE = "ref diff is too large; use git_ref_changed_files then git_ref_file_diff"
 
 
 def handle_status_summary(loader: GitWorktreeContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return a deterministic text summary for a registered status tool call."""
     _require_no_arguments(arguments, tool_name="git_status_summary")
     try:
-        return _format_status_summary(loader.load_status_summary())
+        return _bounded_output(_format_status_summary(loader.load_status_summary()))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def handle_unstaged_files(loader: GitWorktreeContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return unstaged changed-file lines for a registered tool call."""
     _require_no_arguments(arguments, tool_name="git_unstaged_files")
     try:
-        return _format_changed_files(loader.list_unstaged_files())
+        return _bounded_output(_format_changed_files(loader.list_unstaged_files()))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def handle_unstaged_diff(loader: GitWorktreeContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return full unstaged diff text for a registered tool call."""
     _require_no_arguments(arguments, tool_name="git_unstaged_diff")
     try:
-        return _format_diff(loader.load_unstaged_diff())
+        return _bounded_output(_format_diff(loader.load_unstaged_diff()))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def handle_unstaged_file_diff(loader: GitWorktreeContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return one unstaged file diff for a registered tool call."""
     path = _require_string_argument(arguments, "path", tool_name="git_unstaged_file_diff")
     try:
-        return _format_diff(loader.load_unstaged_file_diff(path))
+        return _bounded_output(_format_diff(loader.load_unstaged_file_diff(path)))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def handle_commit_log(loader: GitCommitContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return recent commit metadata for a registered tool call."""
     count = _optional_int_argument(arguments, "count", tool_name="git_commit_log")
     try:
-        return _format_commit_log(loader.list_commits(GitContextLogCount(count) if count is not None else None))
+        commit_log = loader.list_commits(GitContextLogCount(count) if count is not None else None)
+        return _bounded_output(_format_commit_log(commit_log))
     except (GitContextLoadError, ValueError) as err:
         if isinstance(err, ValueError):
             raise
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def handle_commit_details(loader: GitCommitContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return one commit's metadata and message for a registered tool call."""
     commit = _require_string_argument(arguments, "commit", tool_name="git_commit_details")
     try:
-        return _format_commit_details(loader.load_commit_details(commit))
+        return _bounded_output(_format_commit_details(loader.load_commit_details(commit)))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def handle_commit_changed_files(loader: GitCommitContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return changed-file lines for one commit registered tool call."""
     commit = _require_string_argument(arguments, "commit", tool_name="git_commit_changed_files")
     try:
-        return _format_changed_files(loader.list_commit_changed_files(commit))
+        return _bounded_output(_format_changed_files(loader.list_commit_changed_files(commit)))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def handle_commit_diff(loader: GitCommitContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return full commit diff text for a registered tool call."""
     commit = _require_string_argument(arguments, "commit", tool_name="git_commit_diff")
     try:
-        return _format_diff(loader.load_commit_diff(commit))
+        return _bounded_output(_format_diff(loader.load_commit_diff(commit)))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err, oversized_message=_COMMIT_DIFF_RECOVERY_MESSAGE) from err
 
 
 def handle_commit_file_diff(loader: GitCommitContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return one commit file diff for a registered tool call."""
     commit, path = _require_string_arguments(arguments, ("commit", "path"), tool_name="git_commit_file_diff")
     try:
-        return _format_diff(loader.load_commit_file_diff(commit, path))
+        return _bounded_output(_format_diff(loader.load_commit_file_diff(commit, path)))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def handle_ref_changed_files(loader: GitRefContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
@@ -112,18 +119,18 @@ def handle_ref_changed_files(loader: GitRefContextLoader, arguments: Mapping[str
         arguments, ("base_ref", "head_ref"), tool_name="git_ref_changed_files"
     )
     try:
-        return _format_changed_files(loader.list_ref_changed_files(base_ref, head_ref))
+        return _bounded_output(_format_changed_files(loader.list_ref_changed_files(base_ref, head_ref)))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def handle_ref_diff(loader: GitRefContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return full ref diff text for a registered tool call."""
     base_ref, head_ref = _require_string_arguments(arguments, ("base_ref", "head_ref"), tool_name="git_ref_diff")
     try:
-        return _format_diff(loader.load_ref_diff(base_ref, head_ref))
+        return _bounded_output(_format_diff(loader.load_ref_diff(base_ref, head_ref)))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err, oversized_message=_REF_DIFF_RECOVERY_MESSAGE) from err
 
 
 def handle_ref_file_diff(loader: GitRefContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
@@ -132,27 +139,27 @@ def handle_ref_file_diff(loader: GitRefContextLoader, arguments: Mapping[str, To
         arguments, ("base_ref", "head_ref", "path"), tool_name="git_ref_file_diff"
     )
     try:
-        return _format_diff(loader.load_ref_file_diff(base_ref, head_ref, path))
+        return _bounded_output(_format_diff(loader.load_ref_file_diff(base_ref, head_ref, path)))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def handle_branch_ahead_behind(loader: GitRefContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return branch ahead/behind counts for a registered tool call."""
     base_ref = _optional_string_argument(arguments, "base_ref", tool_name="git_branch_ahead_behind")
     try:
-        return _format_branch_ahead_behind(loader.load_branch_ahead_behind(base_ref))
+        return _bounded_output(_format_branch_ahead_behind(loader.load_branch_ahead_behind(base_ref)))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def handle_merge_base(loader: GitRefContextLoader, arguments: Mapping[str, ToolArgumentValue]) -> str:
     """Return merge-base hashes for a registered tool call."""
     base_ref, head_ref = _require_string_arguments(arguments, ("base_ref", "head_ref"), tool_name="git_merge_base")
     try:
-        return _format_merge_base(loader.load_merge_base(base_ref, head_ref))
+        return _bounded_output(_format_merge_base(loader.load_merge_base(base_ref, head_ref)))
     except GitContextLoadError as err:
-        raise RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE) from err
+        raise _tool_failure(err) from err
 
 
 def _format_status_summary(summary: GitStatusSummary) -> str:
@@ -219,6 +226,24 @@ def _format_branch_ahead_behind(result: GitBranchAheadBehind) -> str:
 
 def _format_merge_base(result: GitMergeBase) -> str:
     return "\n".join((f"commit\t{result.commit_hash}", f"short_hash\t{result.short_hash}"))
+
+
+def _bounded_output(text: str) -> str:
+    if len(text) > DEFAULT_MAX_TOOL_RESULT_CHARS:
+        raise RegisteredToolRejectionError(
+            error_code=_GIT_CONTEXT_OVERSIZED_OUTPUT_CODE,
+            error_message=_GIT_CONTEXT_OVERSIZED_OUTPUT_MESSAGE,
+        )
+    return text
+
+
+def _tool_failure(error: GitContextLoadError, *, oversized_message: str | None = None) -> Exception:
+    if error.category is GitContextFailureCategory.OVERSIZED_OUTPUT and oversized_message is not None:
+        return RegisteredToolRejectionError(
+            error_code=_GIT_CONTEXT_OVERSIZED_OUTPUT_CODE,
+            error_message=oversized_message,
+        )
+    return RuntimeError(_GIT_CONTEXT_TOOL_FAILURE_MESSAGE)
 
 
 def _require_no_arguments(arguments: Mapping[str, ToolArgumentValue], *, tool_name: str) -> None:

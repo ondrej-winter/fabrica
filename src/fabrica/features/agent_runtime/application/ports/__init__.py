@@ -12,6 +12,7 @@ from fabrica.features.agent_runtime.application.ports.registered_tool import (
     AsyncRegisteredToolHandler,
     RegisteredTool,
     RegisteredToolHandler,
+    RegisteredToolRejectionError,
 )
 from fabrica.features.agent_runtime.application.ports.skill_context import (
     SkillContextLoader,
@@ -44,6 +45,7 @@ __all__ = [
     "LocalAgentRuntime",
     "RegisteredTool",
     "RegisteredToolHandler",
+    "RegisteredToolRejectionError",
     "SelectedContextLocalAgentRuntime",
     "SkillContextLoadError",
     "SkillContextLoader",

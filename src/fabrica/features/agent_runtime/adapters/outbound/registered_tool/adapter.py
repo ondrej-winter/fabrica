@@ -23,7 +23,11 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolOutcomeStatus,
     canonical_tool_arguments_digest,
 )
-from fabrica.features.agent_runtime.application.ports import AsyncRegisteredTool, RegisteredTool
+from fabrica.features.agent_runtime.application.ports import (
+    AsyncRegisteredTool,
+    RegisteredTool,
+    RegisteredToolRejectionError,
+)
 
 _UNKNOWN_TOOL_MESSAGE = "requested tool is not registered"
 _INVALID_ARGUMENTS_MESSAGE = "registered tool rejected arguments"
@@ -108,19 +112,20 @@ class RegisteredToolExecutor:
                 category="unknown_tool",
             )
 
+        if not isinstance(tool, AsyncRegisteredTool):
+            return _execute_synchronous_tool(tool, request, limits)
+
         try:
-            if isinstance(tool, AsyncRegisteredTool):
-                outcome = await tool.handler(
-                    request.arguments,
-                    ToolExecutionContext(
-                        call_id=request.call_id,
-                        argument_digest=canonical_tool_arguments_digest(request.arguments, tool_name=request.tool_name),
-                        cancellation=cancellation,
-                        opaque_values=opaque_context or {},
-                    ),
-                )
-                return _outcome_result(request, outcome, limits)
-            result_text = tool.handler(request.arguments)
+            outcome = await tool.handler(
+                request.arguments,
+                ToolExecutionContext(
+                    call_id=request.call_id,
+                    argument_digest=canonical_tool_arguments_digest(request.arguments, tool_name=request.tool_name),
+                    cancellation=cancellation,
+                    opaque_values=opaque_context or {},
+                ),
+            )
+            return _outcome_result(request, outcome, limits)
         except (KeyError, TypeError, ValueError):
             return _failure_result(
                 request,
@@ -143,7 +148,46 @@ class RegisteredToolExecutor:
                 category="tool_failure",
             )
 
-        return _success_result(request, result_text, limits)
+
+def _execute_synchronous_tool(tool: RegisteredTool, request: ToolCallRequest, limits: ToolLoopLimits) -> ToolCallResult:
+    """Execute one synchronous tool while mapping its safe error boundary."""
+    try:
+        result_text = tool.handler(request.arguments)
+    except RegisteredToolRejectionError as err:
+        return _rejection_result(request, err)
+    except (KeyError, TypeError, ValueError):
+        return _failure_result(
+            request,
+            ToolCallResultStatus.INVALID_ARGUMENTS,
+            _INVALID_ARGUMENTS_MESSAGE,
+            category="invalid_arguments",
+        )
+    except TimeoutError:
+        return _failure_result(request, ToolCallResultStatus.TIMEOUT, _TOOL_TIMEOUT_MESSAGE, category="timeout")
+    except (OSError, RuntimeError):
+        return _failure_result(
+            request,
+            ToolCallResultStatus.TOOL_FAILURE,
+            _TOOL_FAILURE_MESSAGE,
+            category="tool_failure",
+        )
+    return _success_result(request, result_text, limits)
+
+
+def _rejection_result(request: ToolCallRequest, error: RegisteredToolRejectionError) -> ToolCallResult:
+    """Map an explicit sanitized handler rejection into a recoverable tool result."""
+    return ToolCallResult(
+        call_id=request.call_id,
+        tool_name=request.tool_name,
+        status=ToolCallResultStatus.REJECTED,
+        error_message=error.error_message,
+        observations=(
+            RuntimeObservation(
+                message="registered tool rejected execution",
+                metadata={"tool_name": request.tool_name, "category": error.error_code},
+            ),
+        ),
+    )
 
 
 def _outcome_result(request: ToolCallRequest, outcome: RegisteredToolOutcome, limits: ToolLoopLimits) -> ToolCallResult:

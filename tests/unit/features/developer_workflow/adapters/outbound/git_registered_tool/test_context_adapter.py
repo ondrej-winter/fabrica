@@ -7,6 +7,7 @@ import pytest
 
 from fabrica.features.agent_runtime.adapters.outbound.registered_tool import RegisteredTool, RegisteredToolExecutor
 from fabrica.features.agent_runtime.application.dtos import (
+    DEFAULT_MAX_TOOL_RESULT_CHARS,
     SafeRuntimeMetadataValue,
     ToolCallRequest,
     ToolCallResult,
@@ -364,6 +365,66 @@ def test_loader_failures_map_to_safe_tool_failure_without_private_details() -> N
     assert "/Users/example/project" not in str(result)
     assert "secret" not in str(result)
     assert "private stderr" not in str(result)
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "arguments", "recovery_message"),
+    [
+        (
+            "git_commit_diff",
+            {"commit": "HEAD"},
+            "commit diff is too large; use git_commit_changed_files then git_commit_file_diff",
+        ),
+        (
+            "git_ref_diff",
+            {"base_ref": "main", "head_ref": "HEAD"},
+            "ref diff is too large; use git_ref_changed_files then git_ref_file_diff",
+        ),
+    ],
+)
+def test_oversized_full_diff_failures_preserve_safe_recovery_guidance(
+    tool_name: str,
+    arguments: dict[str, SafeRuntimeMetadataValue],
+    recovery_message: str,
+) -> None:
+    loader = FakeGitContextLoader(
+        error=GitContextLoadError(
+            "private oversized stdout /Users/example/project secret diff",
+            category=GitContextFailureCategory.OVERSIZED_OUTPUT,
+        ),
+    )
+
+    result = _execute(tool_name, loader=loader, arguments=arguments)
+
+    assert result.status is ToolCallResultStatus.REJECTED
+    assert result.error_message == recovery_message
+    assert result.observations[0].metadata == {"tool_name": tool_name, "category": "oversized_output"}
+    assert "private oversized" not in str(result)
+    assert "/Users/example/project" not in str(result)
+    assert "secret" not in str(result)
+
+
+def test_oversized_non_diff_result_is_rejected_before_runtime_truncation() -> None:
+    loader = FakeGitContextLoader(
+        commit_details=GitCommitDetails(
+            commit_hash="abcdef1234567890",
+            short_hash="abcdef1",
+            parents=("1234567890abcdef",),
+            author="Ada Lovelace <ada@example.com>",
+            author_date="2026-08-07T19:00:00+00:00",
+            committer_date="2026-08-07T19:01:00+00:00",
+            subject="Add thing",
+            body="x" * DEFAULT_MAX_TOOL_RESULT_CHARS,
+            refs=("HEAD -> main",),
+        ),
+    )
+
+    result = _execute("git_commit_details", loader=loader, arguments={"commit": "HEAD"})
+
+    assert result.status is ToolCallResultStatus.REJECTED
+    assert result.result_text is None
+    assert result.error_message == "read-only git context result exceeds the tool output bound"
+    assert result.observations[0].metadata == {"tool_name": "git_commit_details", "category": "oversized_output"}
 
 
 def test_tool_result_limit_remains_governed_by_registered_tool_executor() -> None:
