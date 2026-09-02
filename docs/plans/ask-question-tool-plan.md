@@ -74,10 +74,10 @@ both features.
 - [x] AQ-01 Create the `user_interaction` application contracts and schema DTOs.
 - [x] AQ-02 Implement the in-memory interaction manager and transport port.
 - [x] AQ-03 Expose `ask_question` through a `user_interaction` registered-tool adapter.
-- [ ] AQ-04 Integrate solo-call validation and lifecycle coordination in `agent_runtime`. *(In progress: solo batch validation, opaque context propagation, and external-cancellation mapping are implemented; generic terminal hooks remain deferred.)*
-- [ ] AQ-05 Add explicit interactive composition and host response entry points. *(In progress: opt-in composition and per-run host API implemented; acceptance coverage pending.)*
-- [ ] AQ-06 Add unit and integration acceptance coverage.
-- [ ] AQ-07 Update documentation and run the full quality gate.
+- [x] AQ-04 Integrate solo-call validation and lifecycle coordination in `agent_runtime`.
+- [x] AQ-05 Add explicit interactive composition and host response entry points.
+- [x] AQ-06 Add unit and integration acceptance coverage.
+- [x] AQ-07 Update documentation and run the full quality gate.
 
 Keep these checkboxes and detailed task status current during implementation.
 Mark a task complete only after its acceptance criteria and verification pass.
@@ -308,18 +308,18 @@ must not import each other. The composition root alone depends on both features.
 
 **Acceptance criteria**
 
-- [ ] A mixed batch invokes zero tool handlers.
-- [ ] A solo question is a synchronization barrier and resumes with one result;
+- [x] A mixed batch invokes zero tool handlers.
+- [x] A solo question is a synchronization barrier and resumes with one result;
       external cancellation yields structured `cancelled` before the next turn.
-- [ ] Ordinary multi-tool batches remain valid when they do not contain a
+- [x] Ordinary multi-tool batches remain valid when they do not contain a
       solo-classified tool.
-- [ ] Python task cancellation while waiting invokes cleanup and re-raises
+- [x] Python task cancellation while waiting invokes cleanup and re-raises
       `CancelledError`, leaving no pending owner record or resolver.
-- [ ] Existing registered tools and loop replay behavior retain their coverage.
+- [x] Existing registered tools and loop replay behavior retain their coverage.
 
 **Verification**
 
-- [ ] Async unit tests prove mixed-batch rejection, waiting/resume, and waiting
+- [x] Async unit tests prove mixed-batch rejection, waiting/resume, and waiting
       cancellation without relying on wall-clock sleeps.
 
 ### AQ-05 — Add explicit interactive composition and host API
@@ -351,19 +351,19 @@ must not import each other. The composition root alone depends on both features.
 
 **Acceptance criteria**
 
-- [ ] An interactive host receives structured question publication and can answer
+- [x] An interactive host receives structured question publication and can answer
       by ID and matching opaque owner context.
-- [ ] Headless runtime construction cannot silently make `ask_question` usable.
-- [ ] The composition root depends on both slices; neither feature imports
+- [x] Headless runtime construction cannot silently make `ask_question` usable.
+- [x] The composition root depends on both slices; neither feature imports
       bootstrap or the other's private modules, and the selected import graph
       passes import-linter validation.
-- [ ] The curated bootstrap API test names the intended public interactive
+- [x] The curated bootstrap API test names the intended public interactive
       composition surface; generic headless factories still expose no implicit
       `ask_question` tool.
 
 **Verification**
 
-- [ ] A synthetic-model integration test publishes a question, submits an answer,
+- [x] A synthetic-model integration test publishes a question, submits an answer,
       and verifies the next model turn receives the structured tool result.
 
 ### AQ-06 — Complete acceptance coverage
@@ -376,20 +376,20 @@ must not import each other. The composition root alone depends on both features.
 
 **Work and acceptance criteria**
 
-- [ ] Cover neutral-contract migration, `ToolBatchPolicy` defaults and solo
+- [x] Cover neutral-contract migration, `ToolBatchPolicy` defaults and solo
       rejection, schema boundaries, free text, exact selected options, ID linkage,
       one pending interaction, duplicate replay, cancellation races, publication
       idempotency/failure, headless failure, owner-context propagation, wrong-owner
       non-disclosure, terminal cleanup, structured external cancellation, and
       task-cancellation cleanup with re-raised `CancelledError`.
-- [ ] Use fakes/events; do not require a live terminal, UI, network, or service.
-- [ ] Preserve the repository coverage threshold.
+- [x] Use fakes/events; do not require a live terminal, UI, network, or service.
+- [x] Preserve the repository coverage threshold.
 
 **Verification**
 
-- [ ] `uv run pytest tests/unit/features/user_interaction tests/unit/features/agent_runtime`
-- [ ] `uv run pytest tests/integration/features/user_interaction`
-- [ ] `uv run lint-imports`
+- [x] `uv run pytest tests/unit/features/user_interaction tests/unit/features/agent_runtime`
+- [x] `uv run pytest tests/integration/features/user_interaction`
+- [x] `uv run lint-imports`
 
 ### AQ-07 — Documentation and full quality gate
 
@@ -408,16 +408,16 @@ must not import each other. The composition root alone depends on both features.
 
 **Acceptance criteria**
 
-- [ ] Public documentation reflects actual final APIs and does not claim a
+- [x] Public documentation reflects actual final APIs and does not claim a
       concrete UI transport exists.
 
 **Verification**
 
-- [ ] `uv run ruff format .`
-- [ ] `uv run ruff check .`
-- [ ] `uv run ty check src tests`
-- [ ] `uv run lint-imports`
-- [ ] `uv run pytest`
+- [x] `uv run ruff format .`
+- [x] `uv run ruff check .`
+- [x] `uv run ty check src tests`
+- [x] `uv run lint-imports`
+- [x] `uv run pytest`
 
 ## Risks and Constraints
 

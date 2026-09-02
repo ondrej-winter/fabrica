@@ -3,7 +3,7 @@
 ## Status
 
 - State: Accepted.
-- Implementation status: Not implemented.
+- Implementation status: Implemented — Version 1 in-memory interactive composition.
 - Accepted by: Maintainer (interactive approval)
 - Accepted on: September 2, 2026
 - Revision: Version 1 interaction-contract decisions recorded on September 2, 2026.
@@ -755,20 +755,23 @@ The human wait itself has no ordinary tool timeout.
 
 ## Architecture and project structure
 
-Likely future implementation ownership:
+Version 1 implementation ownership:
 
-- Spec: `docs/specs/tools-ask-question-tool-spec.md`.
-- Runtime tool contracts, DTOs, interaction state, and orchestration use cases:
-  under `src/fabrica/features/agent_runtime/application/`.
-- Inbound or outbound interaction transports: under the relevant adapter package
-  for the owning runtime or host integration.
-- Composition and optional CLI wiring: under `src/fabrica/bootstrap/` or the
-  relevant driving adapter.
-- Unit tests: under `tests/unit/features/agent_runtime/` for schema validation,
-  manager lifecycle, state transitions, idempotency, cancellation, and headless
-  failure behavior.
-- Integration tests: under `tests/integration/features/agent_runtime/` for real
-  runtime composition with concrete interaction transports.
+- Spec and implementation plan: `docs/specs/tools-ask-question-tool-spec.md` and
+  `docs/plans/ask-question-tool-plan.md`.
+- `user_interaction` owns the interaction DTOs, application ports, in-memory
+  interaction manager, and the inbound `ask_question` registered-tool adapter
+  under `src/fabrica/features/user_interaction/`.
+- `agent_runtime` remains interaction-agnostic. Its tool loop applies generic
+  batch policy, propagates opaque host context to the tool executor, and invokes
+  terminal lifecycle hooks under `src/fabrica/features/agent_runtime/`.
+- `src/fabrica/bootstrap/composition/user_interaction.py` composes both slices,
+  creates one opaque owner per interactive run, and exposes structured answer and
+  cancellation entry points. It accepts a host-provided `InteractionTransport`;
+  Version 1 includes no concrete UI, CLI, web, or remote transport.
+- Unit tests live under `tests/unit/features/user_interaction/` and
+  `tests/unit/features/agent_runtime/`; composition coverage lives under
+  `tests/integration/features/user_interaction/`.
 
 Implementation must preserve hexagonal boundaries: application code may define
 ports and DTOs for interaction management, but UI frameworks, WebSockets,

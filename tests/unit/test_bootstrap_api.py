@@ -90,6 +90,17 @@ def test_readme_uses_current_bootstrap_runtime_helper_names() -> None:
     assert "create_pydantic_ai_registered_tool_loop_runtime" not in readme
 
 
+def test_readme_documents_opt_in_interactive_ask_question_composition() -> None:
+    """Keep public interactive-runtime guidance aligned with the bootstrap API."""
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "create_interactive_tool_loop_runtime" in readme
+    assert "InteractionTransport" in readme
+    assert "create_tool_loop_runtime()" in readme
+    assert "does not\nexpose `ask_question`" in readme
+    assert "must not fabricate an answer" in readme
+
+
 def test_readme_documents_fetch_web_content_composition_and_safety_boundary() -> None:
     """Keep public-web onboarding aligned with the explicit composition contract."""
     readme = Path("README.md").read_text(encoding="utf-8")

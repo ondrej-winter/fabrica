@@ -183,6 +183,34 @@ def test_release_owner_cancels_waiter_and_removes_retained_result() -> None:
     asyncio.run(scenario())
 
 
+def test_manager_task_cancellation_resolves_pending_question_and_allows_a_new_question() -> None:
+    async def scenario() -> None:
+        transport = _FakeTransport()
+        manager = InMemoryInteractionManager(transport)
+        owner = InteractionOwner("owner_one")
+        task = asyncio.create_task(manager.ask(owner, _question()))
+        await transport.published.wait()
+        cancelled_question_id = transport.publications[0].question_id
+
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        cancelled = await manager.cancel(owner, cancelled_question_id.value)
+        assert cancelled.status is InteractionResultStatus.CANCELLED
+
+        transport.published.clear()
+        replacement_task = asyncio.create_task(manager.ask(owner, _question()))
+        await transport.published.wait()
+        assert transport.publications[-1].question_id != cancelled_question_id
+        await manager.cancel_owner(owner)
+
+        assert (await replacement_task).status is InteractionResultStatus.CANCELLED
+
+    asyncio.run(scenario())
+
+
 @dataclass(slots=True)
 class _FakeTransport:
     publications: list[InteractionPublication] = field(default_factory=list)

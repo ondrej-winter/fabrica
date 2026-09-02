@@ -70,7 +70,11 @@ class InMemoryInteractionManager:
                 "the interactive host could not publish the question",
             ) from err
 
-        return await record.completion
+        try:
+            return await asyncio.shield(record.completion)
+        except asyncio.CancelledError:
+            await self._cancel_pending(question_id, owner)
+            raise
 
     async def submit_answer(self, owner: InteractionOwner, submission: AnswerSubmission) -> InteractionResult:
         """Atomically commit the first authorized answer or replay its result."""

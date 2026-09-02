@@ -25,6 +25,51 @@ uv run pytest
 The default test suite is deterministic and offline. It does not read real Codex
 credentials and does not call the live Codex backend.
 
+## Interactive `ask_question` tool composition
+
+Hosts can opt in to the live `ask_question` tool with
+`create_interactive_tool_loop_runtime()`. The factory requires a host-owned
+`InteractionTransport` that publishes structured questions. It does not provide
+a terminal, web, VS Code, or remote-client transport itself.
+
+```python
+import asyncio
+
+from fabrica.bootstrap import create_interactive_tool_loop_runtime
+from fabrica.features.agent_runtime.application.dtos import LocalAgentRunCommand
+from fabrica.features.user_interaction.application.dtos import AnswerSubmission, InteractionPublication
+
+
+class HostTransport:
+    async def publish(self, publication: InteractionPublication) -> None:
+        print(publication.question.question)
+        print(publication.question.options)
+
+
+runtime = create_interactive_tool_loop_runtime(model=model, transport=HostTransport())
+run = runtime.start_run()
+task = asyncio.create_task(run.run(LocalAgentRunCommand(prompt="Choose a database")))
+
+# The host obtains the published question ID from its transport and submits the
+# user's non-empty free-text answer through the same run object.
+await run.submit_answer(AnswerSubmission(question_id, "PostgreSQL", selected_option=0))
+result = await task
+```
+
+Each `start_run()` creates an opaque owner that authorizes its host answer and
+cancellation methods. `ask_question` accepts one focused question with 2–5
+unique suggestions, blocks the tool loop until an answer or cancellation, and
+returns a structured `answered` or `cancelled` result to the next model turn.
+Suggested options do not constrain a user's non-empty free-text answer.
+
+The ordinary `create_tool_loop_runtime()` factory remains headless and does not
+expose `ask_question`. Hosts must not fabricate an answer or select option zero
+when interaction is unavailable. Use this tool only for material missing user
+information—not tool permission, destructive-action approval, or plan-execution
+approval. See [`docs/specs/tools-ask-question-tool-spec.md`](docs/specs/tools-ask-question-tool-spec.md)
+for the accepted Version 1 contract and its intentional limits: no durable
+recovery, expiry, multi-select, attachments, or concrete UI transport.
+
 ## Production workspace-editing composition
 
 Hosts can compose the model-facing `apply_patch` tool for a workspace through
