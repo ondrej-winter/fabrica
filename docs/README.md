@@ -46,4 +46,5 @@ This directory contains durable project documentation and current reference note
 - `specs/tools-fetch-web-content-tool-spec.md` defines bounded, SSRF-safe public HTTPS
   retrieval for model-callable coding-agent workflows.
 - `specs/tools-apply-patch-tool-spec.md` defines context-based workspace file mutation,
-  including its fail-closed POSIX safety and recovery contract.
+  including capability-gated POSIX production enablement, fail-closed unsupported
+  environments, and its recovery contract.

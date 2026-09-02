@@ -1,31 +1,25 @@
 # Implementation Plan: Complete Production `apply_patch` Enablement
 
-- Readiness: **AP-06 complete.** The explicit production composition performs
-  capability and recovery gating before exposing supervised POSIX mutation.
+- Readiness: **Complete.** Production composition, runtime bounds, acceptance
+  coverage, documentation, and repository-wide validation are complete.
 - Created: September 1, 2026.
 - Source specification: `docs/specs/tools-apply-patch-tool-spec.md`.
 - Scope: remaining work only. The existing `workspace_editing` parser, matcher,
   planner, authorization, journaling, commit/rollback, registered-tool adapter,
   and associated tests are already substantially implemented.
 
-## Current Gap Assessment
+## Completion Summary
 
-The feature is intentionally fail-closed in production. The primary blocker is
-`PosixPatchWorkspaceSnapshotAdapter.verify_workspace_capabilities()`: its
-default configuration rejects production mutation because the current adapter
-does not yet prove two required guarantees:
+Production composition now verifies positive capability evidence for the actual
+workspace, runs durable startup recovery, and exposes supervised POSIX mutation
+only after both gates succeed. It otherwise remains fail-closed: the host retains
+independent read-only tools, omits `apply_patch`, and reports structured
+`UNSUPPORTED_FILESYSTEM_GUARANTEE` or `RECOVERY_REQUIRED` evidence.
 
-1. Native, no-replace POSIX destination creation/rename semantics.
-2. Supervised ownership of potentially blocking commit and cleanup work, so the
-   host never returns while unmanaged mutation may continue.
-
-The current bootstrap helper accepts an injected `PatchApplier`; it does not
-assemble production dependencies or perform startup recovery. The registered-tool
-adapter binds runtime cancellation and supplied phase deadlines to the patch
-lifecycle, but production composition remains deferred.
-
-The public tool schema also needs to be reconciled with the accepted 256 KiB
-patch-input limit and the generic runtime's lower string-argument limit.
+The registered-tool adapter propagates runtime cancellation and phase deadlines,
+and its public `input` schema and runtime normalization path accept the specified
+non-empty 262,144-character patch body. Native no-replace operations and
+supervised helper ownership remain adapter-private.
 
 ## Scope and Non-Goals
 
@@ -61,7 +55,7 @@ patch-input limit and the generic runtime's lower string-argument limit.
 - [x] AP-06 Add explicit production bootstrap composition.
 - [x] AP-07 Align the public schema and runtime argument bounds with the spec.
 - [x] AP-08 Add production-path integration and acceptance tests.
-- [ ] AP-09 Update documentation and run the full quality gate.
+- [x] AP-09 Update documentation and run the full quality gate.
 
 Keep these checkboxes current during implementation. After every completed task
 or meaningful scope change, update its detailed status, acceptance criteria,
@@ -469,6 +463,11 @@ fixtures are explicitly labeled non-production; there are no fixtures that set
 
 ### AP-09 — Documentation and final validation
 
+**Status: complete (September 2, 2026).** README and documentation-index wording
+now describes capability-gated production enablement rather than universal
+production fail-closure. ADR 0009 records the native-operation and supervised
+helper architecture. Repository-wide validation passed.
+
 **Likely files**
 
 - `README.md`
@@ -489,24 +488,26 @@ fixtures are explicitly labeled non-production; there are no fixtures that set
 
 **Acceptance criteria**
 
-- [ ] Documentation no longer describes production mutation as universally
+- [x] Documentation no longer describes production mutation as universally
       fail-closed once a proven backend exists.
-- [ ] Unsupported environments and recovery-required behavior remain documented.
+- [x] Unsupported environments and recovery-required behavior remain documented.
 
 **Verification**
 
-- [ ] `uv run ruff format .`
-- [ ] `uv run ruff format --check .`
-- [ ] `uv run ruff check .`
-- [ ] `uv run ty check src tests`
-- [ ] `uv run lint-imports`
-- [ ] `uv run pytest`
-- [ ] `uv build`
-- [ ] `uvx --from . fabrica --help`
-- [ ] Run `scripts/apply_patch_posix_capability_probe.py` against a temporary
-       workspace on each supported target platform. Store the structured results
-       as implementation evidence; a skipped or failed probe may confirm
-       unsupported status but must never enable production mutation.
+- [x] `uv run ruff format .` (September 2, 2026; 638 files unchanged).
+- [x] `uv run ruff format --check .` (September 2, 2026; 638 files already formatted).
+- [x] `uv run ruff check .` (September 2, 2026; passed).
+- [x] `uv run ty check src tests` (September 2, 2026; passed).
+- [x] `uv run lint-imports` (September 2, 2026; 11 contracts kept).
+- [x] `uv run pytest` (September 2, 2026; 1,571 passed, 3 skipped; 93.06% coverage).
+- [x] `uv build` (September 2, 2026; source distribution and wheel built).
+- [x] `uvx --from . fabrica --help` (September 2, 2026; passed).
+- [x] Ran `scripts/apply_patch_posix_capability_probe.py --workspace <temporary
+       workspace>` on Apple Silicon macOS (September 2, 2026). The probe returned
+       fail-closed standard-library feasibility evidence for no-replace rename and
+       bounded in-process cleanup; it correctly does not enable mutation and does
+       not replace actual-workspace production capability verification of the
+       selected native supervised-helper backend.
 
 ## Risks, Assumptions, and Open Questions
 

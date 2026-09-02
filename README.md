@@ -25,6 +25,46 @@ uv run pytest
 The default test suite is deterministic and offline. It does not read real Codex
 credentials and does not call the live Codex backend.
 
+## Production workspace-editing composition
+
+Hosts can compose the model-facing `apply_patch` tool for a workspace through
+`create_production_workspace_editing_composition()`. The factory performs
+actual-workspace capability verification and durable startup recovery before it
+exposes mutation. Production mutation requires a host approval callback; every
+patch is planned and approved before visible filesystem effects begin.
+
+```python
+from pathlib import Path
+
+from fabrica.bootstrap import (
+    ProductionWorkspaceEditingOptions,
+    create_production_workspace_editing_composition,
+)
+from fabrica.features.workspace_editing.adapters.outbound.authorization import PatchApprovalDecision
+
+
+async def approve_patch(plan):
+    return PatchApprovalDecision(approved=True, plan_digest=plan.plan_digest)
+
+
+composition = await create_production_workspace_editing_composition(
+    Path("/path/to/workspace"),
+    options=ProductionWorkspaceEditingOptions(approval_callback=approve_patch),
+    read_only_tools=(),
+)
+```
+
+Capability evidence is specific to the actual workspace; platform or filesystem
+names alone never enable mutation. Apple Silicon macOS is the primary v1 release
+target. Linux support is capability-gated and may remain unavailable for an
+unsupported filesystem/backend combination. In either case, the factory preserves
+the supplied read-only tools and omits `apply_patch` when mutation cannot safely
+start. Inspect `composition.mutation_gate.error` for structured
+`UNSUPPORTED_FILESYSTEM_GUARANTEE` evidence after a failed capability proof, or
+`RECOVERY_REQUIRED` evidence when an interrupted mutation journal needs operator
+resolution. See [`docs/specs/tools-apply-patch-tool-spec.md`](docs/specs/tools-apply-patch-tool-spec.md)
+for the accepted patch, recovery, and safety contract.
+
 ## Public web-content tool composition
 
 Hosts can explicitly add the read-only `fetch_web_content` tool to a tool-loop
@@ -1059,8 +1099,10 @@ feature slices:
 - `src/fabrica/features/workspace_editing/` owns the canonical `apply_patch`
   model-facing mutation tool, including parsing, hunk matching, immutable
   planning, authorization, POSIX filesystem adapters, journaling, rollback, and
-  startup recovery boundaries. Production POSIX mutation remains fail-closed by
-  default until the required platform capabilities are available.
+  startup recovery boundaries. Production POSIX mutation is enabled only after
+  positive, actual-workspace capability evidence and clean recovery; unsupported
+  or recovery-blocked workspaces remain fail-closed without exposing
+  `apply_patch`.
 - `src/fabrica/shared_kernel/` contains pure concepts genuinely shared by slices,
   such as provider-neutral model usage and pricing evidence DTOs.
 - `src/fabrica/bootstrap/` contains composition-root code, dependency wiring, and
