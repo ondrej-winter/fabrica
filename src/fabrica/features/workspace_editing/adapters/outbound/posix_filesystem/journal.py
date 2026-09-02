@@ -240,6 +240,21 @@ def _read_record(path: Path) -> PatchJournalRecord:
     )
 
 
+def load_durable_journal(workspace_root: Path, journal_digest: str) -> PatchJournalRecord | None:
+    """Load one durable journal by digest without trusting process-memory state."""
+    path = (
+        workspace_root.resolve(strict=True)
+        / ".fabrica"
+        / "apply-patch"
+        / "journal"
+        / f"{journal_digest.removeprefix('sha256:')}.json"
+    )
+    try:
+        return _read_record(path)
+    except (OSError, TypeError, ValueError):
+        return None
+
+
 def _path_evidence_payload(evidence: PatchPathEvidence) -> dict[str, object]:
     return {
         "content_digest": evidence.content_digest,
@@ -362,4 +377,4 @@ def _fatal_directory_result(
     )
 
 
-__all__ = ["PosixPatchJournalAndPreparationAdapter"]
+__all__ = ["PosixPatchJournalAndPreparationAdapter", "load_durable_journal"]

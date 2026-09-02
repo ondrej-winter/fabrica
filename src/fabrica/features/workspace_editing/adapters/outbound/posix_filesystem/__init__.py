@@ -12,6 +12,11 @@ from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.capab
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.commit import (
     PosixPatchCommitAdapter,
 )
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.helper_process import (
+    PosixSupervisedPatchCommitAdapter,
+    PosixSupervisedPatchMutationAdapter,
+    PosixSupervisedPatchPreparationAdapter,
+)
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.journal import (
     PosixPatchJournalAndPreparationAdapter,
 )
@@ -27,5 +32,8 @@ __all__ = [
     "PosixPatchJournalAndPreparationAdapter",
     "PosixPatchWorkspaceCapabilityEvidence",
     "PosixPatchWorkspaceSnapshotAdapter",
+    "PosixSupervisedPatchCommitAdapter",
+    "PosixSupervisedPatchMutationAdapter",
+    "PosixSupervisedPatchPreparationAdapter",
     "collect_posix_patch_workspace_capability_evidence",
 ]

@@ -10,6 +10,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.helper_process import (
+    supervised_helper_ownership_available,
+)
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.native_operations import (
     NativePatchOperationError,
     native_no_replace_backend_available,
@@ -184,10 +187,16 @@ def _native_no_replace_probe(workspace_root: Path) -> PosixPatchCapabilityProbe:
 
 
 def _supervised_helper_ownership_probe() -> PosixPatchCapabilityProbe:
+    if not supervised_helper_ownership_available():
+        return PosixPatchCapabilityProbe(
+            name="supervised_helper_ownership",
+            status=PosixPatchCapabilityStatus.UNSUPPORTED,
+            detail="host does not expose the required helper-process supervision primitives",
+        )
     return PosixPatchCapabilityProbe(
         name="supervised_helper_ownership",
         status=PosixPatchCapabilityStatus.UNSUPPORTED,
-        detail="AP-03 has not yet proven journal-backed helper terminal-state and termination guarantees",
+        detail="supervised mutation ownership is not exposed until production composition selects this adapter",
     )
 
 

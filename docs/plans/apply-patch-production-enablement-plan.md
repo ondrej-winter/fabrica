@@ -1,9 +1,9 @@
 # Implementation Plan: Complete Production `apply_patch` Enablement
 
 ## Status
-- Readiness: **AP-02 complete; ready for AP-03 supervised helper-process
-  ownership implementation**. Production mutation remains fail-closed until
-  AP-03 proves supervised ownership for the actual workspace.
+- Readiness: **AP-03 implementation in progress.** Production composition remains
+  unavailable until AP-06 wires the supervised POSIX mutation adapters and AP-05
+  adds startup recovery gating.
 - Created: September 1, 2026.
 - Source specification: `docs/specs/tools-apply-patch-tool-spec.md`.
 - Scope: remaining work only. The existing `workspace_editing` parser, matcher,
