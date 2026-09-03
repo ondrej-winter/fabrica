@@ -1,5 +1,14 @@
 """Application boundary DTOs for local agent runtime use cases."""
 
+from fabrica.features.agent_runtime.application.dtos.completion import (
+    MAX_COMPLETION_SUMMARY_CHARS,
+    RUN_ID_CONTEXT_KEY,
+    CompletionCommitResult,
+    CompletionCommitStatus,
+    CompletionOutcome,
+    CompletionRecord,
+    CompletionVerification,
+)
 from fabrica.features.agent_runtime.application.dtos.runtime import (
     LocalAgentContextBlock,
     LocalAgentRunCommand,
@@ -140,6 +149,7 @@ __all__ = [
     "DEFAULT_MAX_TOTAL_SKILL_RESOURCE_CONTEXT_CHARS",
     "DEFAULT_SKILL_SCRIPT_TIMEOUT_SECONDS",
     "MAX_APPLY_PATCH_INPUT_CHARS",
+    "MAX_COMPLETION_SUMMARY_CHARS",
     "MAX_TOOL_ARGUMENT_MAPPING_ENTRIES",
     "MAX_TOOL_ARGUMENT_NESTING_DEPTH",
     "MAX_TOOL_ARGUMENT_SEQUENCE_ENTRIES",
@@ -153,9 +163,15 @@ __all__ = [
     "MAX_TOOL_NAME_CHARS",
     "MAX_TOOL_RESPONSE_TEXT_CHARS",
     "MODEL_USAGE_CURRENCY_CODE_CHARS",
+    "RUN_ID_CONTEXT_KEY",
     "SAFE_ENVIRONMENT_NAME_CHARS",
     "SAFE_TOOL_IDENTIFIER_CHARS",
     "SUPPORTED_SKILL_SCRIPT_SUFFIXES",
+    "CompletionCommitResult",
+    "CompletionCommitStatus",
+    "CompletionOutcome",
+    "CompletionRecord",
+    "CompletionVerification",
     "LoadedSkillContext",
     "LoadedSkillResourceContext",
     "LocalAgentContextBlock",

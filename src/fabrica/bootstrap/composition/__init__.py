@@ -8,6 +8,7 @@ from fabrica.bootstrap.composition.codex_runtime import (
     create_codex_runtime,
     create_pydantic_ai_runtime,
 )
+from fabrica.bootstrap.composition.completion_runtime import CompletionToolLoopRun, CompletionToolLoopRuntime
 from fabrica.bootstrap.composition.developer_workflow import (
     CommitMessageRuntime,
     CommitMessageWorkflowOptions,
@@ -72,6 +73,8 @@ __all__ = [
     "DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT",
     "CommitMessageRuntime",
     "CommitMessageWorkflowOptions",
+    "CompletionToolLoopRun",
+    "CompletionToolLoopRuntime",
     "DenyByDefaultSkillScriptApprovalLookup",
     "EvidenceRecordingCommitMessageRuntime",
     "FetchWebContentToolOptions",

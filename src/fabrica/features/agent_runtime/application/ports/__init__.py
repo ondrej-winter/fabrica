@@ -1,6 +1,11 @@
 """Application-owned ports for local agent runtime use cases."""
 
 from fabrica.features.agent_runtime.application.ports.agent_model import AgentModel, AgentModelError
+from fabrica.features.agent_runtime.application.ports.completion import (
+    CompletionGuard,
+    CompletionPresenter,
+    CompletionStore,
+)
 from fabrica.features.agent_runtime.application.ports.inbound import (
     LocalAgentRuntime,
     SelectedContextLocalAgentRuntime,
@@ -42,6 +47,9 @@ __all__ = [
     "AgentModelError",
     "AsyncRegisteredTool",
     "AsyncRegisteredToolHandler",
+    "CompletionGuard",
+    "CompletionPresenter",
+    "CompletionStore",
     "LocalAgentRuntime",
     "RegisteredTool",
     "RegisteredToolHandler",

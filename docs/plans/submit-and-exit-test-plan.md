@@ -36,7 +36,7 @@ marked complete.
 
 ## Progress Tracking
 
-- [ ] SAE-00 Resolve completion runtime, durable storage, recovery, and presentation boundaries.
+- [x] SAE-00 Resolve completion runtime, durable storage, recovery, and presentation boundaries.
 - [ ] SAE-01 Define and test completion DTOs, schema, and record contracts.
 - [ ] SAE-02 Define and test run state and the atomic completion boundary.
 - [ ] SAE-03 Test the `submit_and_exit` inbound registered-tool adapter.
@@ -290,16 +290,29 @@ binding for Version 1 implementation and its dependent test work.
 
 ## Unresolved Decisions and Blockers
 
-- [ ] DQ-05 **Owner: human maintainer / implementation owner.** Select and record
-  the concrete Version 1 durable completion-store adapter, its recovery mechanism,
-  and its exactly-once presentation acknowledgement. This is a blocker because the
-  accepted specification requires a post-commit crash to retain the completion
-  record and `COMPLETED` state for recovery-time presentation.
-- [ ] DQ-06 **Owner: implementation owner.** Record the selected runtime result or
-  effect contract for accepted completion and the configuration/reminder transport
-  for required-completion mode. This is a blocker because the existing tool loop
-  has only generic `SUCCESS`/stop handling and does not carry completion records
-  or model-turn reminder context.
+- [x] DQ-05 **Resolved September 3, 2026.** Version 1 uses the agent-runtime-owned
+  `JsonCompletionStore` adapter at a host-supplied root. One JSON artifact per
+  opaque run ID contains both the immutable record and `completed` state, published
+  with an atomic no-overwrite link. A fresh composition reopens the same root;
+  `root/.presented/<run_id>.json` is the durable exactly-once presentation
+  acknowledgement key.
+- [x] DQ-06 **Resolved September 3, 2026.** `CompletionToolLoopRuntime.start_run()`
+  generates `run_<UUID>` and supplies it only through
+  `ToolExecutionContext.opaque_values["agent_runtime.run_id"]`. Accepted terminal
+  completion will emit the application-owned `CompletionCommitted(record)` effect
+  to the host; it will not use generic terminal hooks. Required-completion
+  configuration will be a `ToolLoopLimits` option and the one-time reminder will
+  be carried by an application-owned model-turn instruction DTO. SAE-01 through
+  SAE-04 implement those model-facing and loop behaviors.
+
+## SAE-00 Implementation Notes
+
+- Completion contracts now include immutable `CompletionRecord`, typed commit
+  results, `CompletionGuard`, `CompletionStore`, and `CompletionPresenter` ports.
+- `JsonCompletionStore` provides the selected durable/reopenable Version 1 storage
+  boundary and durable presenter acknowledgement. The registered tool, state-machine
+  integration, model reminder transport, and presenter invocation remain intentionally
+  deferred to SAE-01 through SAE-06.
 
 ## Risks and Implementation Constraints
 
