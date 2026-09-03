@@ -259,7 +259,10 @@ def _validate_tool_call_batch(
 
 
 def _solo_tool_batch_failure(tool_name: str) -> _ToolCallBatchValidationFailure:
-    error_code = "ASK_QUESTION_MUST_BE_SOLO" if tool_name == "ask_question" else "TOOL_MUST_BE_SOLO"
+    error_code = {
+        "ask_question": "ASK_QUESTION_MUST_BE_SOLO",
+        "submit_and_exit": "TERMINAL_TOOL_MIXED_WITH_OTHER_TOOLS",
+    }.get(tool_name, "TOOL_MUST_BE_SOLO")
     return _ToolCallBatchValidationFailure(
         status=ToolLoopRunStatus.INVALID_TOOL_REQUEST,
         observation=RuntimeObservation(

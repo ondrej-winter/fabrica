@@ -39,7 +39,7 @@ marked complete.
 - [x] SAE-00 Resolve completion runtime, durable storage, recovery, and presentation boundaries.
 - [x] SAE-01 Define and test completion DTOs, schema, and record contracts.
 - [x] SAE-02 Define and test run state and the atomic completion boundary.
-- [ ] SAE-03 Test the `submit_and_exit` inbound registered-tool adapter.
+- [x] SAE-03 Test the `submit_and_exit` inbound registered-tool adapter.
 - [ ] SAE-04 Extend tool-loop tests for terminal batching and required-completion mode.
 - [ ] SAE-05 Test guards, failures, idempotency, timeout, and cancellation races.
 - [ ] SAE-06 Add integration coverage for storage, presentation, and interactive composition.
@@ -331,6 +331,16 @@ binding for Version 1 implementation and its dependent test work.
   record. Guard and pre-commit persistence failures leave the run `RUNNING` so a
   later valid submission can proceed. Registered-tool mapping, full idempotency,
   timeout, and cancellation-race behavior remain deferred to SAE-03 through SAE-05.
+
+## SAE-03 Implementation Notes
+
+- Added the agent-runtime-owned `submit_and_exit` registered-tool adapter. It maps
+  the exact model payload plus opaque run ID and tool-call ID to `SubmitRunCompletion`,
+  returns structured acceptance content, and maps application errors to stable tool
+  rejection codes without adding persistence, retry, verification, or interaction behavior.
+- Extended the generic solo-batch rejection to report
+  `TERMINAL_TOOL_MIXED_WITH_OTHER_TOOLS` for `submit_and_exit`; validation occurs
+  before any tool execution regardless of terminal-call ordering.
 
 ## Risks and Implementation Constraints
 

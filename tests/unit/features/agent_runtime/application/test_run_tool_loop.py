@@ -168,6 +168,43 @@ def test_run_tool_loop_rejects_solo_tool_in_mixed_batch_before_execution() -> No
     )
 
 
+@pytest.mark.parametrize(
+    "tool_calls",
+    [
+        (
+            ToolCallRequest(call_id="call-submit", tool_name="submit_and_exit"),
+            ToolCallRequest(call_id="call-ordinary", tool_name="lookup_note"),
+        ),
+        (
+            ToolCallRequest(call_id="call-ordinary", tool_name="lookup_note"),
+            ToolCallRequest(call_id="call-submit", tool_name="submit_and_exit"),
+        ),
+    ],
+)
+def test_run_tool_loop_rejects_submit_and_exit_mixed_with_other_tools_before_execution(
+    tool_calls: tuple[ToolCallRequest, ToolCallRequest],
+) -> None:
+    command = LocalAgentRunCommand(prompt="Complete and inspect")
+    model = FakeToolAwareModel(responses=[ToolAwareModelResponse(tool_calls=tool_calls)])
+    executor = FakeToolExecutor()
+    tools = (
+        ToolDefinition(
+            name="submit_and_exit", description="Submit terminal completion", batch_policy=ToolBatchPolicy.REQUIRE_SOLO
+        ),
+        ToolDefinition(name="lookup_note", description="Lookup a note"),
+    )
+
+    result = asyncio.run(RunToolLoop(model=model, tool_executor=executor).run(command, available_tools=tools))
+
+    assert result.status is ToolLoopRunStatus.INVALID_TOOL_REQUEST
+    assert result.tool_results == ()
+    assert executor.calls == []
+    assert result.observations[-1] == RuntimeObservation(
+        message="tool loop rejected a solo-only tool in a mixed batch",
+        metadata={"tool_name": "submit_and_exit", "error_code": "TERMINAL_TOOL_MIXED_WITH_OTHER_TOOLS"},
+    )
+
+
 def test_run_tool_loop_forwards_opaque_context_without_exposing_it_to_the_model() -> None:
     command = LocalAgentRunCommand(prompt="Use a tool")
     tool = ToolDefinition(name="lookup_note", description="Lookup a note")
