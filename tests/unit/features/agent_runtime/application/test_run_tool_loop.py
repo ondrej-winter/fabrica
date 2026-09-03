@@ -24,6 +24,8 @@ from fabrica.features.agent_runtime.application.dtos import (
 from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModelError, ToolExecutionError
 from fabrica.features.agent_runtime.application.use_cases import RunToolLoop
 
+EXPECTED_REQUIRED_COMPLETION_MODEL_CALLS = 2
+
 
 @dataclass
 class FakeToolAwareModel:
@@ -93,6 +95,66 @@ def test_run_tool_loop_returns_final_model_output_without_tools() -> None:
     assert result.tool_results == ()
     assert result.observations == (RuntimeObservation(message="model completed"),)
     assert model.calls == [(command, (), ())]
+
+
+def test_run_tool_loop_retains_plain_text_and_reminds_once_when_completion_tool_is_required() -> None:
+    command = LocalAgentRunCommand(prompt="Complete the task")
+    model = FakeToolAwareModel(
+        responses=[
+            ToolAwareModelResponse(output_text="The task is done."),
+            ToolAwareModelResponse(output_text="Still done."),
+        ],
+    )
+
+    result = asyncio.run(
+        RunToolLoop(model=model, tool_executor=FakeToolExecutor()).run(
+            command,
+            limits=ToolLoopLimits(max_tool_iterations=2, require_completion_tool=True),
+        )
+    )
+
+    assert result.status is ToolLoopRunStatus.COMPLETION_TOOL_REQUIRED
+    assert result.output_text is None
+    assert len(model.calls) == EXPECTED_REQUIRED_COMPLETION_MODEL_CALLS
+    assert model.calls[0][0] == command
+    reminder_command = model.calls[1][0]
+    assert reminder_command.instructions[0].instruction_type == "completion_tool_required"
+    assert "submit_and_exit" in reminder_command.instructions[0].text
+    assert result.observations == (
+        RuntimeObservation(
+            message="tool loop retained plain text while completion tool was required",
+            metadata={"output_chars": len("The task is done.")},
+        ),
+        RuntimeObservation(
+            message="tool loop retained plain text while completion tool was required",
+            metadata={"output_chars": len("Still done.")},
+        ),
+    )
+
+
+def test_run_tool_loop_stops_after_successful_terminal_tool_without_another_model_turn() -> None:
+    command = LocalAgentRunCommand(prompt="Complete the task")
+    submit_call = ToolCallRequest(call_id="call-submit", tool_name="submit_and_exit")
+    terminal_result = ToolCallResult(
+        call_id="call-submit",
+        tool_name="submit_and_exit",
+        status=ToolCallResultStatus.SUCCESS,
+        runtime_disposition=ToolExecutionRuntimeDisposition.STOP_RUNTIME,
+    )
+    model = FakeToolAwareModel(responses=[ToolAwareModelResponse(tool_calls=(submit_call,))])
+    executor = FakeToolExecutor(results_by_call_id={submit_call.call_id: terminal_result})
+
+    result = asyncio.run(
+        RunToolLoop(model=model, tool_executor=executor).run(
+            command,
+            limits=ToolLoopLimits(require_completion_tool=True),
+        )
+    )
+
+    assert result.status is ToolLoopRunStatus.SUCCESS
+    assert result.output_text is None
+    assert result.tool_results == (terminal_result,)
+    assert len(model.calls) == 1
 
 
 def test_run_tool_loop_executes_tool_and_returns_result_to_model() -> None:

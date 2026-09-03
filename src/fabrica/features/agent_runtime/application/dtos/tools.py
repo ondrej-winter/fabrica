@@ -156,6 +156,7 @@ class ToolLoopRunStatus(StrEnum):
     TOOL_LIMIT_EXCEEDED = "tool_limit_exceeded"
     TOOL_ADAPTER_ERROR = "tool_adapter_error"
     MAX_ITERATIONS_EXCEEDED = "max_iterations_exceeded"
+    COMPLETION_TOOL_REQUIRED = "completion_tool_required"
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +166,7 @@ class ToolLoopLimits:
     max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS
     max_tool_calls_per_turn: int = DEFAULT_MAX_TOOL_CALLS_PER_TURN
     max_tool_result_chars: int = DEFAULT_MAX_TOOL_RESULT_CHARS
+    require_completion_tool: bool = False
 
     def __post_init__(self) -> None:
         if self.max_tool_iterations < 1:
@@ -527,8 +529,11 @@ def _validate_success_outcome(outcome: RegisteredToolOutcome) -> None:
     if outcome.error_code is not None:
         msg = "success outcomes must not include an error code"
         raise ValueError(msg)
-    if outcome.runtime_disposition is not ToolExecutionRuntimeDisposition.CONTINUE_MODEL:
-        msg = "success outcomes must continue the model loop"
+    if outcome.runtime_disposition not in {
+        ToolExecutionRuntimeDisposition.CONTINUE_MODEL,
+        ToolExecutionRuntimeDisposition.STOP_RUNTIME,
+    }:
+        msg = "success outcomes must have a known runtime disposition"
         raise ValueError(msg)
 
 

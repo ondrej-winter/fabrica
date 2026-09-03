@@ -24,6 +24,7 @@ from fabrica.features.agent_runtime.application.dtos.runtime import (
     LocalAgentRunCommand,
     LocalAgentRunResult,
     LocalAgentRunStatus,
+    ModelTurnInstruction,
     RuntimeObservation,
     SafeRuntimeMetadataValue,
 )
@@ -199,6 +200,7 @@ __all__ = [
     "ModelPricingStatus",
     "ModelQuotaEvidence",
     "ModelTokenUsageEvidence",
+    "ModelTurnInstruction",
     "ModelUsageCollectionStatus",
     "ModelUsageEvidence",
     "ModelUsageEvidenceConfidence",

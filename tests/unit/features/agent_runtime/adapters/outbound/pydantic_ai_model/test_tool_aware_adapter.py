@@ -14,6 +14,7 @@ from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model import (
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentContextBlock,
     LocalAgentRunCommand,
+    ModelTurnInstruction,
     RuntimeObservation,
     ToolCallRequest,
     ToolCallResult,
@@ -57,6 +58,25 @@ def test_tool_aware_adapter_maps_text_response_to_final_output() -> None:
     assert turn.calls[0].prompt == "Context:\n[note]\nThe answer is done.\n\nPrompt:\nAnswer from context"
     assert turn.calls[0].model_hint == "codex-max"
     assert turn.calls[0].messages
+
+
+def test_tool_aware_adapter_renders_application_owned_turn_instructions() -> None:
+    turn = FakeToolAwareTurn(response=ModelResponse(parts=[TextPart("done")]))
+    command = LocalAgentRunCommand(
+        prompt="Finish the task",
+        instructions=(
+            ModelTurnInstruction(
+                instruction_type="completion_tool_required",
+                text="Call submit_and_exit alone.",
+            ),
+        ),
+    )
+
+    asyncio.run(PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(command, available_tools=()))
+
+    assert turn.calls[0].prompt == (
+        "Instructions:\n[completion_tool_required]\nCall submit_and_exit alone.\n\nPrompt:\nFinish the task"
+    )
 
 
 def test_tool_aware_adapter_maps_tool_call_response_to_application_request() -> None:

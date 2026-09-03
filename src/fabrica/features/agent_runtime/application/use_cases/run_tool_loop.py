@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
+    ModelTurnInstruction,
     RuntimeObservation,
     ToolBatchPolicy,
     ToolCallRequest,
@@ -55,15 +56,17 @@ class RunToolLoop:
         active_limits = limits or ToolLoopLimits()
         active_cancellation = cancellation or _NeverCancelledToolCancellationSignal()
         active_opaque_tool_context = opaque_tool_context or {}
+        active_command = command
         tool_results: tuple[ToolCallResult, ...] = ()
         observations: tuple[RuntimeObservation, ...] = ()
         call_ledger: dict[str, _ToolCallLedgerEntry] = {}
+        completion_reminder_sent = False
 
         try:
             for iteration in range(active_limits.max_tool_iterations + 1):
                 try:
                     model_response = await self._model.run_turn(
-                        command,
+                        active_command,
                         tuple(available_tools),
                         tool_results,
                         active_cancellation,
@@ -83,12 +86,22 @@ class RunToolLoop:
 
                 observations = (*observations, *model_response.observations)
                 if model_response.output_text is not None:
-                    return ToolLoopRunResult(
-                        status=ToolLoopRunStatus.SUCCESS,
-                        output_text=model_response.output_text,
-                        tool_results=tool_results,
-                        observations=observations,
+                    output_handling = _handle_model_output(
+                        _ModelOutputContext(
+                            output_text=model_response.output_text,
+                            limits=active_limits,
+                            tool_results=tool_results,
+                            observations=observations,
+                            completion_reminder_sent=completion_reminder_sent,
+                            iteration=iteration,
+                        )
                     )
+                    observations = output_handling.observations
+                    if output_handling.result is not None:
+                        return output_handling.result
+                    completion_reminder_sent = True
+                    active_command = _command_with_completion_reminder(command)
+                    continue
 
                 if iteration >= active_limits.max_tool_iterations:
                     return ToolLoopRunResult(
@@ -135,7 +148,11 @@ class RunToolLoop:
                 )
                 stop_status = _first_stop_status(turn_results)
                 if stop_status is not None:
-                    return ToolLoopRunResult(status=stop_status, tool_results=tool_results, observations=observations)
+                    return ToolLoopRunResult(
+                        status=stop_status,
+                        tool_results=tool_results,
+                        observations=observations,
+                    )
         finally:
             for terminal_hook in self._terminal_hooks:
                 await terminal_hook(active_opaque_tool_context)
@@ -218,6 +235,55 @@ class _ToolCallLedgerEntry:
     result: ToolCallResult
 
 
+@dataclass(frozen=True, slots=True)
+class _ModelOutputHandling:
+    observations: tuple[RuntimeObservation, ...]
+    result: ToolLoopRunResult | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _ModelOutputContext:
+    """State required to resolve one plain-text model response."""
+
+    output_text: str
+    limits: ToolLoopLimits
+    tool_results: tuple[ToolCallResult, ...]
+    observations: tuple[RuntimeObservation, ...]
+    completion_reminder_sent: bool
+    iteration: int
+
+
+def _handle_model_output(context: _ModelOutputContext) -> _ModelOutputHandling:
+    if not context.limits.require_completion_tool:
+        return _ModelOutputHandling(
+            observations=context.observations,
+            result=ToolLoopRunResult(
+                status=ToolLoopRunStatus.SUCCESS,
+                output_text=context.output_text,
+                tool_results=context.tool_results,
+                observations=context.observations,
+            ),
+        )
+
+    observations = (
+        *context.observations,
+        RuntimeObservation(
+            message="tool loop retained plain text while completion tool was required",
+            metadata={"output_chars": len(context.output_text)},
+        ),
+    )
+    if context.completion_reminder_sent or context.iteration >= context.limits.max_tool_iterations:
+        return _ModelOutputHandling(
+            observations=observations,
+            result=ToolLoopRunResult(
+                status=ToolLoopRunStatus.COMPLETION_TOOL_REQUIRED,
+                tool_results=context.tool_results,
+                observations=observations,
+            ),
+        )
+    return _ModelOutputHandling(observations=observations)
+
+
 def _validate_tool_call_batch(
     tool_calls: tuple[ToolCallRequest, ...],
     *,
@@ -272,6 +338,24 @@ def _solo_tool_batch_failure(tool_name: str) -> _ToolCallBatchValidationFailure:
     )
 
 
+def _command_with_completion_reminder(command: LocalAgentRunCommand) -> LocalAgentRunCommand:
+    return LocalAgentRunCommand(
+        prompt=command.prompt,
+        context=command.context,
+        instructions=(
+            *command.instructions,
+            ModelTurnInstruction(
+                instruction_type="completion_tool_required",
+                text=(
+                    "A final response requires submit_and_exit. Do not respond with plain text; "
+                    "call submit_and_exit alone with outcome, summary, and verification."
+                ),
+            ),
+        ),
+        model_hint=command.model_hint,
+    )
+
+
 def _duplicate_call_id_failure(call_id: str, *, duplicate_scope: str) -> _ToolCallBatchValidationFailure:
     return _ToolCallBatchValidationFailure(
         status=ToolLoopRunStatus.INVALID_TOOL_REQUEST,
@@ -295,6 +379,8 @@ def _conflicting_duplicate_call_id_failure(call_id: str) -> _ToolCallBatchValida
 def _first_stop_status(results: tuple[ToolCallResult, ...]) -> ToolLoopRunStatus | None:
     for result in results:
         if result.runtime_disposition is ToolExecutionRuntimeDisposition.STOP_RUNTIME:
+            if result.status is ToolCallResultStatus.SUCCESS:
+                return ToolLoopRunStatus.SUCCESS
             return _tool_result_status_to_loop_status(result.status)
         if result.status in {ToolCallResultStatus.SUCCESS, ToolCallResultStatus.REJECTED}:
             continue

@@ -40,7 +40,7 @@ marked complete.
 - [x] SAE-01 Define and test completion DTOs, schema, and record contracts.
 - [x] SAE-02 Define and test run state and the atomic completion boundary.
 - [x] SAE-03 Test the `submit_and_exit` inbound registered-tool adapter.
-- [ ] SAE-04 Extend tool-loop tests for terminal batching and required-completion mode.
+- [x] SAE-04 Extend tool-loop tests for terminal batching and required-completion mode.
 - [ ] SAE-05 Test guards, failures, idempotency, timeout, and cancellation races.
 - [ ] SAE-06 Add integration coverage for storage, presentation, and interactive composition.
 - [ ] SAE-07 Run the full quality gate and record validation evidence.
@@ -341,6 +341,15 @@ binding for Version 1 implementation and its dependent test work.
 - Extended the generic solo-batch rejection to report
   `TERMINAL_TOOL_MIXED_WITH_OTHER_TOOLS` for `submit_and_exit`; validation occurs
   before any tool execution regardless of terminal-call ordering.
+
+## SAE-04 Implementation Notes
+
+- Added the `ToolLoopLimits.require_completion_tool` policy, structured
+  application-owned model-turn instructions, and one bounded completion reminder.
+  Required-completion mode retains plain model text as diagnostics only, then stops
+  with `COMPLETION_TOOL_REQUIRED` if the reminder is ignored.
+- Accepted `submit_and_exit` tool outcomes now stop the tool loop immediately, so
+  the runtime does not request a post-submission model turn.
 
 ## Risks and Implementation Constraints
 

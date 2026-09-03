@@ -79,6 +79,7 @@ def test_tool_status_values_match_normalized_contracts() -> None:
         "tool_limit_exceeded",
         "tool_adapter_error",
         "max_iterations_exceeded",
+        "completion_tool_required",
     }
 
 

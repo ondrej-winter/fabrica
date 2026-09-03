@@ -14,7 +14,9 @@ from fabrica.features.agent_runtime.application.dtos import (
     SubmitRunCompletionCommand,
     ToolArgumentValue,
     ToolExecutionContext,
+    ToolExecutionRuntimeDisposition,
     ToolMutationGuarantee,
+    ToolOutcomeStatus,
     ToolTextContent,
 )
 from fabrica.features.agent_runtime.application.ports import AsyncRegisteredTool
@@ -54,8 +56,10 @@ class SubmitAndExitRegisteredToolAdapter:
             "run_id": result.record.run_id,
             "status": result.status.value,
         }
-        return RegisteredToolOutcome.model_continue_success(
+        return RegisteredToolOutcome(
+            status=ToolOutcomeStatus.SUCCESS,
             mutation_guarantee=ToolMutationGuarantee.COMMITTED,
+            runtime_disposition=ToolExecutionRuntimeDisposition.STOP_RUNTIME,
             content=(ToolTextContent(json.dumps(payload, sort_keys=True, separators=(",", ":"))),),
         )
 

@@ -16,6 +16,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     RegisteredToolOutcome,
     ToolArgumentValue,
     ToolExecutionContext,
+    ToolExecutionRuntimeDisposition,
     ToolOutcomeStatus,
     ToolTextContent,
     canonical_tool_arguments_digest,
@@ -39,6 +40,7 @@ def test_submit_and_exit_maps_arguments_and_opaque_context_to_completion_submiss
 
     assert outcome.status is ToolOutcomeStatus.SUCCESS
     assert outcome.error_code is None
+    assert outcome.runtime_disposition is ToolExecutionRuntimeDisposition.STOP_RUNTIME
     assert len(store.records) == 1
     record = store.records[0]
     assert record.run_id == "run_123"

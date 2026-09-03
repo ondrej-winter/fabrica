@@ -9,6 +9,7 @@ from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvide
 
 MAX_PROMPT_CHARS = 20_000
 MAX_CONTEXT_TEXT_CHARS = 500_000
+MAX_MODEL_TURN_INSTRUCTION_TEXT_CHARS = 4_000
 
 SafeRuntimeMetadataValue = str | int | float | bool | None
 
@@ -35,6 +36,22 @@ class RuntimeObservation:
 
 
 @dataclass(frozen=True, slots=True)
+class ModelTurnInstruction:
+    """Structured host instruction applied to one model turn."""
+
+    instruction_type: str
+    text: str
+
+    def __post_init__(self) -> None:
+        if not self.instruction_type:
+            msg = "model turn instruction type must not be empty"
+            raise ValueError(msg)
+        if not self.text or len(self.text) > MAX_MODEL_TURN_INSTRUCTION_TEXT_CHARS:
+            msg = "model turn instruction text must contain 1 to 4000 characters"
+            raise ValueError(msg)
+
+
+@dataclass(frozen=True, slots=True)
 class LocalAgentContextBlock:
     """Bounded text context made available to a local agent run."""
 
@@ -55,6 +72,7 @@ class LocalAgentRunCommand:
 
     prompt: str
     context: tuple[LocalAgentContextBlock, ...] = field(default_factory=tuple)
+    instructions: tuple[ModelTurnInstruction, ...] = field(default_factory=tuple)
     model_hint: str | None = None
 
     def __post_init__(self) -> None:
@@ -65,6 +83,7 @@ class LocalAgentRunCommand:
             msg = "prompt exceeds the local runtime bound"
             raise ValueError(msg)
         object.__setattr__(self, "context", tuple(self.context))
+        object.__setattr__(self, "instructions", tuple(self.instructions))
 
 
 @dataclass(frozen=True, slots=True)

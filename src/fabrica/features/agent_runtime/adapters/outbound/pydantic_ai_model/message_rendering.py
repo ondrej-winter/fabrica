@@ -7,11 +7,19 @@ from fabrica.features.agent_runtime.application.dtos import LocalAgentContextBlo
 
 def build_user_prompt(command: LocalAgentRunCommand) -> str:
     """Render a local agent command into the bounded user prompt text."""
-    if not command.context:
+    if not command.context and not command.instructions:
         return command.prompt
-
-    context_text = "\n\n".join(_format_context_block(block) for block in command.context)
-    return f"Context:\n{context_text}\n\nPrompt:\n{command.prompt}"
+    sections: list[str] = []
+    if command.context:
+        context = "\n\n".join(_format_context_block(block) for block in command.context)
+        sections.append(f"Context:\n{context}")
+    if command.instructions:
+        instructions = "\n\n".join(
+            f"[{instruction.instruction_type}]\n{instruction.text}" for instruction in command.instructions
+        )
+        sections.append(f"Instructions:\n{instructions}")
+    sections.append(f"Prompt:\n{command.prompt}")
+    return "\n\n".join(sections)
 
 
 def render_message(message: ModelMessage) -> str:
