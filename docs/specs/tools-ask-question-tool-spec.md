@@ -757,8 +757,7 @@ The human wait itself has no ordinary tool timeout.
 
 Version 1 implementation ownership:
 
-- Spec and implementation plan: `docs/specs/tools-ask-question-tool-spec.md` and
-  `docs/plans/ask-question-tool-plan.md`.
+- Canonical specification: `docs/specs/tools-ask-question-tool-spec.md`.
 - `user_interaction` owns the interaction DTOs, application ports, in-memory
   interaction manager, and the inbound `ask_question` registered-tool adapter
   under `src/fabrica/features/user_interaction/`.
