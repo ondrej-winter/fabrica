@@ -672,21 +672,25 @@ Top-level result:
           "before": [
             {
               "line": 39,
-              "text": ""
+              "text": "",
+              "text_truncated": false
             },
             {
               "line": 40,
-              "text": "@injectable"
+              "text": "@injectable",
+              "text_truncated": false
             }
           ],
           "after": [
             {
               "line": 42,
-              "text": "    def __init__(self, repository):"
+              "text": "    def __init__(self, repository):",
+              "text_truncated": false
             },
             {
               "line": 43,
-              "text": "        self.repository = repository"
+              "text": "        self.repository = repository",
+              "text_truncated": false
             }
           ]
         }
@@ -694,6 +698,8 @@ Top-level result:
       "matches_returned": 1,
       "limit_reached": false,
       "output_truncated": false,
+       "output_omitted": false,
+       "reason": null,
       "more_results_possible": false
     }
   ]
@@ -1000,7 +1006,11 @@ understand surrounding implementation.
 Example:
 
 ```text
-search_codebase("class UserService")
+search_codebase({
+  "queries": [
+    { "pattern": "class\\s+UserService" }
+  ]
+})
 → src/users/service.py:41
 → read_files({ "path": "src/users/service.py", "start_line": 1, "end_line": 180 })
 ```
@@ -1089,7 +1099,7 @@ Keep these Cline-compatible concepts:
 - 2 context lines;
 - ignore common generated and dependency paths;
 - cancellation;
-- 30-second search deadline;
+- 30-second per-query search deadline and 60-second tool-call deadline;
 - one retry for a read-only operation;
 - about 48,000 characters of output budget per query;
 - encourage narrow patterns.
@@ -1127,7 +1137,9 @@ Add these requirements beyond current Cline behavior:
 
 ## Testing Strategy
 
-Required future acceptance tests include the following scenarios.
+The implemented acceptance-test suite covers the following scenarios. Release
+validation additionally covers packaged native-ripgrep behavior on each
+supported platform.
 
 ### Basic search
 
