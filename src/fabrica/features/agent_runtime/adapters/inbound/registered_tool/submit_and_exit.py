@@ -47,7 +47,8 @@ class SubmitAndExitRegisteredToolAdapter:
                     run_id=run_id,
                     tool_call_id=context.call_id,
                     submission=submission,
-                )
+                ),
+                cancellation=context.cancellation,
             )
         except SubmitRunCompletionError as err:
             return RegisteredToolOutcome.recoverable_rejection(error_code=err.code, error_message=str(err))

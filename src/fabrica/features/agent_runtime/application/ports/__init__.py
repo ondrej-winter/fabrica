@@ -3,6 +3,7 @@
 from fabrica.features.agent_runtime.application.ports.agent_model import AgentModel, AgentModelError
 from fabrica.features.agent_runtime.application.ports.completion import (
     CompletionGuard,
+    CompletionGuardRejectionError,
     CompletionPresenter,
     CompletionStore,
 )
@@ -49,6 +50,7 @@ __all__ = [
     "AsyncRegisteredTool",
     "AsyncRegisteredToolHandler",
     "CompletionGuard",
+    "CompletionGuardRejectionError",
     "CompletionPresenter",
     "CompletionStore",
     "LocalAgentRuntime",

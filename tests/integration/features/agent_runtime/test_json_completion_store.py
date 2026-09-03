@@ -11,6 +11,15 @@ from fabrica.features.agent_runtime.application.dtos import (
 )
 
 
+class _NeverCancelled:
+    @property
+    def is_cancelled(self) -> bool:
+        return False
+
+    async def wait_until_cancelled(self) -> None:
+        await asyncio.Event().wait()
+
+
 def test_json_completion_store_reopens_committed_record_and_acknowledges_presentation_once(tmp_path) -> None:
     record = CompletionRecord(
         run_id="run-1",
@@ -22,7 +31,7 @@ def test_json_completion_store_reopens_committed_record_and_acknowledges_present
     )
     store = JsonCompletionStore(tmp_path)
 
-    committed = asyncio.run(store.commit_completion("run-1", record))
+    committed = asyncio.run(store.commit_completion("run-1", record, _NeverCancelled()))
     reopened_store = JsonCompletionStore(tmp_path)
 
     assert committed.status is CompletionCommitStatus.COMMITTED
@@ -43,8 +52,8 @@ def test_json_completion_store_replays_the_committed_record_for_the_same_run(tmp
     )
     store = JsonCompletionStore(tmp_path)
 
-    asyncio.run(store.commit_completion("run-1", record))
-    replay = asyncio.run(store.commit_completion("run-1", record))
+    asyncio.run(store.commit_completion("run-1", record, _NeverCancelled()))
+    replay = asyncio.run(store.commit_completion("run-1", record, _NeverCancelled()))
 
     assert replay.status is CompletionCommitStatus.ALREADY_COMPLETED
     assert replay.record == record

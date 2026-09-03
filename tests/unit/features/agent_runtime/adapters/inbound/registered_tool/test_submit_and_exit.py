@@ -15,6 +15,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     CompletionRunState,
     RegisteredToolOutcome,
     ToolArgumentValue,
+    ToolCancellationSignal,
     ToolExecutionContext,
     ToolExecutionRuntimeDisposition,
     ToolOutcomeStatus,
@@ -83,8 +84,14 @@ def test_submit_and_exit_rejects_invalid_arguments_and_missing_opaque_run_id_wit
 class _FakeCompletionStore:
     records: list[CompletionRecord] = field(default_factory=list)
 
-    async def commit_completion(self, run_id: str, record: CompletionRecord) -> CompletionCommitResult:
+    async def commit_completion(
+        self,
+        run_id: str,
+        record: CompletionRecord,
+        cancellation: ToolCancellationSignal,
+    ) -> CompletionCommitResult:
         assert run_id == record.run_id
+        assert cancellation.is_cancelled is False
         self.records.append(record)
         return CompletionCommitResult(CompletionCommitStatus.COMMITTED, record)
 

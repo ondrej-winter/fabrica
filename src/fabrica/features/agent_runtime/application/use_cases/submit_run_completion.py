@@ -1,8 +1,10 @@
 """Use case for atomically accepting a terminal agent-run completion."""
 
+import asyncio
 from dataclasses import dataclass, field
 
 from fabrica.features.agent_runtime.application.dtos import (
+    DEFAULT_COMPLETION_SUBMIT_TIMEOUT_SECONDS,
     CompletionCommitStatus,
     CompletionErrorCode,
     CompletionRecord,
@@ -12,7 +14,12 @@ from fabrica.features.agent_runtime.application.dtos import (
     SubmitRunCompletionResult,
     completion_submission_digest,
 )
-from fabrica.features.agent_runtime.application.ports import CompletionGuard, CompletionStore
+from fabrica.features.agent_runtime.application.dtos.tools import ToolCancellationSignal
+from fabrica.features.agent_runtime.application.ports import (
+    CompletionGuard,
+    CompletionGuardRejectionError,
+    CompletionStore,
+)
 from fabrica.features.agent_runtime.application.ports.run_state import RunStateMachine
 
 
@@ -50,11 +57,23 @@ class SubmitRunCompletion:
     store: CompletionStore
     run_state_machine: RunStateMachine
     guard: CompletionGuard | None = None
+    timeout_seconds: float = DEFAULT_COMPLETION_SUBMIT_TIMEOUT_SECONDS
 
-    async def submit(self, command: SubmitRunCompletionCommand) -> SubmitRunCompletionResult:
+    def __post_init__(self) -> None:
+        """Validate the bounded completion deadline at composition time."""
+        if self.timeout_seconds <= 0:
+            msg = "completion submit timeout must be positive"
+            raise ValueError(msg)
+
+    async def submit(
+        self,
+        command: SubmitRunCompletionCommand,
+        *,
+        cancellation: ToolCancellationSignal,
+    ) -> SubmitRunCompletionResult:
         """Commit a terminal record only from ``RUNNING`` and return its accepted state."""
         current_state = self.run_state_machine.state_for(command.run_id)
-        if current_state is not CompletionRunState.RUNNING:
+        if current_state is not CompletionRunState.RUNNING and current_state is not CompletionRunState.COMPLETED:
             raise _state_error(current_state)
 
         record = CompletionRecord(
@@ -66,13 +85,21 @@ class SubmitRunCompletion:
             verification=command.submission.verification,
             metadata=command.metadata,
         )
-        if self.guard is not None:
-            block_reason = await self.guard.evaluate(record)
-            if block_reason is not None:
-                raise SubmitRunCompletionError(CompletionErrorCode.COMPLETION_GUARD_FAILED, block_reason)
-
         try:
-            committed = await self.store.commit_completion(command.run_id, record)
+            async with asyncio.timeout(self.timeout_seconds):
+                _raise_if_cancelled(cancellation)
+                if self.guard is not None:
+                    await self.guard.evaluate(record)
+                _raise_if_cancelled(cancellation)
+                committed = await self.store.commit_completion(command.run_id, record, cancellation)
+        except CompletionGuardRejectionError as err:
+            raise SubmitRunCompletionError(err.code, str(err)) from err
+        except SubmitRunCompletionError:
+            raise
+        except TimeoutError as err:
+            raise SubmitRunCompletionError(
+                CompletionErrorCode.SUBMIT_TIMEOUT, "completion submission timed out"
+            ) from err
         except Exception as err:
             raise SubmitRunCompletionError(
                 CompletionErrorCode.PERSISTENCE_ERROR,
@@ -88,6 +115,7 @@ class SubmitRunCompletion:
         if accepted_record is None:
             msg = "completion store returned an accepted status without a record"
             raise SubmitRunCompletionError(CompletionErrorCode.INTERNAL_COMPLETION_ERROR, msg)
+        _validate_replayed_record(current_state, record, accepted_record)
         self.run_state_machine.mark_completed(command.run_id)
         status = (
             CompletionSubmissionStatus.ACCEPTED
@@ -95,6 +123,26 @@ class SubmitRunCompletion:
             else CompletionSubmissionStatus.ALREADY_ACCEPTED
         )
         return SubmitRunCompletionResult(status=status, record=accepted_record)
+
+
+def _raise_if_cancelled(cancellation: ToolCancellationSignal) -> None:
+    if cancellation.is_cancelled:
+        raise SubmitRunCompletionError(CompletionErrorCode.SUBMIT_CANCELLED, "run cancellation won before completion")
+
+
+def _validate_replayed_record(
+    current_state: CompletionRunState,
+    proposed: CompletionRecord,
+    accepted: CompletionRecord,
+) -> None:
+    if current_state is not CompletionRunState.COMPLETED:
+        return
+    if accepted.tool_call_id != proposed.tool_call_id:
+        raise SubmitRunCompletionError(CompletionErrorCode.RUN_ALREADY_COMPLETED, "run is already completed")
+    if accepted.payload_digest != proposed.payload_digest:
+        raise SubmitRunCompletionError(
+            CompletionErrorCode.IDEMPOTENCY_KEY_CONFLICT, "completion retry conflicts with prior payload"
+        )
 
 
 def _state_error(state: CompletionRunState) -> SubmitRunCompletionError:

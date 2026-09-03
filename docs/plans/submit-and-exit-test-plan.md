@@ -41,7 +41,7 @@ marked complete.
 - [x] SAE-02 Define and test run state and the atomic completion boundary.
 - [x] SAE-03 Test the `submit_and_exit` inbound registered-tool adapter.
 - [x] SAE-04 Extend tool-loop tests for terminal batching and required-completion mode.
-- [ ] SAE-05 Test guards, failures, idempotency, timeout, and cancellation races.
+- [x] SAE-05 Test guards, failures, idempotency, timeout, and cancellation races.
 - [ ] SAE-06 Add integration coverage for storage, presentation, and interactive composition.
 - [ ] SAE-07 Run the full quality gate and record validation evidence.
 
@@ -350,6 +350,18 @@ binding for Version 1 implementation and its dependent test work.
   with `COMPLETION_TOOL_REQUIRED` if the reminder is ignored.
 - Accepted `submit_and_exit` tool outcomes now stop the tool loop immediately, so
   the runtime does not request a post-submission model turn.
+
+## SAE-05 Implementation Notes
+
+- Added stable completion-guard rejection codes, a bounded 15-second submission
+  deadline, no automatic retry behavior, and cancellation checks before and after
+  guard evaluation. The completion store remains the atomic cancellation-versus-
+  commit authority at its compare-and-set boundary.
+- Identical retries replay the original accepted record; retries with the same
+  tool-call ID but a different payload return `IDEMPOTENCY_KEY_CONFLICT`, while a
+  later terminal tool-call ID returns `RUN_ALREADY_COMPLETED`. Focused tests cover
+  guard rejection, persistence/internal failures, timeout, cancellation-winning
+  checkpoints, and completion-winning cancellation races.
 
 ## Risks and Implementation Constraints
 

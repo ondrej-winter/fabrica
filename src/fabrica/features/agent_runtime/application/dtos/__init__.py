@@ -1,6 +1,7 @@
 """Application boundary DTOs for local agent runtime use cases."""
 
 from fabrica.features.agent_runtime.application.dtos.completion import (
+    DEFAULT_COMPLETION_SUBMIT_TIMEOUT_SECONDS,
     MAX_COMPLETION_SUMMARY_CHARS,
     RUN_ID_CONTEXT_KEY,
     SUBMIT_AND_EXIT_TOOL_DEFINITION,
@@ -139,6 +140,7 @@ from fabrica.shared_kernel.model_usage import (
 )
 
 __all__ = [
+    "DEFAULT_COMPLETION_SUBMIT_TIMEOUT_SECONDS",
     "DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS",
     "DEFAULT_MAX_SAFE_SKILL_LABEL_CHARS",
     "DEFAULT_MAX_SAFE_SKILL_RESOURCE_LABEL_CHARS",

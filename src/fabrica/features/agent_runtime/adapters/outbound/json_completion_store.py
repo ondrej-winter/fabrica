@@ -14,6 +14,7 @@ from fabrica.features.agent_runtime.application.dtos.completion import (
     CompletionRecord,
     CompletionVerification,
 )
+from fabrica.features.agent_runtime.application.dtos.tools import ToolCancellationSignal
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,11 +23,18 @@ class JsonCompletionStore:
 
     root: Path
 
-    async def commit_completion(self, run_id: str, record: CompletionRecord) -> CompletionCommitResult:
+    async def commit_completion(
+        self,
+        run_id: str,
+        record: CompletionRecord,
+        cancellation: ToolCancellationSignal,
+    ) -> CompletionCommitResult:
         """Atomically write a completed run record or return its prior committed record."""
         if run_id != record.run_id:
             msg = "completion run id must match its record"
             raise ValueError(msg)
+        if cancellation.is_cancelled:
+            return CompletionCommitResult(status=CompletionCommitStatus.CANCELLED)
         path = self._record_path(run_id)
         committed = _write_json_if_absent(path, {"record": _record_payload(record), "state": "completed"})
         if committed:
