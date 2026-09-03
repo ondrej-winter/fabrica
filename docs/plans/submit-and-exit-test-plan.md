@@ -38,7 +38,7 @@ marked complete.
 
 - [x] SAE-00 Resolve completion runtime, durable storage, recovery, and presentation boundaries.
 - [x] SAE-01 Define and test completion DTOs, schema, and record contracts.
-- [ ] SAE-02 Define and test run state and the atomic completion boundary.
+- [x] SAE-02 Define and test run state and the atomic completion boundary.
 - [ ] SAE-03 Test the `submit_and_exit` inbound registered-tool adapter.
 - [ ] SAE-04 Extend tool-loop tests for terminal batching and required-completion mode.
 - [ ] SAE-05 Test guards, failures, idempotency, timeout, and cancellation races.
@@ -321,6 +321,16 @@ binding for Version 1 implementation and its dependent test work.
   specified fields, rejects additional properties, requires solo batching, and keeps
   outcome and verification independent. Registered-tool mapping remains deferred to
   SAE-03.
+
+## SAE-02 Implementation Notes
+
+- Added application-owned completion run states, an in-memory state-machine
+  implementation, and `SubmitRunCompletion`. The use case builds the canonical
+  digest-backed record, applies optional guard policy, and only mirrors
+  `RUNNING → COMPLETED` after the `CompletionStore` atomically accepts the durable
+  record. Guard and pre-commit persistence failures leave the run `RUNNING` so a
+  later valid submission can proceed. Registered-tool mapping, full idempotency,
+  timeout, and cancellation-race behavior remain deferred to SAE-03 through SAE-05.
 
 ## Risks and Implementation Constraints
 

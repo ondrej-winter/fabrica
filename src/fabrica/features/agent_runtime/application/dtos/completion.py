@@ -1,9 +1,11 @@
 """Completion records and outcomes for terminal agent runs."""
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
+from hashlib import sha256
 from types import MappingProxyType
 
 from fabrica.features.agent_runtime.application.dtos.runtime import SafeRuntimeMetadataValue
@@ -52,6 +54,34 @@ class CompletionCommitStatus(StrEnum):
     COMMITTED = "committed"
     ALREADY_COMPLETED = "already_completed"
     CANCELLED = "cancelled"
+
+
+class CompletionRunState(StrEnum):
+    """Lifecycle states for one completion-aware agent run."""
+
+    RUNNING = "running"
+    WAITING_FOR_USER = "waiting_for_user"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    ERROR = "error"
+
+
+class CompletionSubmissionStatus(StrEnum):
+    """Application outcomes for a completion submission attempt."""
+
+    ACCEPTED = "accepted"
+    ALREADY_ACCEPTED = "already_accepted"
+
+
+class CompletionErrorCode(StrEnum):
+    """Stable application errors for terminal completion submission."""
+
+    COMPLETION_NOT_ALLOWED = "COMPLETION_NOT_ALLOWED"
+    COMPLETION_GUARD_FAILED = "COMPLETION_GUARD_FAILED"
+    RUN_ALREADY_COMPLETED = "RUN_ALREADY_COMPLETED"
+    SUBMIT_CANCELLED = "SUBMIT_CANCELLED"
+    PERSISTENCE_ERROR = "PERSISTENCE_ERROR"
+    INTERNAL_COMPLETION_ERROR = "INTERNAL_COMPLETION_ERROR"
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +168,40 @@ class CompletionCommitResult:
             raise ValueError(msg)
 
 
+@dataclass(frozen=True, slots=True)
+class SubmitRunCompletionCommand:
+    """Application command for one validated terminal submission."""
+
+    run_id: str
+    tool_call_id: str
+    submission: CompletionSubmission
+    metadata: Mapping[str, SafeRuntimeMetadataValue] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        _validate_identifier(self.run_id, field_name="run id")
+        _validate_identifier(self.tool_call_id, field_name="tool call id")
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+
+@dataclass(frozen=True, slots=True)
+class SubmitRunCompletionResult:
+    """Accepted durable completion result for one terminal submission."""
+
+    status: CompletionSubmissionStatus
+    record: CompletionRecord
+
+
+def completion_submission_digest(submission: CompletionSubmission) -> str:
+    """Return a stable SHA-256 digest for a validated terminal submission."""
+    payload = {
+        "outcome": submission.outcome.value,
+        "summary": submission.summary,
+        "verification": submission.verification.value,
+    }
+    canonical_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return f"sha256:{sha256(canonical_json.encode()).hexdigest()}"
+
+
 def _validate_identifier(value: str, *, field_name: str) -> None:
     if not value or len(value) > MAX_COMPLETION_IDENTIFIER_CHARS or value != value.strip() or "/" in value:
         msg = f"{field_name} must be a bounded non-empty identifier"
@@ -154,8 +218,14 @@ __all__ = [
     "SUBMIT_AND_EXIT_TOOL_NAME",
     "CompletionCommitResult",
     "CompletionCommitStatus",
+    "CompletionErrorCode",
     "CompletionOutcome",
     "CompletionRecord",
+    "CompletionRunState",
     "CompletionSubmission",
+    "CompletionSubmissionStatus",
     "CompletionVerification",
+    "SubmitRunCompletionCommand",
+    "SubmitRunCompletionResult",
+    "completion_submission_digest",
 ]

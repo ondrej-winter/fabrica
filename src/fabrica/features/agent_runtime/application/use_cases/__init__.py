@@ -14,14 +14,22 @@ from fabrica.features.agent_runtime.application.use_cases.run_local_agent_with_s
     RunLocalAgentWithSelectedContext,
 )
 from fabrica.features.agent_runtime.application.use_cases.run_tool_loop import RunToolLoop
+from fabrica.features.agent_runtime.application.use_cases.submit_run_completion import (
+    InMemoryRunStateMachine,
+    SubmitRunCompletion,
+    SubmitRunCompletionError,
+)
 
 __all__ = [
     "EvaluateSkillScriptPolicy",
     "ExecuteSkillScript",
+    "InMemoryRunStateMachine",
     "LoadSkillContext",
     "LoadSkillResourceContext",
     "PrepareSkillTools",
     "RunLocalAgent",
     "RunLocalAgentWithSelectedContext",
     "RunToolLoop",
+    "SubmitRunCompletion",
+    "SubmitRunCompletionError",
 ]
