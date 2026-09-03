@@ -2,18 +2,21 @@
 
 ## Status
 
-- State: Draft — unconfirmed.
-- Implementation status: Substantially implemented; the implementation predates formal specification acceptance.
-- Accepted by: Not applicable until accepted
-- Accepted on: Not applicable until accepted
-- Revision: Template-governance migration on September 1, 2026.
+- State: Accepted; implementation conformance pending.
+- Implementation status: Substantially implemented; index-snapshot validation and repository-state-based pre-commit modification detection require conformance work.
+- Accepted by: Maintainer
+- Accepted on: September 3, 2026
+- Revision: Accepted safety and audit clarification on September 3, 2026.
 - Supersedes: Not applicable.
 
-This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
+This document is the canonical source of truth for the requirements it defines.
+Derived plans and implementation must preserve its objective, constraints,
+execution boundaries, and success criteria; material changes require an updated
+and re-confirmed specification.
 
-This spec is the canonical source of truth for Fabrica's developer-facing commit
-workflows. It defines the read-only `fabrica commit-message` preview workflow and
-the explicitly confirmed mutating `fabrica commit` workflow.
+This specification defines Fabrica's developer-facing commit workflows: the
+read-only `fabrica commit-message` preview workflow and the explicitly confirmed
+mutating `fabrica commit` workflow.
 
 `docs/specs/tools-git-workflow-tools-spec.md` owns git subprocess and registered-tool
 adapter contracts, including approved commit creation and explicitly composed
@@ -62,20 +65,27 @@ It:
 
 1. runs the configured pre-commit quality check before message generation when
    pre-commit configuration exists;
-2. stops before model invocation when pre-commit fails, times out, cannot run, or
-   modifies files;
+2. compares the index tree and tracked-worktree state immediately before and
+   after pre-commit, then stops before model invocation when pre-commit fails,
+   times out, cannot run, or changes either state;
 3. generates the same staged-only evidence-first commit-message recommendation as
    `fabrica commit-message`;
 4. displays the generated recommendation once;
 5. asks for explicit approval;
-6. creates a git commit only when the user answers explicit yes.
+6. revalidates the analyzed index tree immediately after explicit approval and
+   before commit creation; and
+7. creates a git commit only when the user answers explicit yes and the index is
+   unchanged.
 
 Running pre-commit before message generation keeps the recommendation aligned
-with the staged state that is ready to commit. When hooks modify files, the user
-must review and stage the resulting changes before rerunning `fabrica commit`.
-Formatter hooks are treated the same as any other modifying hook: Fabrica stops
-after the hook changes files and waits for the user to inspect the formatter
-output, stage the desired result, and start the commit workflow again.
+with the staged state that is ready to commit. When hooks change the index or
+tracked worktree, the user must review and stage the resulting changes before
+rerunning `fabrica commit`. Formatter hooks are treated the same as any other
+modifying hook: Fabrica stops after the state change and waits for the user to
+inspect the formatter output, stage the desired result, and start the commit
+workflow again. Untracked files and pre-commit cache artifacts do not by
+themselves block the workflow because they are not part of the pending commit;
+they must never be staged or otherwise modified by Fabrica.
 
 ## Shared commit-message generation model
 
@@ -123,6 +133,25 @@ The generation flow has three phases:
 Final synthesis uses structured evidence by default, not the full raw staged diff.
 The final message must describe the dominant change intent rather than a vague
 activity, file list, or implementation changelog.
+
+### Bounds and resource limits
+
+The developer-workflow application DTOs and use-case options own the default
+generation bounds. The current defaults are:
+
+- at most 100 staged files per generation run;
+- at most 500,000 characters for an individual staged-file diff; and
+- at most 50,000 characters for the complete serialized evidence bundle supplied
+  to final synthesis.
+
+Per-file analysis concurrency is bounded by the application use-case option and
+defaults to four concurrent analyses. Implementations must preserve staged-file
+order in the final evidence bundle regardless of completion order.
+
+When any file-count, per-file-diff, or aggregate-evidence bound is exceeded, the
+workflow must fail before the affected model call or final synthesis, return a
+safe bounded-context failure, and create no commit. It must not truncate a diff
+or silently discard evidence in order to continue.
 
 ## Evidence shape
 
@@ -193,6 +222,13 @@ adapter described in `docs/specs/tools-git-workflow-tools-spec.md` when the repo
 valid; the workflow treats the pre-commit gate as a successful skip and continues
 to recommendation generation.
 
+The pre-commit adapter must capture a repository-state fingerprint immediately
+before and after hook execution. The fingerprint includes the index tree identity
+and the content state of tracked worktree changes; it intentionally excludes
+untracked files and pre-commit cache artifacts. A changed fingerprint is a
+modified-files outcome even if hook output does not contain a conventional
+"files were modified" marker or the hook exits successfully.
+
 The workflow stops before model invocation and does not prompt or commit when
 pre-commit:
 
@@ -200,7 +236,7 @@ pre-commit:
 - times out;
 - cannot start;
 - reports invalid existing configuration;
-- modifies tracked files;
+- changes the index or tracked worktree;
 - produces an application-safe failure result.
 
 When pre-commit modifies files, the command reports that the commit was not
@@ -225,6 +261,14 @@ immediately before the question.
 `CommitMessageRecommendation.commit_message` is the application boundary value
 passed exactly to git commit execution after approval, including subject, body,
 and any valid Conventional Commits footer.
+
+The workflow captures the index tree identity used for staged-file discovery and
+evidence generation. Immediately after approval and before invoking the commit
+creation port, it must re-read that identity. If it differs, the command must not
+invoke the commit port; it reports that staged changes changed after recommendation
+generation and requires the user to rerun `fabrica commit`. Changes to the
+tracked worktree that do not alter the index do not invalidate the already
+analyzed staged snapshot, but Fabrica must not include them as evidence.
 
 ### Confirmation prompt
 
@@ -288,7 +332,12 @@ no commit is created after answering anything other than explicit yes.
 - Always allow repositories without pre-commit configuration to skip the
   pre-commit gate and continue.
 - Always stop `fabrica commit` before model invocation when pre-commit fails,
-  times out, cannot run, or modifies files.
+  times out, cannot run, or changes the index or tracked worktree.
+- Always determine pre-commit modification from before/after repository-state
+  fingerprints, not hook output text alone.
+- Always capture the index tree identity used for commit-message evidence and
+  revalidate it immediately after approval and before commit creation.
+- Always stop without invoking the commit port when that index identity changes.
 - Always require explicit interactive approval before running `git commit`.
 - Always treat default, ambiguous, interrupted, or missing input as rejection.
 - Always return exit code `0` for explicit no/default no-op rejection and non-zero
@@ -312,6 +361,8 @@ no commit is created after answering anything other than explicit yes.
 - Never let model output choose arbitrary git flags, pathspecs, repository paths,
   or shell commands.
 - Never commit on EOF, Ctrl-C, empty input, or any answer other than explicit yes.
+- Never commit an index state that differs from the state analyzed for the shown
+  recommendation.
 
 ## Architecture and ownership
 
@@ -385,7 +436,9 @@ ambient staged git state.
   - no staged files fails before model invocation;
   - per-file diff load failure stops the workflow;
   - per-file evidence analysis failure stops the workflow;
-  - final synthesis failure is normalized into the existing result/error pattern.
+  - final synthesis failure is normalized into the existing result/error pattern;
+  - staged-file, individual-diff, and aggregate-evidence bounds fail without
+    truncating context or invoking a later model call.
 - Unit-test evidence and result DTO validation.
 - Unit-test that final synthesis receives structured evidence, not raw full staged
   diff context, in the default path.
@@ -406,6 +459,10 @@ ambient staged git state.
     commit execution;
   - pre-commit-modified files stop the workflow before model invocation and report
     that the user must review and stage changes before retrying.
+  - a hook that changes the tracked worktree or index is detected from repository
+    state comparison even when its output has no modification marker;
+  - untracked hook-created files and pre-commit cache artifacts do not alone
+    produce a modified-files outcome.
 - Unit-test CLI runner behavior with injected fakes:
   - recommendation output is shown before prompting;
   - the full recommendation block is shown once without duplicating a
@@ -415,6 +472,8 @@ ambient staged git state.
     reject without invoking the commit port;
   - explicit no/default no-op rejection exits `0`;
   - interrupted input exits non-zero;
+  - an index-tree change after recommendation display or during confirmation skips
+    commit execution and tells the user to rerun the workflow;
   - usage and pricing evidence are still printed when requested and available;
   - recommendation-generation failures skip prompting and skip commit execution.
 - Unit-test application DTOs and ports:
@@ -426,6 +485,8 @@ ambient staged git state.
   - approval creates exactly one commit with the generated message;
   - rejection creates no commit and preserves staged changes;
   - pre-commit failure or modification creates no commit;
+  - an index change between recommendation generation and approval creates no
+    commit and preserves the changed index;
   - no staged changes creates no commit and reports the staged-git failure;
   - git commit failure creates no successful commit and returns a non-zero CLI
     result.
@@ -452,14 +513,14 @@ Implementation changes should use the project quality gate:
 - Focused application tests during iteration:
   `uv run pytest tests/unit/features/developer_workflow/application/`
 - Focused CLI tests during iteration:
-  `uv run pytest tests/unit/adapters/inbound/cli/`
+  `uv run pytest tests/unit/features/developer_workflow/adapters/inbound/cli/`
 - Focused integration tests during iteration:
   `uv run pytest tests/integration/features/developer_workflow/`
 
 ## Success Criteria
 
-- The spec reads as the canonical source of truth, not as a proposal, diff,
-  migration note, or implementation diary.
+- The accepted lifecycle state, acceptance record, and canonical authority are
+  explicit.
 - `fabrica commit-message` is specified as read-only, staged-only, bounded, and
   deterministic under tests.
 - `fabrica commit-message` does not run pre-commit hooks or mutate repository
@@ -474,13 +535,16 @@ Implementation changes should use the project quality gate:
 - `fabrica commit` is specified as a separate explicit mutating workflow while
   preserving `fabrica commit-message` as the read-only preview workflow.
 - `fabrica commit` runs pre-commit before message generation and stops before
-  model invocation when pre-commit fails or modifies files.
+  model invocation when pre-commit fails or changes the index or tracked
+  worktree, based on state comparison rather than hook output alone.
 - The approval behavior is conservative: only explicit `y` or `yes` creates a
   commit.
 - Rejection and cancellation paths leave repository state untouched.
 - No-op rejection exits `0`; interrupted input exits non-zero.
 - The generated `CommitMessageRecommendation.commit_message` is the exact message
   source for git commit execution.
+- The index committed after approval is verified to be the exact staged snapshot
+  analyzed for the displayed recommendation.
 - Interactive prompt handling belongs to the CLI adapter and git commit execution
   belongs to a developer-workflow outbound adapter behind an application port.
 - Successful output includes a concise confirmation with the new commit hash when
@@ -506,7 +570,8 @@ The detailed exclusions already recorded below remain authoritative.
 
 ## Acceptance and Planning Gate
 
-This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+This accepted specification is ready for implementation planning and conformance
+work. Material changes require an updated and re-confirmed specification.
 
 ## Conventions and Constraints
 
@@ -520,18 +585,22 @@ Follow the project architecture, typing, logging, secret-safety, and validation 
 
 ## Current Context
 
-The detailed workflow, architecture, and safety context in this specification remains authoritative.
+The detailed workflow, architecture, and safety context in this specification is
+authoritative.
 
 ## Assumptions
 
-- The existing detailed requirements remain valid unless explicitly superseded by an accepted revision.
+- The detailed requirements remain valid unless an accepted revision explicitly
+  supersedes them.
 
 ## Desired Behavior
 
-The detailed behavioral contract in this specification defines the required observable outcomes and failure behavior.
+The detailed behavioral contract in this specification defines the required
+observable outcomes and failure behavior.
 
 ## Project Structure
 
 - Specification: This file under `docs/specs/`.
-- Source and test ownership: The detailed architecture section in this specification remains authoritative.
+- Source and test ownership: The detailed architecture section remains
+  authoritative.
 - Documentation ownership: `docs/specs/` and the relevant documentation indexes.
