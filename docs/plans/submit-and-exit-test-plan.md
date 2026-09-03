@@ -42,8 +42,8 @@ marked complete.
 - [x] SAE-03 Test the `submit_and_exit` inbound registered-tool adapter.
 - [x] SAE-04 Extend tool-loop tests for terminal batching and required-completion mode.
 - [x] SAE-05 Test guards, failures, idempotency, timeout, and cancellation races.
-- [ ] SAE-06 Add integration coverage for storage, presentation, and interactive composition.
-- [ ] SAE-07 Run the full quality gate and record validation evidence.
+- [x] SAE-06 Add integration coverage for storage, presentation, and interactive composition.
+- [x] SAE-07 Run the full quality gate and record validation evidence.
 
 ## Test Foundations
 
@@ -240,24 +240,24 @@ storage, recovery, or completion presentation.
 - Selected SAE-00 durable store, recovery, and completion-presentation composition
   modules.
 
-- [ ] SAE-06.1 Test synthetic-model end-to-end completion.
+- [x] SAE-06.1 Test synthetic-model end-to-end completion.
   - **Acceptance:** A sole terminal call commits completion, stops the run, and
     presents the committed summary. The synthetic model fails if called after the
     commit.
-- [ ] SAE-06.2 Test presentation and recovery.
+- [x] SAE-06.2 Test presentation and recovery.
   - **Acceptance:** `CompletionRecord.summary` is rendered exactly once; executor
     acknowledgement prose is never a duplicate final answer. A crash after atomic
     commit retains the record and `COMPLETED` state for recovery-time presentation
     by a fresh composition that reopens the SAE-00.2-selected durable adapter.
-- [ ] SAE-06.3 Test `ask_question` then `submit_and_exit`.
+- [x] SAE-06.3 Test `ask_question` then `submit_and_exit`.
   - **Acceptance:** The answer result reaches the model, then a sole terminal call
     completes the run; owner and pending-interaction cleanup still occurs. Headless
     composition does not expose `ask_question` by default.
 
 ### SAE-07 — Quality Gate
 
-- [ ] SAE-07.1 Run focused tests after each task before broader validation.
-- [ ] SAE-07.2 Run the full repository gate before handoff:
+- [x] SAE-07.1 Run focused tests after each task before broader validation.
+- [x] SAE-07.2 Run the full repository gate before handoff:
 
 ```bash
 uv run ruff format --check .
