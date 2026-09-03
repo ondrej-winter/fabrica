@@ -2,11 +2,14 @@
 
 ## Status
 
-- State: Draft — unconfirmed.
+- State: Accepted.
 - Implementation status: Not implemented.
-- Accepted by: Not applicable until accepted
-- Accepted on: Not applicable until accepted
-- Revision: Template-governance migration on September 1, 2026.
+- Accepted by: Human maintainer
+- Accepted on: September 3, 2026
+- Revision: Accepted on September 3, 2026 after resolving the completion payload,
+  verification, interaction, and blocked-result decisions; the same revision also
+  specifies the atomic completion commit boundary, conflict-safe idempotency,
+  mandatory terminal batching, and bounded required-completion reminders.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
@@ -148,7 +151,7 @@ submit_and_exit
 Keep this name. It is explicit, Cline-compatible, and makes terminal intent
 clearer than names such as `finish`, `done`, `final_answer`, or `complete`.
 
-Canonical provisional model-facing JSON schema:
+Canonical model-facing JSON schema:
 
 ```json
 {
@@ -173,8 +176,11 @@ Canonical provisional model-facing JSON schema:
 }
 ```
 
-The exact outcome and verification enums remain provisional. See the open
-questions.
+Version 1 fixes the outcome enum to `completed`, `partial`, and `blocked`, and
+the verification enum to `verified`, `not_verified`, and `not_applicable`.
+`summary` is the sole model-provided final text and is the canonical user-facing
+response. The schema intentionally does not include evidence references, changed
+files, verification commands, or a separate machine-oriented summary.
 
 ## Current Cline behavior
 
@@ -312,7 +318,9 @@ The result has not been successfully verified. This includes tests not being run
 tests failing, the verification environment being unavailable, or verification
 being incomplete.
 
-Whether failed verification deserves its own status remains an open question.
+Version 1 does not distinguish failed checks from checks that were not run or
+could not run. The summary must state the material reason when it affects the
+user's understanding of the result.
 
 ### `not_applicable`
 
@@ -457,15 +465,16 @@ CompletionRecord
     submitted_at
     tool_call_id
     run_id
+    payload_digest
 ```
 
-Optionally, later versions may include:
+Later versions may add:
 
 ```text
 verification_evidence
 ```
 
-depending on the verification-evidence design.
+if an identified consumer need justifies an explicit evidence-reference contract.
 
 ## Run lifecycle
 
@@ -518,13 +527,23 @@ When `submit_and_exit` is configured for a session, `requireCompletionTool = tru
 should normally follow automatically. This matches Cline and prevents the model
 from ignoring the terminal protocol and ending with plain text.
 
+When this mode is enabled, plain assistant text is not a final response. The host
+must retain the attempted text as a non-user-visible runtime observation and add
+one standard reminder to the next model turn that `submit_and_exit` is required.
+The reminder must not be emitted more than once for the run and counts against
+the normal bounded tool-loop iteration budget. If the next model response is also
+plain text, or the loop budget is exhausted first, stop the run with
+`COMPLETION_TOOL_REQUIRED`; do not silently treat the text as completion and do
+not retry indefinitely. The terminal result should retain the attempted text only
+in bounded diagnostics, not render it as the final user-facing response.
+
 If `submit_and_exit` is absent, ordinary conversational agents may use plain
 assistant responses to complete a run. This supports both conversational mode and
 task-execution mode with explicit terminal state.
 
 ## Terminal synchronization barrier
 
-`submit_and_exit` should behave as a terminal synchronization barrier. Once
+`submit_and_exit` must behave as a terminal synchronization barrier. Once
 accepted:
 
 ```text
@@ -541,21 +560,22 @@ rm / update / test / patch
 
 from happening after the agent has declared completion.
 
-Provisional v1 rule:
+Version 1 rule:
 
 ```text
 submit_and_exit must be the sole tool call in its model turn
 ```
 
-If the model emits `run_commands(...)` and `submit_and_exit(...)` together,
-reject the completion call with `TERMINAL_TOOL_MIXED_WITH_OTHER_TOOLS` and let
-the next iteration submit after seeing verification results.
+Set its registered `ToolDefinition.batch_policy` to `REQUIRE_SOLO`. Validate the
+entire model tool-call batch before executing any call. If the model emits
+`run_commands(...)` and `submit_and_exit(...)` together, reject the complete
+batch with `TERMINAL_TOOL_MIXED_WITH_OTHER_TOOLS`; execute no call from that
+batch, leave the run `RUNNING`, and let the next iteration submit after seeing
+the rejection.
 
 This prevents a model from issuing verification and claiming
 `verification="verified"` concurrently before it knows whether verification
 succeeds.
-
-Whether the sole-call rule is mandatory remains an open question.
 
 ## Verification evidence and guards
 
@@ -604,19 +624,31 @@ RUNNING → COMPLETED
 
 ## Atomicity and persistence
 
-Submission must be atomic. Do not mark the run completed before the completion
-record is durably accepted.
-
-Correct ordering:
+Submission must commit the completion record and `RUNNING → COMPLETED` state
+transition atomically. `CompletionStore` and `RunStateMachine` may be separate
+ports, but their implementation must expose one transaction or compare-and-set
+commit boundary equivalent to:
 
 ```text
-validate
-→ persist completion record
-→ emit terminal result
-→ mark completed
+commit_completion(
+  run_id,
+  tool_call_id,
+  canonical_payload,
+  expected_run_state=RUNNING,
+) → accepted completion record
 ```
 
-If persistence fails, submission fails and the run remains `RUNNING`.
+The successful operation must durably write the immutable completion record and
+transition the same run to `COMPLETED` together. It must not expose a committed
+record for a still-`RUNNING` run, nor a `COMPLETED` run without its completion
+record. Emit the accepted terminal result only after this operation commits.
+
+If the commit fails before its durable transaction/CAS point, submission fails and
+the run remains `RUNNING` unless cancellation has already won. If the host fails
+after a durable commit but before presentation, recovery must treat the committed
+record as authoritative, retain `COMPLETED`, and render that record exactly once
+when a presenter resumes. A storage implementation that cannot provide this
+atomicity must not be used for terminal completion.
 
 ## Timeout, retries, and idempotency
 
@@ -636,10 +668,12 @@ maxRetries = 0
 Terminal state transition is not the kind of operation that should be replayed
 speculatively.
 
-Despite no automatic retries, explicit duplicate delivery can happen. Use
-`tool_call_id` as an idempotency key.
+Despite no automatic retries, explicit duplicate delivery can happen. Use the
+pair `(run_id, tool_call_id)` as the idempotency key. Persist a canonical digest
+of the validated `outcome`, `summary`, and `verification` payload with that key.
 
-If the identical terminal call is delivered again after being accepted, return:
+If the same scoped key and payload digest are delivered again after acceptance,
+return the originally committed completion result, for example:
 
 ```json
 {
@@ -648,6 +682,13 @@ If the identical terminal call is delivered again after being accepted, return:
 ```
 
 Do not create a second completion record.
+
+If the same `(run_id, tool_call_id)` is reused with a different tool name or
+payload digest, reject it with `IDEMPOTENCY_KEY_CONFLICT`, expose neither a new
+completion record nor a successful replay, and preserve the previously committed
+record unchanged. A retry after a successful commit must return the committed
+record even though the run is already `COMPLETED`; any different later terminal
+call must return `RUN_ALREADY_COMPLETED`.
 
 ## Cancellation race
 
@@ -684,6 +725,8 @@ Stable infrastructure and tool error codes should include:
 - `TERMINAL_TOOL_MIXED_WITH_OTHER_TOOLS`;
 - `VERIFICATION_REQUIREMENT_NOT_MET`;
 - `RUN_ALREADY_COMPLETED`;
+- `IDEMPOTENCY_KEY_CONFLICT`;
+- `COMPLETION_TOOL_REQUIRED`;
 - `SUBMIT_TIMEOUT`;
 - `SUBMIT_CANCELLED`;
 - `PERSISTENCE_ERROR`;
@@ -774,6 +817,8 @@ timestamp
 outcome
 verification
 summary
+canonical payload digest
+atomic completion commit with the run state
 ```
 
 `RunStateMachine` owns:
@@ -867,9 +912,13 @@ Required future acceptance tests include the following scenarios.
 ### Lifecycle
 
 - Plain text does not finish when completion tool is required.
+- Plain text produces one reminder and then `COMPLETION_TOOL_REQUIRED` when the
+  next response is plain text or the normal iteration limit is exhausted.
 - Successful completion tool finishes.
 - Failed completion tool does not finish.
-- Duplicate completion is idempotent.
+- Exact duplicate completion replays the committed result without another record.
+- Conflicting reuse of one `(run_id, tool_call_id)` is rejected with
+  `IDEMPOTENCY_KEY_CONFLICT`.
 - Tool cannot run after completion.
 
 ### Verification
@@ -879,7 +928,9 @@ Required future acceptance tests include the following scenarios.
 - Not-applicable submission accepted.
 - Host verification guard can reject unsupported verified claims.
 
-Exact statuses depend on open questions.
+- `outcome="completed"` with `verification="not_verified"` is valid when the
+  requested work is complete but verification failed, was unavailable, or was
+  incomplete. The summary must disclose the material verification limitation.
 
 ### Guard
 
@@ -890,12 +941,13 @@ Exact statuses depend on open questions.
 
 ### Terminal batching
 
-If the sole-call rule is adopted:
-
 - `submit_and_exit` alone is allowed.
-- `submit_and_exit` plus `read_files` is rejected.
-- `submit_and_exit` plus `run_commands` is rejected.
-- `submit_and_exit` plus `apply_patch` is rejected.
+- `submit_and_exit` plus `read_files` rejects the complete batch and executes
+  neither call.
+- `submit_and_exit` plus `run_commands` rejects the complete batch and executes
+  neither call.
+- `submit_and_exit` plus `apply_patch` rejects the complete batch and executes
+  neither call.
 
 ### Failure
 
@@ -903,6 +955,10 @@ If the sole-call rule is adopted:
 - Persistence failure leaves the run active.
 - Timeout leaves the run active.
 - Cancellation race resolves deterministically.
+- Cancellation and completion cannot both commit; the atomic completion commit
+  succeeds only while the run is `RUNNING`.
+- A crash after atomic completion commit preserves the committed record and
+  `COMPLETED` state for recovery-time presentation.
 
 ### Rendering
 
@@ -947,9 +1003,10 @@ adapters.
   persistence, timeout, or cancellation-before-commit fails.
 - Always keep completion persistence atomic with run-state transition.
 - Always treat accepted submission as terminal for the current run.
-- Ask before enforcing explicit verification evidence references, adding a richer
-  outcome enum, adding a richer verification enum, allowing terminal tool calls in
-  mixed tool batches, or splitting `summary` into separate machine and user forms.
+- Do not add explicit verification evidence references, richer outcome or
+  verification enums, terminal mixed-tool batches, or separate machine and user
+  summary forms without updating this accepted specification and renewing human
+  maintainer acceptance.
 - Never perform work, verification, tests, permission grants, file mutation,
   retries, or user questions inside `submit_and_exit`.
 - Never complete the run from a failed `submit_and_exit` call.
@@ -961,7 +1018,7 @@ adapters.
 - The spec defines `submit_and_exit` as the terminal run-completion orchestration
   primitive.
 - The public name remains `submit_and_exit`.
-- The provisional input schema includes independent `outcome`, `verification`,
+- The input schema includes independent `outcome`, `verification`,
   and `summary` fields with bounded structured values.
 - The spec clearly separates task completion state from verification evidence.
 - The spec preserves Cline-compatible lifecycle behavior: `lifecycle.completesRun`,
@@ -979,41 +1036,26 @@ adapters.
   runtime failures is explicit.
 - Future acceptance tests are explicit enough to drive implementation.
 
-## Open Questions
+## Resolved Version 1 Decisions
 
-| Question | Impact | Blocking? | Owner | Resolution |
-| --- | --- | --- | --- | --- |
-| See the detailed questions below; each requires maintainer triage before acceptance. | Requirement and implementation planning. | To be determined | Maintainer | Unresolved |
-
-- Should verification evidence remain a model declaration with optional runtime
-  policy guards, should the runtime validate recent evidence, or should the schema
-  require explicit evidence references such as tool-call IDs?
-- Should the outcome enum remain `completed`, `partial`, and `blocked`, or should
-  it include another status such as `failed`?
-- Should the verification enum remain `verified`, `not_verified`, and
-  `not_applicable`, or should it use richer statuses such as `passed`, `failed`,
-  `not_run`, and `not_applicable`?
-- Should failed verification allow `outcome="completed"`, or should failed
-  verification force `outcome="partial"` or another non-completed state?
-- Should `submit_and_exit` always be the sole tool call in a model turn, or may
-  hosts allow ordered execution where submission runs only after earlier calls
-  succeed?
-- Should `ask_question` always be available in runs that also support
-  `submit_and_exit`, or should particular lifecycle modes make them mutually
-  exclusive?
-- Should `summary` be the only user-visible final content, or is there a real
-  consumer need for separate machine-oriented `summary` and user-facing
-  `final_message` fields?
-- Should completion input include changed files, or should the runtime derive them
-  from patch history, git diff, or workspace transaction logs?
-- Should completion input include verification commands, or should the runtime
-  derive them from command history and verification-class tool results?
-- Should a blocked result always use `submit_and_exit`, or should some blocked
-  conditions map to non-completion run states?
+| Decision | Resolution |
+| --- | --- |
+| Verification evidence | `verification="verified"` remains a model declaration. Hosts may apply optional `CompletionGuard` policy checks; Version 1 neither requires evidence references nor mandates runtime validation of tool history. |
+| Outcome enum | Exactly `completed`, `partial`, and `blocked`; Version 1 does not add `failed`. |
+| Verification enum | Exactly `verified`, `not_verified`, and `not_applicable`; Version 1 does not add `failed` or `not_run`. |
+| Completed but not verified | Valid. The summary must disclose material failed, unavailable, or incomplete verification; hosts may enforce stricter policy through a completion guard. |
+| Terminal batching | `submit_and_exit` must be the sole tool call in its model turn. A mixed batch is rejected in full before any call executes. |
+| Interactive task runs | Hosts may expose both `ask_question` and `submit_and_exit`. `ask_question` pauses for material user input; `submit_and_exit` remains the terminal action after the run resumes. Headless hosts may omit `ask_question`. |
+| Final content | `summary` is the sole model-provided final text and the canonical user-facing response. |
+| Changed files | No Version 1 completion-input field. A host may separately surface trustworthy run-scoped mutation provenance when it has it. |
+| Verification commands | No Version 1 completion-input field. Hosts may retain run-scoped tool history for diagnostics or completion guards. |
+| Blocked results | Every legitimate agent-reported blocker completes through `submit_and_exit(outcome="blocked")`. Provider, transport, persistence, invariant, and cancellation failures use runtime terminal states such as `ERROR` or `CANCELLED`. |
 
 ## Acceptance and Planning Gate
 
-This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+This accepted specification is ready for implementation planning. Derived plans
+must preserve the Version 1 decisions above; any material contract change
+requires updating this specification and renewed human maintainer acceptance.
 
 ## Conventions and Constraints
 
