@@ -13,6 +13,9 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.contex
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.pre_commit import (
     PreCommitSubprocessRunner,
 )
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.repository_snapshot import (
+    GitRepositorySnapshotSubprocessReader,
+)
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.staged_changes import (
     GitStagedChangesSubprocessLoader,
 )
@@ -22,6 +25,7 @@ __all__ = [
     "GitCommandRunner",
     "GitCommitSubprocessCreator",
     "GitContextSubprocessLoader",
+    "GitRepositorySnapshotSubprocessReader",
     "GitStagedChangesSubprocessLoader",
     "PreCommitSubprocessRunner",
 ]

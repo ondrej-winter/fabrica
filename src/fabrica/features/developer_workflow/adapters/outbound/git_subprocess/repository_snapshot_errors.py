@@ -1,0 +1,10 @@
+"""Safe error messages for repository snapshot subprocess observations."""
+
+DECODE_ERROR_MESSAGE = "repository snapshot output could not be decoded as UTF-8"
+GIT_FAILED_MESSAGE = "repository snapshot command failed"
+GIT_START_FAILED_MESSAGE = "repository snapshot command failed to start"
+GIT_TIMED_OUT_MESSAGE = "repository snapshot command timed out"
+GIT_UNAVAILABLE_MESSAGE = "git executable is unavailable"
+MALFORMED_OUTPUT_MESSAGE = "repository snapshot output was malformed"
+NOT_REPOSITORY_MESSAGE = "current directory is not inside a git repository"
+OVERSIZED_OUTPUT_MESSAGE = "repository snapshot output exceeded the configured bound"
