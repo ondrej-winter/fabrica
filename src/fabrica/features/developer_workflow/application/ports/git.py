@@ -14,6 +14,8 @@ from fabrica.features.developer_workflow.application.dtos import (
     GitContextFailureCategory,
     GitContextLogCount,
     GitMergeBase,
+    GitRepositorySnapshot,
+    GitRepositorySnapshotFailureCategory,
     GitStagedChangesFailureCategory,
     GitStagedDiff,
     GitStagedFileList,
@@ -22,6 +24,7 @@ from fabrica.features.developer_workflow.application.dtos import (
     PreCommitRunCommand,
     PreCommitRunResult,
     SafeGitContextMetadataValue,
+    SafeGitRepositorySnapshotMetadataValue,
     SafeGitStagedChangesMetadataValue,
     SafePreCommitMetadataValue,
 )
@@ -84,6 +87,37 @@ class GitContextLoadError(Exception):
         super().__init__(message)
         self.category = category
         self.metadata = dict(metadata or {})
+
+
+class GitRepositorySnapshotLoadError(Exception):
+    """Application-safe failure raised when a repository snapshot cannot load."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        category: GitRepositorySnapshotFailureCategory,
+        metadata: Mapping[str, SafeGitRepositorySnapshotMetadataValue] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.category = category
+        self.metadata = dict(metadata or {})
+
+
+class GitRepositorySnapshotReader(Protocol):
+    """Outbound port for best-effort repository-state observations.
+
+    Returned observations do not lock repository state or provide atomic
+    compare-and-commit behavior. Callers compare values before later actions.
+    """
+
+    def load_snapshot(self) -> GitRepositorySnapshot:
+        """Load the current index-tree and tracked-worktree identities."""
+        ...
+
+    def load_index_tree_id(self) -> str:
+        """Load the current index-tree identity for a best-effort comparison."""
+        ...
 
 
 class GitWorktreeContextLoader(Protocol):
@@ -208,6 +242,8 @@ __all__ = [
     "GitCommitError",
     "GitContextLoadError",
     "GitRefContextLoader",
+    "GitRepositorySnapshotLoadError",
+    "GitRepositorySnapshotReader",
     "GitStagedChangesLoadError",
     "GitStagedChangesLoader",
     "GitStagedDiffLoader",

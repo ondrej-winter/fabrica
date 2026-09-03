@@ -114,7 +114,7 @@ final quality-gate execution follows all implementation work.
 
 ## Progress Tracking
 
-- [ ] T1 — Define repository snapshot application contracts.
+- [x] T1 — Define repository snapshot application contracts.
 - [ ] T2 — Implement and test the safe Git subprocess snapshot adapter.
 - [ ] T3 — Make pre-commit state comparison authoritative.
 - [ ] T4 — Retain and revalidate the analyzed index snapshot before commit.

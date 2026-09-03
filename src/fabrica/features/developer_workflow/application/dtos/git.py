@@ -11,6 +11,9 @@ STAGED_DIFF_CONTEXT_LABEL = "Git staged diff"
 SafeGitStagedChangesMetadataValue = str | int | float | bool | None
 DEFAULT_MAX_PRE_COMMIT_OUTPUT_CHARS = 500_000
 SafePreCommitMetadataValue = str | int | float | bool | None
+GIT_REPOSITORY_INDEX_TREE_ID_LENGTHS = frozenset({40, 64})
+GIT_REPOSITORY_TRACKED_WORKTREE_ID_LENGTH = 64
+SafeGitRepositorySnapshotMetadataValue = str | int | float | bool | None
 
 
 class GitStagedFileStatus(StrEnum):
@@ -36,6 +39,49 @@ class GitStagedChangesFailureCategory(StrEnum):
     TIMED_OUT = "timed_out"
     GIT_FAILED = "git_failed"
     DECODE_ERROR = "decode_error"
+
+
+class GitRepositorySnapshotFailureCategory(StrEnum):
+    """Application-safe failure categories for repository snapshot observations."""
+
+    GIT_UNAVAILABLE = "git_unavailable"
+    NOT_A_REPOSITORY = "not_a_repository"
+    TIMED_OUT = "timed_out"
+    GIT_FAILED = "git_failed"
+    DECODE_ERROR = "decode_error"
+    MALFORMED_OUTPUT = "malformed_output"
+
+
+@dataclass(frozen=True, slots=True)
+class GitRepositorySnapshot:
+    """Comparable repository-state observation, not a lock or transaction.
+
+    Comparing snapshots is a best-effort safety check. Repository state can still
+    change after an observation and before a separately invoked git command.
+    """
+
+    index_tree_id: str
+    tracked_worktree_id: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "index_tree_id",
+            _validate_repository_snapshot_identifier(
+                self.index_tree_id,
+                field_name="index_tree_id",
+                expected_lengths=GIT_REPOSITORY_INDEX_TREE_ID_LENGTHS,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "tracked_worktree_id",
+            _validate_repository_snapshot_identifier(
+                self.tracked_worktree_id,
+                field_name="tracked_worktree_id",
+                expected_lengths=frozenset({GIT_REPOSITORY_TRACKED_WORKTREE_ID_LENGTH}),
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -499,6 +545,18 @@ def _validate_non_empty_text(value: str, *, field_name: str) -> None:
     if not value.strip():
         msg = f"{field_name} must not be empty"
         raise ValueError(msg)
+
+
+def _validate_repository_snapshot_identifier(
+    value: str,
+    *,
+    field_name: str,
+    expected_lengths: frozenset[int],
+) -> str:
+    if len(value) not in expected_lengths or any(character not in "0123456789abcdef" for character in value):
+        msg = f"repository snapshot {field_name} must be a lowercase hexadecimal identifier"
+        raise ValueError(msg)
+    return value
 
 
 def _validate_non_negative_count(value: int, *, field_name: str) -> None:
