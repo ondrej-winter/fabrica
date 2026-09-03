@@ -1,10 +1,11 @@
 # Test Plan: `submit_and_exit`
 
-- **Readiness:** **Needs revision** — resolve SAE-00's completion-runtime,
-  durable-storage, recovery, and presentation boundary before implementation.
+- **Readiness:** **Implementation complete** — SAE-00's completion-runtime,
+  durable-storage, recovery, and presentation boundaries are implemented. Final
+  repository-gate completion remains blocked by the documented coverage baseline.
 - **Source specification:** `docs/specs/tools-submit-and-exit-tool-spec.md`
 
-- **Specification status:** Accepted on September 3, 2026; not yet implemented.
+- **Specification status:** Accepted on September 3, 2026; implemented.
 
 - **Scope:** Version 1 contract, run lifecycle, persistence, and presentation test coverage.
 - **Test tooling:** `pytest` via `uv`, `ruff`, `ty`, and `import-linter`.
@@ -43,7 +44,7 @@ marked complete.
 - [x] SAE-04 Extend tool-loop tests for terminal batching and required-completion mode.
 - [x] SAE-05 Test guards, failures, idempotency, timeout, and cancellation races.
 - [x] SAE-06 Add integration coverage for storage, presentation, and interactive composition.
-- [x] SAE-07 Run the full quality gate and record validation evidence.
+- [ ] SAE-07 Run the full quality gate and record validation evidence.
 
 ## Test Foundations
 
@@ -75,7 +76,7 @@ storage, recovery, or completion presentation.
 - `tests/integration/features/agent_runtime/`
 - `pyproject.toml`, if the selected boundary requires an import-linter contract.
 
-- [ ] SAE-00.1 Define the application-owned completion contracts.
+- [x] SAE-00.1 Define the application-owned completion contracts.
   - **Decision required:** Name the DTOs, stable errors, `CompletionGuard`, atomic
     `commit_completion(run_id, record)` port, cancellation/state-transition
     ownership, and completion-presentation/recovery port.
@@ -83,7 +84,7 @@ storage, recovery, or completion presentation.
     the same run from `RUNNING` to `COMPLETED`; it returns typed committed,
     already-completed, or cancelled outcomes without exposing infrastructure
     types through the registered-tool boundary.
-- [ ] SAE-00.2 Select the Version 1 durable storage and recovery adapter.
+- [x] SAE-00.2 Select the Version 1 durable storage and recovery adapter.
   - **Decision required:** Identify the concrete adapter, its durable artifact or
     backing store, how a fresh composition reopens it, and the recovery-time
     exactly-once presentation idempotency key. An in-memory fake is sufficient
@@ -91,7 +92,7 @@ storage, recovery, or completion presentation.
   - **Fallback:** If Version 1 is intentionally limited to in-memory storage,
     defer SAE-06.2 recovery behavior and obtain a maintainer-approved
     specification revision before implementation begins.
-- [ ] SAE-00.3 Define the host-facing completion runtime API and result/effect shape.
+- [x] SAE-00.3 Define the host-facing completion runtime API and result/effect shape.
   - **Decision required:** Specify how a host generates an opaque run ID at
     `start_run()`, injects it into `ToolExecutionContext.opaque_values`, receives
     `CompletionCommitted(record)`, and exposes the canonical summary. Decide
@@ -101,13 +102,13 @@ storage, recovery, or completion presentation.
   - **Acceptance:** A committed completion terminates without another model turn;
     presentation uses only the committed record summary, and ordinary terminal
     cleanup hooks cannot accidentally render failed or cancelled submissions.
-- [ ] SAE-00.4 Define required-completion configuration and reminder transport.
+- [x] SAE-00.4 Define required-completion configuration and reminder transport.
   - **Decision required:** State whether registering `submit_and_exit`
     automatically enables required-completion mode, where the option/default
     lives, and how one bounded reminder reaches the next model turn despite the
     current model port accepting only command, definitions, tool results, and
     cancellation.
-- [ ] SAE-00.5 Add boundary tests and validate architecture before lifecycle work.
+- [x] SAE-00.5 Add boundary tests and validate architecture before lifecycle work.
   - **Verification:** Run focused DTO/port tests and `uv run lint-imports` after
     the boundary skeleton exists.
 
@@ -119,22 +120,22 @@ storage, recovery, or completion presentation.
 - Selected SAE-00 completion DTO module(s) under
   `src/fabrica/features/agent_runtime/application/dtos/`
 
-- [ ] SAE-01.1 Test the exact public name, required fields,
+- [x] SAE-01.1 Test the exact public name, required fields,
       `additionalProperties=false`, and solo batch policy.
   - **Acceptance:** `outcome` is exactly `completed`, `partial`, `blocked`;
     `verification` is exactly `verified`, `not_verified`, `not_applicable`;
     `summary` is a string with length 1 through 12,000.
   - **Verification:** Parameterized valid and invalid schema/DTO tests.
-- [ ] SAE-01.2 Test independent outcome and verification values.
+- [x] SAE-01.2 Test independent outcome and verification values.
   - **Acceptance:** All nine outcome/verification combinations are structurally
     valid, including `completed + not_verified`.
   - **Verification:** Parameterized matrix test.
-- [ ] SAE-01.3 Test invalid input.
+- [x] SAE-01.3 Test invalid input.
   - **Acceptance:** Missing or extra fields, unknown enums, empty/overbound/non-
     string summaries, and non-object payloads return `INVALID_INPUT`; no guard or
     persistence call occurs.
   - **Verification:** Assert fake guard and store collectors remain empty.
-- [ ] SAE-01.4 Test immutable `CompletionRecord` behavior.
+- [x] SAE-01.4 Test immutable `CompletionRecord` behavior.
   - **Acceptance:** Record contains run ID, tool call ID, outcome, verification,
     summary, timezone-aware timestamp, and canonical payload digest.
   - **Verification:** Equivalent valid payloads hash stably; changed payloads have
@@ -149,15 +150,15 @@ storage, recovery, or completion presentation.
 - Selected SAE-00 completion port and use-case module(s) under
   `src/fabrica/features/agent_runtime/application/`
 
-- [ ] SAE-02.1 Test successful terminal submission from `RUNNING`.
+- [x] SAE-02.1 Test successful terminal submission from `RUNNING`.
   - **Acceptance:** Guard allow, record persistence, and `RUNNING → COMPLETED`
     commit together; result reports `accepted`.
   - **Verification:** Cover every outcome with at least one verification value.
-- [ ] SAE-02.2 Test failed submission leaves the run active.
+- [x] SAE-02.2 Test failed submission leaves the run active.
   - **Acceptance:** Validation, guard, persistence, timeout, and pre-commit
     cancellation failures leave no record and preserve `RUNNING`.
   - **Verification:** A subsequent valid submission succeeds.
-- [ ] SAE-02.3 Test completion only from `RUNNING`.
+- [x] SAE-02.3 Test completion only from `RUNNING`.
   - **Acceptance:** `WAITING_FOR_USER`, `CANCELLED`, `ERROR`, and `COMPLETED`
     reject new submission; exact accepted duplicate replay is the sole exception.
   - **Verification:** State-machine parameterized tests.
@@ -170,13 +171,13 @@ storage, recovery, or completion presentation.
 - `tests/unit/features/agent_runtime/application/test_run_tool_loop.py`
 - Selected SAE-00 `submit_and_exit` registered-tool adapter module.
 
-- [ ] SAE-03.1 Test adapter mapping.
+- [x] SAE-03.1 Test adapter mapping.
   - **Acceptance:** Validated model arguments and host-controlled execution context
     reach the completion use case; success returns structured `accepted` content;
     application errors map to stable tool error codes.
   - **Verification:** Adapter never persists, retries, verifies work, or prompts a
     user directly.
-- [ ] SAE-03.2 Test terminal solo batching.
+- [x] SAE-03.2 Test terminal solo batching.
   - **Acceptance:** `submit_and_exit` alone is allowed. A batch containing it plus
     `read_files`, `run_commands`, `apply_patch`, `ask_question`, or an ordinary
     tool is rejected before any tool executes.
@@ -191,38 +192,38 @@ storage, recovery, or completion presentation.
 
 - Extend `tests/unit/features/agent_runtime/application/test_run_tool_loop.py`
 
-- [ ] SAE-04.1 Test conversational mode.
+- [x] SAE-04.1 Test conversational mode.
   - **Acceptance:** Plain model text completes a run when the completion tool is
     not required; no record or reminder is produced.
-- [ ] SAE-04.2 Test the first plain-text response in required-completion mode.
+- [x] SAE-04.2 Test the first plain-text response in required-completion mode.
   - **Acceptance:** Text becomes a non-user-visible observation; exactly one
     reminder is added through the SAE-00.4-selected model-turn transport and
     consumes normal iteration budget.
-- [ ] SAE-04.3 Test reminder followed by valid submission.
+- [x] SAE-04.3 Test reminder followed by valid submission.
   - **Acceptance:** Only the submitted summary is rendered and no post-submission
     model turn occurs.
-- [ ] SAE-04.4 Test ignored reminder and exhausted budget.
+- [x] SAE-04.4 Test ignored reminder and exhausted budget.
   - **Acceptance:** Stop with `COMPLETION_TOOL_REQUIRED`; do not issue a second
     reminder, create a record, or render plain text as a final answer.
 
 ### SAE-05 — Guards, Idempotency, Failures, and Races
 
-- [ ] SAE-05.1 Test allowing and blocking completion guards.
+- [x] SAE-05.1 Test allowing and blocking completion guards.
   - **Acceptance:** A blocked guard preserves the active run, persists nothing,
     returns `COMPLETION_GUARD_FAILED`, and does not leak sensitive host context.
   - **Verification:** An optional stricter verification guard maps failure to
     `VERIFICATION_REQUIREMENT_NOT_MET` without adding model-input evidence fields.
-- [ ] SAE-05.2 Test idempotency.
+- [x] SAE-05.2 Test idempotency.
   - **Acceptance:** Repeating the same `(run_id, tool_call_id, tool_name,
     payload_digest)` returns the committed result or `already_accepted`, creates
     one record, and does not render twice. Different payload/tool name returns
     `IDEMPOTENCY_KEY_CONFLICT`; a different later terminal call returns
     `RUN_ALREADY_COMPLETED`.
-- [ ] SAE-05.3 Test persistence, timeout, and internal failures.
+- [x] SAE-05.3 Test persistence, timeout, and internal failures.
   - **Acceptance:** `PERSISTENCE_ERROR`, `SUBMIT_TIMEOUT`, and
     `INTERNAL_COMPLETION_ERROR` leave no record and retain `RUNNING`; there are no
     automatic retries.
-- [ ] SAE-05.4 Test cancellation races.
+- [x] SAE-05.4 Test cancellation races.
   - **Acceptance:** Whichever compare-and-set transition commits first,
     `COMPLETED` or `CANCELLED`, wins; never both. A completion record exists only
     when completion wins.
@@ -257,7 +258,7 @@ storage, recovery, or completion presentation.
 ### SAE-07 — Quality Gate
 
 - [x] SAE-07.1 Run focused tests after each task before broader validation.
-- [x] SAE-07.2 Run the full repository gate before handoff:
+- [ ] SAE-07.2 Run the full repository gate before handoff:
 
 ```bash
 uv run ruff format --check .
@@ -266,6 +267,18 @@ uv run ty check src tests
 uv run lint-imports
 uv run pytest
 ```
+
+#### Validation Evidence — September 3, 2026
+
+- `uv run ruff format --check .`, `uv run ruff check .`, `uv run ty check .`,
+  and `uv run lint-imports` passed.
+- The full `uv run pytest` suite ran 1,665 tests successfully with 3 skipped,
+  but failed the configured 93% coverage threshold at 92.99%. This 0.01
+  percentage-point shortfall is repository baseline coverage drift and is not
+  attributable to the documentation-only tracker reconciliation.
+- The focused completion suite ran 63 tests successfully. Its process also exits
+  non-zero because the repository-wide coverage threshold applies to focused
+  pytest invocations; that result does not indicate a test failure.
 
 ## Resolved Design Decisions
 

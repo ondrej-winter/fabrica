@@ -3,7 +3,7 @@
 ## Status
 
 - State: Accepted.
-- Implementation status: Not implemented.
+- Implementation status: Implemented.
 - Accepted by: Human maintainer
 - Accepted on: September 3, 2026
 - Revision: Accepted on September 3, 2026 after resolving the completion payload,
