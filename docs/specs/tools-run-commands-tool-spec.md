@@ -5,8 +5,8 @@
 - State: Accepted and implemented.
 - Accepted by: Product interview
 - Accepted on: August 30, 2026
-- Revision: Existing accepted specification; template metadata normalized on
-  September 1, 2026, preserving the confirmed execution, timeout, output,
+- Revision: Aligned with the implemented `workspace_command_execution` feature
+  on September 2, 2026, preserving the confirmed execution, timeout, output,
   context, and safety decisions recorded on August 31, 2026.
 - Supersedes: Not applicable.
 
@@ -41,13 +41,15 @@ as an explicitly requested capability.
 - Filesystem reading is owned by `docs/specs/tools-read-files-tool-spec.md`.
 - Textual source discovery is owned by `docs/specs/tools-search-codebase-tool-spec.md`.
 - Filesystem mutation is owned by `docs/specs/tools-apply-patch-tool-spec.md`.
-- This spec defines the desired `run_commands` tool contract only. It does not
-  implement the tool.
+- This spec defines the implemented `run_commands` tool contract. The capability
+  is owned by `src/fabrica/features/workspace_command_execution/`, with its
+  registered-tool adapter and bootstrap composition preserving this contract.
 - `run_commands` is the verification and project-tooling counterpart to the
   read/search/edit tools. It should not replace them for ordinary reading,
   searching, or editing work.
-- The public contract must be closed enough that future implementation work can
-  start from focused acceptance tests rather than rediscovering core semantics.
+- The public contract is closed enough that implementation changes can be
+  evaluated against focused acceptance tests rather than rediscovering core
+  semantics.
 
 The intended agent loop is:
 
@@ -772,6 +774,11 @@ Recommended per-command retained output:
 MAX_COMMAND_OUTPUT_CHARS = 48,000
 ```
 
+This is one combined retained-character budget for `stdout` and `stderr` for a
+single command, not a separate 48,000-character allowance for each stream. When
+both streams contain output, allocate the available budget deterministically
+between them, such as proportionally to their retained lengths.
+
 Head plus tail is preferable because command output often has this shape:
 
 ```text
@@ -807,9 +814,9 @@ Return truncation metadata as well:
 
 The model should never need to infer truncation.
 
-The retained output for a command must include at most one truncation marker. The
-marker counts toward `retained_output_chars`; `total_output_chars` records decoded
-characters observed before any per-command or aggregate limiting.
+Each truncated stream must include at most one truncation marker. Markers count
+toward `retained_output_chars`; `total_output_chars` records decoded characters
+observed before any per-command or aggregate limiting.
 
 ## stdout and stderr ordering
 
@@ -832,8 +839,9 @@ The model-visible final result must return separate `stdout` and `stderr`
 fields. The host may retain ordered stream events separately for richer rendering.
 
 Do not return a `combined_output` field in the model-visible final result because
-it duplicates provider tokens. Apply the fixed cap and explicit truncation
-metadata independently to `stdout` and `stderr`.
+it duplicates provider tokens. Apply the command's combined fixed output cap
+across the separate `stdout` and `stderr` fields. Apply explicit truncation
+metadata to the command result, and preserve a marker in each truncated stream.
 
 ## Progress streaming
 
@@ -1183,22 +1191,25 @@ not distribute these concerns between the tool wrapper and executor.
 character counting, head preservation, rolling tail, and truncation metadata. It
 must operate with bounded memory.
 
-Likely future implementation ownership:
+Implementation ownership:
 
 - Spec: `docs/specs/tools-run-commands-tool-spec.md`.
-- Runtime tool contracts and DTOs: under
-  `src/fabrica/features/agent_runtime/application/` if exposed as a model-callable
-  runtime tool.
-- Process execution, OS-specific process-tree handling, sandbox integration, and
-  platform shell invocation: adapter or infrastructure code, not domain or
-  application core.
-- Permission policy integration: application-owned policy port plus adapter-owned
-  UI or host approval mechanism.
-- Unit tests: mirrored under `tests/unit/` for validation, planning, environment
-  filtering, result limiting, output collection, and permission decisions.
-- Integration tests: under `tests/integration/` for real subprocess behavior,
-  process-tree termination, shell behavior, environment filtering, cwd
-  containment, cancellation, and timeout checks.
+- Runtime tool contracts and DTOs: the `workspace_command_execution` application
+  boundary, composed with `agent_runtime` registered-tool contracts by its inbound
+  adapter.
+- Process execution, POSIX process-tree handling, workspace resolution,
+  environment filtering, and platform shell invocation: outbound adapters under
+  `src/fabrica/features/workspace_command_execution/adapters/outbound/`.
+- Permission policy integration: application-owned policy ports plus host-owned
+  UI or approval adapters supplied through bootstrap composition.
+- Bootstrap composition: `src/fabrica/bootstrap/composition/workspace_command_execution.py`.
+  The built-in supervisor supports macOS and Linux POSIX process groups; other
+  platforms must provide a platform-specific `CommandSupervisor` explicitly.
+- Unit tests: mirrored under `tests/unit/features/workspace_command_execution/`
+  for validation, planning, environment filtering, result limiting, output
+  collection, permission decisions, workspace containment, and POSIX supervision.
+- Integration tests: under `tests/integration/features/workspace_command_execution/`
+  for explicit runtime composition and real subprocess behavior.
 
 Implementation must preserve hexagonal boundaries: domain and application code
 must not directly depend on OS-specific process APIs, shell syntax, UI approval
@@ -1285,7 +1296,8 @@ Add these requirements beyond current Cline behavior:
 
 ## Testing Strategy
 
-Required future acceptance tests include the following scenarios.
+The implemented tool's acceptance coverage includes the following scenarios;
+new or changed behavior must preserve or extend this coverage.
 
 ### Direct execution
 
