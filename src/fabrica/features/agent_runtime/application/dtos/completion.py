@@ -7,11 +7,27 @@ from enum import StrEnum
 from types import MappingProxyType
 
 from fabrica.features.agent_runtime.application.dtos.runtime import SafeRuntimeMetadataValue
+from fabrica.features.agent_runtime.application.dtos.tools import ToolBatchPolicy, ToolDefinition
 
 MAX_COMPLETION_SUMMARY_CHARS = 12_000
 MAX_COMPLETION_IDENTIFIER_CHARS = 120
 SHA256_DIGEST_CHARS = 71
 RUN_ID_CONTEXT_KEY = "agent_runtime.run_id"
+SUBMIT_AND_EXIT_TOOL_NAME = "submit_and_exit"
+SUBMIT_AND_EXIT_TOOL_DESCRIPTION = """Finish the current task and terminate the agent run.
+
+Call this only after all useful work is complete or when the task cannot proceed further.
+
+Before submitting, review the original request, ensure all requested changes are present, and perform appropriate
+verification where possible. Inspect verification results before claiming verification succeeded.
+
+Use outcome to state whether the task was completed, partially completed, or blocked. Use verification to state
+whether correctness was actually checked.
+
+The summary is the final user-facing response. Clearly state what was done, verification performed, and any
+remaining limitation.
+
+This is a terminal tool. Do not call it together with other tool calls."""
 
 
 class CompletionOutcome(StrEnum):
@@ -36,6 +52,46 @@ class CompletionCommitStatus(StrEnum):
     COMMITTED = "committed"
     ALREADY_COMPLETED = "already_completed"
     CANCELLED = "cancelled"
+
+
+@dataclass(frozen=True, slots=True)
+class CompletionSubmission:
+    """Validated model-facing payload for one terminal completion submission."""
+
+    outcome: CompletionOutcome
+    summary: str
+    verification: CompletionVerification
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.outcome, CompletionOutcome):
+            msg = "completion outcome must be a known completion outcome"
+            raise TypeError(msg)
+        if not isinstance(self.summary, str) or not self.summary or len(self.summary) > MAX_COMPLETION_SUMMARY_CHARS:
+            msg = "completion summary must contain 1 to 12000 characters"
+            raise ValueError(msg)
+        if not isinstance(self.verification, CompletionVerification):
+            msg = "completion verification must be a known completion verification state"
+            raise TypeError(msg)
+
+
+SUBMIT_AND_EXIT_TOOL_DEFINITION = ToolDefinition(
+    name=SUBMIT_AND_EXIT_TOOL_NAME,
+    description=SUBMIT_AND_EXIT_TOOL_DESCRIPTION,
+    argument_schema={
+        "type": "object",
+        "properties": {
+            "outcome": {"type": "string", "enum": tuple(outcome.value for outcome in CompletionOutcome)},
+            "summary": {"type": "string", "minLength": 1, "maxLength": MAX_COMPLETION_SUMMARY_CHARS},
+            "verification": {
+                "type": "string",
+                "enum": tuple(verification.value for verification in CompletionVerification),
+            },
+        },
+        "required": ("outcome", "summary", "verification"),
+        "additionalProperties": False,
+    },
+    batch_policy=ToolBatchPolicy.REQUIRE_SOLO,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,9 +149,13 @@ __all__ = [
     "MAX_COMPLETION_SUMMARY_CHARS",
     "RUN_ID_CONTEXT_KEY",
     "SHA256_DIGEST_CHARS",
+    "SUBMIT_AND_EXIT_TOOL_DEFINITION",
+    "SUBMIT_AND_EXIT_TOOL_DESCRIPTION",
+    "SUBMIT_AND_EXIT_TOOL_NAME",
     "CompletionCommitResult",
     "CompletionCommitStatus",
     "CompletionOutcome",
     "CompletionRecord",
+    "CompletionSubmission",
     "CompletionVerification",
 ]

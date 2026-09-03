@@ -37,7 +37,7 @@ marked complete.
 ## Progress Tracking
 
 - [x] SAE-00 Resolve completion runtime, durable storage, recovery, and presentation boundaries.
-- [ ] SAE-01 Define and test completion DTOs, schema, and record contracts.
+- [x] SAE-01 Define and test completion DTOs, schema, and record contracts.
 - [ ] SAE-02 Define and test run state and the atomic completion boundary.
 - [ ] SAE-03 Test the `submit_and_exit` inbound registered-tool adapter.
 - [ ] SAE-04 Extend tool-loop tests for terminal batching and required-completion mode.
@@ -313,6 +313,14 @@ binding for Version 1 implementation and its dependent test work.
   boundary and durable presenter acknowledgement. The registered tool, state-machine
   integration, model reminder transport, and presenter invocation remain intentionally
   deferred to SAE-01 through SAE-06.
+
+## SAE-01 Implementation Notes
+
+- Added immutable `CompletionSubmission` validation and the canonical
+  `SUBMIT_AND_EXIT_TOOL_DEFINITION`. The model-facing schema has exactly the three
+  specified fields, rejects additional properties, requires solo batching, and keeps
+  outcome and verification independent. Registered-tool mapping remains deferred to
+  SAE-03.
 
 ## Risks and Implementation Constraints
 
