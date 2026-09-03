@@ -116,7 +116,7 @@ final quality-gate execution follows all implementation work.
 
 - [x] T1 — Define repository snapshot application contracts.
 - [x] T2 — Implement and test the safe Git subprocess snapshot adapter.
-- [ ] T3 — Make pre-commit state comparison authoritative.
+- [x] T3 — Make pre-commit state comparison authoritative.
 - [ ] T4 — Retain and revalidate the analyzed index snapshot before commit.
 - [ ] T5 — Wire the implementation and synchronize user-facing/adapter specs.
 - [ ] T6 — Run focused, integration, and full quality-gate validation.

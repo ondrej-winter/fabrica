@@ -293,6 +293,55 @@ def test_confirmed_commit_workflow_stops_before_runtime_when_pre_commit_modifies
     assert _git_unstaged_file_names(git_repository) == ("example.txt",)
 
 
+def test_confirmed_commit_workflow_stops_before_runtime_when_successful_pre_commit_silently_modifies_files(
+    tmp_path: Path,
+) -> None:
+    runtime = FakeRuntime(results=[])
+    git_repository = _create_repository_with_staged_diff(tmp_path)
+    _configure_git_identity(git_repository)
+    _write_silent_modifying_pre_commit_config(git_repository)
+    skill_root = _write_commit_message_skill(tmp_path)
+    workflow = create_confirmed_commit_workflow(
+        runtime=runtime,
+        options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
+    )
+
+    result = asyncio.run(workflow.run(skill_id="conventional-commits"))
+
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
+    assert result.observations[0].metadata["category"] == "pre_commit_modified_files"
+    assert runtime.calls == []
+    assert _git_commit_count(git_repository) == 0
+    assert _git_staged_file_names(git_repository) == ("example.txt",)
+    assert _git_unstaged_file_names(git_repository) == ("example.txt",)
+
+
+def test_confirmed_commit_workflow_allows_untracked_pre_commit_artifacts(tmp_path: Path) -> None:
+    runtime = FakeRuntime(
+        results=[
+            LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text=_analysis_json()),
+            LocalAgentRunResult(
+                status=LocalAgentRunStatus.SUCCESS,
+                output_text=_synthesis_text(commit_message="feat: add confirmed commit flow"),
+            ),
+        ]
+    )
+    git_repository = _create_repository_with_staged_diff(tmp_path)
+    _configure_git_identity(git_repository)
+    _write_untracked_artifact_pre_commit_config(git_repository)
+    skill_root = _write_commit_message_skill(tmp_path)
+    workflow = create_confirmed_commit_workflow(
+        runtime=runtime,
+        options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
+    )
+
+    result = asyncio.run(workflow.run(skill_id="conventional-commits"))
+
+    assert result.succeeded
+    assert _git_commit_count(git_repository) == 1
+    assert (git_repository / ".fabrica-pre-commit-cache").is_file()
+
+
 def test_confirmed_commit_workflow_reports_git_failure_without_creating_commit(tmp_path: Path) -> None:
     runtime = FakeRuntime(
         results=[
@@ -457,6 +506,23 @@ def _write_modifying_pre_commit_config(git_repository: Path) -> None:
             "Path('example.txt').write_text('example\\nmodified by hook\\n', encoding='utf-8')\n"
             "sys.exit(1)\n"
         ),
+    )
+
+
+def _write_silent_modifying_pre_commit_config(git_repository: Path) -> None:
+    _write_local_pre_commit_config(
+        git_repository,
+        script=(
+            "from pathlib import Path\n"
+            "Path('example.txt').write_text('example\\nmodified by hook\\n', encoding='utf-8')\n"
+        ),
+    )
+
+
+def _write_untracked_artifact_pre_commit_config(git_repository: Path) -> None:
+    _write_local_pre_commit_config(
+        git_repository,
+        script="from pathlib import Path\nPath('.fabrica-pre-commit-cache').write_text('cache\\n', encoding='utf-8')\n",
     )
 
 

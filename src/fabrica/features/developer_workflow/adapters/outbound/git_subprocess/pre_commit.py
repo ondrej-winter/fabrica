@@ -25,6 +25,9 @@ from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.pre_co
     PRE_COMMIT_TIMED_OUT_MESSAGE,
     PRE_COMMIT_UNAVAILABLE_MESSAGE,
 )
+from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.repository_snapshot import (
+    GitRepositorySnapshotSubprocessReader,
+)
 from fabrica.features.developer_workflow.application.dtos import (
     DEFAULT_MAX_PRE_COMMIT_OUTPUT_CHARS,
     PreCommitFailureCategory,
@@ -66,7 +69,10 @@ class PreCommitSubprocessRunner:
         missing_config_result = self._missing_config_result()
         if missing_config_result is not None:
             return missing_config_result
+        snapshot_reader = self._snapshot_reader()
+        before_snapshot = snapshot_reader.load_snapshot()
         result, duration_seconds = self._run(pre_commit_run_argv(command))
+        after_snapshot = snapshot_reader.load_snapshot()
         stdout = self._decode(result.stdout)
         stderr = self._decode(result.stderr)
         if "not a git repository" in stderr.lower():
@@ -76,8 +82,11 @@ class PreCommitSubprocessRunner:
                 returncode=result.returncode,
                 duration_seconds=duration_seconds,
             )
+        status = _status_from_result(result.returncode)
+        if after_snapshot != before_snapshot:
+            status = PreCommitRunStatus.MODIFIED_FILES
         return PreCommitRunResult(
-            status=_status_from_result(result.returncode, stdout=stdout, stderr=stderr),
+            status=status,
             stdout=self._bounded_output(stdout, duration_seconds=duration_seconds),
             stderr=self._bounded_output(stderr, duration_seconds=duration_seconds),
             returncode=result.returncode,
@@ -85,6 +94,15 @@ class PreCommitSubprocessRunner:
                 "duration_seconds": round(duration_seconds, 6),
                 "side_effects": "pre-commit hooks may modify files or caches",
             },
+        )
+
+    def _snapshot_reader(self) -> GitRepositorySnapshotSubprocessReader:
+        """Create the adapter-local reader sharing this runner and execution settings."""
+        return GitRepositorySnapshotSubprocessReader(
+            working_directory=self._working_directory,
+            timeout_seconds=self._timeout_seconds,
+            runner=self._runner,
+            verbose_diagnostics=self._verbose_diagnostics,
         )
 
     def _run(self, argv: Sequence[str]) -> tuple[GitCommandResult, float]:
@@ -181,10 +199,7 @@ class PreCommitSubprocessRunner:
         return PreCommitRunError(message, category=category, metadata=metadata)
 
 
-def _status_from_result(returncode: int, *, stdout: str, stderr: str) -> PreCommitRunStatus:
+def _status_from_result(returncode: int) -> PreCommitRunStatus:
     if returncode == 0:
         return PreCommitRunStatus.PASSED
-    combined_output = f"{stdout}\n{stderr}".lower()
-    if "files were modified by this hook" in combined_output:
-        return PreCommitRunStatus.MODIFIED_FILES
     return PreCommitRunStatus.FAILED
