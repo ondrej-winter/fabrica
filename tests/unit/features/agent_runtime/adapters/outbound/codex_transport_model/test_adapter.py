@@ -200,5 +200,4 @@ def test_adapter_propagates_non_success_transport_evidence_without_fabricating_o
     assert result.usage_evidence == (usage_evidence,)
     assert result.cost_evidence == (cost_evidence,)
     assert result.usage_evidence[0].tokens == ModelTokenUsageEvidence()
-    assert result.cost_evidence[0].estimated_amount is None
-    assert result.cost_evidence[0].currency is None
+    assert result.cost_evidence[0].confidence is ModelUsageEvidenceConfidence.UNKNOWN

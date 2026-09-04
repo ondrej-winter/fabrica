@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
 from io import StringIO
 
 from fabrica.adapters.inbound.cli.model_evidence import write_model_evidence_report
@@ -154,12 +153,12 @@ def test_write_model_evidence_report_formats_requested_usage_and_pricing() -> No
         ),
         cost_evidence=(
             ModelCostEvidence(
-                pricing_status=ModelPricingStatus.PUBLIC_PRICE_ESTIMATE,
+                pricing_status=ModelPricingStatus.NOT_AVAILABLE,
                 source=ModelUsageEvidenceSource.MANUAL_OBSERVATION,
-                confidence=ModelUsageEvidenceConfidence.ESTIMATED,
-                estimated_amount=Decimal("0.03"),
-                currency="USD",
-                observations=(ModelUsageObservation("estimated from public table", metadata={"provider": "codex"}),),
+                confidence=ModelUsageEvidenceConfidence.MANUAL,
+                observations=(
+                    ModelUsageObservation("per-call pricing is not available", metadata={"provider": "codex"}),
+                ),
             ),
         ),
         stdout=stdout,
@@ -173,8 +172,8 @@ def test_write_model_evidence_report_formats_requested_usage_and_pricing() -> No
         "input_tokens=12 output_tokens=7 total_tokens=19 limit=100 remaining=81 "
         "reset_at=2026-08-14T16:00:00Z observation='from response' collection_status=collected\n"
         "Pricing evidence:\n"
-        "- status=public_price_estimate source=manual_observation confidence=estimated estimated_amount=0.03 "
-        "currency=USD observation='estimated from public table' provider=codex\n"
+        "- status=not_available source=manual_observation confidence=manual "
+        "observation='per-call pricing is not available' provider=codex\n"
     )
 
 

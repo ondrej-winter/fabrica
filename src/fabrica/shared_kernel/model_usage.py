@@ -2,12 +2,10 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from decimal import Decimal
 from enum import StrEnum
 from types import MappingProxyType
 
 DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS = 240
-MODEL_USAGE_CURRENCY_CODE_CHARS = 3
 
 type SafeModelUsageObservationValue = str | int | float | bool | None
 
@@ -45,13 +43,11 @@ class ModelUsageEvidenceConfidence(StrEnum):
 
 
 class ModelPricingStatus(StrEnum):
-    """Provider-neutral pricing evidence states."""
+    """Provider-neutral non-monetary pricing evidence states."""
 
     UNKNOWN = "unknown"
     NOT_AVAILABLE = "not_available"
     SUBSCRIPTION_INCLUDED = "subscription_included"
-    PUBLIC_PRICE_ESTIMATE = "public_price_estimate"
-    MANUAL_ESTIMATE = "manual_estimate"
     UNSUPPORTED = "unsupported"
 
 
@@ -139,21 +135,14 @@ class ModelUsageEvidence:
 
 @dataclass(frozen=True, slots=True)
 class ModelCostEvidence:
-    """Provider-agnostic pricing or cost evidence for one model call or usage probe."""
+    """Independent, non-monetary result-level pricing-state evidence."""
 
     pricing_status: ModelPricingStatus
     source: ModelUsageEvidenceSource
     confidence: ModelUsageEvidenceConfidence
-    estimated_amount: Decimal | None = None
-    currency: str | None = None
     observations: tuple[ModelUsageObservation, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
-        if (self.estimated_amount is None) != (self.currency is None):
-            msg = "estimated_amount and currency must be provided together"
-            raise ValueError(msg)
-        if self.estimated_amount is not None:
-            _validate_estimate(self.pricing_status, self.estimated_amount, self.currency)
         object.__setattr__(self, "observations", tuple(self.observations))
 
 
@@ -169,25 +158,12 @@ def _validate_non_empty_text(value: str, *, field_name: str) -> None:
         raise ValueError(msg)
 
 
-def _validate_estimate(pricing_status: ModelPricingStatus, estimated_amount: Decimal, currency: str | None) -> None:
-    if pricing_status not in {ModelPricingStatus.PUBLIC_PRICE_ESTIMATE, ModelPricingStatus.MANUAL_ESTIMATE}:
-        msg = "monetary estimates require an estimate pricing status"
-        raise ValueError(msg)
-    if estimated_amount < Decimal(0):
-        msg = "estimated_amount must not be negative"
-        raise ValueError(msg)
-    if currency is None or currency != currency.upper() or len(currency) != MODEL_USAGE_CURRENCY_CODE_CHARS:
-        msg = "currency must be a three-letter uppercase code"
-        raise ValueError(msg)
-
-
 def _is_safe_observation_value(value: object) -> bool:
     return value is None or isinstance(value, str | int | float | bool)
 
 
 __all__ = [
     "DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS",
-    "MODEL_USAGE_CURRENCY_CODE_CHARS",
     "ModelCostEvidence",
     "ModelPricingStatus",
     "ModelQuotaEvidence",

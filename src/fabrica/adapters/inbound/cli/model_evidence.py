@@ -64,15 +64,12 @@ def format_usage_evidence(evidence: ModelUsageEvidence) -> str:
 
 
 def format_cost_evidence(evidence: ModelCostEvidence) -> str:
-    """Format one model cost evidence record as stable CLI fields."""
+    """Format one non-monetary model pricing evidence record as stable CLI fields."""
     fields = [
         f"status={evidence.pricing_status.value}",
         f"source={evidence.source.value}",
         f"confidence={evidence.confidence.value}",
     ]
-    if evidence.estimated_amount is not None and evidence.currency is not None:
-        fields.append(f"estimated_amount={evidence.estimated_amount}")
-        fields.append(f"currency={evidence.currency}")
     fields.extend(format_observation_messages(evidence.observations))
     return " ".join(fields)
 

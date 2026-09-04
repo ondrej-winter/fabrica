@@ -2,7 +2,6 @@
 
 from fabrica.shared_kernel.model_usage import (
     DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS,
-    MODEL_USAGE_CURRENCY_CODE_CHARS,
     ModelCostEvidence,
     ModelPricingStatus,
     ModelQuotaEvidence,
@@ -17,7 +16,6 @@ from fabrica.shared_kernel.model_usage import (
 
 __all__ = [
     "DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS",
-    "MODEL_USAGE_CURRENCY_CODE_CHARS",
     "ModelCostEvidence",
     "ModelPricingStatus",
     "ModelQuotaEvidence",

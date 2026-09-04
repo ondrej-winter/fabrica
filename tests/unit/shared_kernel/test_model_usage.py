@@ -1,7 +1,6 @@
 """Tests for provider-agnostic usage and cost evidence DTO contracts."""
 
 from dataclasses import FrozenInstanceError
-from decimal import Decimal
 from typing import cast
 
 import pytest
@@ -52,8 +51,6 @@ def test_usage_evidence_vocabularies_match_v1_contract() -> None:
         "unknown",
         "not_available",
         "subscription_included",
-        "public_price_estimate",
-        "manual_estimate",
         "unsupported",
     }
 
@@ -148,65 +145,20 @@ def test_usage_evidence_carries_provider_model_tokens_quota_and_observations() -
         )
 
 
-def test_cost_evidence_allows_unknown_unavailable_subscription_and_unsupported_without_amounts() -> None:
+def test_cost_evidence_allows_the_accepted_non_monetary_pricing_states() -> None:
     for pricing_status in (
         ModelPricingStatus.UNKNOWN,
         ModelPricingStatus.NOT_AVAILABLE,
         ModelPricingStatus.SUBSCRIPTION_INCLUDED,
         ModelPricingStatus.UNSUPPORTED,
     ):
-        evidence = ModelCostEvidence(
-            pricing_status=pricing_status,
-            source=ModelUsageEvidenceSource.USAGE_ENDPOINT,
-            confidence=ModelUsageEvidenceConfidence.UNKNOWN,
-        )
-
-        assert evidence.estimated_amount is None
-        assert evidence.currency is None
-
-
-def test_cost_evidence_requires_valid_decimal_amount_and_currency_for_estimates() -> None:
-    evidence = ModelCostEvidence(
-        pricing_status=ModelPricingStatus.PUBLIC_PRICE_ESTIMATE,
-        estimated_amount=Decimal("0.0123"),
-        currency="USD",
-        source=ModelUsageEvidenceSource.SOURCE_CODE_OBSERVATION,
-        confidence=ModelUsageEvidenceConfidence.ESTIMATED,
-    )
-
-    assert evidence.estimated_amount == Decimal("0.0123")
-    assert evidence.currency == "USD"
-
-    with pytest.raises(ValueError, match="provided together"):
-        ModelCostEvidence(
-            pricing_status=ModelPricingStatus.PUBLIC_PRICE_ESTIMATE,
-            estimated_amount=Decimal("0.01"),
-            source=ModelUsageEvidenceSource.SOURCE_CODE_OBSERVATION,
-            confidence=ModelUsageEvidenceConfidence.ESTIMATED,
-        )
-    with pytest.raises(ValueError, match="uppercase"):
-        ModelCostEvidence(
-            pricing_status=ModelPricingStatus.PUBLIC_PRICE_ESTIMATE,
-            estimated_amount=Decimal("0.01"),
-            currency="usd",
-            source=ModelUsageEvidenceSource.SOURCE_CODE_OBSERVATION,
-            confidence=ModelUsageEvidenceConfidence.ESTIMATED,
-        )
-    with pytest.raises(ValueError, match="estimate pricing status"):
-        ModelCostEvidence(
-            pricing_status=ModelPricingStatus.UNKNOWN,
-            estimated_amount=Decimal("0.01"),
-            currency="USD",
-            source=ModelUsageEvidenceSource.SOURCE_CODE_OBSERVATION,
-            confidence=ModelUsageEvidenceConfidence.ESTIMATED,
-        )
-    with pytest.raises(ValueError, match="estimated_amount"):
-        ModelCostEvidence(
-            pricing_status=ModelPricingStatus.MANUAL_ESTIMATE,
-            estimated_amount=Decimal("-0.01"),
-            currency="USD",
-            source=ModelUsageEvidenceSource.MANUAL_OBSERVATION,
-            confidence=ModelUsageEvidenceConfidence.MANUAL,
+        assert (
+            ModelCostEvidence(
+                pricing_status=pricing_status,
+                source=ModelUsageEvidenceSource.USAGE_ENDPOINT,
+                confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+            ).pricing_status
+            is pricing_status
         )
 
 
@@ -226,4 +178,4 @@ def test_usage_and_cost_evidence_are_immutable_boundary_values() -> None:
     with pytest.raises(FrozenInstanceError):
         usage_evidence.provider = "changed"  # ty: ignore[invalid-assignment]
     with pytest.raises(FrozenInstanceError):
-        cost_evidence.currency = "EUR"  # ty: ignore[invalid-assignment]
+        cost_evidence.pricing_status = ModelPricingStatus.UNKNOWN  # ty: ignore[invalid-assignment]

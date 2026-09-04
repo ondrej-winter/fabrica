@@ -122,8 +122,7 @@ def test_non_success_result_can_carry_failed_or_unavailable_evidence() -> None:
     assert result.usage_evidence == (usage_evidence,)
     assert result.cost_evidence == (cost_evidence,)
     assert result.usage_evidence[0].tokens == ModelTokenUsageEvidence()
-    assert result.cost_evidence[0].estimated_amount is None
-    assert result.cost_evidence[0].currency is None
+    assert result.cost_evidence[0].source is ModelUsageEvidenceSource.RESPONSE_PAYLOAD
 
 
 def test_non_success_result_is_not_successful() -> None:

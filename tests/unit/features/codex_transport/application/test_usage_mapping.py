@@ -59,8 +59,7 @@ def test_map_codex_completion_evidence_maps_complete_token_usage() -> None:
     assert usage.tokens.cached_input_tokens == COMPLETE_CACHED_INPUT_TOKENS
     assert usage.tokens.reasoning_tokens == COMPLETE_REASONING_TOKENS
     assert cost.pricing_status is ModelPricingStatus.UNKNOWN
-    assert cost.estimated_amount is None
-    assert cost.currency is None
+    assert cost.source is ModelUsageEvidenceSource.RESPONSE_PAYLOAD
 
 
 def test_map_codex_completion_evidence_maps_partial_usage_without_defaulting_missing_fields() -> None:
@@ -115,7 +114,7 @@ def test_map_codex_completion_evidence_maps_non_success_statuses(
     assert usage.status is expected_collection_status
     assert usage.tokens.total_tokens is None
     assert cost.pricing_status is ModelPricingStatus.NOT_AVAILABLE
-    assert cost.estimated_amount is None
+    assert cost.confidence is ModelUsageEvidenceConfidence.UNKNOWN
 
 
 def test_codex_completion_usage_facts_reject_negative_token_counts() -> None:

@@ -126,7 +126,6 @@ from fabrica.features.agent_runtime.application.dtos.tools import (
 )
 from fabrica.shared_kernel.model_usage import (
     DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS,
-    MODEL_USAGE_CURRENCY_CODE_CHARS,
     ModelCostEvidence,
     ModelPricingStatus,
     ModelQuotaEvidence,
@@ -175,7 +174,6 @@ __all__ = [
     "MAX_TOOL_IMAGE_BYTES",
     "MAX_TOOL_NAME_CHARS",
     "MAX_TOOL_RESPONSE_TEXT_CHARS",
-    "MODEL_USAGE_CURRENCY_CODE_CHARS",
     "RUN_ID_CONTEXT_KEY",
     "SAFE_ENVIRONMENT_NAME_CHARS",
     "SAFE_TOOL_IDENTIFIER_CHARS",

@@ -83,7 +83,7 @@ in parallel after their contract changes are complete.
 
 ## Progress Tracking
 
-- [ ] **MUCE-1** Remove Version 1 monetary pricing vocabulary from shared
+- [x] **MUCE-1** Remove Version 1 monetary pricing vocabulary from shared
   evidence contracts.
 - [ ] **MUCE-2** Enforce generic observation metadata key and string-value
   bounds.
@@ -98,7 +98,7 @@ in parallel after their contract changes are complete.
 
 ### MUCE-1 — Remove Version 1 monetary pricing vocabulary from shared evidence contracts
 
-- [ ] **MUCE-1** Update the shared evidence contract to eliminate monetary
+- [x] **MUCE-1** Update the shared evidence contract to eliminate monetary
   estimate semantics.
 
 **Likely files**
@@ -123,13 +123,13 @@ in parallel after their contract changes are complete.
 
 **Acceptance criteria**
 
-- [ ] **MUCE-1-A** Production source contains no `Decimal`, `estimated_amount`,
+- [x] **MUCE-1-A** Production source contains no `Decimal`, `estimated_amount`,
   `currency`, `public_price_estimate`, or `manual_estimate` vocabulary.
-- [ ] **MUCE-1-B** `ModelPricingStatus` exactly matches the accepted Version 1
+- [x] **MUCE-1-B** `ModelPricingStatus` exactly matches the accepted Version 1
   state set.
-- [ ] **MUCE-1-C** `ModelCostEvidence` contains pricing status, source,
+- [x] **MUCE-1-C** `ModelCostEvidence` contains pricing status, source,
   confidence, and observations only.
-- [ ] **MUCE-1-D** Existing immutability and tuple-boundary behavior remains
+- [x] **MUCE-1-D** Existing immutability and tuple-boundary behavior remains
   intact.
 
 **Verification**
