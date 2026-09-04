@@ -97,7 +97,13 @@ class FakeConfirmedCommitWorkflow:
         self.generate_calls.append(command)
         return self.generation_result
 
-    def commit(self, recommendation: CommitMessageRecommendation) -> ConfirmedCommitWorkflowResult:
+    def commit(
+        self,
+        recommendation: CommitMessageRecommendation,
+        *,
+        analyzed_index_tree_id: str,
+    ) -> ConfirmedCommitWorkflowResult:
+        _ = analyzed_index_tree_id
         self.commit_calls.append(recommendation)
         if self.commit_result is None:
             return ConfirmedCommitWorkflowResult(
@@ -371,6 +377,41 @@ def test_commit_command_reports_commit_failure_without_reprinting_recommendation
     )
 
 
+def test_commit_command_reports_stale_index_denial_after_approval_without_reprinting_recommendation() -> None:
+    recommendation = _recommendation()
+    workflow = FakeConfirmedCommitWorkflow(
+        generation_result=_generation_success(recommendation),
+        commit_result=ConfirmedCommitWorkflowResult(
+            status=DeveloperWorkflowStatus.SAFETY_DENIED,
+            recommendation=recommendation,
+            observations=(
+                DeveloperWorkflowObservation(
+                    message=(
+                        "staged changes changed after recommendation generation; rerun the command before committing."
+                    ),
+                    metadata={"category": "commit_recommendation_stale"},
+                ),
+            ),
+        ),
+    )
+    stdout = StringIO()
+    stderr = StringIO()
+
+    exit_code = run_feature_cli_command(
+        CliCommitCommand(),
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO("yes\n"), stdout=stdout, stderr=stderr),
+    )
+
+    assert exit_code == EXPECTED_INTERRUPTED_EXIT_CODE
+    assert stdout.getvalue().count("Commit message:") == 1
+    assert workflow.commit_calls == [recommendation]
+    assert stderr.getvalue() == (
+        "status: safety_denied\n"
+        "observation: staged changes changed after recommendation generation; "
+        "rerun the command before committing. category=commit_recommendation_stale\n"
+    )
+
+
 def _recommendation() -> CommitMessageRecommendation:
     return CommitMessageRecommendation(
         summary="Adds x.",
@@ -388,6 +429,7 @@ def _generation_success(
         status=DeveloperWorkflowStatus.SUCCESS,
         recommendation=recommendation,
         usage_evidence=usage_evidence,
+        analyzed_index_tree_id="a" * 40,
     )
 
 

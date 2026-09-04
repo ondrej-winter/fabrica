@@ -30,6 +30,7 @@ from fabrica.features.developer_workflow.application.dtos import (
     DeveloperWorkflowStatus,
     GenerateCommitMessageResult,
     GitCommitResult,
+    GitRepositorySnapshot,
     GitStagedChangesFailureCategory,
     GitStagedFile,
     GitStagedFileStatus,
@@ -96,6 +97,17 @@ class PassingPreCommitRunner:
     def run_pre_commit(self, command: PreCommitRunCommand) -> PreCommitRunResult:
         self.commands.append(command)
         return PreCommitRunResult(status=PreCommitRunStatus.PASSED)
+
+
+@dataclass
+class PassingSnapshotReader:
+    index_tree_id: str = "a" * 40
+
+    def load_index_tree_id(self) -> str:
+        return self.index_tree_id
+
+    def load_snapshot(self) -> GitRepositorySnapshot:
+        return GitRepositorySnapshot(index_tree_id=self.index_tree_id, tracked_worktree_id="0" * 64)
 
 
 def test_confirmed_commit_workflow_creates_commit_from_parsed_recommendation_message(tmp_path: Path) -> None:
@@ -182,7 +194,79 @@ def test_confirmed_commit_workflow_allows_repository_without_pre_commit_config(t
     assert result.commit_result is not None
     assert result.commit_result.short_hash
     assert _git_commit_count(git_repository) == 1
-    assert _git_log_message(git_repository) == "chore: add example file"
+
+
+def test_confirmed_commit_workflow_denies_commit_when_index_changes_after_generation(tmp_path: Path) -> None:
+    runtime = FakeRuntime(
+        results=[
+            LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text=_analysis_json()),
+            LocalAgentRunResult(
+                status=LocalAgentRunStatus.SUCCESS,
+                output_text=_synthesis_text(commit_message="feat: add example file"),
+            ),
+        ]
+    )
+    git_repository = _create_repository_with_staged_diff(tmp_path)
+    _configure_git_identity(git_repository)
+    _write_passing_pre_commit_config(git_repository)
+    skill_root = _write_commit_message_skill(tmp_path)
+    workflow = create_confirmed_commit_workflow(
+        runtime=runtime,
+        options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
+    )
+
+    generation_result = asyncio.run(workflow.generate(skill_id="conventional-commits"))
+    assert generation_result.succeeded
+    assert generation_result.recommendation is not None
+    assert generation_result.analyzed_index_tree_id is not None
+    (git_repository / "second.txt").write_text("second\n", encoding="utf-8")
+    _run_git(("git", "add", "second.txt"), cwd=git_repository)
+    result = workflow.commit(
+        generation_result.recommendation,
+        analyzed_index_tree_id=generation_result.analyzed_index_tree_id,
+    )
+
+    assert result.status is DeveloperWorkflowStatus.SAFETY_DENIED
+    assert result.commit_attempted is False
+    assert result.observations[0].metadata == {"category": "commit_recommendation_stale"}
+    assert _git_commit_count(git_repository) == 0
+    assert _git_staged_file_names(git_repository) == ("example.txt", "second.txt")
+
+
+def test_confirmed_commit_workflow_allows_tracked_worktree_change_after_generation(tmp_path: Path) -> None:
+    runtime = FakeRuntime(
+        results=[
+            LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text=_analysis_json()),
+            LocalAgentRunResult(
+                status=LocalAgentRunStatus.SUCCESS,
+                output_text=_synthesis_text(commit_message="feat: add example file"),
+            ),
+        ]
+    )
+    git_repository = _create_repository_with_staged_diff(tmp_path)
+    _configure_git_identity(git_repository)
+    _write_passing_pre_commit_config(git_repository)
+    skill_root = _write_commit_message_skill(tmp_path)
+    workflow = create_confirmed_commit_workflow(
+        runtime=runtime,
+        options=CommitMessageWorkflowOptions(git_working_directory=git_repository, skill_roots=(skill_root,)),
+    )
+
+    generation_result = asyncio.run(workflow.generate(skill_id="conventional-commits"))
+    assert generation_result.succeeded
+    assert generation_result.recommendation is not None
+    assert generation_result.analyzed_index_tree_id is not None
+    (git_repository / "example.txt").write_text("example\nunstaged\n", encoding="utf-8")
+    result = workflow.commit(
+        generation_result.recommendation,
+        analyzed_index_tree_id=generation_result.analyzed_index_tree_id,
+    )
+
+    assert result.succeeded
+    assert result.commit_attempted is True
+    assert _git_commit_count(git_repository) == 1
+    assert _git_unstaged_file_names(git_repository) == ("example.txt",)
+    assert _git_log_message(git_repository) == "feat: add example file"
 
 
 def test_confirmed_commit_workflow_preserves_model_evidence(tmp_path: Path) -> None:
@@ -389,6 +473,7 @@ def test_confirmed_commit_workflow_maps_commit_error_after_preserving_recommenda
             GitCommitError("git commit failed", metadata={"category": "git_failed", "returncode": 1})
         ),
         pre_commit_runner=PassingPreCommitRunner(),
+        snapshot_reader=PassingSnapshotReader(),
         evidence_recorder=recorder,
     )
 

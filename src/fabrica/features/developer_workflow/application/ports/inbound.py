@@ -26,5 +26,10 @@ class ConfirmedCommitWorkflowRunner(Protocol):
     async def generate(self, command: GenerateCommitMessageCommand) -> ConfirmedCommitWorkflowResult:
         """Generate a commit-message recommendation without creating a commit."""
 
-    def commit(self, recommendation: CommitMessageRecommendation) -> ConfirmedCommitWorkflowResult:
+    def commit(
+        self,
+        recommendation: CommitMessageRecommendation,
+        *,
+        analyzed_index_tree_id: str,
+    ) -> ConfirmedCommitWorkflowResult:
         """Create a git commit after the caller has obtained external approval."""

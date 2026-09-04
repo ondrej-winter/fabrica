@@ -28,6 +28,7 @@ from fabrica.features.developer_workflow.adapters.outbound.git_registered_tool i
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess import (
     GitCommitSubprocessCreator,
     GitContextSubprocessLoader,
+    GitRepositorySnapshotSubprocessReader,
     GitStagedChangesSubprocessLoader,
     PreCommitSubprocessRunner,
 )
@@ -217,6 +218,11 @@ def create_confirmed_commit_workflow(
         pre_commit_runner=PreCommitSubprocessRunner(
             working_directory=workflow_options.git_working_directory,
             timeout_seconds=workflow_options.pre_commit_timeout_seconds,
+            verbose_diagnostics=workflow_options.verbose_diagnostics,
+        ),
+        snapshot_reader=GitRepositorySnapshotSubprocessReader(
+            working_directory=workflow_options.git_working_directory,
+            timeout_seconds=workflow_options.staged_git_timeout_seconds,
             verbose_diagnostics=workflow_options.verbose_diagnostics,
         ),
         evidence_recorder=evidence_recording_runtime,

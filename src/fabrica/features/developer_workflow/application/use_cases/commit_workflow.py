@@ -33,6 +33,8 @@ from fabrica.features.developer_workflow.application.ports import (
     CommitMessageSynthesizer,
     GitCommitCreator,
     GitCommitError,
+    GitRepositorySnapshotLoadError,
+    GitRepositorySnapshotReader,
     GitStagedChangesLoadError,
     PreCommitRunError,
     PreCommitRunner,
@@ -263,6 +265,7 @@ class ConfirmedCommitWorkflow:
     generator: CommitMessageGenerator
     committer: GitCommitter
     pre_commit_runner: PreCommitRunner
+    snapshot_reader: GitRepositorySnapshotReader
     evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
 
     async def run(
@@ -274,6 +277,7 @@ class ConfirmedCommitWorkflow:
             return generation_result
         return self.commit(
             generation_result.recommendation,
+            analyzed_index_tree_id=_required_analyzed_index_tree_id(generation_result),
             output_text=generation_result.output_text,
             usage_evidence=generation_result.usage_evidence,
             cost_evidence=generation_result.cost_evidence,
@@ -289,46 +293,26 @@ class ConfirmedCommitWorkflow:
         pre_commit_result = self._run_pre_commit_gate()
         if pre_commit_result is not None:
             return pre_commit_result
+        analyzed_index_tree_id = self._load_index_tree_id()
+        if isinstance(analyzed_index_tree_id, ConfirmedCommitWorkflowResult):
+            return analyzed_index_tree_id
         try:
             result = await self.generator.generate(skill_id=selected_skill_id)
-        except GitStagedChangesLoadError as err:
-            return self._failure_result(
-                DeveloperWorkflowStatus.CONFIGURATION_ERROR,
-                DeveloperWorkflowObservation(
-                    message=str(err),
-                    metadata={"category": err.category, **err.metadata},
-                ),
-            )
-        except CommitMessageSkillContextLoadError as err:
-            return self._failure_result(
-                DeveloperWorkflowStatus.CONFIGURATION_ERROR,
-                DeveloperWorkflowObservation(
-                    message=str(err),
-                    metadata={"category": err.category, **err.metadata},
-                ),
-            )
-        except (GenerateCommitMessageError, ValueError) as err:
-            return self._failure_result(
-                DeveloperWorkflowStatus.CONFIGURATION_ERROR,
-                DeveloperWorkflowObservation(
-                    message=str(err),
-                    metadata={
-                        "category": "invalid_commit_message_input",
-                        **getattr(err, "metadata", {}),
-                    },
-                ),
-            )
-        except (CommitMessageAnalysisError, CommitMessageSynthesisError) as err:
-            return self._failure_result(
-                err.status,
-                DeveloperWorkflowObservation(
-                    message=str(err),
-                    metadata={
-                        "category": _commit_message_runtime_failure_category(err.status),
-                        **err.metadata,
-                    },
-                ),
-            )
+        except (
+            GitStagedChangesLoadError,
+            CommitMessageSkillContextLoadError,
+            GenerateCommitMessageError,
+            ValueError,
+            CommitMessageAnalysisError,
+            CommitMessageSynthesisError,
+        ) as err:
+            return self._generation_failure_result(err)
+
+        current_index_tree_id = self._load_index_tree_id()
+        if isinstance(current_index_tree_id, ConfirmedCommitWorkflowResult):
+            return current_index_tree_id
+        if current_index_tree_id != analyzed_index_tree_id:
+            return self._stale_index_result()
 
         recommendation = result.recommendation
         return ConfirmedCommitWorkflowResult(
@@ -336,17 +320,34 @@ class ConfirmedCommitWorkflow:
             recommendation=recommendation,
             usage_evidence=self._usage_evidence,
             cost_evidence=self._cost_evidence,
+            analyzed_index_tree_id=analyzed_index_tree_id,
         )
 
     def commit(
         self,
         recommendation: CommitMessageRecommendation,
         *,
+        analyzed_index_tree_id: str,
         output_text: str | None = None,
         usage_evidence: tuple[ModelUsageEvidence, ...] | None = None,
         cost_evidence: tuple[ModelCostEvidence, ...] | None = None,
     ) -> ConfirmedCommitWorkflowResult:
         """Create a git commit from a recommendation approved by the caller."""
+        current_index_tree_id = self._load_index_tree_id(
+            recommendation=recommendation,
+            output_text=output_text,
+            usage_evidence=usage_evidence,
+            cost_evidence=cost_evidence,
+        )
+        if isinstance(current_index_tree_id, ConfirmedCommitWorkflowResult):
+            return current_index_tree_id
+        if current_index_tree_id != analyzed_index_tree_id:
+            return self._stale_index_result(
+                recommendation=recommendation,
+                output_text=output_text,
+                usage_evidence=usage_evidence,
+                cost_evidence=cost_evidence,
+            )
         try:
             commit_result = self.committer.create(
                 CreateGitCommitCommand(message=recommendation.commit_message),
@@ -401,6 +402,96 @@ class ConfirmedCommitWorkflow:
             cost_evidence=self._cost_evidence,
         )
 
+    def _generation_failure_result(
+        self,
+        error: (
+            GitStagedChangesLoadError
+            | CommitMessageSkillContextLoadError
+            | GenerateCommitMessageError
+            | ValueError
+            | CommitMessageAnalysisError
+            | CommitMessageSynthesisError
+        ),
+    ) -> ConfirmedCommitWorkflowResult:
+        if isinstance(error, (GitStagedChangesLoadError, CommitMessageSkillContextLoadError)):
+            return self._failure_result(
+                DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+                DeveloperWorkflowObservation(
+                    message=str(error),
+                    metadata={"category": error.category, **error.metadata},
+                ),
+            )
+        if isinstance(error, (GenerateCommitMessageError, ValueError)):
+            return self._failure_result(
+                DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+                DeveloperWorkflowObservation(
+                    message=str(error),
+                    metadata={
+                        "category": "invalid_commit_message_input",
+                        **getattr(error, "metadata", {}),
+                    },
+                ),
+            )
+        return self._failure_result(
+            error.status,
+            DeveloperWorkflowObservation(
+                message=str(error),
+                metadata={
+                    "category": _commit_message_runtime_failure_category(error.status),
+                    **error.metadata,
+                },
+            ),
+        )
+
+    def _load_index_tree_id(
+        self,
+        *,
+        recommendation: CommitMessageRecommendation | None = None,
+        output_text: str | None = None,
+        usage_evidence: tuple[ModelUsageEvidence, ...] | None = None,
+        cost_evidence: tuple[ModelCostEvidence, ...] | None = None,
+    ) -> str | ConfirmedCommitWorkflowResult:
+        try:
+            return self.snapshot_reader.load_index_tree_id()
+        except GitRepositorySnapshotLoadError as err:
+            return ConfirmedCommitWorkflowResult(
+                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+                recommendation=recommendation,
+                output_text=output_text,
+                observations=(
+                    DeveloperWorkflowObservation(
+                        message=str(err),
+                        metadata={"category": err.category, **err.metadata},
+                    ),
+                ),
+                usage_evidence=usage_evidence or self._usage_evidence,
+                cost_evidence=cost_evidence or self._cost_evidence,
+            )
+
+    def _stale_index_result(
+        self,
+        *,
+        recommendation: CommitMessageRecommendation | None = None,
+        output_text: str | None = None,
+        usage_evidence: tuple[ModelUsageEvidence, ...] | None = None,
+        cost_evidence: tuple[ModelCostEvidence, ...] | None = None,
+    ) -> ConfirmedCommitWorkflowResult:
+        return ConfirmedCommitWorkflowResult(
+            status=DeveloperWorkflowStatus.SAFETY_DENIED,
+            recommendation=recommendation,
+            output_text=output_text,
+            observations=(
+                DeveloperWorkflowObservation(
+                    message=(
+                        "staged changes changed after recommendation generation; rerun the command before committing."
+                    ),
+                    metadata={"category": "commit_recommendation_stale"},
+                ),
+            ),
+            usage_evidence=usage_evidence or self._usage_evidence,
+            cost_evidence=cost_evidence or self._cost_evidence,
+        )
+
     def _run_pre_commit_gate(self) -> ConfirmedCommitWorkflowResult | None:
         try:
             result = self.pre_commit_runner.run_pre_commit(PreCommitRunCommand())
@@ -448,6 +539,13 @@ def _pre_commit_metadata(result: PreCommitRunResult) -> dict[str, str | int | fl
     if result.returncode is not None:
         metadata["returncode"] = result.returncode
     return metadata
+
+
+def _required_analyzed_index_tree_id(result: ConfirmedCommitWorkflowResult) -> str:
+    if result.analyzed_index_tree_id is None:
+        msg = "successful confirmed commit generation must retain an analyzed index tree identity"
+        raise ValueError(msg)
+    return result.analyzed_index_tree_id
 
 
 class CommitMessageEvidenceRecorder(Protocol):

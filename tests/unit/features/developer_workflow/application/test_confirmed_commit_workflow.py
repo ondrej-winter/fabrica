@@ -8,9 +8,12 @@ import pytest
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageEvidenceBundle,
     CommitMessageRecommendation,
+    CreateGitCommitCommand,
     DeveloperWorkflowStatus,
     GenerateCommitMessageResult,
     GitCommitResult,
+    GitRepositorySnapshot,
+    GitRepositorySnapshotFailureCategory,
     GitStagedChangesFailureCategory,
     GitStagedFile,
     GitStagedFileStatus,
@@ -24,6 +27,7 @@ from fabrica.features.developer_workflow.application.ports import (
     CommitMessageAnalysisError,
     CommitMessageSkillContextLoadError,
     CommitMessageSynthesisError,
+    GitRepositorySnapshotLoadError,
     GitStagedChangesLoadError,
     PreCommitRunError,
 )
@@ -68,24 +72,50 @@ class FakeGenerator:
 class FakeCommitter:
     """Fake git committer recording approved commit commands."""
 
-    calls: list[object] = field(default_factory=list)
+    calls: list[CreateGitCommitCommand] = field(default_factory=list)
 
-    def create(self, command: object) -> GitCommitResult:
+    def create(self, command: CreateGitCommitCommand) -> GitCommitResult:
         """Record one commit attempt and return a deterministic commit result."""
         self.calls.append(command)
         return GitCommitResult(short_hash="abc1234")
+
+
+@dataclass
+class FakeSnapshotReader:
+    index_tree_ids: list[str | Exception] = field(default_factory=lambda: ["a" * 40] * 10)
+    calls: int = 0
+
+    def load_index_tree_id(self) -> str:
+        value = self.index_tree_ids[self.calls]
+        self.calls += 1
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    def load_snapshot(self) -> GitRepositorySnapshot:
+        index_tree_id = "a" * 40
+        if self.calls < len(self.index_tree_ids):
+            candidate = self.index_tree_ids[self.calls]
+            if isinstance(candidate, str):
+                index_tree_id = candidate
+        return GitRepositorySnapshot(
+            index_tree_id=index_tree_id,
+            tracked_worktree_id="0" * 64,
+        )
 
 
 def test_confirmed_commit_runs_pre_commit_before_recommendation_generation() -> None:
     pre_commit = FakePreCommitRunner(PreCommitRunResult(status=PreCommitRunStatus.PASSED))
     generator = FakeGenerator(_generate_result(_recommendation()))
     committer = FakeCommitter()
+    snapshots = FakeSnapshotReader()
 
     result = asyncio.run(
         ConfirmedCommitWorkflow(
             generator=generator,
             committer=committer,
             pre_commit_runner=pre_commit,
+            snapshot_reader=snapshots,
         ).generate(skill_id="team-style")
     )
 
@@ -95,6 +125,80 @@ def test_confirmed_commit_runs_pre_commit_before_recommendation_generation() -> 
     assert pre_commit.commands[0].all_files is False
     assert generator.skill_ids == ["team-style"]
     assert committer.calls == []
+
+
+def test_confirmed_commit_denies_recommendation_when_index_changes_during_generation() -> None:
+    generator = FakeGenerator(_generate_result(_recommendation()))
+    committer = FakeCommitter()
+    result = asyncio.run(
+        ConfirmedCommitWorkflow(
+            generator=generator,
+            committer=committer,
+            pre_commit_runner=FakePreCommitRunner(),
+            snapshot_reader=FakeSnapshotReader(["a" * 40, "b" * 40]),
+        ).generate()
+    )
+
+    assert result.status is DeveloperWorkflowStatus.SAFETY_DENIED
+    assert result.recommendation is None
+    assert result.observations[0].metadata == {"category": "commit_recommendation_stale"}
+    assert committer.calls == []
+
+
+def test_confirmed_commit_denies_commit_when_index_changes_after_approval() -> None:
+    recommendation = _recommendation()
+    committer = FakeCommitter()
+    workflow = ConfirmedCommitWorkflow(
+        generator=FakeGenerator(_generate_result(recommendation)),
+        committer=committer,
+        pre_commit_runner=FakePreCommitRunner(),
+        snapshot_reader=FakeSnapshotReader(["a" * 40, "a" * 40, "b" * 40]),
+    )
+
+    generation_result = asyncio.run(workflow.generate())
+    result = workflow.commit(recommendation, analyzed_index_tree_id=generation_result.analyzed_index_tree_id or "")
+
+    assert result.status is DeveloperWorkflowStatus.SAFETY_DENIED
+    assert result.recommendation is recommendation
+    assert result.commit_attempted is False
+    assert committer.calls == []
+
+
+def test_confirmed_commit_allows_worktree_only_change_when_index_is_unchanged() -> None:
+    recommendation = _recommendation()
+    committer = FakeCommitter()
+    workflow = ConfirmedCommitWorkflow(
+        generator=FakeGenerator(_generate_result(recommendation)),
+        committer=committer,
+        pre_commit_runner=FakePreCommitRunner(),
+        snapshot_reader=FakeSnapshotReader(),
+    )
+
+    generation_result = asyncio.run(workflow.generate())
+    result = workflow.commit(recommendation, analyzed_index_tree_id=generation_result.analyzed_index_tree_id or "")
+
+    assert result.succeeded
+    assert committer.calls[0].message == recommendation.commit_message
+
+
+def test_confirmed_commit_snapshot_error_fails_closed_before_generation() -> None:
+    error = GitRepositorySnapshotLoadError(
+        "repository snapshot timed out",
+        category=GitRepositorySnapshotFailureCategory.TIMED_OUT,
+    )
+    generator = FakeGenerator(_generate_result(_recommendation()))
+    result = asyncio.run(
+        ConfirmedCommitWorkflow(
+            generator=generator,
+            committer=FakeCommitter(),
+            pre_commit_runner=FakePreCommitRunner(),
+            snapshot_reader=FakeSnapshotReader([error]),
+        ).generate()
+    )
+
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
+    assert result.observations[0].metadata["category"] is GitRepositorySnapshotFailureCategory.TIMED_OUT
+    assert generator.skill_ids == []
 
 
 def test_confirmed_commit_continues_when_pre_commit_is_not_configured() -> None:
@@ -107,6 +211,7 @@ def test_confirmed_commit_continues_when_pre_commit_is_not_configured() -> None:
             generator=generator,
             committer=committer,
             pre_commit_runner=pre_commit,
+            snapshot_reader=FakeSnapshotReader(),
         ).generate(skill_id="team-style")
     )
 
@@ -127,6 +232,7 @@ def test_confirmed_commit_pre_commit_failure_skips_generation_and_commit() -> No
             generator=generator,
             committer=committer,
             pre_commit_runner=pre_commit,
+            snapshot_reader=FakeSnapshotReader(),
         ).generate()
     )
 
@@ -154,6 +260,7 @@ def test_confirmed_commit_modified_files_skips_generation_and_reports_review_req
             generator=generator,
             committer=committer,
             pre_commit_runner=pre_commit,
+            snapshot_reader=FakeSnapshotReader(),
         ).generate()
     )
 
@@ -184,6 +291,7 @@ def test_confirmed_commit_pre_commit_error_skips_generation_and_commit() -> None
             generator=generator,
             committer=committer,
             pre_commit_runner=pre_commit,
+            snapshot_reader=FakeSnapshotReader(),
         ).generate()
     )
 
@@ -244,6 +352,7 @@ def test_confirmed_commit_generation_errors_skip_commit(
             generator=generator,
             committer=committer,
             pre_commit_runner=pre_commit,
+            snapshot_reader=FakeSnapshotReader(),
         ).generate(skill_id="team-style")
     )
 

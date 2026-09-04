@@ -7,6 +7,7 @@ from types import MappingProxyType
 
 from fabrica.features.developer_workflow.application.dtos.git import (
     GitCommitResult,
+    GitRepositorySnapshot,
     GitStagedDiff,
     GitStagedFile,
 )
@@ -199,11 +200,18 @@ class ConfirmedCommitWorkflowResult:
     usage_evidence: tuple[ModelUsageEvidence, ...] = field(default_factory=tuple)
     cost_evidence: tuple[ModelCostEvidence, ...] = field(default_factory=tuple)
     commit_attempted: bool = False
+    analyzed_index_tree_id: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "observations", tuple(self.observations))
         object.__setattr__(self, "usage_evidence", tuple(self.usage_evidence))
         object.__setattr__(self, "cost_evidence", tuple(self.cost_evidence))
+        if self.analyzed_index_tree_id is not None:
+            validated_index_tree_id = GitRepositorySnapshot(
+                index_tree_id=self.analyzed_index_tree_id,
+                tracked_worktree_id="0" * 64,
+            ).index_tree_id
+            object.__setattr__(self, "analyzed_index_tree_id", validated_index_tree_id)
 
     @property
     def succeeded(self) -> bool:

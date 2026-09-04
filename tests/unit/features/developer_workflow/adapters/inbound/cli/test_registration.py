@@ -78,7 +78,13 @@ class RecordingConfirmedCommitWorkflow:
         self.generate_calls.append(command)
         return ConfirmedCommitWorkflowResult(status=DeveloperWorkflowStatus.SUCCESS)
 
-    def commit(self, recommendation: CommitMessageRecommendation) -> ConfirmedCommitWorkflowResult:
+    def commit(
+        self,
+        recommendation: CommitMessageRecommendation,
+        *,
+        analyzed_index_tree_id: str,
+    ) -> ConfirmedCommitWorkflowResult:
+        _ = analyzed_index_tree_id
         self.commit_calls.append(recommendation)
         return ConfirmedCommitWorkflowResult(status=DeveloperWorkflowStatus.SUCCESS)
 

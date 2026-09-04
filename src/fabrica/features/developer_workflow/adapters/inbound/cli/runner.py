@@ -14,6 +14,7 @@ from fabrica.features.developer_workflow.adapters.inbound.cli.output import (
 )
 from fabrica.features.developer_workflow.application.dtos import (
     CommitMessageWorkflowResult,
+    ConfirmedCommitWorkflowResult,
     DeveloperWorkflowObservation,
     DeveloperWorkflowStatus,
     GenerateCommitMessageCommand,
@@ -29,7 +30,6 @@ if TYPE_CHECKING:
         DeveloperWorkflowCliStreams,
         EvidenceWriter,
     )
-    from fabrica.features.developer_workflow.application.dtos import ConfirmedCommitWorkflowResult
     from fabrica.features.developer_workflow.application.ports import (
         CommitMessageWorkflowRunner,
         ConfirmedCommitWorkflowRunner,
@@ -88,7 +88,29 @@ def run_confirmed_commit_cli_command(
             evidence_writer=evidence_writer,
         )
 
-    commit_result = workflow.commit(generation_result.recommendation)
+    if generation_result.analyzed_index_tree_id is None:
+        return _write_confirmed_commit_result(
+            ConfirmedCommitWorkflowResult(
+                status=DeveloperWorkflowStatus.CONFIGURATION_ERROR,
+                recommendation=generation_result.recommendation,
+                observations=(
+                    DeveloperWorkflowObservation(
+                        message="commit recommendation is missing its staged-change safety binding",
+                        metadata={"category": "missing_commit_recommendation_binding"},
+                    ),
+                ),
+                usage_evidence=generation_result.usage_evidence,
+                cost_evidence=generation_result.cost_evidence,
+            ),
+            options=options,
+            streams=streams,
+            evidence_writer=evidence_writer,
+            output_already_written=True,
+        )
+    commit_result = workflow.commit(
+        generation_result.recommendation,
+        analyzed_index_tree_id=generation_result.analyzed_index_tree_id,
+    )
     if commit_result.succeeded and commit_result.commit_result is not None:
         if commit_result.commit_result.short_hash is not None:
             write_line(streams.stdout, f"Committed as {commit_result.commit_result.short_hash}.")
