@@ -27,7 +27,7 @@ def add_global_options(parser: argparse.ArgumentParser) -> None:
         "--print-prices",
         action="store_true",
         dest="_fabrica_cli_print_prices",
-        help="Print model pricing/cost evidence after command output when available.",
+        help="Print non-monetary model pricing-state evidence after command output when available.",
     )
     parser.add_argument(
         "--verbose-diagnostics",

@@ -1,6 +1,7 @@
 *.egg-info/
 *.py[cod]
 .coverage
+.coverage.*
 .grimp_cache/
 .import_linter_cache/
 .mypy_cache/

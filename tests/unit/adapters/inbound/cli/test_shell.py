@@ -575,6 +575,8 @@ def test_run_cli_routes_help_to_injected_stdout_without_raising() -> None:
 
     assert exit_code == 0
     assert "synthetic" in stdout.getvalue()
+    assert "--print-prices" in stdout.getvalue()
+    assert "non-monetary model pricing-state evidence" in stdout.getvalue()
     assert stderr.getvalue() == ""
 
 

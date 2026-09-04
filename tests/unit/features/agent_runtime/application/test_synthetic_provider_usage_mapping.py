@@ -3,8 +3,6 @@
 from dataclasses import dataclass
 
 from fabrica.features.agent_runtime.application.dtos import (
-    ModelCostEvidence,
-    ModelPricingStatus,
     ModelTokenUsageEvidence,
     ModelUsageCollectionStatus,
     ModelUsageEvidence,
@@ -64,20 +62,7 @@ def test_synthetic_openai_style_response_maps_tokens_into_generic_usage_evidence
     )
 
 
-def test_synthetic_openai_style_unknown_pricing_state_maps_to_generic_cost_evidence() -> None:
-    cost_evidence = _map_synthetic_openai_style_cost()
-
-    assert cost_evidence == (
-        ModelCostEvidence(
-            pricing_status=ModelPricingStatus.UNKNOWN,
-            source=ModelUsageEvidenceSource.SOURCE_CODE_OBSERVATION,
-            confidence=ModelUsageEvidenceConfidence.UNKNOWN,
-            observations=(ModelUsageObservation(message="synthetic pricing state is unknown"),),
-        ),
-    )
-
-
-def test_synthetic_openai_style_usage_remains_valid_with_independent_pricing_state_evidence() -> None:
+def test_synthetic_openai_style_usage_allows_an_empty_pricing_state_evidence_tuple() -> None:
     response = SyntheticOpenAIStyleResponse(
         model=SYNTHETIC_OPENAI_MODEL,
         usage=SyntheticOpenAIStyleUsage(
@@ -88,11 +73,11 @@ def test_synthetic_openai_style_usage_remains_valid_with_independent_pricing_sta
     )
 
     usage_evidence = _map_synthetic_openai_style_usage(response)
-    cost_evidence = _map_synthetic_openai_style_cost()
+    cost_evidence = ()
 
     assert usage_evidence.provider == SYNTHETIC_OPENAI_PROVIDER
     assert usage_evidence.tokens.input_tokens == SYNTHETIC_PROMPT_TOKENS
-    assert cost_evidence[0].pricing_status is ModelPricingStatus.UNKNOWN
+    assert cost_evidence == ()
 
 
 def _map_synthetic_openai_style_usage(response: SyntheticOpenAIStyleResponse) -> ModelUsageEvidence:
@@ -108,15 +93,4 @@ def _map_synthetic_openai_style_usage(response: SyntheticOpenAIStyleResponse) ->
             total_tokens=response.usage.total_tokens,
         ),
         observations=(ModelUsageObservation(message="synthetic OpenAI-style usage extracted from response payload"),),
-    )
-
-
-def _map_synthetic_openai_style_cost() -> tuple[ModelCostEvidence, ...]:
-    return (
-        ModelCostEvidence(
-            pricing_status=ModelPricingStatus.UNKNOWN,
-            source=ModelUsageEvidenceSource.SOURCE_CODE_OBSERVATION,
-            confidence=ModelUsageEvidenceConfidence.UNKNOWN,
-            observations=(ModelUsageObservation(message="synthetic pricing state is unknown"),),
-        ),
     )

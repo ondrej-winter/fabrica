@@ -135,7 +135,7 @@ def test_format_metadata_limits_field_count() -> None:
     assert "metadata_fields_truncated=true" in formatted
 
 
-def test_write_model_evidence_report_formats_requested_usage_and_pricing() -> None:
+def test_write_model_evidence_report_formats_requested_usage_and_non_monetary_pricing_state() -> None:
     stdout = StringIO()
 
     write_model_evidence_report(
@@ -156,9 +156,7 @@ def test_write_model_evidence_report_formats_requested_usage_and_pricing() -> No
                 pricing_status=ModelPricingStatus.NOT_AVAILABLE,
                 source=ModelUsageEvidenceSource.MANUAL_OBSERVATION,
                 confidence=ModelUsageEvidenceConfidence.MANUAL,
-                observations=(
-                    ModelUsageObservation("per-call pricing is not available", metadata={"provider": "codex"}),
-                ),
+                observations=(ModelUsageObservation("pricing state is not available", metadata={"provider": "codex"}),),
             ),
         ),
         stdout=stdout,
@@ -173,7 +171,7 @@ def test_write_model_evidence_report_formats_requested_usage_and_pricing() -> No
         "reset_at=2026-08-14T16:00:00Z observation='from response' collection_status=collected\n"
         "Pricing evidence:\n"
         "- status=not_available source=manual_observation confidence=manual "
-        "observation='per-call pricing is not available' provider=codex\n"
+        "observation='pricing state is not available' provider=codex\n"
     )
 
 

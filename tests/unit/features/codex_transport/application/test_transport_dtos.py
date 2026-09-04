@@ -67,7 +67,7 @@ def test_result_exposes_success_helper_and_safe_observations() -> None:
     assert result.cost_evidence == ()
 
 
-def test_result_carries_generic_usage_and_cost_evidence_immutably() -> None:
+def test_result_carries_independent_generic_usage_and_pricing_state_evidence_immutably() -> None:
     usage_evidence = ModelUsageEvidence(
         provider="codex",
         status=ModelUsageCollectionStatus.COLLECTED,
@@ -76,22 +76,32 @@ def test_result_carries_generic_usage_and_cost_evidence_immutably() -> None:
         model="gpt-5",
         tokens=ModelTokenUsageEvidence(input_tokens=4, output_tokens=2, total_tokens=6),
     )
-    cost_evidence = ModelCostEvidence(
-        pricing_status=ModelPricingStatus.UNKNOWN,
-        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
-        confidence=ModelUsageEvidenceConfidence.UNKNOWN,
-        observations=(ModelUsageObservation(message="Codex per-call cost is not known"),),
+    cost_evidence = (
+        ModelCostEvidence(
+            pricing_status=ModelPricingStatus.UNKNOWN,
+            source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+            confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+            observations=(ModelUsageObservation(message="Codex pricing state is unknown"),),
+        ),
+        ModelCostEvidence(
+            pricing_status=ModelPricingStatus.UNSUPPORTED,
+            source=ModelUsageEvidenceSource.SOURCE_CODE_OBSERVATION,
+            confidence=ModelUsageEvidenceConfidence.MANUAL,
+        ),
     )
 
     result = CodexTransportResult(
         status=CodexTransportStatus.SUCCESS,
         output_text="pong",
         usage_evidence=(usage_evidence,),
-        cost_evidence=(cost_evidence,),
+        cost_evidence=cost_evidence,
     )
 
     assert result.usage_evidence == (usage_evidence,)
-    assert result.cost_evidence == (cost_evidence,)
+    assert result.cost_evidence == cost_evidence
+    assert len(result.usage_evidence) == 1
+    assert len(result.cost_evidence) == len(cost_evidence)
+    assert len(result.usage_evidence) != len(result.cost_evidence)
     with pytest.raises(FrozenInstanceError):
         result.usage_evidence = ()  # ty: ignore[invalid-assignment]
 
@@ -108,7 +118,7 @@ def test_non_success_result_can_carry_failed_or_unavailable_evidence() -> None:
         pricing_status=ModelPricingStatus.NOT_AVAILABLE,
         source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
         confidence=ModelUsageEvidenceConfidence.UNKNOWN,
-        observations=(ModelUsageObservation(message="cost evidence unavailable after transport failure"),),
+        observations=(ModelUsageObservation(message="pricing-state evidence unavailable after transport failure"),),
     )
 
     result = CodexTransportResult(

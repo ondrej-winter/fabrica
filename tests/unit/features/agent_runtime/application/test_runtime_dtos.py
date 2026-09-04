@@ -101,7 +101,7 @@ def test_non_success_result_is_not_successful() -> None:
     assert result.cost_evidence == ()
 
 
-def test_result_carries_usage_and_cost_evidence_without_changing_success_semantics() -> None:
+def test_result_carries_independent_usage_and_pricing_state_evidence_without_positional_correlation() -> None:
     usage_evidence = ModelUsageEvidence(
         provider="synthetic",
         model="model-a",
@@ -110,21 +110,31 @@ def test_result_carries_usage_and_cost_evidence_without_changing_success_semanti
         confidence=ModelUsageEvidenceConfidence.EXTRACTED,
         tokens=ModelTokenUsageEvidence(input_tokens=10, output_tokens=4, total_tokens=14),
     )
-    cost_evidence = ModelCostEvidence(
-        pricing_status=ModelPricingStatus.UNKNOWN,
-        source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
-        confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+    cost_evidence = (
+        ModelCostEvidence(
+            pricing_status=ModelPricingStatus.UNKNOWN,
+            source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
+            confidence=ModelUsageEvidenceConfidence.UNKNOWN,
+        ),
+        ModelCostEvidence(
+            pricing_status=ModelPricingStatus.UNSUPPORTED,
+            source=ModelUsageEvidenceSource.SOURCE_CODE_OBSERVATION,
+            confidence=ModelUsageEvidenceConfidence.MANUAL,
+        ),
     )
 
     result = LocalAgentRunResult(
         status=LocalAgentRunStatus.SUCCESS,
         usage_evidence=cast("tuple[ModelUsageEvidence, ...]", [usage_evidence]),
-        cost_evidence=cast("tuple[ModelCostEvidence, ...]", [cost_evidence]),
+        cost_evidence=cost_evidence,
     )
 
     assert result.succeeded is True
     assert result.usage_evidence == (usage_evidence,)
-    assert result.cost_evidence == (cost_evidence,)
+    assert result.cost_evidence == cost_evidence
+    assert len(result.usage_evidence) == 1
+    assert len(result.cost_evidence) == len(cost_evidence)
+    assert len(result.usage_evidence) != len(result.cost_evidence)
     assert isinstance(result.usage_evidence, tuple)
     assert isinstance(result.cost_evidence, tuple)
 

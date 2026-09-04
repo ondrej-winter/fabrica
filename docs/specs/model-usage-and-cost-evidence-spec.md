@@ -4,9 +4,8 @@
 
 - State: Accepted — Version 1.
 - Implementation status: Usage evidence, Codex mapping, runtime propagation, CLI
-  presentation, and offline tests are implemented. The existing monetary-estimate
-  fields, estimate statuses, and related tests require follow-up conformance work
-  before the implementation fully satisfies this accepted Version 1 contract.
+  presentation, non-monetary pricing-state boundaries, and offline tests are
+  implemented in conformance with this accepted Version 1 contract.
 - Accepted by: Maintainer.
 - Accepted on: September 4, 2026.
 - Revision: Accepted Version 1 evidence-boundary clarification on September 4,

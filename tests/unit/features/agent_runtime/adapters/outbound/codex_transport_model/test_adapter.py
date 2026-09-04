@@ -51,7 +51,7 @@ def test_adapter_maps_successful_transport_result_to_runtime_result() -> None:
         pricing_status=ModelPricingStatus.UNKNOWN,
         source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
         confidence=ModelUsageEvidenceConfidence.UNKNOWN,
-        observations=(ModelUsageObservation(message="Codex per-call cost is not known"),),
+        observations=(ModelUsageObservation(message="Codex pricing state is unknown"),),
     )
     transport = FakeCodexTransportCompletion(
         result=CodexTransportResult(
@@ -182,7 +182,7 @@ def test_adapter_propagates_non_success_transport_evidence_without_fabricating_o
         pricing_status=ModelPricingStatus.NOT_AVAILABLE,
         source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
         confidence=ModelUsageEvidenceConfidence.UNKNOWN,
-        observations=(ModelUsageObservation(message="cost evidence unavailable after transport failure"),),
+        observations=(ModelUsageObservation(message="pricing-state evidence unavailable after transport failure"),),
     )
     transport = FakeCodexTransportCompletion(
         result=CodexTransportResult(

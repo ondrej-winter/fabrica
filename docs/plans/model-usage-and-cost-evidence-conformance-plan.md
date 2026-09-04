@@ -89,9 +89,9 @@ in parallel after their contract changes are complete.
   bounds.
 - [x] **MUCE-3** Make Codex generic-evidence metadata allowlists explicit and
   test unsafe-field exclusion.
-- [ ] **MUCE-4** Align synthetic-provider, runtime/transport, and CLI evidence
+- [x] **MUCE-4** Align synthetic-provider, runtime/transport, and CLI evidence
   tests with non-monetary pricing states.
-- [ ] **MUCE-5** Complete focused and full validation and review documentation
+- [x] **MUCE-5** Complete focused and full validation and review documentation
   consistency.
 
 ## Detailed Tasks
@@ -236,7 +236,7 @@ uv run ruff check src/fabrica/features/codex_transport tests/unit/features/codex
 
 ### MUCE-4 — Align synthetic-provider, runtime/transport, and CLI tests
 
-- [ ] **MUCE-4** Remove monetary evidence behavior from presentation and
+- [x] **MUCE-4** Remove monetary evidence behavior from presentation and
   validation fixtures while preserving result-level pricing-state reporting.
 
 **Likely files**
@@ -271,14 +271,14 @@ uv run ruff check src/fabrica/features/codex_transport tests/unit/features/codex
 
 **Acceptance criteria**
 
-- [ ] **MUCE-4-A** CLI output never renders a monetary amount or currency.
-- [ ] **MUCE-4-B** CLI pricing evidence remains clear as non-monetary state plus
+- [x] **MUCE-4-A** CLI output never renders a monetary amount or currency.
+- [x] **MUCE-4-B** CLI pricing evidence remains clear as non-monetary state plus
   provenance and confidence.
-- [ ] **MUCE-4-C** `--print-prices` help describes non-monetary pricing-state
+- [x] **MUCE-4-C** `--print-prices` help describes non-monetary pricing-state
   evidence without renaming the command surface.
-- [ ] **MUCE-4-D** Synthetic provider validation covers only generic token
+- [x] **MUCE-4-D** Synthetic provider validation covers only generic token
   evidence and an allowed empty pricing-state tuple.
-- [ ] **MUCE-4-E** Runtime and transport tests preserve independent usage and
+- [x] **MUCE-4-E** Runtime and transport tests preserve independent usage and
   cost-evidence collections without positional correlation.
 
 **Verification**
@@ -294,7 +294,7 @@ uv run pytest tests/unit/features/codex_transport/application/test_transport_dto
 
 ### MUCE-5 — Complete conformance validation and documentation review
 
-- [ ] **MUCE-5** Perform final regression, quality-gate, and consistency checks.
+- [x] **MUCE-5** Perform final regression, quality-gate, and consistency checks.
 
 **Likely files**
 
@@ -321,12 +321,12 @@ uv run pytest tests/unit/features/codex_transport/application/test_transport_dto
 
 **Acceptance criteria**
 
-- [ ] **MUCE-5-A** No removed monetary identifier remains in executable
+- [x] **MUCE-5-A** No removed monetary identifier remains in executable
   production code, tests, or user-facing CLI text.
-- [ ] **MUCE-5-B** Documentation and CLI help do not imply exact cost or
+- [x] **MUCE-5-B** Documentation and CLI help do not imply exact cost or
   subscription billing attribution.
-- [ ] **MUCE-5-C** Default validation remains offline and deterministic.
-- [ ] **MUCE-5-D** Formatting, linting, type checking, import-linter contracts,
+- [x] **MUCE-5-C** Default validation remains offline and deterministic.
+- [x] **MUCE-5-D** Formatting, linting, type checking, import-linter contracts,
   and the complete test suite pass with no unapproved failures.
 
 **Verification**
@@ -338,6 +338,19 @@ uv run ty check src tests
 uv run lint-imports
 uv run pytest
 ```
+
+**Completed validation — September 4, 2026**
+
+- Exact-identifier scan found no removed monetary identifiers in executable
+  Python source or tests.
+- Focused evidence coverage passed: 126 tests passed with `--no-cov`; the
+  repository-wide coverage threshold intentionally requires the full suite.
+- Full quality gate passed: `ruff format --check`, `ruff check`, `ty check src
+  tests`, `lint-imports`, and the offline `pytest` suite (1,736 passed, 3
+  skipped, 93.03% coverage).
+- Documentation and CLI help were reviewed. The accepted specification status
+  was corrected to reflect completed Version 1 conformance; no user-facing text
+  implies monetary cost or subscription billing attribution.
 
 ## Risks and Guardrails
 
