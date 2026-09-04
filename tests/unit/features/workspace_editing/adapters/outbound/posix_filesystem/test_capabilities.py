@@ -100,6 +100,8 @@ def test_directory_descriptor_probe_failure_is_captured(tmp_path: Path, monkeypa
 
 def test_platform_specific_probe_selection_is_explicit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(capabilities.sys, "platform", "linux")
+    monkeypatch.setattr(capabilities, "native_no_replace_backend_available", lambda: True)
+    monkeypatch.setattr(capabilities, "prove_native_no_replace", lambda _workspace_root: None)
 
     linux_evidence = collect_posix_patch_workspace_capability_evidence(Path.cwd())
 
@@ -107,9 +109,10 @@ def test_platform_specific_probe_selection_is_explicit(monkeypatch: pytest.Monke
     assert next(probe for probe in linux_evidence.probes if probe.name == "platform_scope").status is (
         PosixPatchCapabilityStatus.SUPPORTED
     )
-    assert "native_no_replace" in linux_evidence.unsupported_reasons
+    assert "native_no_replace" not in linux_evidence.unsupported_reasons
 
     monkeypatch.setattr(capabilities.sys, "platform", "freebsd")
+    monkeypatch.setattr(capabilities, "native_no_replace_backend_available", lambda: False)
 
     unsupported_evidence = collect_posix_patch_workspace_capability_evidence(Path.cwd())
 
