@@ -57,6 +57,24 @@ def test_gather_ordered_fails_closed_when_any_operation_fails() -> None:
         asyncio.run(BoundedAsyncQueryFanoutExecutor().gather_ordered((failing,), max_concurrency=1))
 
 
+def test_gather_ordered_raises_an_operation_error_when_multiple_operations_fail() -> None:
+    async def first_failing() -> str:
+        msg = "first query failed"
+        raise RuntimeError(msg)
+
+    async def second_failing() -> str:
+        msg = "second query failed"
+        raise RuntimeError(msg)
+
+    with pytest.raises(RuntimeError, match=r"(first|second) query failed"):
+        asyncio.run(
+            BoundedAsyncQueryFanoutExecutor().gather_ordered(
+                (first_failing, second_failing),
+                max_concurrency=2,
+            ),
+        )
+
+
 def test_gather_ordered_rejects_non_positive_concurrency() -> None:
     with pytest.raises(ValueError, match="max_concurrency"):
         asyncio.run(BoundedAsyncQueryFanoutExecutor().gather_ordered((), max_concurrency=0))

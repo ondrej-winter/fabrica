@@ -3,7 +3,7 @@
 ## Status
 
 - State: Accepted and implemented — Version 1 technical contract.
-- Implementation status: Substantially implemented; this accepted specification reconciles the existing Version 1 boundary.
+- Implementation status: Implemented; the Version 1 transport boundary enforces final-result-only completion handling and conservative completion retries.
 - Accepted by: Maintainer
 - Accepted on: September 4, 2026
 - Revision: Accepted Version 1 technical-contract clarification on September 4, 2026.
@@ -120,11 +120,12 @@ Streaming is an adapter implementation detail in Version 1. The adapter may use
 the observed streaming wire protocol internally, but it must consume that
 protocol before returning one final normalized result. It must not expose
 incremental events or partial output through the application boundary. A stream
-is successful only when the adapter can extract a non-empty final output from an
-accepted completed response shape. Malformed stream framing, unrecognized
-required event shapes, a terminal backend error, cancellation, EOF before a
-completed result, or output that cannot be safely normalized must produce a
-non-success result without partial output. These cases must be classified as
+is successful only after an accepted completed response shape, using either its
+non-empty final output or recognized text events buffered internally before that
+completion. Malformed stream framing, unrecognized required event shapes, a
+terminal backend error, cancellation, EOF before a completed result, or output
+that cannot be safely normalized must produce a non-success result without
+partial output. These cases must be classified as
 `backend_shape_mismatch` when the observed protocol shape is unsupported and as
 `transport_error` when delivery or completion is indeterminate.
 
@@ -326,6 +327,11 @@ to claim or infer a billing source.
 - The spec defines final-result-only streaming behavior, partial-stream failure
   handling, and private-backend drift handling without exposing private wire
   schemas through the application boundary.
+- A successful streamed completion requires matching SSE and JSON
+  `response.completed` identifiers plus non-whitespace final output in that
+  terminal payload. Earlier deltas, done-text events, or EOF alone never prove
+  success; malformed, unsupported, or mismatched required stream shapes fail
+  closed without returning partial output.
 - The spec explicitly defers billing-source and subscription-attribution claims.
 - The spec provides enough project-structure guidance to start implementation
   without guessing where code and tests belong.

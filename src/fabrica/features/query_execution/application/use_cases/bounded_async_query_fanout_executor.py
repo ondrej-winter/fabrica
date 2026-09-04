@@ -33,8 +33,6 @@ class BoundedAsyncQueryFanoutExecutor:
                 for index, operation in enumerate(operations):
                     task_group.create_task(run_one(index, operation))
         except ExceptionGroup as err:
-            if len(err.exceptions) == 1:
-                raise err.exceptions[0] from err
-            raise
+            raise err.exceptions[0] from err
 
         return tuple(cast("T", result) for result in results)

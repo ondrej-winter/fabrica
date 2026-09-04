@@ -158,7 +158,10 @@ def test_map_success_response_from_event_stream() -> None:
             "event: response.output_text.delta\n"
             'data: {"type":"response.output_text.delta","delta":"ng"}\n\n'
             "event: response.completed\n"
-            'data: {"type":"response.completed"}\n\n'
+            "data: {"
+            '"type":"response.completed",'
+            '"response":{"output":[{"content":[{"type":"output_text","text":"pong"}]}]}'
+            "}\n\n"
         ),
     )
 
@@ -169,7 +172,7 @@ def test_map_success_response_from_event_stream() -> None:
     assert result.observations[0].metadata["response_shape"] == "event_stream"
 
 
-def test_map_success_response_from_event_stream_done_text() -> None:
+def test_map_event_stream_rejects_done_text_when_completion_has_no_response() -> None:
     response = CodexBackendResponse(
         status_code=200,
         headers={"content-type": "text/event-stream"},
@@ -183,8 +186,8 @@ def test_map_success_response_from_event_stream_done_text() -> None:
 
     result = map_codex_backend_response(response)
 
-    assert result.status is CodexTransportStatus.SUCCESS
-    assert result.output_text == "pong"
+    assert result.status is CodexTransportStatus.BACKEND_SHAPE_MISMATCH
+    assert result.output_text is None
 
 
 def test_map_success_response_from_event_stream_completed_response_output() -> None:
@@ -192,6 +195,10 @@ def test_map_success_response_from_event_stream_completed_response_output() -> N
         status_code=200,
         headers={"content-type": "text/event-stream"},
         json_body=(
+            "event: response.created\n"
+            'data: {"type":"response.created","response":{"id":"resp_synthetic"}}\n\n'
+            "event: response.in_progress\n"
+            'data: {"type":"response.in_progress","response":{"id":"resp_synthetic"}}\n\n'
             "event: response.completed\n"
             "data: {"
             '"type":"response.completed",'
@@ -206,6 +213,66 @@ def test_map_success_response_from_event_stream_completed_response_output() -> N
     assert result.output_text == "pong"
 
 
+def test_map_success_response_from_event_stream_releases_done_text_only_after_completion() -> None:
+    response = CodexBackendResponse(
+        status_code=200,
+        headers={"content-type": "text/event-stream"},
+        json_body=(
+            "event: response.output_text.delta\n"
+            'data: {"type":"response.output_text.delta","delta":"po"}\n\n'
+            "event: response.output_text.delta\n"
+            'data: {"type":"response.output_text.delta","delta":"ng"}\n\n'
+            "event: response.output_text.done\n"
+            'data: {"type":"response.output_text.done","text":"pong"}\n\n'
+            "event: response.completed\n"
+            'data: {"type":"response.completed","response":{"output":[]}}\n\n'
+        ),
+    )
+
+    result = map_codex_backend_response(response)
+
+    assert result.status is CodexTransportStatus.SUCCESS
+    assert result.output_text == "pong"
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":1}\n\n',
+        'event: response.output_text.done\ndata: {"type":"response.output_text.done","text":1}\n\n',
+    ],
+)
+def test_map_event_stream_rejects_invalid_buffered_text_events(event: str) -> None:
+    response = CodexBackendResponse(
+        status_code=200,
+        headers={"content-type": "text/event-stream"},
+        json_body=event,
+    )
+
+    result = map_codex_backend_response(response)
+
+    assert result.status is CodexTransportStatus.BACKEND_SHAPE_MISMATCH
+    assert result.output_text is None
+
+
+def test_map_event_stream_rejects_events_after_terminal_completion() -> None:
+    response = CodexBackendResponse(
+        status_code=200,
+        headers={"content-type": "text/event-stream"},
+        json_body=(
+            "event: response.completed\n"
+            'data: {"type":"response.completed","response":{"output_text":"pong"}}\n\n'
+            "event: response.in_progress\n"
+            'data: {"type":"response.in_progress","response":{}}\n\n'
+        ),
+    )
+
+    result = map_codex_backend_response(response)
+
+    assert result.status is CodexTransportStatus.BACKEND_SHAPE_MISMATCH
+    assert result.output_text is None
+
+
 def test_map_success_response_from_event_stream_extracts_usage_evidence() -> None:
     response = CodexBackendResponse(
         status_code=200,
@@ -216,7 +283,7 @@ def test_map_success_response_from_event_stream_extracts_usage_evidence() -> Non
             "event: response.completed\n"
             "data: {"
             '"type":"response.completed",'
-            f'"response":{{"usage":{{"input_tokens":{STREAM_INPUT_TOKENS},'
+            f'"response":{{"output":[{{"content":[{{"type":"output_text","text":"pong"}}]}}],"usage":{{"input_tokens":{STREAM_INPUT_TOKENS},'
             f'"output_tokens":{STREAM_OUTPUT_TOKENS},"total_tokens":{STREAM_TOTAL_TOKENS}}}}}'
             "}\n\n"
         ),
@@ -233,7 +300,7 @@ def test_map_success_response_from_event_stream_extracts_usage_evidence() -> Non
     assert usage.tokens.total_tokens == STREAM_TOTAL_TOKENS
 
 
-def test_map_success_response_from_event_stream_output_item_done_content() -> None:
+def test_map_event_stream_output_item_done_without_completion_is_transport_error() -> None:
     response = CodexBackendResponse(
         status_code=200,
         headers={"content-type": "text/event-stream"},
@@ -243,6 +310,77 @@ def test_map_success_response_from_event_stream_output_item_done_content() -> No
             '"type":"response.output_item.done",'
             '"item":{"content":[{"type":"output_text","text":"pong"}]}'
             "}\n\n"
+        ),
+    )
+
+    result = map_codex_backend_response(response)
+
+    assert result.status is CodexTransportStatus.TRANSPORT_ERROR
+    assert result.output_text is None
+
+
+@pytest.mark.parametrize(
+    ("stream", "expected_status"),
+    [
+        (
+            'event: response.completed\ndata: {"type":"response.completed","response":{"output_text":"   "}}\n\n',
+            CodexTransportStatus.BACKEND_SHAPE_MISMATCH,
+        ),
+        (
+            (
+                "event: response.completed\n"
+                'data: {"type":"response.output_text.done","response":{"output_text":"pong"}}\n\n'
+            ),
+            CodexTransportStatus.BACKEND_SHAPE_MISMATCH,
+        ),
+        (
+            'event: response.unknown\ndata: {"type":"response.unknown"}\n\n',
+            CodexTransportStatus.BACKEND_SHAPE_MISMATCH,
+        ),
+        (
+            "event: response.completed\ndata: not-json\n\n",
+            CodexTransportStatus.BACKEND_SHAPE_MISMATCH,
+        ),
+        (
+            "unexpected framing\n\n",
+            CodexTransportStatus.BACKEND_SHAPE_MISMATCH,
+        ),
+        (
+            'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"partial"}\n\n',
+            CodexTransportStatus.TRANSPORT_ERROR,
+        ),
+        (
+            "data: [DONE]\n\n",
+            CodexTransportStatus.TRANSPORT_ERROR,
+        ),
+        (
+            'event: response.failed\ndata: {"type":"response.failed","error":{"type":"synthetic_failure"}}\n\n',
+            CodexTransportStatus.TRANSPORT_ERROR,
+        ),
+    ],
+)
+def test_map_event_stream_failures_exclude_partial_output(stream: str, expected_status: CodexTransportStatus) -> None:
+    response = CodexBackendResponse(
+        status_code=200,
+        headers={"content-type": "text/event-stream"},
+        json_body=stream,
+    )
+
+    result = map_codex_backend_response(response)
+
+    assert result.status is expected_status
+    assert result.output_text is None
+
+
+def test_map_event_stream_ignores_comments_blank_lines_and_empty_heartbeats_before_completion() -> None:
+    response = CodexBackendResponse(
+        status_code=200,
+        headers={"content-type": "text/event-stream"},
+        json_body=(
+            ": synthetic comment\n\n"
+            "data:\n\n"
+            "event: response.completed\n"
+            'data: {"type":"response.completed","response":{"output_text":"pong"}}\n\n'
         ),
     )
 

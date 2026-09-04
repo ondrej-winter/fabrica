@@ -25,6 +25,7 @@ from fabrica.adapters.outbound.httpx_client.exceptions import HttpxRetryError
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
+    from fabrica.adapters.outbound.httpx_client.contracts import AsyncHttpBodyConsumer
     from fabrica.adapters.outbound.httpx_client.policy import RetryPolicy
 
 LOGGER = logging.getLogger(__name__)
@@ -141,6 +142,103 @@ class AsyncHttpxRetryExecutor:
                     retry_after=response.headers.get("Retry-After"),
                 ),
             )
+
+        state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
+        if last_exception is not None:
+            raise HttpxRetryError(last_exception, self._diagnostics(state=state, policy=request.policy))
+        raise HttpxRetryError(
+            httpx.TransportError("HTTP request failed before an attempt was made"),
+            self._diagnostics(state=state, policy=request.policy),
+        )
+
+    async def stream(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        request: HttpxRetryRequest,
+        body_consumer: AsyncHttpBodyConsumer,
+    ) -> HttpxRetryResult:
+        """Execute one retry request and consume its response body without buffering it.
+
+        Retry eligibility is determined from the response status before invoking
+        ``body_consumer``. Any consumer or body-read failure propagates after the
+        response closes, preventing a potentially unsafe replay.
+        """
+        start_time = self._monotonic()
+        attempt = 0
+        last_reason: str | None = None
+        last_status: int | None = None
+        last_error_type: str | None = None
+        last_exception: httpx.HTTPError | None = None
+
+        while attempt < request.policy.max_attempts:
+            remaining_budget = self._remaining_budget(policy=request.policy, start_time=start_time)
+            if remaining_budget <= 0:
+                break
+            attempt += 1
+            try:
+                stream_context = client.stream(
+                    request.method,
+                    request.url,
+                    headers=dict(request.headers or {}),
+                    json=dict(request.json) if request.json is not None else None,
+                    timeout=_timeout_with_budget(timeout=request.timeout, budget_seconds=remaining_budget),
+                )
+                response = await stream_context.__aenter__()
+            except request.policy.retryable_exception_types as err:
+                last_exception = err
+                last_reason = "exception"
+                last_status = None
+                last_error_type = type(err).__name__
+                state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
+                if not self._should_retry(attempt=attempt, policy=request.policy, start_time=start_time):
+                    raise HttpxRetryError(err, self._diagnostics(state=state, policy=request.policy)) from err
+                await self._sleep_before_retry(
+                    policy=request.policy,
+                    delay=AsyncRetryDelay(state=state, reason=last_reason, status=None, error_type=last_error_type),
+                )
+                continue
+            except httpx.HTTPError as err:
+                raise HttpxRetryError(
+                    err,
+                    self._diagnostics(
+                        state=AsyncRetryState(attempt, start_time, "exception", None, type(err).__name__),
+                        policy=request.policy,
+                    ),
+                ) from err
+
+            try:
+                last_exception = None
+                last_status = response.status_code
+                if response.status_code in request.policy.retryable_status_codes:
+                    last_reason = "http_status"
+                    state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
+                    if self._should_retry(attempt=attempt, policy=request.policy, start_time=start_time):
+                        await self._sleep_before_retry(
+                            policy=request.policy,
+                            delay=AsyncRetryDelay(
+                                state=state,
+                                reason=last_reason,
+                                status=last_status,
+                                error_type=None,
+                                retry_after=response.headers.get("Retry-After"),
+                            ),
+                        )
+                        continue
+                body = await body_consumer(response.aiter_bytes())
+                return HttpxRetryResult(
+                    response=HttpResponse(
+                        status_code=response.status_code,
+                        headers=dict(response.headers),
+                        text=body,
+                    ),
+                    diagnostics=self._diagnostics(
+                        state=AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type),
+                        policy=request.policy,
+                    ),
+                )
+            finally:
+                await stream_context.__aexit__(None, None, None)
 
         state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
         if last_exception is not None:

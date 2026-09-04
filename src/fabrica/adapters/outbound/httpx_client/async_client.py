@@ -11,7 +11,11 @@ from fabrica.adapters.outbound.httpx_client.async_executor import AsyncHttpxRetr
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from fabrica.adapters.outbound.httpx_client.contracts import HttpxRetryRequest, HttpxRetryResult
+    from fabrica.adapters.outbound.httpx_client.contracts import (
+        AsyncHttpBodyConsumer,
+        HttpxRetryRequest,
+        HttpxRetryResult,
+    )
 
 
 class AsyncHttpxRetryClient:
@@ -30,3 +34,13 @@ class AsyncHttpxRetryClient:
         """Execute one retry request using a short-lived async HTTPX client."""
         async with self._client_factory() as client:
             return await self._executor.request(client=client, request=request)
+
+    async def stream(self, request: HttpxRetryRequest, body_consumer: AsyncHttpBodyConsumer) -> HttpxRetryResult:
+        """Execute a retry request and pass its unbuffered body to one consumer.
+
+        The shared client owns the HTTPX response and client lifecycles. It makes
+        a retry decision before consuming the response body and never retries
+        after consumption starts.
+        """
+        async with self._client_factory() as client:
+            return await self._executor.stream(client=client, request=request, body_consumer=body_consumer)

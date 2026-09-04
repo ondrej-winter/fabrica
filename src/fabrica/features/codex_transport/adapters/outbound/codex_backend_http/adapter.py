@@ -1,8 +1,11 @@
 """HTTP implementation and request building for Codex backend outbound ports."""
 
-from collections.abc import Mapping
+import asyncio
+from collections.abc import AsyncIterable, Mapping
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
+
+import httpx
 
 from fabrica.adapters.outbound.httpx_client import (
     AsyncHttpxRetryClient,
@@ -232,6 +235,10 @@ class CodexBackendHttpAdapter:
                 map_codex_backend_transport_error(err.error_type),
                 err.diagnostics,
             )
+        except asyncio.CancelledError:
+            return map_codex_backend_transport_error("CancelledError")
+        except httpx.HTTPError as err:
+            return map_codex_backend_transport_error(type(err).__name__)
 
         return _with_retry_observation(
             map_codex_backend_response(
@@ -245,15 +252,16 @@ class CodexBackendHttpAdapter:
         )
 
     async def _post(self, request: CodexBackendRequest) -> HttpxRetryResult:
-        return await self.http_client.request(
+        return await self.http_client.stream(
             HttpxRetryRequest(
                 method="POST",
                 url=request.url,
-                policy=self.completion_retry_policy,
+                policy=_completion_retry_policy(self.completion_retry_policy),
                 headers=request.headers,
                 json=request.json_payload,
                 timeout=self.completion_timeout,
-            )
+            ),
+            _consume_stream_body,
         )
 
     async def _get(self, request: CodexUsageRequest) -> HttpxRetryResult:
@@ -324,6 +332,15 @@ def _retry_observation(diagnostics: RetryDiagnostics) -> CodexTransportObservati
     )
 
 
+def _completion_retry_policy(policy: RetryPolicy) -> RetryPolicy:
+    """Restrict completion replays to complete HTTP 429 responses only."""
+    return replace(
+        policy,
+        retryable_status_codes=frozenset({429}),
+        retryable_exception_types=(),
+    )
+
+
 def _safe_json_body(response: HttpResponse) -> object:
     content_type = response.headers.get("content-type", "")
     if "text/event-stream" in content_type:
@@ -332,6 +349,11 @@ def _safe_json_body(response: HttpResponse) -> object:
         return response.json()
     except ValueError:
         return response.text
+
+
+async def _consume_stream_body(body: AsyncIterable[bytes]) -> str:
+    """Consume one Codex HTTP body inside the adapter without exposing stream chunks."""
+    return b"".join([chunk async for chunk in body]).decode("utf-8")
 
 
 def _join_url(*, base_url: str, path: str) -> str:

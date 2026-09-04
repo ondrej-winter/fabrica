@@ -131,3 +131,35 @@ def test_complete_passes_through_backend_failure_result() -> None:
     )
 
     assert result == backend_result
+
+
+@pytest.mark.parametrize("http_status", [401, 403])
+def test_complete_does_not_reload_credentials_or_replay_backend_after_authentication_failure(http_status: int) -> None:
+    credentials = CodexCredentials(
+        access_token=CODEX_BEARER_VALUE,
+        account_id=CODEX_ACCOUNT_ID,
+    )
+    command = CodexCompletionCommand(prompt="Reply with the single word: pong")
+    backend_result = CodexTransportResult(
+        status=CodexTransportStatus.AUTHENTICATION_FAILED,
+        observations=(
+            CodexTransportObservation(
+                message="Codex backend rejected credentials",
+                metadata={"http_status": http_status, "category": "authentication"},
+            ),
+        ),
+    )
+    credential_store = FakeCredentialStore(credentials=credentials)
+    backend = FakeCodexBackend(result=backend_result)
+
+    result = asyncio.run(
+        CompleteWithCodexTransport(credential_store=credential_store, backend=backend).complete(command)
+    )
+
+    assert result is backend_result
+    assert result.status is CodexTransportStatus.AUTHENTICATION_FAILED
+    assert result.output_text is None
+    assert credential_store.load_count == 1
+    assert backend.calls == [(command, credentials)]
+    assert CODEX_BEARER_VALUE not in str(result.observations)
+    assert CODEX_ACCOUNT_ID not in str(result.observations)

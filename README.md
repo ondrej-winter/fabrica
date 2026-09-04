@@ -324,6 +324,12 @@ query remote package or vulnerability indexes.
 Live Codex backend validation is opt-in because it reads local Codex credentials
 and sends one request to the live backend.
 
+The transport exposes only one final normalized completion result. It does not
+surface incremental stream events or partial output: success requires the
+recognized terminal completion event and non-empty final text; malformed,
+truncated, cancelled, or terminal-error streams return a non-success result
+without partial text.
+
 Keep live validation output redacted: do not copy credentials, auth headers,
 cookies, backend payloads, account identifiers, private paths, or personal data
 into logs, issue notes, or documentation.

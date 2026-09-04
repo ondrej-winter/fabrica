@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import cast
 
@@ -160,7 +160,10 @@ def map_codex_usage_transport_error(error_type: str) -> CodexUsageResult:
 
 
 def _map_success_response(response: CodexBackendResponse) -> CodexTransportResult:
-    output_text = _extract_output_text(response.json_body)
+    response_body = response.json_body
+    if isinstance(response_body, str):
+        return _map_event_stream_response(response, response_body)
+    output_text = _extract_output_text(response_body)
     if output_text is None:
         return _completion_result(
             status=CodexTransportStatus.BACKEND_SHAPE_MISMATCH,
@@ -172,7 +175,240 @@ def _map_success_response(response: CodexBackendResponse) -> CodexTransportResul
         response=response,
         outcome=("Codex backend returned expected response shape", "success"),
         output_text=output_text,
-        usage_facts=_extract_completion_usage_facts(response.json_body),
+        usage_facts=_extract_completion_usage_facts(response_body),
+    )
+
+
+def _map_event_stream_response(response: CodexBackendResponse, response_text: str) -> CodexTransportResult:
+    stream_outcome = _parse_completion_event_stream(response_text)
+    if stream_outcome.status is CodexTransportStatus.SUCCESS:
+        return _completion_result(
+            status=stream_outcome.status,
+            response=response,
+            outcome=("Codex backend stream completed with final output", "success"),
+            output_text=stream_outcome.output_text,
+            usage_facts=stream_outcome.usage_facts,
+        )
+    return _completion_result(
+        status=stream_outcome.status,
+        response=response,
+        outcome=(stream_outcome.message, stream_outcome.category),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _CompletionEventStreamOutcome:
+    """Internal normalized outcome of parsing one fully delivered SSE response."""
+
+    status: CodexTransportStatus
+    message: str
+    category: str
+    output_text: str | None = None
+    usage_facts: CodexCompletionUsageFacts | None = None
+
+
+@dataclass(slots=True)
+class _CompletionEventStreamState:
+    """Internal state retained until a stream proves terminal completion."""
+
+    terminal_payload: Mapping[object, object] | None = None
+    output_text_deltas: list[str] = field(default_factory=list)
+    completed_output_text: str | None = None
+
+
+_KNOWN_NONTERMINAL_EVENT_TYPES = frozenset(
+    {
+        "response.created",
+        "response.in_progress",
+        "response.output_text.delta",
+        "response.output_text.done",
+        "response.output_item.added",
+        "response.output_item.done",
+        "response.content_part.added",
+        "response.content_part.done",
+    }
+)
+_TERMINAL_SUCCESS_EVENT_TYPE = "response.completed"
+_TERMINAL_ERROR_EVENT_TYPES = frozenset({"response.failed", "error"})
+
+
+def _parse_completion_event_stream(response_text: str) -> _CompletionEventStreamOutcome:
+    try:
+        frames = _parse_sse_frames(response_text)
+    except ValueError:
+        return _event_stream_shape_mismatch()
+
+    state = _CompletionEventStreamState()
+    for event_name, event_data in frames:
+        frame_outcome = _classify_completion_event_frame(event_name=event_name, event_data=event_data)
+        if frame_outcome is None:
+            continue
+        if isinstance(frame_outcome, _CompletionEventStreamOutcome):
+            return frame_outcome
+        state_outcome = _record_completion_event_payload(state, frame_outcome)
+        if state_outcome is not None:
+            return state_outcome
+
+    if state.terminal_payload is None:
+        return _CompletionEventStreamOutcome(
+            status=CodexTransportStatus.TRANSPORT_ERROR,
+            message="Codex backend stream ended before terminal completion",
+            category="incomplete_stream",
+        )
+
+    return _completion_event_stream_success(state, state.terminal_payload)
+
+
+def _record_completion_event_payload(
+    state: _CompletionEventStreamState,
+    payload: Mapping[object, object],
+) -> _CompletionEventStreamOutcome | None:
+    payload_type = payload["type"]
+    if payload_type == _TERMINAL_SUCCESS_EVENT_TYPE:
+        if state.terminal_payload is not None:
+            return _event_stream_shape_mismatch()
+        state.terminal_payload = payload
+        return None
+    if state.terminal_payload is not None:
+        return _event_stream_shape_mismatch()
+    if payload_type == "response.output_text.delta":
+        return _record_output_text_delta(state, payload)
+    if payload_type == "response.output_text.done":
+        return _record_output_text_done(state, payload)
+    return None
+
+
+def _record_output_text_delta(
+    state: _CompletionEventStreamState,
+    payload: Mapping[object, object],
+) -> _CompletionEventStreamOutcome | None:
+    delta = payload.get("delta")
+    if not isinstance(delta, str):
+        return _event_stream_shape_mismatch()
+    state.output_text_deltas.append(delta)
+    return None
+
+
+def _record_output_text_done(
+    state: _CompletionEventStreamState,
+    payload: Mapping[object, object],
+) -> _CompletionEventStreamOutcome | None:
+    text = payload.get("text")
+    if not isinstance(text, str):
+        return _event_stream_shape_mismatch()
+    state.completed_output_text = text
+    return None
+
+
+def _completion_event_stream_success(
+    state: _CompletionEventStreamState,
+    terminal_payload: Mapping[object, object],
+) -> _CompletionEventStreamOutcome:
+    if not isinstance(terminal_payload.get("response"), Mapping):
+        return _event_stream_shape_mismatch()
+
+    output_text = _extract_output_text_from_mapping(terminal_payload)
+    if output_text is None:
+        output_text = state.completed_output_text or "".join(state.output_text_deltas)
+    if output_text is None or not output_text.strip():
+        return _event_stream_shape_mismatch()
+    return _CompletionEventStreamOutcome(
+        status=CodexTransportStatus.SUCCESS,
+        message="Codex backend stream completed with final output",
+        category="success",
+        output_text=output_text,
+        usage_facts=_extract_completion_usage_facts_from_mapping(
+            terminal_payload,
+            source=ModelUsageEvidenceSource.STREAM_EVENT,
+        ),
+    )
+
+
+def _classify_completion_event_frame(
+    *, event_name: str | None, event_data: str
+) -> Mapping[object, object] | _CompletionEventStreamOutcome | None:
+    if event_data in {"", "[DONE]"}:
+        outcome: Mapping[object, object] | _CompletionEventStreamOutcome | None = (
+            None if event_name is None else _event_stream_shape_mismatch()
+        )
+    else:
+        outcome = _classify_nonempty_completion_event_frame(event_name=event_name, event_data=event_data)
+    return outcome
+
+
+def _classify_nonempty_completion_event_frame(
+    *, event_name: str | None, event_data: str
+) -> Mapping[object, object] | _CompletionEventStreamOutcome | None:
+    try:
+        payload = json.loads(event_data)
+    except json.JSONDecodeError:
+        return _event_stream_shape_mismatch()
+    if not isinstance(payload, Mapping) or not isinstance(event_name, str):
+        return _event_stream_shape_mismatch()
+    payload_mapping = cast("Mapping[object, object]", payload)
+    payload_type = payload_mapping.get("type")
+    if not isinstance(payload_type, str) or payload_type != event_name:
+        return _event_stream_shape_mismatch()
+    return _classify_completion_payload(payload_type=payload_type, payload=payload_mapping)
+
+
+def _classify_completion_payload(
+    *, payload_type: str, payload: Mapping[object, object]
+) -> Mapping[object, object] | _CompletionEventStreamOutcome | None:
+    if payload_type in _KNOWN_NONTERMINAL_EVENT_TYPES:
+        return payload
+    if payload_type == _TERMINAL_SUCCESS_EVENT_TYPE:
+        return payload
+    if payload_type in _TERMINAL_ERROR_EVENT_TYPES:
+        return _CompletionEventStreamOutcome(
+            status=CodexTransportStatus.TRANSPORT_ERROR,
+            message="Codex backend stream reported a terminal error",
+            category="backend_error",
+        )
+    return _event_stream_shape_mismatch()
+
+
+def _parse_sse_frames(response_text: str) -> tuple[tuple[str | None, str], ...]:
+    frames: list[tuple[str | None, str]] = []
+    fields: list[str] = []
+    for line in response_text.splitlines():
+        if not line:
+            _append_sse_frame(frames=frames, fields=fields)
+            fields = []
+            continue
+        if line.startswith(":"):
+            continue
+        fields.append(line)
+    _append_sse_frame(frames=frames, fields=fields)
+    return tuple(frames)
+
+
+def _append_sse_frame(*, frames: list[tuple[str | None, str]], fields: list[str]) -> None:
+    if not fields:
+        return
+    event_name: str | None = None
+    data_lines: list[str] = []
+    for sse_field in fields:
+        name, separator, value = sse_field.partition(":")
+        if not separator or name not in {"event", "data"}:
+            msg = "unsupported SSE field"
+            raise ValueError(msg)
+        value = value.removeprefix(" ")
+        if name == "event":
+            if event_name is not None:
+                msg = "multiple SSE event fields"
+                raise ValueError(msg)
+            event_name = value
+        else:
+            data_lines.append(value)
+    frames.append((event_name, "\n".join(data_lines)))
+
+
+def _event_stream_shape_mismatch() -> _CompletionEventStreamOutcome:
+    return _CompletionEventStreamOutcome(
+        status=CodexTransportStatus.BACKEND_SHAPE_MISMATCH,
+        message="Codex backend stream shape was unexpected",
+        category="shape_mismatch",
     )
 
 
@@ -327,31 +563,18 @@ def _extract_error_field(json_body: object, field_name: str) -> str | None:
 
 
 def _extract_output_text(json_body: object) -> str | None:
-    if isinstance(json_body, str):
-        return _extract_output_text_from_event_stream(json_body)
     if not isinstance(json_body, Mapping):
         return None
     return _extract_output_text_from_mapping(cast("Mapping[object, object]", json_body))
 
 
 def _extract_completion_usage_facts(json_body: object) -> CodexCompletionUsageFacts | None:
-    if isinstance(json_body, str):
-        return _extract_completion_usage_facts_from_event_stream(json_body)
     if not isinstance(json_body, Mapping):
         return None
     return _extract_completion_usage_facts_from_mapping(
         cast("Mapping[object, object]", json_body),
         source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD,
     )
-
-
-def _extract_completion_usage_facts_from_event_stream(response_text: str) -> CodexCompletionUsageFacts | None:
-    latest_facts: CodexCompletionUsageFacts | None = None
-    for payload in _iter_event_payloads(response_text):
-        facts = _extract_completion_usage_facts_from_mapping(payload, source=ModelUsageEvidenceSource.STREAM_EVENT)
-        if facts is not None:
-            latest_facts = facts
-    return latest_facts
 
 
 def _extract_completion_usage_facts_from_mapping(
@@ -395,44 +618,6 @@ def _extract_output_text_from_mapping(json_body: Mapping[object, object]) -> str
     if not isinstance(output, Sequence) or isinstance(output, str | bytes):
         return None
     return _extract_output_text_from_output_items(output)
-
-
-def _extract_output_text_from_event_stream(response_text: str) -> str | None:
-    extracted_parts: list[str] = []
-    done_text: str | None = None
-    for payload in _iter_event_payloads(response_text):
-        event_type = payload.get("type")
-        text = payload.get("text")
-        delta = payload.get("delta")
-        if event_type == "response.output_text.done" and isinstance(text, str):
-            done_text = text
-            continue
-        if event_type == "response.output_text.delta" and isinstance(delta, str):
-            extracted_parts.append(delta)
-            continue
-        output_text = _extract_output_text(payload)
-        if output_text is not None and not extracted_parts:
-            extracted_parts.append(output_text)
-    if not extracted_parts:
-        return done_text
-    return "".join(extracted_parts)
-
-
-def _iter_event_payloads(response_text: str) -> tuple[Mapping[object, object], ...]:
-    payloads: list[Mapping[object, object]] = []
-    for line in response_text.splitlines():
-        if not line.startswith("data:"):
-            continue
-        event_data = line.removeprefix("data:").strip()
-        if event_data in {"", "[DONE]"}:
-            continue
-        try:
-            payload = json.loads(event_data)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(payload, Mapping):
-            payloads.append(cast("Mapping[object, object]", payload))
-    return tuple(payloads)
 
 
 def _extract_output_text_from_content(content: object) -> str | None:

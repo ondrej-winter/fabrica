@@ -113,15 +113,15 @@ The following gaps remain:
 
 ## Progress Tracking
 
-- [ ] **CTSC-1** Define and test strict SSE completion parsing.
-- [ ] **CTSC-2** Add the minimum stream-aware HTTP execution capability.
-- [ ] **CTSC-3** Integrate strict streaming completion handling in the Codex adapter.
-- [ ] **CTSC-4** Enforce the completion POST retry invariant.
-- [ ] **CTSC-5** Add credential-load and authentication no-replay regressions.
-- [ ] **CTSC-6** Align documentation and run full validation.
-- [ ] **CTSC-C1** Checkpoint: deterministic stream conformance tests pass.
-- [ ] **CTSC-C2** Checkpoint: full offline quality gate passes.
-- [ ] **CTSC-C3** Checkpoint: optional live validation is documented as manual and opt-in.
+- [x] **CTSC-1** Define and test strict SSE completion parsing.
+- [x] **CTSC-2** Add the minimum stream-aware HTTP execution capability.
+- [x] **CTSC-3** Integrate strict streaming completion handling in the Codex adapter.
+- [x] **CTSC-4** Enforce the completion POST retry invariant.
+- [x] **CTSC-5** Add credential-load and authentication no-replay regressions.
+- [x] **CTSC-6** Align documentation and run full validation.
+- [x] **CTSC-C1** Checkpoint: deterministic stream conformance tests pass.
+- [x] **CTSC-C2** Checkpoint: full offline quality gate passes.
+- [x] **CTSC-C3** Checkpoint: optional live validation is documented as manual and opt-in.
 
 ## Dependency Graph and Sequencing
 
@@ -143,7 +143,7 @@ completion execution path, not the usage probe path.
 
 ### CTSC-1 — Define and test strict SSE completion parsing
 
-- [ ] **CTSC-1** Implement a stateful, adapter-internal SSE parser that accepts
+- [x] **CTSC-1** Implement a stateful, adapter-internal SSE parser that accepts
   only known successful completion shapes and requires a recognized terminal
   `response.completed` event plus non-empty final normalized output.
 
@@ -175,14 +175,14 @@ completion execution path, not the usage probe path.
 
 **Acceptance criteria**
 
-- [ ] **CTSC-1-A** Valid accepted event streams with a terminal completed event
+- [x] **CTSC-1-A** Valid accepted event streams with a terminal completed event
   and non-empty final output return `success`.
-- [ ] **CTSC-1-B** No non-success result contains `output_text`.
-- [ ] **CTSC-1-C** Invalid JSON, malformed framing, and unsupported required
+- [x] **CTSC-1-B** No non-success result contains `output_text`.
+- [x] **CTSC-1-C** Invalid JSON, malformed framing, and unsupported required
   shapes return `backend_shape_mismatch`.
-- [ ] **CTSC-1-D** Partial EOF and terminal failure conditions return a
+- [x] **CTSC-1-D** Partial EOF and terminal failure conditions return a
   non-success status without partial text.
-- [ ] **CTSC-1-E** Mismatched SSE/JSON terminal identifiers and whitespace-only
+- [x] **CTSC-1-E** Mismatched SSE/JSON terminal identifiers and whitespace-only
   terminal output return `backend_shape_mismatch` without partial text.
 
 **Verification**
@@ -193,7 +193,7 @@ uv run pytest tests/unit/features/codex_transport/adapters/outbound/codex_backen
 
 ### CTSC-2 — Add the minimum stream-aware HTTP execution capability
 
-- [ ] **CTSC-2** Add an additive, transport-neutral async HTTP capability only
+- [x] **CTSC-2** Add an additive, transport-neutral async HTTP capability only
   as necessary for the Codex adapter to consume completion streams fully and
   distinguish a completed stream from read, cancellation, and delivery failure.
 
@@ -222,16 +222,17 @@ uv run pytest tests/unit/features/codex_transport/adapters/outbound/codex_backen
 
 **Acceptance criteria**
 
-- [ ] **CTSC-2-A** Existing non-streaming HTTP client tests remain unchanged or
+- [x] **CTSC-2-A** Existing non-streaming HTTP client tests remain unchanged or
   pass with intentional compatible updates.
-- [ ] **CTSC-2-B** The Codex adapter can distinguish completed body delivery
-  from body-read or cancellation failure.
-- [ ] **CTSC-2-C** The shared HTTP contract remains transport-neutral and does
+- [x] **CTSC-2-B** The owning adapter can distinguish completed body delivery
+  from body-read or cancellation failure through the transport-neutral callback;
+  Codex adapter integration remains CTSC-3 work.
+- [x] **CTSC-2-C** The shared HTTP contract remains transport-neutral and does
   not expose private Codex details.
-- [ ] **CTSC-2-D** The shared HTTP client closes response and client resources on
+- [x] **CTSC-2-D** The shared HTTP client closes response and client resources on
   successful consumption, read failure, and cancellation, while cancellation is
   propagated.
-- [ ] **CTSC-2-E** Retry execution cannot replay a request after the body
+- [x] **CTSC-2-E** Retry execution cannot replay a request after the body
   consumer has started.
 
 **Verification**
@@ -242,7 +243,7 @@ uv run pytest tests/unit/adapters/outbound/httpx_client
 
 ### CTSC-3 — Integrate strict streaming completion handling in the Codex adapter
 
-- [ ] **CTSC-3** Route only Codex completion POSTs through the new stream-aware
+- [x] **CTSC-3** Route only Codex completion POSTs through the new stream-aware
   path, consume the stream inside `CodexBackendHttpAdapter`, and map the final
   outcome through the strict SSE parser.
 
@@ -268,13 +269,13 @@ uv run pytest tests/unit/adapters/outbound/httpx_client
 
 **Acceptance criteria**
 
-- [ ] **CTSC-3-A** The completion adapter returns final output only after valid
+- [x] **CTSC-3-A** The completion adapter returns final output only after valid
   internal stream completion.
-- [ ] **CTSC-3-B** No raw stream payload, credentials, headers, or partial text
+- [x] **CTSC-3-B** No raw stream payload, credentials, headers, or partial text
   is exposed in a result or observation.
-- [ ] **CTSC-3-C** Usage probing continues to function through its existing
+- [x] **CTSC-3-C** Usage probing continues to function through its existing
   endpoint-specific behavior.
-- [ ] **CTSC-3-D** A streamed-body failure or cancellation after a successful
+- [x] **CTSC-3-D** A streamed-body failure or cancellation after a successful
   response status returns `transport_error`, excludes output, and does not leak
   raw stream data.
 
@@ -287,7 +288,7 @@ uv run pytest tests/integration/features/codex_transport/test_codex_backend_http
 
 ### CTSC-4 — Enforce the completion POST retry invariant
 
-- [ ] **CTSC-4** Make the completion retry policy non-bypassable: only HTTP 429
+- [x] **CTSC-4** Make the completion retry policy non-bypassable: only HTTP 429
   may be replayed; 5xx responses, HTTP client exceptions, and ambiguous or
   partial stream outcomes remain single-attempt.
 
@@ -309,10 +310,10 @@ uv run pytest tests/integration/features/codex_transport/test_codex_backend_http
 
 **Acceptance criteria**
 
-- [ ] **CTSC-4-A** A completion HTTP 429 retries within policy limits.
-- [ ] **CTSC-4-B** Completion 5xx returns after one attempt.
-- [ ] **CTSC-4-C** Completion transport/read exceptions return after one attempt.
-- [ ] **CTSC-4-D** Completion results include scalar-safe retry diagnostics:
+- [x] **CTSC-4-A** A completion HTTP 429 retries within policy limits.
+- [x] **CTSC-4-B** Completion 5xx returns after one attempt.
+- [x] **CTSC-4-C** Completion transport/read exceptions return after one attempt.
+- [x] **CTSC-4-D** Completion results include scalar-safe retry diagnostics:
   attempt count, retry count, final reason, final HTTP status or error type,
   elapsed seconds, and budget exhaustion.
 
@@ -324,7 +325,7 @@ uv run pytest tests/unit/features/codex_transport/adapters/outbound/codex_backen
 
 ### CTSC-5 — Add credential-load and authentication no-replay regressions
 
-- [ ] **CTSC-5** Add deterministic orchestration tests proving that 401 and 403
+- [x] **CTSC-5** Add deterministic orchestration tests proving that 401 and 403
   load credentials once and make one backend request, without refreshing,
   rereading, or replaying.
 
@@ -353,10 +354,10 @@ uv run pytest tests/unit/features/codex_transport/adapters/outbound/codex_backen
 
 **Acceptance criteria**
 
-- [ ] **CTSC-5-A** Tests use only synthetic values and fake HTTP behavior.
-- [ ] **CTSC-5-B** 401 and 403 each prove a single credential load and a single
+- [x] **CTSC-5-A** Tests use only synthetic values and fake HTTP behavior.
+- [x] **CTSC-5-B** 401 and 403 each prove a single credential load and a single
   request attempt, with no refresh, auth-file reread, or replay.
-- [ ] **CTSC-5-C** Tests prove no partial output leaks into every listed
+- [x] **CTSC-5-C** Tests prove no partial output leaks into every listed
   non-success result category.
 
 **Verification**
@@ -368,7 +369,7 @@ uv run pytest tests/unit/features/codex_transport/adapters/outbound/codex_backen
 
 ### CTSC-6 — Align documentation and run full validation
 
-- [ ] **CTSC-6** Reconcile documentation with the final behavior and execute the
+- [x] **CTSC-6** Reconcile documentation with the final behavior and execute the
   complete offline quality gate.
 
 **Likely files**
@@ -388,10 +389,10 @@ uv run pytest tests/unit/features/codex_transport/adapters/outbound/codex_backen
 
 **Acceptance criteria**
 
-- [ ] **CTSC-6-A** Documentation accurately describes strict final-result-only
+- [x] **CTSC-6-A** Documentation accurately describes strict final-result-only
   streaming behavior and opt-in operational validation.
-- [ ] **CTSC-6-B** The default test suite remains offline and credential-free.
-- [ ] **CTSC-6-C** All required validation commands pass without bypass flags.
+- [x] **CTSC-6-B** The default test suite remains offline and credential-free.
+- [x] **CTSC-6-C** All required validation commands pass without bypass flags.
 
 **Verification**
 
@@ -407,17 +408,17 @@ uv run pytest
 
 ### CTSC-C1 — Deterministic stream conformance tests
 
-- [ ] **CTSC-C1** Complete only after CTSC-1 through CTSC-5 focused tests pass
+- [x] **CTSC-C1** Complete only after CTSC-1 through CTSC-5 focused tests pass
   and every non-success stream case is proven to exclude partial output.
 
 ### CTSC-C2 — Full offline quality gate
 
-- [ ] **CTSC-C2** Complete only after formatting, linting, type checking,
+- [x] **CTSC-C2** Complete only after formatting, linting, type checking,
   import-linter, and the full default pytest suite pass.
 
 ### CTSC-C3 — Opt-in live validation documentation
 
-- [ ] **CTSC-C3** Confirm the manual validation procedure remains opt-in and is
+- [x] **CTSC-C3** Confirm the manual validation procedure remains opt-in and is
   documented without recording sensitive values. If intentionally performed,
   run `codex login` followed by `make test-live-codex`, recording only command
   outcome, normalized status, and bounded redacted observations.

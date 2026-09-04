@@ -1,6 +1,7 @@
 """Tests for the Codex backend HTTP adapter."""
 
 import asyncio
+import json
 from collections.abc import Callable
 
 import httpx
@@ -22,7 +23,8 @@ EXPECTED_ATTEMPT_COUNT = 2
 EXPECTED_RETRY_COUNT = 1
 EXPECTED_FIRST_JITTERED_DELAY = 0.25
 SUCCESS_STATUS = 200
-RETRYABLE_STATUS = 503
+RATE_LIMIT_STATUS = 429
+BACKEND_ERROR_STATUS = 503
 SYNTHETIC_ERROR_MESSAGE = "synthetic secret url"
 
 
@@ -45,7 +47,7 @@ def test_complete_posts_built_request_and_maps_success_response() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal captured_request
         captured_request = request
-        return httpx.Response(200, json={"output_text": "pong"})
+        return _completed_stream_response("pong")
 
     adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
 
@@ -72,7 +74,7 @@ def test_complete_allows_timeout_and_request_setting_overrides() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert str(request.url) == "https://example.invalid/backend-api/custom-responses"
         assert request.headers["OAI-Product-Sku"] == "synthetic-sku"
-        return httpx.Response(200, json={"output_text": "pong"})
+        return _completed_stream_response("pong")
 
     adapter = CodexBackendHttpAdapter(
         http_client=_http_client(handler),
@@ -98,7 +100,7 @@ def test_complete_allows_timeout_and_request_setting_overrides() -> None:
     assert result.status is CodexTransportStatus.SUCCESS
 
 
-def test_complete_retries_transient_post_failure_and_records_summary() -> None:
+def test_complete_retries_429_with_custom_policy_and_records_summary() -> None:
     clock = MonotonicClock()
     calls = 0
 
@@ -106,8 +108,8 @@ def test_complete_retries_transient_post_failure_and_records_summary() -> None:
         nonlocal calls
         calls += 1
         if calls == 1:
-            return httpx.Response(RETRYABLE_STATUS)
-        return httpx.Response(SUCCESS_STATUS, json={"output_text": "pong"})
+            return httpx.Response(RATE_LIMIT_STATUS)
+        return _completed_stream_response("pong")
 
     adapter = CodexBackendHttpAdapter(
         http_client=_http_client(handler, clock=clock),
@@ -134,21 +136,30 @@ def test_complete_retries_transient_post_failure_and_records_summary() -> None:
     assert retry_observation.metadata["retry_count"] == EXPECTED_RETRY_COUNT
     assert retry_observation.metadata["last_retry_reason"] == "http_status"
     assert retry_observation.metadata["last_http_status"] == SUCCESS_STATUS
+    assert retry_observation.metadata["last_error_type"] is None
+    assert retry_observation.metadata["elapsed_seconds"] == EXPECTED_FIRST_JITTERED_DELAY
+    assert retry_observation.metadata["budget_exhausted"] is False
     assert CODEX_BEARER_VALUE not in str(retry_observation)
     assert CODEX_ACCOUNT_ID not in str(retry_observation)
 
 
-def test_complete_default_retry_policy_does_not_replay_backend_5xx() -> None:
+def test_complete_does_not_replay_5xx_when_custom_policy_allows_it() -> None:
     calls = 0
 
     def handler(_request: httpx.Request) -> httpx.Response:
         nonlocal calls
         calls += 1
         if calls == 1:
-            return httpx.Response(RETRYABLE_STATUS)
-        return httpx.Response(SUCCESS_STATUS, json={"output_text": "pong"})
+            return httpx.Response(BACKEND_ERROR_STATUS)
+        return _completed_stream_response("pong")
 
-    adapter = CodexBackendHttpAdapter(http_client=_http_client(handler))
+    adapter = CodexBackendHttpAdapter(
+        http_client=_http_client(handler),
+        completion_retry_policy=RetryPolicy(
+            total_budget_seconds=10.0,
+            retryable_status_codes=frozenset({BACKEND_ERROR_STATUS}),
+        ),
+    )
 
     result = asyncio.run(
         adapter.complete(
@@ -165,7 +176,45 @@ def test_complete_default_retry_policy_does_not_replay_backend_5xx() -> None:
     retry_observation = result.observations[-1]
     assert retry_observation.metadata["attempt_count"] == 1
     assert retry_observation.metadata["retry_count"] == 0
-    assert retry_observation.metadata["last_http_status"] == RETRYABLE_STATUS
+    assert retry_observation.metadata["last_http_status"] == BACKEND_ERROR_STATUS
+
+
+def test_complete_does_not_replay_transport_error_when_custom_policy_allows_it() -> None:
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise httpx.ConnectError(SYNTHETIC_ERROR_MESSAGE, request=request)
+        return _completed_stream_response("pong")
+
+    adapter = CodexBackendHttpAdapter(
+        http_client=_http_client(handler),
+        completion_retry_policy=RetryPolicy(
+            total_budget_seconds=10.0,
+            retryable_exception_types=(httpx.ConnectError,),
+        ),
+    )
+
+    result = asyncio.run(
+        adapter.complete(
+            command=CodexCompletionCommand(prompt="synthetic prompt"),
+            credentials=CodexCredentials(
+                access_token=CODEX_BEARER_VALUE,
+                account_id=CODEX_ACCOUNT_ID,
+            ),
+        )
+    )
+
+    assert result.status is CodexTransportStatus.TRANSPORT_ERROR
+    assert result.output_text is None
+    assert calls == 1
+    retry_observation = result.observations[-1]
+    assert retry_observation.metadata["attempt_count"] == 1
+    assert retry_observation.metadata["retry_count"] == 0
+    assert retry_observation.metadata["last_retry_reason"] == "exception"
+    assert retry_observation.metadata["last_error_type"] == "ConnectError"
 
 
 def test_complete_maps_backend_error_response_without_leaking_request_secrets() -> None:
@@ -220,7 +269,7 @@ def test_complete_maps_event_stream_success_response() -> None:
                     "event: response.output_text.delta\n"
                     'data: {"type":"response.output_text.delta","delta":"pong"}\n\n'
                     "event: response.completed\n"
-                    'data: {"type":"response.completed"}\n\n'
+                    'data: {"type":"response.completed","response":{"output_text":"pong"}}\n\n'
                 ),
             )
         )
@@ -363,4 +412,15 @@ def _http_client(
     return AsyncHttpxRetryClient(
         client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)),
         executor=executor,
+    )
+
+
+def _completed_stream_response(output_text: str) -> httpx.Response:
+    return httpx.Response(
+        SUCCESS_STATUS,
+        headers={"content-type": "text/event-stream"},
+        text=(
+            "event: response.completed\n"
+            f"data: {json.dumps({'type': 'response.completed', 'response': {'output_text': output_text}})}\n\n"
+        ),
     )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json as json_library
+from collections.abc import AsyncIterable, Awaitable, Callable
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Self
@@ -43,6 +44,9 @@ class HttpxRetryRequest:
     headers: Mapping[str, str] | None = None
     json: Mapping[str, object] | None = None
     timeout: float | HttpTimeout | None = None
+
+
+type AsyncHttpBodyConsumer = Callable[[AsyncIterable[bytes]], Awaitable[str]]
 
 
 @dataclass(frozen=True, slots=True)

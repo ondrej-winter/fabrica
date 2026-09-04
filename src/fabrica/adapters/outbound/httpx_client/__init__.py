@@ -4,6 +4,7 @@ from fabrica.adapters.outbound.httpx_client.async_client import AsyncHttpxRetryC
 from fabrica.adapters.outbound.httpx_client.async_executor import AsyncHttpxRetryExecutor
 from fabrica.adapters.outbound.httpx_client.client import SyncHttpxRetryClient
 from fabrica.adapters.outbound.httpx_client.contracts import (
+    AsyncHttpBodyConsumer,
     HttpResponse,
     HttpTimeout,
     HttpxRetryRequest,
@@ -19,6 +20,7 @@ from fabrica.adapters.outbound.httpx_client.policy import (
 
 __all__ = [
     "DEFAULT_RETRY_POLICY",
+    "AsyncHttpBodyConsumer",
     "AsyncHttpxRetryClient",
     "AsyncHttpxRetryExecutor",
     "HttpResponse",
