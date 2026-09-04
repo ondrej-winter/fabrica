@@ -17,7 +17,10 @@ from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.nativ
 if TYPE_CHECKING:
     from pathlib import Path
 
-pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="native no-replace backend is implemented for macOS")
+pytestmark = pytest.mark.skipif(
+    sys.platform not in {"darwin", "linux"},
+    reason="native no-replace backend targets macOS/Linux",
+)
 
 
 def test_native_no_replace_backend_proves_its_workspace_contract(tmp_path: Path) -> None:

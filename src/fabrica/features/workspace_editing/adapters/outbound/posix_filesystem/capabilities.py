@@ -182,7 +182,7 @@ def _native_no_replace_probe(workspace_root: Path) -> PosixPatchCapabilityProbe:
     return PosixPatchCapabilityProbe(
         "native_no_replace",
         PosixPatchCapabilityStatus.SUPPORTED,
-        "renameatx_np proved RENAME_EXCL and RENAME_NOFOLLOW_ANY no-replace semantics",
+        "native rename no-replace semantics proved against the workspace",
     )
 
 

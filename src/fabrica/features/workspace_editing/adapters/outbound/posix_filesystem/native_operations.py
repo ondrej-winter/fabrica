@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 _DARWIN_RENAME_EXCL = 0x00000004
 _DARWIN_RENAME_NOFOLLOW_ANY = 0x00000010
+_LINUX_RENAME_NOREPLACE = 1
 _DIRECTORY_OPEN_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 
 
@@ -24,7 +25,12 @@ class NativePatchOperationError(OSError):
 
 def native_no_replace_backend_available() -> bool:
     """Return whether this host exposes the selected no-replace backend."""
-    return sys.platform == "darwin" and hasattr(ctypes.CDLL(None, use_errno=True), "renameatx_np")
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        return hasattr(libc, "renameatx_np")
+    if sys.platform == "linux":
+        return hasattr(libc, "renameat2")
+    return False
 
 
 def prove_native_no_replace(workspace_root: Path) -> None:
@@ -74,7 +80,10 @@ def rename_no_replace(workspace_root: Path, source_path: str, destination_path: 
         _opened_parent(workspace_root, source_path) as (source_parent_fd, source_name),
         _opened_parent(workspace_root, destination_path) as (destination_parent_fd, destination_name),
     ):
-        _darwin_renameatx_no_replace(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        if sys.platform == "darwin":
+            _darwin_renameatx_no_replace(source_parent_fd, source_name, destination_parent_fd, destination_name)
+        else:
+            _linux_renameat2_no_replace(source_parent_fd, source_name, destination_parent_fd, destination_name)
 
 
 def rename_replace(workspace_root: Path, source_path: str, destination_path: str) -> None:
@@ -112,6 +121,24 @@ def _require_native_no_replace_backend() -> None:
     if not native_no_replace_backend_available():
         msg = "selected native no-replace patch backend is unavailable"
         raise NativePatchOperationError(errno.ENOTSUP, msg)
+
+
+def _linux_renameat2_no_replace(source_fd: int, source_name: str, destination_fd: int, destination_name: str) -> None:
+    """Perform atomic Linux renameat2 with RENAME_NOREPLACE."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    renameat2 = libc.renameat2
+    renameat2.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
+    renameat2.restype = ctypes.c_int
+    result = renameat2(
+        source_fd,
+        os.fsencode(source_name),
+        destination_fd,
+        os.fsencode(destination_name),
+        _LINUX_RENAME_NOREPLACE,
+    )
+    if result != 0:
+        error_number = ctypes.get_errno()
+        raise OSError(error_number, os.strerror(error_number), destination_name)
 
 
 def _darwin_renameatx_no_replace(source_fd: int, source_name: str, destination_fd: int, destination_name: str) -> None:

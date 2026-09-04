@@ -441,6 +441,7 @@ def _install_process(monkeypatch: pytest.MonkeyPatch, process: FakeProcess) -> N
         return process
 
     monkeypatch.setattr(adapter.asyncio, "create_subprocess_exec", create_process)
+    monkeypatch.setattr(adapter.os, "killpg", lambda _pid, _signal: process.terminate())
 
 
 def _allow_command_builder(monkeypatch: pytest.MonkeyPatch) -> None:

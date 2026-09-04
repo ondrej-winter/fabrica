@@ -104,7 +104,10 @@ def test_posix_commit_adapter_persists_committed_journal_with_path_outcomes(tmp_
     ]
 
 
-@pytest.mark.skipif(sys.platform != "darwin", reason="AP-02 native no-replace commit backend is implemented for macOS")
+@pytest.mark.skipif(
+    sys.platform not in {"darwin", "linux"},
+    reason="AP-02 native no-replace commit backend targets macOS/Linux",
+)
 def test_posix_commit_adapter_rejects_destination_created_at_native_commit_point_without_overwriting(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
