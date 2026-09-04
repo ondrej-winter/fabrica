@@ -87,7 +87,7 @@ in parallel after their contract changes are complete.
   evidence contracts.
 - [x] **MUCE-2** Enforce generic observation metadata key and string-value
   bounds.
-- [ ] **MUCE-3** Make Codex generic-evidence metadata allowlists explicit and
+- [x] **MUCE-3** Make Codex generic-evidence metadata allowlists explicit and
   test unsafe-field exclusion.
 - [ ] **MUCE-4** Align synthetic-provider, runtime/transport, and CLI evidence
   tests with non-monetary pricing states.
@@ -183,7 +183,7 @@ uv run ruff check src/fabrica/shared_kernel tests/unit/shared_kernel/test_model_
 
 ### MUCE-3 — Make Codex generic-evidence metadata allowlists explicit
 
-- [ ] **MUCE-3** Ensure Codex-owned generic-evidence paths construct only
+- [x] **MUCE-3** Ensure Codex-owned generic-evidence paths construct only
   explicitly allowlisted metadata and test unsafe-field exclusion.
 
 **Likely files**
@@ -215,15 +215,15 @@ uv run ruff check src/fabrica/shared_kernel tests/unit/shared_kernel/test_model_
 
 **Acceptance criteria**
 
-- [ ] **MUCE-3-A** Every Codex generic-evidence observation path uses explicit
+- [x] **MUCE-3-A** Every Codex generic-evidence observation path uses explicit
   provider-owned safe metadata construction.
-- [ ] **MUCE-3-B** Secret-like, account-like, cookie/header-like, raw-body, and
+- [x] **MUCE-3-B** Secret-like, account-like, cookie/header-like, raw-body, and
   private-endpoint-like values are absent from emitted generic metadata.
-- [ ] **MUCE-3-C** Completion and usage-endpoint mappings continue to emit one
+- [x] **MUCE-3-C** Completion and usage-endpoint mappings continue to emit one
   explicit non-monetary pricing-state item for each subscription-backed result.
-- [ ] **MUCE-3-D** Tests inspect emitted metadata mappings directly rather than
+- [x] **MUCE-3-D** Tests inspect emitted metadata mappings directly rather than
   relying only on string rendering.
-- [ ] **MUCE-3-E** Oversized allowlisted string values are safely dropped before
+- [x] **MUCE-3-E** Oversized allowlisted string values are safely dropped before
   generic observation construction, or otherwise handled without leaking them.
 
 **Verification**

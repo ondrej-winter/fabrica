@@ -1,12 +1,14 @@
 """Map Codex usage endpoint results into provider-agnostic evidence."""
 
 from collections.abc import Mapping
-from typing import cast
 
 from fabrica.features.codex_transport.application.dtos import CodexTransportStatus, CodexUsageResult
 from fabrica.features.codex_transport.application.mappers.generic_usage_evidence import (
     CODEX_PROVIDER,
+    CODEX_USAGE_ENDPOINT_PRICING_OBSERVATION_KEYS,
+    CODEX_USAGE_ENDPOINT_USAGE_OBSERVATION_KEYS,
     CodexGenericEvidence,
+    safe_codex_observation_metadata,
 )
 from fabrica.shared_kernel.model_usage import (
     ModelCostEvidence,
@@ -17,21 +19,9 @@ from fabrica.shared_kernel.model_usage import (
     ModelUsageEvidenceConfidence,
     ModelUsageEvidenceSource,
     ModelUsageObservation,
-    SafeModelUsageObservationValue,
 )
 
 _COMPLETE_QUOTA_FIELD_COUNT = 4
-_SAFE_USAGE_OBSERVATION_KEYS = frozenset(
-    {
-        "plan",
-        "plan_type",
-        "tier",
-        "usage_percent",
-        "quota_percent",
-        "rate_limit_header_count",
-        "rate_limit_header_names",
-    },
-)
 
 
 def map_codex_usage_endpoint_evidence(result: CodexUsageResult) -> CodexGenericEvidence:
@@ -74,7 +64,10 @@ def _usage_endpoint_cost_evidence(status: CodexTransportStatus) -> ModelCostEvid
         observations=(
             ModelUsageObservation(
                 message="Codex usage endpoint pricing evidence is not available for subscription-backed usage",
-                metadata={"provider": CODEX_PROVIDER, "codex_usage_status": status.value},
+                metadata=safe_codex_observation_metadata(
+                    {"provider": CODEX_PROVIDER, "codex_usage_status": status.value},
+                    allowed_keys=CODEX_USAGE_ENDPOINT_PRICING_OBSERVATION_KEYS,
+                ),
             ),
         ),
     )
@@ -142,7 +135,7 @@ def _usage_endpoint_observation(
     evidence_values: object,
     quota: ModelQuotaEvidence | None,
 ) -> ModelUsageObservation:
-    metadata: dict[str, SafeModelUsageObservationValue] = {
+    metadata: dict[str, object] = {
         "provider": CODEX_PROVIDER,
         "codex_usage_status": status.value,
         "collection_status": collection_status.value,
@@ -150,25 +143,18 @@ def _usage_endpoint_observation(
     if quota is not None:
         metadata["quota_field_count"] = _quota_field_count(quota)
     if isinstance(evidence_values, Mapping):
-        metadata.update(_safe_usage_endpoint_observation_metadata(cast("Mapping[object, object]", evidence_values)))
+        metadata.update(evidence_values)
     return ModelUsageObservation(
         message=_usage_endpoint_observation_message(
             status=status,
             collection_status=collection_status,
             quota=quota,
         ),
-        metadata=metadata,
+        metadata=safe_codex_observation_metadata(
+            metadata,
+            allowed_keys=CODEX_USAGE_ENDPOINT_USAGE_OBSERVATION_KEYS,
+        ),
     )
-
-
-def _safe_usage_endpoint_observation_metadata(
-    evidence_values: Mapping[object, object],
-) -> dict[str, SafeModelUsageObservationValue]:
-    return {
-        key: cast("SafeModelUsageObservationValue", value)
-        for key, value in evidence_values.items()
-        if isinstance(key, str) and key in _SAFE_USAGE_OBSERVATION_KEYS and _is_safe_observation_value(value)
-    }
 
 
 def _usage_endpoint_observation_message(
@@ -196,10 +182,6 @@ def _safe_non_empty_text(value: object) -> str | None:
     if isinstance(value, str) and value:
         return value
     return None
-
-
-def _is_safe_observation_value(value: object) -> bool:
-    return value is None or isinstance(value, str | int | float | bool)
 
 
 __all__ = ["map_codex_usage_endpoint_evidence"]

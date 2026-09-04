@@ -13,6 +13,7 @@ from fabrica.features.codex_transport.application.mappers import (
     map_codex_usage_endpoint_evidence,
 )
 from fabrica.shared_kernel.model_usage import (
+    DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_STRING_VALUE_CHARS,
     ModelPricingStatus,
     ModelUsageCollectionStatus,
     ModelUsageEvidenceConfidence,
@@ -58,8 +59,14 @@ def test_map_codex_completion_evidence_maps_complete_token_usage() -> None:
     assert usage.tokens.total_tokens == COMPLETE_TOTAL_TOKENS
     assert usage.tokens.cached_input_tokens == COMPLETE_CACHED_INPUT_TOKENS
     assert usage.tokens.reasoning_tokens == COMPLETE_REASONING_TOKENS
+    assert usage.observations[0].metadata == {
+        "provider": "codex",
+        "codex_status": "success",
+        "collection_status": "collected",
+    }
     assert cost.pricing_status is ModelPricingStatus.UNKNOWN
     assert cost.source is ModelUsageEvidenceSource.RESPONSE_PAYLOAD
+    assert cost.observations[0].metadata == {"provider": "codex", "codex_status": "success"}
 
 
 def test_map_codex_completion_evidence_maps_partial_usage_without_defaulting_missing_fields() -> None:
@@ -155,10 +162,17 @@ def test_map_codex_usage_endpoint_evidence_maps_safe_quota_fields() -> None:
     assert usage.quota.reset_at == "2026-08-05T20:00:00Z"
     assert usage.quota.window_seconds == USAGE_WINDOW_SECONDS
     assert usage.tokens.total_tokens is None
-    assert usage.observations[0].metadata["plan_type"] == "synthetic-pro"
-    assert usage.observations[0].metadata["usage_percent"] == USAGE_PERCENT
+    assert usage.observations[0].metadata == {
+        "provider": "codex",
+        "codex_usage_status": "success",
+        "collection_status": "collected",
+        "quota_field_count": 4,
+        "plan_type": "synthetic-pro",
+        "usage_percent": USAGE_PERCENT,
+    }
     assert cost.pricing_status is ModelPricingStatus.NOT_AVAILABLE
     assert cost.source is ModelUsageEvidenceSource.USAGE_ENDPOINT
+    assert cost.observations[0].metadata == {"provider": "codex", "codex_usage_status": "success"}
 
 
 def test_map_codex_usage_endpoint_evidence_maps_partial_quota_without_coercion() -> None:
@@ -228,7 +242,7 @@ def test_map_codex_usage_endpoint_evidence_maps_non_success_statuses(
     assert cost.pricing_status is ModelPricingStatus.NOT_AVAILABLE
 
 
-def test_map_codex_usage_endpoint_evidence_does_not_expose_unsafe_values() -> None:
+def test_map_codex_usage_endpoint_evidence_excludes_unsafe_and_oversized_metadata_values() -> None:
     evidence = map_codex_usage_endpoint_evidence(
         CodexUsageResult(
             status=CodexTransportStatus.SUCCESS,
@@ -237,10 +251,19 @@ def test_map_codex_usage_endpoint_evidence_does_not_expose_unsafe_values() -> No
                     "remaining": USAGE_REMAINING,
                     "account_id": "synthetic-account",
                     "access_token": "synthetic-access-token",
+                    "authorization": "Bearer synthetic-token",
+                    "cookie": "synthetic-cookie",
+                    "raw_body": "synthetic-raw-body",
+                    "private_endpoint": "https://private.example.test/usage",
+                    "plan_type": "p" * (DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_STRING_VALUE_CHARS + 1),
                 },
             ),
         ),
     )
 
-    assert "synthetic-account" not in str(evidence)
-    assert "synthetic-access-token" not in str(evidence)
+    assert evidence.usage_evidence[0].observations[0].metadata == {
+        "provider": "codex",
+        "codex_usage_status": "success",
+        "collection_status": "partially_collected",
+        "quota_field_count": 1,
+    }

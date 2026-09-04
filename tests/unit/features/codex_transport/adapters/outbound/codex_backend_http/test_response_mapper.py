@@ -103,8 +103,12 @@ def test_map_success_response_extracts_safe_response_usage_evidence() -> None:
     assert usage.tokens.total_tokens == RESPONSE_TOTAL_TOKENS
     assert usage.tokens.cached_input_tokens == RESPONSE_CACHED_INPUT_TOKENS
     assert usage.tokens.reasoning_tokens == RESPONSE_REASONING_TOKENS
-    assert "synthetic-account" not in str(result)
-    assert "synthetic-access-token" not in str(result)
+    assert usage.observations[0].metadata == {
+        "provider": "codex",
+        "codex_status": "success",
+        "collection_status": "collected",
+    }
+    assert result.cost_evidence[0].observations[0].metadata == {"provider": "codex", "codex_status": "success"}
 
 
 def test_map_success_response_extracts_partial_usage_without_zero_defaults() -> None:

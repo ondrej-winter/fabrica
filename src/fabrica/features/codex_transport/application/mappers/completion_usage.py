@@ -4,8 +4,11 @@ from dataclasses import dataclass
 
 from fabrica.features.codex_transport.application.dtos import CodexTransportStatus
 from fabrica.features.codex_transport.application.mappers.generic_usage_evidence import (
+    CODEX_COMPLETION_PRICING_OBSERVATION_KEYS,
+    CODEX_COMPLETION_USAGE_OBSERVATION_KEYS,
     CODEX_PROVIDER,
     CodexGenericEvidence,
+    safe_codex_observation_metadata,
 )
 from fabrica.shared_kernel.model_usage import (
     ModelCostEvidence,
@@ -123,7 +126,10 @@ def _cost_evidence(*, status: CodexTransportStatus, source: ModelUsageEvidenceSo
         observations=(
             ModelUsageObservation(
                 message=message,
-                metadata={"provider": CODEX_PROVIDER, "codex_status": status.value},
+                metadata=safe_codex_observation_metadata(
+                    {"provider": CODEX_PROVIDER, "codex_status": status.value},
+                    allowed_keys=CODEX_COMPLETION_PRICING_OBSERVATION_KEYS,
+                ),
             ),
         ),
     )
@@ -167,11 +173,14 @@ def _usage_observation(
         message = "Codex completion usage evidence was unavailable for this outcome"
     return ModelUsageObservation(
         message=message,
-        metadata={
-            "provider": CODEX_PROVIDER,
-            "codex_status": status.value,
-            "collection_status": collection_status.value,
-        },
+        metadata=safe_codex_observation_metadata(
+            {
+                "provider": CODEX_PROVIDER,
+                "codex_status": status.value,
+                "collection_status": collection_status.value,
+            },
+            allowed_keys=CODEX_COMPLETION_USAGE_OBSERVATION_KEYS,
+        ),
     )
 
 
