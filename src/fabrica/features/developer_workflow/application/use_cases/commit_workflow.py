@@ -182,7 +182,7 @@ class CommitMessageWorkflow:
     """Application workflow for selected-skill commit-message generation."""
 
     generator: CommitMessageGenerator
-    evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
+    evidence_recorder: CommitMessageEvidenceRecorder | None = None
 
     async def run(
         self,
@@ -266,7 +266,7 @@ class ConfirmedCommitWorkflow:
     committer: GitCommitter
     pre_commit_runner: PreCommitRunner
     snapshot_reader: GitRepositorySnapshotReader
-    evidence_recorder: "CommitMessageEvidenceRecorder | None" = None
+    evidence_recorder: CommitMessageEvidenceRecorder | None = None
 
     async def run(
         self, command: object | None = None, *, skill_id: str = DEFAULT_COMMIT_MESSAGE_SKILL_ID

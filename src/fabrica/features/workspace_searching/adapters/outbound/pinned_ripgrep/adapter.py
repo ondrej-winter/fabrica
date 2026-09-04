@@ -213,7 +213,7 @@ class PinnedRipgrepWorkspaceSearchBackend(WorkspaceSearchBackend):
             paths = tuple(sorted({location.path for location in locations}))
             source_text_by_path = await self.source_loader.load(self.workspace_root, paths)
             matches = hydrate_search_locations(locations, source_text_by_path, limits=context.limits)
-        except (RipgrepJsonEventError, UnicodeError, ValueError, OSError):
+        except RipgrepJsonEventError, UnicodeError, ValueError, OSError:
             return _failure(query, SearchErrorCode.IO_ERROR, transient=True)
         return SearchQuerySuccess(
             query=query,

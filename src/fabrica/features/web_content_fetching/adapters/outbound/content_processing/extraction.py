@@ -49,7 +49,7 @@ def _extract_html(text: str, *, final_url: str) -> ExtractedWebContent | FetchEr
             content=_normalize_text(markdownify(str(soup), heading_style="ATX")),
             content_format=FetchContentFormat.MARKDOWN,
         )
-    except (AttributeError, TypeError, ValueError):
+    except AttributeError, TypeError, ValueError:
         return FetchError(
             code=FetchErrorCode.CONTENT_EXTRACTION_FAILED,
             message="The HTML response could not be converted to readable content",

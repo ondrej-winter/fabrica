@@ -242,13 +242,13 @@ class _Harness:
     post_staging_policy_result: PatchResult | None = None
     file_staging_result: PatchResult | None = None
     preparation_stager_callback: Callable[[], None] | None = None
-    clock: "_FixedClock" = field(default_factory=lambda: _FixedClock(datetime(2026, 9, 2, tzinfo=UTC)))
+    clock: _FixedClock = field(default_factory=lambda: _FixedClock(datetime(2026, 9, 2, tzinfo=UTC)))
     commit_result_plan_digest: str | None = None
     events: list[str] = field(default_factory=list)
     committed_plan: PatchPlan | None = None
-    snapshot_reader: "_SnapshotReader" = field(init=False)
-    journal_store: "_JournalStore" = field(init=False)
-    committer: "_Committer" = field(init=False)
+    snapshot_reader: _SnapshotReader = field(init=False)
+    journal_store: _JournalStore = field(init=False)
+    committer: _Committer = field(init=False)
     use_case: ApplyPatch = field(init=False)
 
     def __post_init__(self) -> None:

@@ -111,7 +111,7 @@ def _task_result(
         return _cancelled_result(command)
     try:
         result = task.result()
-    except (OSError, RuntimeError, ValueError):
+    except OSError, RuntimeError, ValueError:
         return _internal_failure_result(command)
     if (
         result.status is CommandExecutionStatus.TIMED_OUT

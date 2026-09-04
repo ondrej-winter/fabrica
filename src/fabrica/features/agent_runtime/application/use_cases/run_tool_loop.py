@@ -190,7 +190,7 @@ class RunToolLoop:
         limits: ToolLoopLimits,
         cancellation: ToolCancellationSignal,
         opaque_context: Mapping[str, object],
-        call_ledger: dict[str, "_ToolCallLedgerEntry"],
+        call_ledger: dict[str, _ToolCallLedgerEntry],
     ) -> ToolCallResult:
         entry = call_ledger.get(tool_call.call_id)
         if entry is not None:

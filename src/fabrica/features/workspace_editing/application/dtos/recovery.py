@@ -82,7 +82,7 @@ class PatchJournalRecord:
     state: PatchJournalState
     created_directories: tuple[PatchDirectoryOutcome, ...] = field(default_factory=tuple)
     path_outcomes: tuple[PatchPathOutcome, ...] = field(default_factory=tuple)
-    rollback_entries: tuple["PatchRollbackEntry", ...] = field(default_factory=tuple)
+    rollback_entries: tuple[PatchRollbackEntry, ...] = field(default_factory=tuple)
     metadata: Mapping[str, SafePatchMetadataValue] = field(default_factory=dict)
 
     def __post_init__(self) -> None:

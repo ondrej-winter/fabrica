@@ -43,7 +43,7 @@ def test_posix_capability_probe_reports_fail_closed_decision(tmp_path: Path) -> 
     assert report["capabilities"]["stdlib_no_replace_rename"] == {
         "status": "unsupported",
         "detail": (
-            "Python 3.13 stdlib exposes os.rename/os.replace with dir_fd support but no portable "
+            "Python 3.14 stdlib exposes os.rename/os.replace with dir_fd support but no portable "
             "RENAME_NOREPLACE or renameat2 wrapper; adapter needs ctypes/platform syscall support or "
             "a different pre-commit design"
         ),

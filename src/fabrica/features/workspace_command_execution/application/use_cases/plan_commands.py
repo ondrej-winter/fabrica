@@ -62,7 +62,7 @@ class PlanCommands:
                 )
         except CommandPlanningError as err:
             return _rejected(index, preview, err.code, err.message)
-        except (OSError, ValueError, TypeError):
+        except OSError, ValueError, TypeError:
             return _rejected(index, preview, CommandErrorCode.INTERNAL_EXECUTION_ERROR, "command planning failed")
         else:
             return planned

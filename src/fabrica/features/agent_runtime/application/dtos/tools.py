@@ -265,7 +265,7 @@ class RegisteredToolOutcome:
         result_text: str | None = None,
         content: tuple[ToolContentPart, ...] = (),
         details: Mapping[str, SafeRuntimeMetadataValue] | None = None,
-    ) -> "RegisteredToolOutcome":
+    ) -> RegisteredToolOutcome:
         """Create a successful outcome that lets the model loop continue."""
         return cls(
             status=ToolOutcomeStatus.SUCCESS,
@@ -282,7 +282,7 @@ class RegisteredToolOutcome:
         error_code: str,
         error_message: str,
         details: Mapping[str, SafeRuntimeMetadataValue] | None = None,
-    ) -> "RegisteredToolOutcome":
+    ) -> RegisteredToolOutcome:
         """Create a recoverable no-mutation rejection shown to the model."""
         return cls(
             status=ToolOutcomeStatus.REJECTED,
@@ -300,7 +300,7 @@ class RegisteredToolOutcome:
         error_code: str,
         error_message: str,
         details: Mapping[str, SafeRuntimeMetadataValue] | None = None,
-    ) -> "RegisteredToolOutcome":
+    ) -> RegisteredToolOutcome:
         """Create an ordinary non-fatal tool failure outcome."""
         return cls(
             status=ToolOutcomeStatus.TOOL_FAILURE,
@@ -318,7 +318,7 @@ class RegisteredToolOutcome:
         mutation_guarantee: ToolMutationGuarantee,
         error_message: str,
         details: Mapping[str, SafeRuntimeMetadataValue] | None = None,
-    ) -> "RegisteredToolOutcome":
+    ) -> RegisteredToolOutcome:
         """Create a fatal outcome that stops the runtime loop."""
         return cls(
             status=ToolOutcomeStatus.FATAL,
@@ -435,7 +435,7 @@ class ToolCallResult:
         object.__setattr__(self, "content", tuple(self.content))
         object.__setattr__(self, "observations", tuple(self.observations))
 
-    def bounded(self, limits: ToolLoopLimits) -> "ToolCallResult":
+    def bounded(self, limits: ToolLoopLimits) -> ToolCallResult:
         """Return a copy whose result text fits the configured loop bound."""
         if self.result_text is None or len(self.result_text) <= limits.max_tool_result_chars:
             return self

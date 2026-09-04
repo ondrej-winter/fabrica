@@ -251,7 +251,7 @@ def load_durable_journal(workspace_root: Path, journal_digest: str) -> PatchJour
     )
     try:
         return _read_record(path)
-    except (OSError, TypeError, ValueError):
+    except OSError, TypeError, ValueError:
         return None
 
 

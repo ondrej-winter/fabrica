@@ -19,7 +19,7 @@ def decode_web_content(body: bytes, *, declared_charset: str | None) -> str | Fe
     encoding = _bom_encoding(body) or declared_charset or "utf-8"
     try:
         return body.decode(encoding)
-    except (LookupError, UnicodeDecodeError):
+    except LookupError, UnicodeDecodeError:
         return FetchError(
             code=FetchErrorCode.UNSUPPORTED_ENCODING,
             message="The response body could not be decoded reliably",

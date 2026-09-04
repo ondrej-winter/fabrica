@@ -167,7 +167,7 @@ def _probe_stdlib_no_replace_rename() -> CapabilityProbe:
     return CapabilityProbe(
         status="unsupported",
         detail=(
-            "Python 3.13 stdlib exposes os.rename/os.replace with dir_fd support but no portable "
+            "Python 3.14 stdlib exposes os.rename/os.replace with dir_fd support but no portable "
             "RENAME_NOREPLACE or renameat2 wrapper; adapter needs ctypes/platform syscall support or "
             "a different pre-commit design"
         ),
@@ -288,7 +288,7 @@ def _filesystem_type(path: Path) -> str:
 
     try:
         completed = subprocess.run(command, check=True, capture_output=True, text=True, timeout=5)  # noqa: S603
-    except (OSError, subprocess.SubprocessError):
+    except OSError, subprocess.SubprocessError:
         return "unknown"
     return completed.stdout.strip() or "unknown"
 

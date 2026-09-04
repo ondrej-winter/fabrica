@@ -77,7 +77,7 @@ class SelectedSkillToolDeclaration:
         *,
         reason: str | None = None,
         metadata: Mapping[str, SafeRuntimeMetadataValue] | None = None,
-    ) -> "SelectedSkillToolDeclaration":
+    ) -> SelectedSkillToolDeclaration:
         """Return a fail-closed copy with a replacement exposure status."""
         return SelectedSkillToolDeclaration(
             skill_id=self.skill_id,

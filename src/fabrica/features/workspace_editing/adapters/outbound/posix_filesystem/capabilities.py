@@ -217,7 +217,7 @@ def _filesystem_type(path: Path) -> str:
         return "unsupported-platform"
     try:
         completed = subprocess.run(command, check=True, capture_output=True, text=True, timeout=5)  # noqa: S603
-    except (OSError, subprocess.SubprocessError):
+    except OSError, subprocess.SubprocessError:
         return "unknown"
     return completed.stdout.strip() or "unknown"
 

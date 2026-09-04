@@ -210,7 +210,7 @@ async def _terminate_process_group(process: asyncio.subprocess.Process, grace_se
 def _process_group_exists(process_group_id: int) -> bool:
     try:
         os.killpg(process_group_id, 0)
-    except (PermissionError, ProcessLookupError):
+    except PermissionError, ProcessLookupError:
         return False
     return True
 

@@ -145,7 +145,7 @@ class PosixSupervisedPatchMutationAdapter:
             terminal_result = _validate_terminal_evidence(self.workspace_root, operation, journal, outcome)
             if terminal_result is not None:
                 return terminal_result
-        except (EOFError, OSError):
+        except EOFError, OSError:
             return _recovery_required(journal, "helper IPC closed before terminal outcome verification")
         else:
             return outcome
@@ -215,7 +215,7 @@ def run_patch_operation_in_helper(
         else:
             outcome = asyncio.run(PosixPatchCommitAdapter(Path(workspace_root)).roll_back(durable_journal))
         connection.send(outcome)
-    except (OSError, ValueError, RuntimeError):
+    except OSError, ValueError, RuntimeError:
         connection.send(_recovery_required(journal, "helper could not prove a safe terminal mutation outcome"))
     finally:
         connection.close()

@@ -39,7 +39,7 @@ fabricate that information simply to keep the run moving.
 
 ## Current Context
 
-- Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
+- Project: `fabrica`, a Python 3.14 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
 - Runtime direction is owned by `docs/specs/agent-runtime-spec.md`.
 - Primitive capability specs include `docs/specs/tools-read-files-tool-spec.md`,

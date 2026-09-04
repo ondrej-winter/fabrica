@@ -126,7 +126,7 @@ class RegisteredToolExecutor:
                 ),
             )
             return _outcome_result(request, outcome, limits)
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return _failure_result(
                 request,
                 ToolCallResultStatus.INVALID_ARGUMENTS,
@@ -140,7 +140,7 @@ class RegisteredToolExecutor:
                 _TOOL_TIMEOUT_MESSAGE,
                 category="timeout",
             )
-        except (OSError, RuntimeError):
+        except OSError, RuntimeError:
             return _failure_result(
                 request,
                 ToolCallResultStatus.TOOL_FAILURE,
@@ -155,7 +155,7 @@ def _execute_synchronous_tool(tool: RegisteredTool, request: ToolCallRequest, li
         result_text = tool.handler(request.arguments)
     except RegisteredToolRejectionError as err:
         return _rejection_result(request, err)
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         return _failure_result(
             request,
             ToolCallResultStatus.INVALID_ARGUMENTS,
@@ -164,7 +164,7 @@ def _execute_synchronous_tool(tool: RegisteredTool, request: ToolCallRequest, li
         )
     except TimeoutError:
         return _failure_result(request, ToolCallResultStatus.TIMEOUT, _TOOL_TIMEOUT_MESSAGE, category="timeout")
-    except (OSError, RuntimeError):
+    except OSError, RuntimeError:
         return _failure_result(
             request,
             ToolCallResultStatus.TOOL_FAILURE,

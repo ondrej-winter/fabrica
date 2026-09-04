@@ -333,7 +333,7 @@ class PosixPatchCommitAdapter:
         """Ensure durable recovery evidence still binds this plan before file work."""
         try:
             payload = json.loads(self._record_path(journal).read_text(encoding="utf-8"))
-        except (OSError, ValueError, TypeError):
+        except OSError, ValueError, TypeError:
             return _rejected("STALE_PLAN", "durable journal is unavailable or invalid before file commit")
         if (
             payload.get("journal_digest") != journal.journal_digest

@@ -32,7 +32,7 @@ explicit metadata about any content it did not receive.
 
 ## Current Context
 
-- Project: `fabrica`, a Python 3.13 local agent runtime experiment using a
+- Project: `fabrica`, a Python 3.14 local agent runtime experiment using a
   `src/` layout and hexagonal architecture organized by vertical slices.
 - Runtime direction is owned by `docs/specs/agent-runtime-spec.md`.
 - Filesystem mutation tool design is owned by `docs/specs/tools-apply-patch-tool-spec.md`.

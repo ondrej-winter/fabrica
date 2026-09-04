@@ -27,7 +27,7 @@ belongs in `docs/specs/model-usage-and-cost-evidence-spec.md`.
 
 ## Current Context
 
-- Project: `fabrica`, a Python 3.13 application scaffold for local agent
+- Project: `fabrica`, a Python 3.14 application scaffold for local agent
   runtime experiments.
 - Architecture: `src/` layout with hexagonal architecture organized by vertical
   feature slices.
