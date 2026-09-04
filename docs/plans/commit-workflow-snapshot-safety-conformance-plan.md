@@ -2,7 +2,7 @@
 
 ## Status
 
-- State: Ready.
+- State: Complete.
 - Source specification: `docs/specs/commit-workflows-spec.md`.
 - Related adapter specification: `docs/specs/tools-git-workflow-tools-spec.md`.
 - Created: September 3, 2026.
@@ -119,10 +119,10 @@ final quality-gate execution follows all implementation work.
 - [x] T3 — Make pre-commit state comparison authoritative.
 - [x] T4 — Retain and revalidate the analyzed index snapshot before commit.
 - [x] T5 — Wire the implementation and synchronize user-facing/adapter specs.
-- [ ] T6 — Run focused, integration, and full quality-gate validation.
+- [x] T6 — Run focused, integration, and full quality-gate validation.
 - [x] C1 — Contract checkpoint after T2.
 - [x] C2 — Workflow checkpoint after T4.
-- [ ] C3 — Handoff checkpoint after T6.
+- [x] C3 — Handoff checkpoint after T6.
 
 ## Ordered Tasks
 
@@ -395,6 +395,20 @@ final quality-gate execution follows all implementation work.
 - Confirm implementation, tests, README, and both related specifications agree.
 - Summarize changed files, validation evidence, accepted risks, and any
   intentionally deferred work.
+
+**Completed September 4, 2026**
+
+- Focused developer-workflow test directories collected and passed their test
+  cases: application (117), inbound CLI (34), Git subprocess (171), and
+  integration (27). Their partial invocations return nonzero only because the
+  repository-wide coverage threshold applies to every pytest invocation; this is
+  expected for partial suites and does not indicate test failures.
+- The final configured quality gate passed sequentially: `uv run ruff format .`,
+  `uv run ruff check .`, `uv run ty check src tests`, and `uv run pytest`.
+  The full suite reported 1,708 passed, 3 skipped, and 93.02% total coverage.
+- No scope deviations or new blockers were found. The accepted best-effort
+  compare-before-commit race remains intentionally deferred as documented in
+  this plan and the related specifications.
 
 ## Risks and Mitigations
 
