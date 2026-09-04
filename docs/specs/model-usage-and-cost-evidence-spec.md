@@ -2,163 +2,237 @@
 
 ## Status
 
-- State: Draft — unconfirmed.
-- Implementation status: Baseline contract implemented; broader provider-neutral evidence requirements remain unconfirmed.
-- Accepted by: Not applicable until accepted
-- Accepted on: Not applicable until accepted
-- Revision: Template-governance migration on September 1, 2026.
-- Supersedes: Not applicable.
+- State: Accepted — Version 1.
+- Implementation status: Usage evidence, Codex mapping, runtime propagation, CLI
+  presentation, and offline tests are implemented. The existing monetary-estimate
+  fields, estimate statuses, and related tests require follow-up conformance work
+  before the implementation fully satisfies this accepted Version 1 contract.
+- Accepted by: Maintainer.
+- Accepted on: September 4, 2026.
+- Revision: Accepted Version 1 evidence-boundary clarification on September 4,
+  2026.
+- Supersedes: Draft — unconfirmed model-usage-and-cost-evidence specification.
 
-This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
+This document is the canonical source of truth for the requirements it defines.
+Derived plans and implementation must preserve its objective, constraints,
+execution boundaries, and success criteria; material changes require an updated
+and re-confirmed specification.
 
 ## Objective
 
-Add a provider-agnostic usage and cost evidence model for Fabrica model calls so
-agent workflows can report useful usage evidence across providers without
-pretending that ambiguous provider-specific pricing is knowable.
+Provide provider-neutral model usage and non-monetary pricing evidence for
+Fabrica model calls. The evidence must help a developer running Fabrica locally
+debug and compare provider behavior without implying that ambiguous,
+provider-specific billing or per-call cost is knowable.
 
-The primary user is a developer running Fabrica locally who wants trustworthy
-model usage evidence for debugging, planning, and comparing provider behavior.
 The first validation provider is Codex because its subscription-backed behavior,
 private backend shape, volatile usage endpoints, and uncertain billing
 attribution make it the hardest case.
 
-The goal is not exact cost accounting in v1. The goal is an application-level
-contract that can represent token counts, quota or rate-limit evidence, evidence
-source attribution, and pricing confidence independently of any single backend.
+Version 1 is not an exact cost-accounting system. It provides application-level
+contracts for token counts, provider-local quota or rate-limit evidence, evidence
+source attribution, confidence, and explicit non-monetary pricing state.
 
 ## Current Context
 
 - Runtime result DTOs live in
   `src/fabrica/features/agent_runtime/application/dtos/runtime.py` and expose
-  provider-agnostic usage evidence on `LocalAgentRunResult`.
+  usage and cost-evidence tuples on `LocalAgentRunResult`.
 - Codex transport result DTOs live in
   `src/fabrica/features/codex_transport/application/dtos/transport.py` and expose
-  normalized completion output, redacted observations, and provider-agnostic
-  usage/cost evidence tuples.
-- Codex-specific usage probing already exists in
-  `src/fabrica/features/codex_transport/application/dtos/usage.py` as
-  `CodexUsageEvidence`, `CodexUsageResult`, and `CodexUsageStatus`.
-- `CodexUsageEvidence` is currently a safe scalar mapping. It is useful for
-  provider-specific observations but is not the desired permanent cross-provider
-  model.
-- Default automated tests must remain deterministic and offline. Live/private
-  Codex probing belongs in explicit opt-in checks, not the default quality gate.
+  normalized completion output, redacted observations, and evidence tuples.
+- Codex-specific usage probing is represented by `CodexUsageEvidence`,
+  `CodexUsageResult`, and `CodexUsageProbeCommand` in
+  `src/fabrica/features/codex_transport/application/dtos/transport.py`.
+- Generic evidence DTOs live in `src/fabrica/shared_kernel/model_usage.py` because
+  both `agent_runtime` and `codex_transport` use them as provider-neutral boundary
+  concepts.
+- Default automated tests remain deterministic and offline. Live or private Codex
+  probing belongs in explicit opt-in validation, never in the default quality gate.
 
 ## Assumptions
 
-- A generic usage DTO can represent common token categories across providers
-  without flattening away important provider-specific evidence.
+- A generic usage DTO can represent common token categories without flattening
+  provider-specific evidence into false equivalence.
 - Codex exposes enough safe token, quota, or usage evidence to make collection
-  worthwhile even when exact price is unknown.
-- Pricing should remain optional enrichment instead of being required for a model
-  call or transport result to be useful.
-- Every collected evidence item should record where it came from, such as a
-  response payload, stream event, header, usage endpoint, manual observation, or
-  source-code observation.
-- Confidence vocabulary can start small and expand when new providers or evidence
-  sources require more precision.
-- Provider-specific raw payloads are not needed for the v1 application contract
-  and should not be persisted by default.
+  worthwhile even when billing attribution is unknown.
+- Pricing evidence is optional for conventional API-style providers, but
+  subscription-backed providers need an explicit non-monetary pricing state so an
+  empty tuple is not mistaken for a zero or attributable cost.
+- Every emitted evidence item records an evidence source and confidence label.
+- Provider-specific raw payloads are unnecessary in Version 1 and must not be
+  persisted.
 
 ## Scope
 
 ### In Scope
 
-- Provider-neutral model usage and pricing evidence exposed through application boundaries.
+- Provider-neutral usage evidence exposed through application boundaries.
+- Non-monetary provider-neutral pricing-state evidence.
+- Provider-owned mapping of safe usage, quota, rate-limit, and pricing-state facts.
+- Offline Codex and synthetic conventional API-style validation.
 
 ### Out of Scope
 
-The detailed exclusions already recorded below remain authoritative.
+- Exact Codex pricing or subscription billing attribution.
+- Any monetary cost amount, currency, price calculation, price catalog, or billing
+  integration in production Version 1.
+- Pairing a cost/pricing evidence item to a particular usage item, model call, or
+  provider invocation.
+- Cross-provider comparison of quota or rate-limit fields.
+- Billing-page scraping, raw provider-payload persistence, or account-private
+  billing evidence.
+- Live Codex probes in default local tests, CI, or quality gates.
 
 ## Desired Behavior
 
-Fabrica should expose normalized model usage evidence through an application-level
-contract that can be attached to model-call results when available and omitted
-when unavailable.
+Fabrica exposes normalized usage evidence and optional result-level pricing-state
+evidence through model-call results. Evidence is informative and provenance
+bearing; it is not a billing ledger.
 
-### Provider-agnostic usage evidence
+### Provider-neutral usage evidence
 
-Add a generic usage evidence DTO family with fields for:
+Usage evidence must support:
 
-- provider identifier, such as `codex`, `openai`, or another stable provider
-  label;
-- model identifier when safe and known;
-- collection status, such as collected, partially collected, unavailable,
-  unsupported, or failed;
-- evidence source, such as response payload, stream event, response header, usage
+- a stable provider identifier, such as `codex` or `openai`;
+- a model identifier when safe and known;
+- a collection status: `collected`, `partially_collected`, `unavailable`,
+  `unsupported`, or `failed`;
+- an evidence source: response payload, stream event, response header, usage
   endpoint, manual observation, or source-code observation;
-- confidence, such as observed, extracted, inferred, manual, estimated, or
-  unknown;
-- token counts when available:
-  - input tokens;
-  - output tokens;
-  - total tokens;
-  - cached input tokens;
-  - reasoning tokens;
-- quota or rate-limit evidence when available, represented as safe normalized
-  observations rather than raw provider payloads. V1 structured quota/rate-limit
-  evidence should use `limit`, `remaining`, `reset_at`, and `window_seconds`
-  fields when those values are safely known;
-- redacted observations for missing, partial, or ambiguous evidence.
+- a confidence label: `observed`, `extracted`, `inferred`, `manual`, `estimated`,
+  or `unknown`;
+- optional reported token categories: input, output, total, cached input, and
+  reasoning tokens;
+- optional provider-local quota or rate-limit fields: `limit`, `remaining`,
+  `reset_at`, and `window_seconds`;
+- redacted, bounded observations explaining missing, partial, ambiguous, or
+  provider-specific evidence.
 
-Usage evidence must be valid without a cost estimate. Missing token categories
-should be represented as absent values, not zero, unless the provider explicitly
-reported zero.
+Missing token categories must be absent rather than zero unless the provider
+explicitly reported zero. A mapper must preserve all provider-reported token
+fields independently. It must not derive, replace, reconcile, or reject a
+reported `total_tokens` solely because it differs from other reported token
+categories.
 
-### Cost and pricing evidence
+Structured quota or rate-limit fields are provider-local operational facts. Their
+units, scopes, and reset semantics are not normalized in Version 1 and consumers
+must not compare them across providers.
 
-Add a separate optional sibling cost or pricing evidence DTO with fields for:
+### Pricing-state evidence
 
-- pricing status, such as unknown, not available, subscription included,
-  public-price estimate, manual estimate, or unsupported;
-- currency when a monetary estimate exists;
-- estimated amount when a monetary estimate exists;
-- confidence and source attribution;
-- redacted explanatory observations.
+Pricing-state evidence is a sibling DTO to usage evidence. The usage and
+cost-evidence tuples are independent result-level collections: tuple position is
+not a pairing rule, and a pricing-state item must not be interpreted as a
+per-usage-item or per-invocation cost attribution.
 
-Codex subscription-backed usage should default to unknown, unavailable, or
-subscription-included pricing status unless there is a trustworthy source for a
-more specific claim. Public API pricing must not be treated as exact Codex
-subscription billing without explicit evidence.
+Version 1 supports only these pricing states:
+
+- `unknown`;
+- `not_available`;
+- `subscription_included`;
+- `unsupported`.
+
+Version 1 must not expose, calculate, retain, or render a monetary amount or
+currency. `public_price_estimate` and `manual_estimate` are deferred from the
+Version 1 vocabulary. A later accepted specification must define provenance,
+billing-unit, scope, and calculation semantics before monetary estimates can be
+introduced.
+
+Conventional API-style providers may expose an empty `cost_evidence` tuple when
+no applicable pricing-state evidence was collected. Subscription-backed providers
+must emit explicit pricing-state evidence. Codex subscription-backed usage should
+normally use `unknown`, `not_available`, or `subscription_included`, according to
+the safe facts available; public API token pricing must never be represented as
+Codex subscription billing.
+
+### Observation safety
+
+Generic observations must accept only scalar metadata and enforce documented
+maximum lengths for messages, metadata keys, and string metadata values. Generic
+DTO validation is not a redaction engine.
+
+Each provider-owned mapper must maintain a tested allowlist of safe observation
+metadata keys. Mappers must drop secrets, authentication headers, cookies, raw
+request or response payloads, account identifiers, private endpoint details, and
+billing-page content before generic evidence DTO construction.
 
 ### Codex mapping
 
-Codex should be the first provider-specific mapping into the generic contract.
-The Codex mapping should:
+Codex is the first provider-specific mapping into the generic contract. Its
+mapping must:
 
-- translate safe response usage fields into generic token fields when present;
-- translate safe stream-event usage fields if supported;
-- translate safe usage-endpoint evidence into quota, rate-limit, or token
-  evidence where applicable;
-- preserve provider-specific facts only as safe normalized observations when the
-  generic fields are not expressive enough;
-- avoid storing raw response bodies, account identifiers, secrets, private
-  endpoint details, or billing-page content;
-- report unknown pricing explicitly instead of silently omitting cost ambiguity.
+- map safe completion-response or stream-event usage into generic token fields;
+- map safe usage-endpoint facts into provider-local quota or rate-limit fields;
+- preserve facts not represented by generic fields only as allowlisted safe
+  observations;
+- avoid raw response bodies, account identifiers, secrets, private endpoint
+  details, and billing-page content;
+- emit an explicit non-monetary pricing-state evidence item for every
+  subscription-backed result covered by the mapping.
 
 ### Second-provider validation
 
-Before treating the generic contract as stable, validate it against at least one
-conventional API-style usage shape in addition to Codex. This second provider can
-be represented by a focused synthetic fixture in v1; live integration is not
-required.
+Before treating the generic contract as provider-neutral, maintain a test-only
+synthetic conventional API-style fixture that maps normal input, output, and total
+token fields into the same contract. The fixture proves that the DTO family is not
+Codex-shaped; it is not a production integration and does not establish a reusable
+provider-adapter contract.
 
-The validation target should prove that the DTO can represent a normal response
-shape with token usage and, when applicable, a public-price estimate without
-embedding Codex-specific assumptions.
+## Project Structure
 
-## Non-goals
+- Spec: `docs/specs/model-usage-and-cost-evidence-spec.md`.
+- Generic evidence DTOs: `src/fabrica/shared_kernel/model_usage.py`.
+- Codex-specific usage probe DTOs:
+  `src/fabrica/features/codex_transport/application/dtos/transport.py`.
+- Codex generic-evidence mappings:
+  `src/fabrica/features/codex_transport/application/mappers/`.
+- Runtime result integration:
+  `src/fabrica/features/agent_runtime/application/dtos/runtime.py`.
+- Provider extraction belongs in provider-owned adapters or mapping code.
+- Unit tests mirror their source ownership under `tests/unit/`.
 
-- Do not calculate exact Codex pricing in v1.
-- Do not scrape billing pages.
-- Do not persist raw provider payloads.
-- Do not make live Codex probes part of default tests or quality gates.
-- Do not add provider billing integrations.
-- Do not make public API token pricing look like exact subscription-backed Codex
-  billing.
-- Do not add Codex-only token fields directly into generic runtime result DTOs as
-  the permanent model.
+Do not create a standalone `model_usage` feature slice unless a later accepted
+specification establishes a distinct use-case family.
+
+## Conventions and Constraints
+
+- Preserve hexagonal boundaries: generic evidence is an application-boundary
+  concept; provider-payload extraction remains provider-owned.
+- Use immutable dataclasses and `StrEnum` values consistent with existing DTOs.
+- Public DTOs and ports require explicit type annotations.
+- Keep provider identifiers, sources, collection statuses, confidence labels, and
+  pricing states as closed vocabularies where practical.
+- Use `None` only for legitimate absence, including a token category that the
+  provider did not report.
+- Keep observations bounded, scalar, redacted, and sourced from tested
+  provider-owned allowlists.
+- Do not add a generic provider-specific extension mapping in Version 1.
+- Never log or persist secrets, tokens, authentication headers, cookies, account
+  identifiers, raw provider payloads, or billing-page content.
+- Do not introduce dependencies for currency, decimal-money arithmetic, or
+  provider pricing catalogs in Version 1.
+
+## Testing Strategy
+
+- Unit-test generic DTO validation:
+  - non-negative token and quota values are accepted;
+  - missing token categories remain absent rather than defaulting to zero;
+  - reported token fields are preserved without total derivation or reconciliation;
+  - the Version 1 source, confidence, collection-status, and pricing-state
+    vocabularies are enforced;
+  - observation messages, metadata keys, and string values obey their bounds.
+- Unit-test Codex mapping:
+  - complete, missing, and partial completion usage;
+  - safe quota/rate-limit mapping and provider-local treatment;
+  - explicit subscription-backed non-monetary pricing states;
+  - unsafe raw fields, secret-like fields, and account-like fields are excluded by
+    tested mapper allowlists.
+- Unit-test the synthetic conventional API-style fixture against generic token
+  evidence only; it must not exercise monetary estimates.
+- Extend runtime and CLI tests for optional usage evidence and non-monetary
+  pricing-state presentation.
+- Keep all default tests offline and deterministic.
 
 ## Commands and Validation
 
@@ -169,170 +243,90 @@ embedding Codex-specific assumptions.
 | Type check | `uv run ty check src tests` | Required for implementation changes |
 | Tests | `uv run pytest` | Required for implementation changes |
 | Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
-| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
-| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
+| Manual acceptance | Recorded in this specification's Status section. | Completed |
 
-- Format: `uv run ruff format .`
-- Lint: `uv run ruff check .`
-- Type check: `uv run ty check src tests`
-- Test: `uv run pytest`
-- Focused unit tests during implementation:
-  - `uv run pytest tests/unit/features/agent_runtime/application/`
-  - `uv run pytest tests/unit/features/codex_transport/application/`
-  - `uv run pytest tests/unit/features/codex_transport/adapters/`
+Focused implementation checks should include:
 
-Manual verification, if live probing is implemented later, must be explicit and
-opt-in. It must use redacted output and must not be part of the default local or
-CI validation path.
+- `uv run pytest tests/unit/shared_kernel/test_model_usage.py`;
+- `uv run pytest tests/unit/features/codex_transport/application/test_usage_mapping.py`;
+- `uv run pytest tests/unit/features/agent_runtime/application/test_synthetic_provider_usage_mapping.py`;
+- relevant runtime-adapter and CLI evidence-output tests.
 
-## Project Structure
-
-- Spec: `docs/specs/model-usage-and-cost-evidence-spec.md`.
-- Generic usage and cost evidence DTO location:
-  `src/fabrica/shared_kernel/model_usage.py`.
-- Do not create a standalone `model_usage` feature slice. Reconsider that only
-  after usage/cost evidence grows into its own use case family.
-- Existing Codex-specific usage DTOs:
-  `src/fabrica/features/codex_transport/application/dtos/usage.py`.
-- Codex usage mapping should live in the Codex transport slice, either in
-  application mapping code or an adapter-local mapper depending on where the raw
-  provider shape is handled.
-- Runtime result integration:
-  `src/fabrica/features/agent_runtime/application/dtos/runtime.py`.
-- Relevant model/runtime result boundaries should expose tuples of usage evidence
-  items and tuples of cost evidence items so multiple sources can contribute
-  evidence with distinct provenance.
-- Unit tests should mirror the owning source location under `tests/unit/features/`.
-
-The usage evidence DTOs now live in `shared_kernel` because both `agent_runtime`
-and `codex_transport` use them as provider-neutral boundary concepts.
-
-## Conventions and Constraints
-
-- Preserve hexagonal boundaries: generic usage evidence belongs at an application
-  boundary, while provider payload extraction belongs in provider-specific
-  adapters or application mapping code.
-- Use immutable dataclasses and `StrEnum` values consistent with existing DTOs.
-- Public DTOs and ports must have explicit type annotations.
-- Keep provider identifiers, evidence sources, confidence values, and pricing
-  statuses as closed vocabularies where practical.
-- Use this closed v1 confidence vocabulary: `observed`, `extracted`, `inferred`,
-  `manual`, `estimated`, and `unknown`.
-- Use `None` only for legitimate absence, such as a token category not reported
-  by the provider.
-- Keep observations redacted and bounded.
-- Represent provider-specific facts as safe normalized observations in v1. Do not
-  add a generic provider-specific extension mapping to the usage DTO.
-- Never log secrets, raw provider payloads, authentication headers, cookies,
-  account identifiers, or billing-page content.
-- Treat pricing claims as evidence-bearing statements with status, source, and
-  confidence, not as implicit arithmetic hidden inside a transport adapter.
-
-## Testing Strategy
-
-- Unit-test generic usage DTO validation:
-  - token counts accept non-negative integers;
-  - missing token categories remain absent rather than defaulting to zero;
-  - total token count may be provided by the provider or derived only when the
-    derivation rule is explicit;
-  - provider, source, confidence, and status vocabularies reject invalid values.
-- Unit-test pricing evidence validation:
-  - unknown or unavailable pricing requires no amount or currency;
-  - monetary estimates require currency, amount, source, and confidence;
-  - subscription-included status does not imply a per-call price.
-- Unit-test Codex mapping:
-  - present response usage maps to generic token fields;
-  - missing usage maps to unavailable or partially collected evidence;
-  - partial usage preserves only reported categories;
-  - usage-endpoint quota or rate-limit values map to safe normalized evidence;
-  - structured quota or rate-limit evidence uses `limit`, `remaining`,
-    `reset_at`, and `window_seconds` only when safely known;
-  - pricing remains unknown or subscription-oriented unless explicit evidence is
-    available;
-  - unsafe raw fields are not exposed in DTOs or observations.
-- Unit-test an OpenAI-style synthetic conventional provider mapping:
-  - normal API-style input/output/total token fields map into the same generic
-    contract;
-  - optional public-price estimates are represented as estimates with source and
-    confidence.
-- Preserve existing Codex transport and agent runtime tests while extending result
-  DTO tests for optional usage evidence if runtime results are changed.
-- Keep all default tests offline and deterministic.
+Live backend validation, if later performed, must be explicit, opt-in, redacted,
+and excluded from default local and CI validation.
 
 ## Execution Boundaries
 
-- Always collect token or quota evidence even when exact cost is unknown.
-- Always attach source attribution and confidence to evidence that may influence
-  planning, cost estimates, or user-facing output.
-- Always represent unknown or unavailable pricing explicitly.
-- Always keep provider-specific extraction behind provider-owned code.
-- Always redact observations and avoid raw provider payload persistence.
-- Keep generic usage/cost evidence DTOs provider-neutral and free of adapter or
-  transport payload details.
-- Ask before introducing a new `model_usage` feature slice.
-- Ask before adding generic provider-specific extension fields to the usage DTO.
-- Ask before adding live probes to developer workflows, CI, or default quality
-  gates.
-- Ask before introducing a dependency for currency, decimal money arithmetic, or
-  provider pricing catalogs.
-- Never claim exact Codex per-call cost from subscription-backed usage without a
-  trustworthy source.
-- Never scrape billing pages or store account-private billing evidence in source
-  artifacts.
+- Always retain available token or provider-local quota evidence even when pricing
+  state is unknown.
+- Always attach source and confidence to emitted usage and pricing-state evidence.
+- Always emit explicit pricing-state evidence for subscription-backed providers.
+- Never infer a monetary amount, exact Codex per-call cost, or billing attribution
+  from subscription-backed usage.
+- Never treat result-level pricing-state evidence as paired with a usage item.
+- Never compare provider-local quota or rate-limit values across providers.
+- Always keep provider-specific extraction and metadata allowlisting in
+  provider-owned code.
+- Ask before adding a `model_usage` feature slice, generic provider-extension
+  fields, live probes in CI/default workflows, monetary estimates, currency,
+  pricing catalogs, or billing integrations.
+
+## Implementation Status and Deferred Work
+
+### Implemented baseline
+
+- Generic usage and cost-evidence DTOs exist in `shared_kernel`.
+- Codex completion and usage-endpoint mapping exists in the Codex transport slice.
+- Runtime results propagate both evidence tuples.
+- CLI output can render usage and pricing evidence.
+- Offline generic-DTO, Codex-mapping, runtime, CLI, and synthetic-provider tests
+  exist.
+
+### Required Version 1 conformance work
+
+- Remove or defer monetary fields and estimate pricing states from the production
+  DTO vocabulary, CLI rendering, and tests.
+- Add generic observation key and string-value bounds.
+- Make provider-owned observation metadata allowlists explicit and test them for
+  unsafe secret-like and account-like fields.
+- Align synthetic-provider validation and CLI tests with the non-monetary Version
+  1 pricing boundary.
+
+### Deferred beyond Version 1
+
+- Monetary public-price or manual estimates.
+- Price-source provenance, effective dates, billing-unit and scope semantics.
+- Pricing catalogs, currency arithmetic, and billing integrations.
+- Per-call correlation between usage and pricing evidence.
+- Generic quota unit/scope normalization and cross-provider quota comparison.
+- A production second-provider adapter or reusable provider-adapter contract.
 
 ## Success Criteria
 
-- The spec defines provider-agnostic usage evidence separately from Codex-specific
-  backend details.
-- The spec treats Codex as the first validation adapter, not the permanent core
-  model.
-- The spec makes unknown, unavailable, subscription-included, public-price
-  estimate, and manual-estimate pricing states explicit.
-- The spec requires evidence source and confidence labels for usage and pricing
-  evidence.
-- The spec documents resolved v1 project structure, boundaries, non-goals, validation
-  commands, and testing strategy.
-- The first implementation slice can add generic DTOs and Codex mapping without
-  requiring exact cost calculation or live private probes.
-
-## Resolved v1 decisions
-
-- Generic usage and cost evidence DTOs live in
-  `src/fabrica/shared_kernel/model_usage.py`.
-- Do not create a new `model_usage` feature slice.
-- Represent provider-specific facts only as safe normalized observations in v1;
-  do not add a generic provider-specific extension map.
-- Use the v1 confidence vocabulary `observed`, `extracted`, `inferred`,
-  `manual`, `estimated`, and `unknown`.
-- Model cost evidence as a sibling DTO to usage evidence rather than nesting cost
-  inside usage evidence.
-- Use an OpenAI-style synthetic fixture as the second provider validation case.
-- Use generic structured quota/rate-limit evidence fields `limit`, `remaining`,
-  `reset_at`, and `window_seconds` when safely known.
-- Relevant model/runtime result DTOs should expose tuples of usage evidence items
-  and tuples of cost evidence items so multiple evidence sources can retain their
-  own source and confidence.
-
-## Proposed first implementation slice
-
-1. Add generic usage and cost evidence DTOs in
-   `src/fabrica/shared_kernel/model_usage.py`.
-2. Add focused DTO validation tests for token counts, source attribution,
-   confidence, status, and pricing states.
-3. Add Codex mapping from safe response usage or existing `CodexUsageEvidence`
-   values into the generic contract.
-4. Add Codex mapping tests for present, missing, partial, quota/rate-limit, and
-   unknown-pricing cases.
-5. Add one OpenAI-style synthetic conventional provider mapping test or fixture
-   to validate that the generic contract is not Codex-shaped.
-6. Attach usage evidence and cost evidence tuples to `LocalAgentRunResult`.
+- The contract separates provider-neutral usage and pricing-state evidence from
+  Codex-private backend details.
+- Codex is the first validation adapter, not the permanent core model.
+- Pricing states are explicitly non-monetary in Version 1 and never imply exact
+  Codex subscription billing.
+- Usage and pricing-state evidence are independent result-level collections with
+  no implied per-call or per-usage correlation.
+- Subscription-backed providers emit explicit pricing-state evidence, while a
+  conventional provider may have no applicable pricing-state evidence.
+- Token fields are preserved as reported, and quota/rate-limit facts remain
+  provider-local rather than cross-provider comparable.
+- Provider-owned mappings use tested allowlists to prevent unsafe observation
+  metadata from reaching generic evidence DTOs.
+- The specification documents the implemented baseline, required conformance
+  work, deferred work, boundaries, and validation strategy.
 
 ## Open Questions
 
 | Question | Impact | Blocking? | Owner | Resolution |
 | --- | --- | --- | --- | --- |
-| No additional unresolved question is recorded by this migration. | None known. | No | Maintainer | Not applicable |
+| No open Version 1 questions remain. | None known. | No | Maintainer | Resolved through Version 1 acceptance on September 4, 2026. |
 
 ## Acceptance and Planning Gate
 
-This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+This accepted Version 1 specification may be handed to implementation planning.
+Any plan must preserve the non-monetary pricing boundary and treat the listed
+Version 1 conformance work as required before claiming full conformance.
