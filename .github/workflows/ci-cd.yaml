@@ -17,9 +17,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test-macos:
-    name: Test on macOS
-    runs-on: macos-latest
+  static-analysis:
+    name: Static analysis
+    runs-on: ubuntu-latest
     permissions:
       contents: read
 
@@ -35,31 +35,7 @@ jobs:
         with:
           python-version: "3.14"
           enable-cache: true
-          cache-python: true
           cache-dependency-glob: uv.lock
-
-      - name: Test
-        run: uv run --frozen --all-groups pytest
-
-  quality:
-    name: Quality checks
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.14"
 
       - name: Install dependencies
         run: uv sync --frozen --all-groups
@@ -76,8 +52,56 @@ jobs:
       - name: Import lint
         run: uv run lint-imports
 
+  test:
+    name: Test on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@e105c8fb1d7b13074b851babdaef4185243c6a07
+        with:
+          python-version: "3.14"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
       - name: Test
-        run: uv run pytest
+        run: uv run --frozen --all-groups pytest
+
+  build:
+    name: Build distribution packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@e105c8fb1d7b13074b851babdaef4185243c6a07
+        with:
+          python-version: "3.14"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
 
       - name: Build distribution packages
         run: uv build
@@ -92,31 +116,27 @@ jobs:
           path: dist/
 
   patch-release:
-    name: Create patch release and publish to PyPI
+    name: Create patch release artifacts
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' && github.actor != 'github-actions[bot]'
-    needs: [quality]
+    needs: [static-analysis, test, build]
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/fabrica/
     permissions:
       contents: write
-      id-token: write
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff
         with:
           enable-cache: true
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.14"
 
@@ -133,5 +153,28 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run semantic-release version --patch --no-changelog
 
+      - name: Upload release distribution artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-python-distributions
+          path: dist/
+
+  publish-pypi:
+    name: Publish release artifacts to PyPI
+    needs: [patch-release]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/fabrica/
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download release distribution artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: release-python-distributions
+          path: dist/
+
       - name: Publish distribution packages to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
