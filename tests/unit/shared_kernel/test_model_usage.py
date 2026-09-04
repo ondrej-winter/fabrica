@@ -7,6 +7,8 @@ import pytest
 
 from fabrica.shared_kernel.model_usage import (
     DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS,
+    DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_KEY_CHARS,
+    DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_STRING_VALUE_CHARS,
     ModelCostEvidence,
     ModelPricingStatus,
     ModelQuotaEvidence,
@@ -101,14 +103,52 @@ def test_usage_observation_metadata_is_safe_copied_and_immutable() -> None:
         cast("dict[str, object]", observation.metadata)["category"] = "changed"
 
 
-def test_usage_observation_rejects_non_string_keys_nested_values_and_unbounded_messages() -> None:
+def test_usage_observation_accepts_scalar_metadata_at_documented_bounds() -> None:
+    metadata_key = "k" * DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_KEY_CHARS
+    metadata_value = "v" * DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_STRING_VALUE_CHARS
+
+    observation = ModelUsageObservation(
+        message="m" * DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS,
+        metadata={
+            metadata_key: metadata_value,
+            "integer": 1,
+            "float": 1.5,
+            "boolean": True,
+            "none": None,
+        },
+    )
+
+    assert observation.message == "m" * DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS
+    assert observation.metadata[metadata_key] == metadata_value
+    assert dict(observation.metadata) == {
+        metadata_key: metadata_value,
+        "integer": 1,
+        "float": 1.5,
+        "boolean": True,
+        "none": None,
+    }
+
+
+def test_usage_observation_rejects_invalid_metadata_and_unbounded_messages() -> None:
     unsafe_key_metadata = cast("dict[str, SafeModelUsageObservationValue]", {1: "unsafe"})
     unsafe_nested_metadata = cast("dict[str, SafeModelUsageObservationValue]", {"raw": {"nested": "payload"}})
 
     with pytest.raises(TypeError, match="keys must be strings"):
         ModelUsageObservation(message="unsafe", metadata=unsafe_key_metadata)
+    with pytest.raises(ValueError, match="keys must not be empty"):
+        ModelUsageObservation(message="unsafe", metadata={"": "unsafe"})
+    with pytest.raises(ValueError, match="metadata key exceeds"):
+        ModelUsageObservation(
+            message="unsafe",
+            metadata={"k" * (DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_KEY_CHARS + 1): "unsafe"},
+        )
     with pytest.raises(TypeError, match="bounded scalar"):
         ModelUsageObservation(message="unsafe", metadata=unsafe_nested_metadata)
+    with pytest.raises(ValueError, match=r"string value.*exceeds"):
+        ModelUsageObservation(
+            message="unsafe",
+            metadata={"safe_key": "v" * (DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_STRING_VALUE_CHARS + 1)},
+        )
     with pytest.raises(ValueError, match="message must not be empty"):
         ModelUsageObservation(message="")
     with pytest.raises(ValueError, match="safe usage observation bound"):

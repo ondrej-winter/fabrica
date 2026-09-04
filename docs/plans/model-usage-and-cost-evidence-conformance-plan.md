@@ -85,7 +85,7 @@ in parallel after their contract changes are complete.
 
 - [x] **MUCE-1** Remove Version 1 monetary pricing vocabulary from shared
   evidence contracts.
-- [ ] **MUCE-2** Enforce generic observation metadata key and string-value
+- [x] **MUCE-2** Enforce generic observation metadata key and string-value
   bounds.
 - [ ] **MUCE-3** Make Codex generic-evidence metadata allowlists explicit and
   test unsafe-field exclusion.
@@ -142,7 +142,7 @@ uv run ty check src tests
 
 ### MUCE-2 — Enforce generic observation metadata key and string-value bounds
 
-- [ ] **MUCE-2** Add and enforce documented generic metadata bounds.
+- [x] **MUCE-2** Add and enforce documented generic metadata bounds.
 
 **Likely files**
 
@@ -167,12 +167,12 @@ uv run ty check src tests
 
 **Acceptance criteria**
 
-- [ ] **MUCE-2-A** Empty, oversized, and non-string metadata keys are rejected.
-- [ ] **MUCE-2-B** Oversized string metadata values are rejected.
-- [ ] **MUCE-2-C** Valid scalar metadata remains accepted and immutable.
-- [ ] **MUCE-2-D** Message, key, and string-value bounds have focused boundary
+- [x] **MUCE-2-A** Empty, oversized, and non-string metadata keys are rejected.
+- [x] **MUCE-2-B** Oversized string metadata values are rejected.
+- [x] **MUCE-2-C** Valid scalar metadata remains accepted and immutable.
+- [x] **MUCE-2-D** Message, key, and string-value bounds have focused boundary
   tests.
-- [ ] **MUCE-2-E** Generic validation does not claim to redact secrets.
+- [x] **MUCE-2-E** Generic validation does not claim to redact secrets.
 
 **Verification**
 

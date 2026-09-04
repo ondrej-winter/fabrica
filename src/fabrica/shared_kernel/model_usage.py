@@ -6,6 +6,8 @@ from enum import StrEnum
 from types import MappingProxyType
 
 DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS = 240
+DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_KEY_CHARS = 80
+DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_STRING_VALUE_CHARS = 240
 
 type SafeModelUsageObservationValue = str | int | float | bool | None
 
@@ -89,7 +91,7 @@ class ModelQuotaEvidence:
 
 @dataclass(frozen=True, slots=True)
 class ModelUsageObservation:
-    """Redacted, bounded scalar observation attached to usage or cost evidence."""
+    """Bounded scalar observation attached to usage or cost evidence."""
 
     message: str
     metadata: Mapping[str, SafeModelUsageObservationValue] = field(default_factory=dict)
@@ -106,9 +108,18 @@ class ModelUsageObservation:
             if not isinstance(key, str):
                 msg = "usage observation metadata keys must be strings"
                 raise TypeError(msg)
+            if not key:
+                msg = "usage observation metadata keys must not be empty"
+                raise ValueError(msg)
+            if len(key) > DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_KEY_CHARS:
+                msg = "usage observation metadata key exceeds the safe bound"
+                raise ValueError(msg)
             if not _is_safe_observation_value(value):
                 msg = f"usage observation metadata value for {key!r} must be a bounded scalar"
                 raise TypeError(msg)
+            if isinstance(value, str) and len(value) > DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_STRING_VALUE_CHARS:
+                msg = f"usage observation metadata string value for {key!r} exceeds the safe bound"
+                raise ValueError(msg)
             copied_metadata[key] = value
         object.__setattr__(self, "metadata", MappingProxyType(copied_metadata))
 
@@ -164,6 +175,8 @@ def _is_safe_observation_value(value: object) -> bool:
 
 __all__ = [
     "DEFAULT_MAX_MODEL_USAGE_OBSERVATION_MESSAGE_CHARS",
+    "DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_KEY_CHARS",
+    "DEFAULT_MAX_MODEL_USAGE_OBSERVATION_METADATA_STRING_VALUE_CHARS",
     "ModelCostEvidence",
     "ModelPricingStatus",
     "ModelQuotaEvidence",
