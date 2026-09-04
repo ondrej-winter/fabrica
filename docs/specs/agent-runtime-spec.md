@@ -2,26 +2,28 @@
 
 ## Status
 
-- State: Draft — unconfirmed.
-- Implementation status: Substantially implemented; the implementation predates formal specification acceptance.
-- Accepted by: Not applicable until accepted
-- Accepted on: Not applicable until accepted
-- Revision: Template-governance migration on September 1, 2026.
+- State: Accepted — Version 1 runtime baseline.
+- Implementation status: Substantially implemented before formal Version 1 acceptance; this revision records the confirmed runtime baseline and its ownership boundaries.
+- Accepted by: Maintainer
+- Accepted on: September 4, 2026
+- Revision: Accepted Version 1 runtime-baseline clarification on September 4, 2026.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
 
 ## Objective
 
-Define the direction for a local Python agent runtime that can run developer
-workflows through replaceable model transports and explicit tool boundaries.
+Define the Version 1 direction for a local Python agent runtime that can run
+developer workflows through replaceable model transports and explicit tool
+boundaries.
 
 The primary user is an agent power user who wants local Python agent workflows
 with clear runtime contracts, opt-in tool access, and subscription-backed Codex
 support as the first high-risk transport capability.
 
-This spec owns the runtime-level design. Codex-specific authentication,
-private-backend request details, and live validation rules belong in
+This spec owns the runtime-level design and the shared model-callable tool-loop
+contract. Codex-specific authentication, private-backend request details, and
+live validation rules belong in
 `docs/specs/codex-transport-spec.md`. Provider-neutral usage and pricing evidence
 belongs in `docs/specs/model-usage-and-cost-evidence-spec.md`.
 
@@ -33,11 +35,9 @@ belongs in `docs/specs/model-usage-and-cost-evidence-spec.md`.
   feature slices.
 - Tooling: `uv` for environment and command execution, `ruff` for
   formatting/linting, `ty` for type checking, and `pytest` for tests.
-- Existing runtime code lives under `src/fabrica/features/agent_runtime/`,
-  including policy-controlled Agent Skill context loading and script execution.
-- Codex transport code lives under `src/fabrica/features/codex_transport/` and
-  is the first provider support path for the runtime.
-- Composition and dependency wiring live under `src/fabrica/bootstrap/`.
+- Existing runtime code lives under `src/fabrica/features/agent_runtime/`. Codex
+  transport code lives under `src/fabrica/features/codex_transport/`, and
+  composition and dependency wiring live under `src/fabrica/bootstrap/`.
 - Tests mirror source ownership under `tests/unit/` and `tests/integration/`.
 
 ## Assumptions
@@ -51,15 +51,19 @@ belongs in `docs/specs/model-usage-and-cost-evidence-spec.md`.
   unknowns.
 - Default local tests and quality gates must not call live model backends or
   require real subscription credentials.
-- Agent Skills support is useful, but it should remain separate from transport
-  viability and runtime composition concerns. Local script execution must remain
-  policy-controlled and bound to immutable approved script bytes.
+- Agent Skills are an optional runtime extension. The core runtime must support
+  explicit Skills integration boundaries, but must not require skill discovery,
+  activation, or script execution in every composition.
 
 ## Scope
 
 ### In Scope
 
-- The provider-agnostic local agent runtime direction and its explicit tool boundaries.
+- The provider-agnostic local agent runtime direction, normalized run results,
+  and explicit tool registration.
+- The shared model-callable tool-loop lifecycle and control contract defined
+  below.
+- The integration boundary for optional Agent Skills support.
 
 ### Out of Scope
 
@@ -77,14 +81,34 @@ Fabrica should expose a local Python agent runtime that can:
   transport provides them;
 - expose selected tools explicitly rather than granting ambient access to local
   system capabilities;
-- execute selected Agent Skill scripts only after policy approval, then run a
-  private temporary snapshot of the approved bytes instead of reopening the
-  selected script path;
-- run selected Agent Skill script subprocesses in dedicated process groups and
-  terminate the group with bounded cleanup on timeout;
+- apply the shared tool-loop lifecycle contract below when it invokes registered
+  model-facing tools;
 - keep all filesystem, process, network, credential, and framework I/O inside
   adapters or composition-root code;
 - keep default automated tests deterministic and offline.
+
+### Shared tool-loop lifecycle contract
+
+The runtime baseline owns the following rules for every registered model-facing
+tool:
+
+- Tools must execute through typed asynchronous contracts and return typed
+  outcomes rather than using free-form text to control the loop.
+- The runtime-owned execution context must propagate cancellation and phase
+  deadlines with narrowly scoped call metadata; it must not expose arbitrary host
+  services to tool handlers.
+- The runtime must keep a per-run ledger keyed by model `call_id` and canonical
+  normalized-argument digest. An exact duplicate must return the recorded terminal
+  result without re-invoking the handler; reusing a `call_id` with different
+  normalized arguments must fail before handler execution. Incomplete or
+  indeterminate mutation work must not be automatically replayed after restart.
+- Outcomes must explicitly distinguish model-continuing completion, recoverable
+  rejection or failure, and terminal or fatal runtime-stop dispositions. Fatal
+  partial, retained, rollback-failed, or indeterminate mutation outcomes must
+  stop the agent loop.
+- Result bounding must preserve stable status, error code, mutation guarantee,
+  retryability, and terminal or fatal disposition before truncating optional
+  preview, excerpt, or evidence detail.
 
 ### Runtime milestones
 
@@ -94,13 +118,13 @@ Fabrica should expose a local Python agent runtime that can:
    DTOs.
 3. Add provider-agnostic usage and cost evidence according to
    `docs/specs/model-usage-and-cost-evidence-spec.md`.
-4. Add model-callable tools through explicit, bounded capabilities such as the
-   read-only git context tools in
-   `docs/specs/tools-git-workflow-tools-spec.md`.
-5. Keep Agent Skills script support explicit and policy-controlled: load
-   immutable script bytes with their computed approval binding, compare that
-   binding to the approved metadata, and execute only a private temporary
-   snapshot of the matched bytes.
+4. Add model-callable tools through explicit, bounded capabilities, with
+   tool-specific schemas, authorization, side effects, recovery, and sandbox
+   policy owned by the applicable capability or orchestration specification.
+5. Integrate Agent Skills as an optional extension according to
+   `docs/specs/tools-skills-tool-spec.md`. Skill discovery, activation, resource
+   routing, and script-execution guarantees are not prerequisites for core
+   runtime compositions.
 
 ## Explicitly out of scope for the runtime baseline
 
@@ -108,6 +132,10 @@ Fabrica should expose a local Python agent runtime that can:
 - Coupling runtime DTOs to private Codex backend request or response schemas.
 - Live backend calls in the default test suite or quality gate.
 - Unbounded arbitrary shell, filesystem, or network tools.
+- Concrete Python import paths, bootstrap factories, adapters, and DTOs as stable
+  public APIs. They remain experimental in Version 1.
+- Mandatory Agent Skills discovery, activation, or script execution in every
+  runtime composition.
 - Production sandboxing guarantees for skill scripts.
 - RAG or vector search for skills.
 - Multi-provider polish before the Codex support path proves viable.
@@ -120,9 +148,9 @@ Fabrica should expose a local Python agent runtime that can:
 - Runtime application ports and DTOs: under the owning slice's
   `application/ports/` and `application/dtos/` packages.
 - Runtime adapters: under the owning slice's `adapters/` package.
-- Runtime script execution ports: `SkillScriptMetadataLoader`,
-  `SkillScriptSnapshotLoader`, and `SkillScriptExecutor` under
-  `src/fabrica/features/agent_runtime/application/ports/`.
+- Optional Agent Skills integration, including selected script execution, is owned
+  by `docs/specs/tools-skills-tool-spec.md` and its relevant feature ports and
+  adapters.
 - Composition and optional CLI wiring: under `src/fabrica/bootstrap/` or a
   driving adapter owned by the relevant feature slice.
 - Unit tests: under `tests/unit/features/agent_runtime/`.
@@ -139,12 +167,9 @@ Fabrica should expose a local Python agent runtime that can:
   details out of the runtime core.
 - Keep environment, filesystem, credential, process, and network I/O inside
   adapters or composition-root code.
-- Keep script approval metadata and executed bytes bound together: snapshot
-  loading returns immutable content plus the binding computed from that content,
-  and subprocess execution targets a private temporary copy only after the binding
-  matches the approved decision.
-- Keep selected script subprocess timeout handling descendant-aware by using a
-  dedicated process group and bounded group termination before reporting timeout.
+- Implement runtime-shared tool lifecycle semantics in the runtime layer. Keep
+  tool-specific schemas, authorization, side effects, recovery, and sandbox policy
+  with their owning capability or orchestration specification.
 - Use explicit type annotations on public ports, DTOs, services, and adapter
   APIs.
 - Use layer-appropriate exceptions and preserve context with exception chaining.
@@ -154,19 +179,17 @@ Fabrica should expose a local Python agent runtime that can:
 
 ## Testing Strategy
 
-- Unit-test runtime orchestration against fake model transports and fake tools.
-- Unit-test DTO mappings and result normalization without provider credentials.
-- Unit-test tool selection and tool-result loops with deterministic test doubles.
-- Unit-test Agent Skill script policy and execution boundaries with deterministic
-  filesystem/subprocess fakes, including regression coverage that stale approved
-  metadata cannot execute different bytes.
-- Unit-test subprocess timeout cleanup with deterministic process fakes rather
-  than relying on fragile real descendant-process behavior in the default suite.
+- Unit-test runtime orchestration and the shared tool-loop contract against fake
+  model transports and fake tools.
+- Unit-test DTO mappings, result normalization, cancellation and deadline
+  propagation, duplicate-call protection, outcome disposition, and
+  status-prioritized result bounding without provider credentials.
 - Keep provider adapter tests in the provider-owning feature slice.
 - Keep live backend checks opt-in and isolated from the default `uv run pytest`
   suite.
-- Add regression tests for runtime contracts when provider behavior changes the
-  normalized result shape.
+- Optional Agent Skills tests, including script policy, snapshot binding, and
+  subprocess cleanup, belong with the Skills extension and must use deterministic
+  filesystem/subprocess fakes in the default suite.
 
 ## Commands and Validation
 
@@ -178,7 +201,6 @@ Fabrica should expose a local Python agent runtime that can:
 | Tests | `uv run pytest` | Required for implementation changes |
 | Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
 | Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
-| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 Implementation changes should use the project quality gate:
@@ -189,42 +211,44 @@ Implementation changes should use the project quality gate:
 - Test: `uv run pytest`
 
 Live backend validation, when intentionally performed, must be manual or
-explicitly opt-in. It must not be part of the default local or CI test suite.
+explicitly opt-in. It must not be part of the default local or CI test suite; it
+remains owned by the Codex transport specification.
 
 ## Success Criteria
 
-- The spec clearly distinguishes runtime responsibilities from provider support
-  responsibilities.
+- The spec is accepted and clearly distinguishes runtime responsibilities from
+  provider and tool-specific responsibilities.
 - The runtime uses provider-agnostic ports and DTOs instead of private transport
   schemas.
+- The shared tool-loop contract defines typed async execution, cancellation and
+  deadline propagation, duplicate-call protection, status-prioritized bounding,
+  and continue, terminal, and fatal dispositions.
 - The first provider support path can be Codex without making the runtime Codex
   specific.
-- Runtime tests can run offline and deterministically.
-- Future tool, PydanticAI, and Agent Skills hardening work has clear boundaries
-  for where code and tests belong.
+- Core runtime compositions do not require Agent Skills discovery, activation, or
+  script execution.
+- Concrete Python import paths and bootstrap factories remain experimental in
+  Version 1.
+- The default project quality gate passes without live backend calls or
+  credentials.
 
 ## Open Questions
 
 | Question | Impact | Blocking? | Owner | Resolution |
 | --- | --- | --- | --- | --- |
-| See the detailed questions below; each requires maintainer triage before acceptance. | Requirement and implementation planning. | To be determined | Maintainer | Unresolved |
-
-- What is the smallest stable runtime result contract that supports model output,
-  tool calls, usage evidence, and redacted observations without overfitting to
-  Codex?
-- Which runtime surfaces should become public Python APIs before CLI workflows are
-  expanded?
-- How much PydanticAI integration is useful before the runtime's own ports and
-  DTOs become too thin to justify?
-- What additional approval, isolation, and sandbox policy is sufficient before
-  Agent Skill scripts are exposed beyond constrained local subprocess execution?
+| What additional approval, isolation, and sandbox policy is sufficient before Agent Skill scripts are exposed beyond constrained local subprocess execution? | May constrain a future Skills extension; it does not change the accepted core runtime baseline. | No | Maintainer | Unresolved; retain the Version 1 limitation that no production sandbox guarantee is made. |
 
 ## Acceptance and Planning Gate
 
-This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+This accepted Version 1 specification is ready for downstream planning. The
+non-blocking Skills sandbox question may constrain only future extension work; it
+must not be interpreted as a production sandbox guarantee or as a requirement for
+core runtime compositions.
 
 ## Execution Boundaries
 
 - Always: Preserve the explicit safety and ownership constraints in this specification.
-- Ask first: Expand scope, introduce dependencies, or change public contracts.
-- Never: Bypass documented security, privacy, or architecture boundaries.
+- Ask first: Expand scope, introduce dependencies, change public contracts, or
+  promote experimental concrete Python APIs to stable support commitments.
+- Never: Bypass documented security, privacy, architecture, provider, or
+  tool-specific boundaries.
