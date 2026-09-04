@@ -2,11 +2,11 @@
 
 ## Status
 
-- State: Accepted; implementation conformance pending.
-- Implementation status: Substantially implemented; index-snapshot validation and repository-state-based pre-commit modification detection require conformance work.
+- State: Accepted and implemented.
+- Implementation status: Snapshot-safety conformance implemented; validation remains tracked by the related implementation plan.
 - Accepted by: Maintainer
 - Accepted on: September 3, 2026
-- Revision: Accepted safety and audit clarification on September 3, 2026.
+- Revision: Snapshot-safety conformance synchronized on September 4, 2026.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines.
@@ -75,7 +75,7 @@ It:
 6. revalidates the analyzed index tree immediately after explicit approval and
    before commit creation; and
 7. creates a git commit only when the user answers explicit yes and the index is
-   unchanged.
+   unchanged at that final best-effort comparison.
 
 Running pre-commit before message generation keeps the recommendation aligned
 with the staged state that is ready to commit. When hooks change the index or

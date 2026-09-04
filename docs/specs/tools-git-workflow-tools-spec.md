@@ -6,7 +6,7 @@
 - Implementation status: Implemented and validated before formal specification acceptance.
 - Accepted by: Product interview
 - Accepted on: September 2, 2026
-- Revision: Accepted after implementation-conformance audit on September 2, 2026.
+- Revision: Snapshot-safety adapter conformance synchronized on September 4, 2026.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
@@ -779,6 +779,40 @@ bridge developer-workflow capabilities into the agent-runtime tool system and ma
 depend on agent-runtime tool DTOs at that adapter boundary. Composition helpers
 must register read-only and mutating tools independently based on the composed
 runtime's requested capabilities.
+
+## Repository snapshot and pre-commit safety
+
+The confirmed commit composition uses a feature-owned, read-only repository
+snapshot adapter in addition to the approved commit and pre-commit adapters. Its
+application-owned result contains only an index-tree object ID and a digest of the
+tracked-worktree state; it does not expose file contents, pathnames, or raw Git
+output.
+
+The adapter obtains the index-tree identity with the fixed argv
+`git --no-pager write-tree`. It obtains the tracked-worktree representation with
+the fixed argv `git -c core.pager=cat -c core.quotePath=false -c color.ui=false
+--no-pager diff --no-ext-diff --no-textconv --no-renames --no-color --binary
+--ignore-submodules=none`. The adapter hashes that
+raw tracked-only diff locally with SHA-256. This comparison includes tracked
+content and mode changes while excluding untracked and ignored artifacts; callers
+receive only the fixed-length digest.
+
+Before a configured pre-commit invocation, the adapter captures both snapshot
+components and captures them again after every started hook process that returns
+a result. A difference in either component takes precedence over the hook exit
+status and yields `MODIFIED_FILES`; bounded hook output remains diagnostic only.
+If either snapshot cannot be compared because Git is unavailable, the directory
+is not a repository, a command times out or fails, decoding fails, or output is
+malformed or oversized, the workflow fails safely and does not continue.
+
+For `fabrica commit`, application orchestration captures the index tree before
+staged-evidence generation, verifies it again before recommendation display, and
+revalidates it immediately after CLI approval before invoking the commit port.
+Only the index tree is an approval precondition after recommendation generation:
+tracked but unstaged worktree changes alone do not block an approved commit. This
+is a best-effort compare-before-commit check, not atomic compare-and-commit
+protection; a separate process can still change the index after the final read
+and before `git commit` starts.
 
 ## Relationship to commit workflows
 

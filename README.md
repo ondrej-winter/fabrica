@@ -419,7 +419,11 @@ and continues to recommendation generation. If configured pre-commit fails,
 cannot run, times out, has invalid configuration, or modifies files, Fabrica
 stops before model invocation, skips the prompt, and creates no commit. Formatter
 rewrites are treated as modified files: review and stage the resulting changes,
-then rerun `fabrica commit`.
+then rerun `fabrica commit`. After Fabrica displays a recommendation, it checks
+that the staged index is unchanged both before display and immediately after
+approval; tracked but unstaged worktree edits alone do not block approval. This
+is a best-effort check rather than atomic compare-and-commit protection, so the
+index can still change after the final check and before Git starts the commit.
 
 For the default `conventional-commits` skill and `.agents/skills` root, the same
 interactive workflow is available through `make`:
