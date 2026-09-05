@@ -696,11 +696,11 @@ failure observations. It performs no credential reads or network calls during
 construction; those side effects happen only when the returned runtime is run.
 Default tests cover this path with synthetic credentials and mocked HTTP.
 
-## Selected Agent Skills context loading
+## Agent Skills context loading and activation
 
 The `agent_runtime` slice can also load explicitly selected local Agent Skills
 markdown and text resources as bounded context for one runtime command. This is
-a context-loading spike only: it reads selected `SKILL.md` text and explicitly
+a host-selected context path: it reads selected `SKILL.md` text and explicitly
 selected non-script resource text, then converts those inputs into
 `LocalAgentContextBlock` values without executing scripts, auto-discovering
 resources, scanning global skill directories, or calling Codex.
@@ -735,8 +735,9 @@ augmented = create_skill_context_augmented_local_agent_command(
 When no root override is supplied, the default skill root is the working
 repository's `.agents/skills` directory. The file adapters read only explicitly
 selected `<skill_id>/SKILL.md` files and explicitly selected resource files under
-configured roots. `SKILL.md` files must contain UTF-8 markdown with non-empty
-content and a top-level `# Heading`. Resource loading is also UTF-8 text-only and
+configured roots. `SKILL.md` files must contain UTF-8 (without a BOM), YAML frontmatter with
+lowercase-kebab-case `name` and non-empty `description` fields, a directory name
+matching `name`, and non-empty markdown instructions. Resource loading is also UTF-8 text-only and
 allowlisted to `.md`, `.txt`, `.json`, `.yaml`, `.yml`, and `.toml` files;
 `SKILL.md`, script-like files, binary files, directories, absolute paths, and
 path traversal are rejected.
@@ -759,11 +760,34 @@ Diagnostics are privacy-first by default: failures expose safe selected skill
 identifiers and normalized categories rather than private absolute paths or file
 contents. Verbose path diagnostics require explicit opt-in at composition time.
 
-This is not full Agent Skills support. Script execution, broad bundled-resource
-loading, command execution, network access, automatic discovery, RAG or vector
-search, tool calls, approval workflows, and sandboxing remain deferred. Default
-tests use synthetic skill files only; they do not read real user skill
-directories, read Codex credentials, call live backends, or execute scripts.
+### Model-facing `skills` activation
+
+The accepted Version 1 `skills` tool is a separate, model-callable activation
+primitive. A host first builds an immutable registry snapshot from configured
+global and workspace skill roots, then composes one registered `skills` tool with
+that snapshot, a run-scoped `ActiveSkillSet`, and a host-owned trust evaluator.
+The tool exposes exactly `{ "skill": string, "args"?: string | null }`.
+
+Its catalog advertises deterministic concise descriptions within the existing
+tool-description limit. A successful activation resolves a configured skill,
+checks the host allowlist and trust binding, safely rereads the canonical
+`SKILL.md`, verifies its exact `sha256:` revision against the snapshot, and
+returns the complete instructions as bounded structured tool text. The optional
+`args` value remains data in the activation result; it is not interpreted as
+instructions. Repeating the same skill revision is idempotent. Ordered active
+skills are retained with compacted run state and are rehydrated before ordinary
+retrieved context; malformed state or insufficient context capacity fails closed
+before the next model turn.
+
+The `skills` tool loads procedural instructions only. Version 1 does not grant
+permissions, register tools dynamically, execute scripts automatically, expose
+`@skill/...` resource paths or skill roots through workspace tools, scan arbitrary
+directories, support plugin or managed providers, install or edit skills, or
+expand command, filesystem, network, or sandbox capabilities. Selected resources
+and separately policy-gated selected-script workflows remain host-controlled
+paths; they are not model-callable consequences of activation. Default tests use
+synthetic local skill files only and do not read real user skill directories,
+read Codex credentials, call live backends, or execute scripts.
 
 ## Selected Agent Skills script policy evaluation
 

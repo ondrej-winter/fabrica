@@ -552,7 +552,9 @@ def _write_commit_message_skill(tmp_path: Path) -> Path:
     skill_directory = skill_root / "conventional-commits"
     skill_directory.mkdir(parents=True)
     (skill_directory / "SKILL.md").write_text(
-        "# Conventional Commits\nUse concise commit messages.\n", encoding="utf-8"
+        "---\nname: conventional-commits\ndescription: Write concise Conventional Commit messages.\n---\n\n"
+        "# Conventional Commits\nUse concise commit messages.\n",
+        encoding="utf-8",
     )
     return skill_root
 

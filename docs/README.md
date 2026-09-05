@@ -48,3 +48,6 @@ This directory contains durable project documentation and current reference note
 - `specs/tools-apply-patch-tool-spec.md` defines context-based workspace file mutation,
   including capability-gated POSIX production enablement, fail-closed unsupported
   environments, and its recovery contract.
+- `specs/tools-skills-tool-spec.md` defines Version 1 model-callable Agent Skill
+  activation, including canonical `SKILL.md` parsing, global/workspace snapshots,
+  revision-bound trust, bounded activation content, and active-skill compaction.

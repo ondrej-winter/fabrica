@@ -249,10 +249,14 @@ def _lookup_note(arguments: Mapping[str, ToolArgumentValue]) -> str:
     return f"note:{note_id}"
 
 
-def _write_skill(root: Path, skill_id: str, markdown: str) -> Path:
+def _write_skill(root: Path, skill_id: str, instructions: str) -> Path:
     skill_file = root / skill_id / "SKILL.md"
     skill_file.parent.mkdir(parents=True, exist_ok=True)
-    skill_file.write_text(markdown, encoding="utf-8")
+    description = instructions.splitlines()[0].removeprefix("# ").strip()
+    skill_file.write_text(
+        f"---\nname: {skill_id}\ndescription: {description}\n---\n\n{instructions}",
+        encoding="utf-8",
+    )
     return skill_file
 
 

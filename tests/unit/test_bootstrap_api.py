@@ -17,6 +17,7 @@ EXPECTED_BOOTSTRAP_EXPORTS = [
     "DEFAULT_CODEX_AUTH_FILE",
     "DEFAULT_COMMIT_MESSAGE_CODEX_MODEL",
     "DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT",
+    "ActiveSkillCompactionOptions",
     "CommitMessageWorkflowOptions",
     "DenyByDefaultSkillScriptApprovalLookup",
     "FetchWebContentToolOptions",

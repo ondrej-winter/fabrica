@@ -2,10 +2,10 @@
 
 ## Status
 
-- State: Planned.
+- State: Complete.
 - Derived from: `docs/specs/tools-skills-tool-spec.md`.
 - Specification status: Accepted on September 5, 2026.
-- Implementation status: Not started.
+- Implementation status: T1-T8 and all completion checkpoints complete.
 
 ## Objective
 
@@ -66,16 +66,16 @@ Compaction integration + full validation
 ## Progress Tracking
 
 - [x] T1 Canonical skill definition and parser
-- [ ] T2 Selected-context migration
-- [ ] T3 Registry snapshots and provider adapters
-- [ ] T4 Trust and revision-integrity contract
-- [ ] T5 Activation and active-skill state
-- [ ] T6 Model-facing tool and bounded transport
-- [ ] T7 Compaction integration
-- [ ] T8 Documentation and full quality gate
-- [ ] C1 Parser migration review
-- [ ] C2 Security and boundary review
-- [ ] C3 Runtime integration readiness
+- [x] T2 Selected-context migration
+- [x] T3 Registry snapshots and provider adapters
+- [x] T4 Trust and revision-integrity contract
+- [x] T5 Activation and active-skill state
+- [x] T6 Model-facing tool and bounded transport
+- [x] T7 Compaction integration
+- [x] T8 Documentation and full quality gate
+- [x] C1 Parser migration review
+- [x] C2 Security and boundary review
+- [x] C3 Runtime integration readiness
 
 ## Ordered Tasks
 
@@ -113,11 +113,11 @@ README examples, and selected-context tests.
 
 **Acceptance and verification**
 
-- [ ] T2.A Selected context and activation share parser behavior.
-- [ ] T2.B No compatibility fallback accepts a legacy heading-only file.
-- [ ] T2.C Selected resources and policy-gated scripts retain their current,
+- [x] T2.A Selected context and activation share parser behavior.
+- [x] T2.B No compatibility fallback accepts a legacy heading-only file.
+- [x] T2.C Selected resources and policy-gated scripts retain their current,
   explicit non-model-callable boundaries.
-- [ ] T2.V Run selected-context unit/integration tests and documentation review.
+- [x] T2.V Run selected-context unit/integration tests and documentation review.
 
 ### T3 — Registry snapshots and provider adapters
 
@@ -134,11 +134,11 @@ composition, and tests.
 
 **Acceptance and verification**
 
-- [ ] T3.A Snapshots remain stable despite later provider changes.
-- [ ] T3.B Canonical and unique bare-name resolution work; ambiguity is explicit.
-- [ ] T3.C Plugin and managed sources are unavailable in V1.
-- [ ] T3.D Catalog ordering and capping are deterministic and bounded.
-- [ ] T3.V Run provider/registry unit tests and global/workspace composition tests.
+- [x] T3.A Snapshots remain stable despite later provider changes.
+- [x] T3.B Canonical and unique bare-name resolution work; ambiguity is explicit.
+- [x] T3.C Plugin and managed sources are unavailable in V1.
+- [x] T3.D Catalog ordering and capping are deterministic and bounded.
+- [x] T3.V Run provider/registry unit tests and global/workspace composition tests.
 
 ### T4 — Trust and revision integrity
 
@@ -146,14 +146,20 @@ composition, and tests.
 
 1. Define decisions bound to workspace identity, canonical ID, source, revision,
    and run ID; implement allowlist and enabled-state checks.
-2. Choose and document retained-bytes or safe-reread-and-hash integrity strategy.
+2. Use and document the safe-reread-and-hash integrity strategy: reread the
+   configured source through the canonical definition loader and compare its
+   exact-byte SHA-256 revision to the snapshot revision before activation.
 3. Map denied and hidden states to stable errors without metadata disclosure.
 
 **Acceptance and verification**
 
-- [ ] T4.A Workspace approval cannot authorize another workspace, run, skill, or revision.
-- [ ] T4.B Changed bytes cannot activate under a stale trusted revision.
-- [ ] T4.V Run trust, allowlist, revision-integrity tests and `uv run ty check src tests`.
+- [x] T4.A Workspace approval cannot authorize another workspace, run, skill, or revision.
+- [x] T4.B Changed bytes cannot activate under a stale trusted revision.
+- [x] T4.V Ran focused trust, allowlist, and revision-integrity tests with
+  `uv run pytest --no-cov ...` (8 passed), plus `uv run ty check src tests` and
+  `uv run lint-imports` (passed). The ordinary focused pytest invocation is not
+  suitable here because the repository's global 90% coverage threshold applies
+  to the entire source tree.
 
 ### T5 — Activation and ActiveSkillSet
 
@@ -165,10 +171,10 @@ composition, and tests.
 
 **Acceptance and verification**
 
-- [ ] T5.A Failed, cancelled, timed-out, or mismatched activation leaves state unchanged.
-- [ ] T5.B Same ID/revision returns `already_active` without reinjection.
-- [ ] T5.C Activation neither executes scripts nor changes tool permissions.
-- [ ] T5.V Run activation, cancellation, timeout, and active-set unit tests.
+- [x] T5.A Failed, cancelled, timed-out, or mismatched activation leaves state unchanged.
+- [x] T5.B Same ID/revision returns `already_active` without reinjection.
+- [x] T5.C Activation neither executes scripts nor changes tool permissions.
+- [x] T5.V Ran focused activation, trust, and registry tests with `uv run pytest --no-cov ...` (14 passed), plus `uv run ty check src tests` and `uv run lint-imports` (passed). The ordinary focused pytest invocation is not suitable here because the repository's global 90% coverage threshold applies to the entire source tree.
 
 ### T6 — Model-facing tool and bounded transport
 
@@ -181,10 +187,10 @@ composition, and tests.
 
 **Acceptance and verification**
 
-- [ ] T6.A Public input is exactly `skill` plus nullable `args`.
-- [ ] T6.B Valid complete instructions reach the model without silent truncation.
-- [ ] T6.C Disabled, denied, ambiguous, malformed, and missing cases are stable.
-- [ ] T6.V Run registered-tool and tool-loop tests; assert catalog <= 1,000 chars.
+- [x] T6.A Public input is exactly `skill` plus nullable `args`.
+- [x] T6.B Valid complete instructions reach the model without silent truncation.
+- [x] T6.C Disabled, denied, ambiguous, malformed, and missing cases are stable.
+- [x] T6.V Ran focused registered-tool, tool-loop, activation, trust, and registry tests with `uv run pytest --no-cov ...` (25 passed); ran `uv run ruff check .`, `uv run ruff format --check .`, `uv run ty check src tests`, and `uv run lint-imports` (passed). Catalog coverage asserts the existing 1,000-character bound.
 
 ### T7 — Compaction integration
 
@@ -198,10 +204,12 @@ composition, and tests.
 
 **Acceptance and verification**
 
-- [ ] T7.A Compaction preserves instruction order and exact revisions.
-- [ ] T7.B Missing/malformed active state cannot silently resume empty.
-- [ ] T7.C Context overflow fails before the next model turn.
-- [ ] T7.V Run focused multi-skill compaction integration tests.
+- [x] T7.A Compaction preserves instruction order and exact revisions.
+- [x] T7.B Missing/malformed active state cannot silently resume empty.
+- [x] T7.C Context overflow fails before the next model turn.
+- [x] T7.V Ran focused active-skill compaction and skills-tool integration tests
+  with `uv run pytest --no-cov ...` (15 passed), plus `uv run ruff check ...`
+  and `uv run ty check src tests` (passed).
 
 ### T8 — Documentation and quality gate
 
@@ -214,32 +222,32 @@ composition, and tests.
 
 **Acceptance and verification**
 
-- [ ] T8.A Documentation matches the implemented public behavior.
-- [ ] T8.B No docs claim V1 supports `@skill`, plugins/managed providers, or automatic scripts.
-- [ ] T8.V Run `uv run ruff format .`.
-- [ ] T8.V Run `uv run ruff check .`.
-- [ ] T8.V Run `uv run ty check src tests`.
-- [ ] T8.V Run `uv run lint-imports`.
-- [ ] T8.V Run `uv run pytest`.
+- [x] T8.A Documentation matches the implemented public behavior.
+- [x] T8.B No docs claim V1 supports `@skill`, plugins/managed providers, or automatic scripts.
+- [x] T8.V Ran `uv run ruff format .` (718 files unchanged) on September 5, 2026.
+- [x] T8.V Ran `uv run ruff check .` (passed) on September 5, 2026.
+- [x] T8.V Ran `uv run ty check src tests` (passed) on September 5, 2026.
+- [x] T8.V Ran `uv run lint-imports` (11 contracts kept) on September 5, 2026.
+- [x] T8.V Ran `uv run pytest` (1,771 passed, 3 skipped; 92.10% coverage) on September 5, 2026.
 
 ## Checkpoints
 
 ### C1 — Parser migration review
 
-- [ ] C1 Parser behavior, selected-context migration, and documentation agree.
-- [ ] C1 No heading-only compatibility path remains.
+- [x] C1 Parser behavior, selected-context migration, and documentation agree.
+- [x] C1 No heading-only compatibility path remains.
 
 ### C2 — Security and boundary review
 
-- [ ] C2 Revision-integrity design is documented and tested.
-- [ ] C2 Filesystem I/O remains adapter-owned.
-- [ ] C2 Resource routing, scripts, and capability escalation remain out of scope.
+- [x] C2 Revision-integrity design is documented and tested.
+- [x] C2 Filesystem I/O remains adapter-owned.
+- [x] C2 Resource routing, scripts, and capability escalation remain out of scope.
 
 ### C3 — Runtime integration readiness
 
-- [ ] C3 Catalog and activation results comply with existing generic tool limits.
-- [ ] C3 Compaction and tool-loop behavior have focused integration coverage.
-- [ ] C3 Full quality-gate evidence is recorded.
+- [x] C3 Catalog and activation results comply with existing generic tool limits.
+- [x] C3 Compaction and tool-loop behavior have focused integration coverage.
+- [x] C3 Full quality-gate evidence is recorded.
 
 ## Parallelization
 

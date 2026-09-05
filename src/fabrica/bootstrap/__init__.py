@@ -35,6 +35,7 @@ from fabrica.bootstrap.composition.skill_scripts import (
     create_skill_script_policy_evaluator,
 )
 from fabrica.bootstrap.composition.tool_loop import (
+    ActiveSkillCompactionOptions,
     ModelDrivenSkillRuntime,
     ModelDrivenSkillRuntimeOptions,
     ToolLoopRuntime,
@@ -69,6 +70,7 @@ __all__ = [
     "DEFAULT_CODEX_AUTH_FILE",
     "DEFAULT_COMMIT_MESSAGE_CODEX_MODEL",
     "DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT",
+    "ActiveSkillCompactionOptions",
     "CommitMessageWorkflowOptions",
     "DenyByDefaultSkillScriptApprovalLookup",
     "FetchWebContentToolOptions",

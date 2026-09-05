@@ -33,6 +33,7 @@ from fabrica.bootstrap.composition.skill_context import (
     create_skill_resource_augmented_local_agent_command,
     create_skill_resource_context_loader,
 )
+from fabrica.bootstrap.composition.skill_registry import create_skill_registry_snapshot_builder
 from fabrica.bootstrap.composition.skill_scripts import (
     DenyByDefaultSkillScriptApprovalLookup,
     SkillScriptExecutionOptions,
@@ -41,6 +42,7 @@ from fabrica.bootstrap.composition.skill_scripts import (
     create_skill_script_policy_evaluator,
 )
 from fabrica.bootstrap.composition.tool_loop import (
+    ActiveSkillCompactionOptions,
     ModelDrivenSkillRuntime,
     ModelDrivenSkillRuntimeOptions,
     ToolLoopRuntime,
@@ -71,6 +73,7 @@ __all__ = [
     "DEFAULT_CODEX_AUTH_FILE",
     "DEFAULT_COMMIT_MESSAGE_CODEX_MODEL",
     "DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT",
+    "ActiveSkillCompactionOptions",
     "CommitMessageRuntime",
     "CommitMessageWorkflowOptions",
     "CompletionToolLoopRun",
@@ -113,6 +116,7 @@ __all__ = [
     "create_skill_augmented_local_agent_command",
     "create_skill_context_augmented_local_agent_command",
     "create_skill_context_loader",
+    "create_skill_registry_snapshot_builder",
     "create_skill_resource_augmented_local_agent_command",
     "create_skill_resource_context_loader",
     "create_skill_script_executor",

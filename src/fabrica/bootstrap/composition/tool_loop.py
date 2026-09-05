@@ -19,7 +19,9 @@ from fabrica.features.agent_runtime.adapters.outbound.registered_tool import (
     SkillAssociatedRegisteredTool,
 )
 from fabrica.features.agent_runtime.application.dtos import (
+    ActiveSkillCompactionState,
     LocalAgentRunCommand,
+    RuntimeObservation,
     SkillToolExposureStatus,
     SkillToolPreparationCommand,
     SkillToolPreparationResult,
@@ -27,9 +29,15 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolDefinition,
     ToolLoopLimits,
     ToolLoopRunResult,
+    ToolLoopRunStatus,
 )
 from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModel
-from fabrica.features.agent_runtime.application.use_cases import PrepareSkillTools, RunToolLoop
+from fabrica.features.agent_runtime.application.use_cases import (
+    ActiveSkillContextRehydrationStatus,
+    PrepareSkillTools,
+    RehydrateActiveSkillContext,
+    RunToolLoop,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,12 +57,30 @@ class ModelDrivenSkillRuntimeOptions:
 
 
 @dataclass(frozen=True, slots=True)
+class ActiveSkillCompactionOptions:
+    """Run identity and rehydration policy for active-skill context resumption."""
+
+    rehydrator: RehydrateActiveSkillContext
+    run_id: str
+    registry_snapshot_id: str
+
+    def __post_init__(self) -> None:
+        if not self.run_id:
+            msg = "active skill compaction run ID must not be empty"
+            raise ValueError(msg)
+        if not self.registry_snapshot_id:
+            msg = "active skill compaction registry snapshot ID must not be empty"
+            raise ValueError(msg)
+
+
+@dataclass(frozen=True, slots=True)
 class ToolLoopRuntime:
     """Offline tool-loop runtime composed from explicit in-process tools."""
 
     runner: RunToolLoop
     available_tools: tuple[ToolDefinition, ...]
     limits: ToolLoopLimits | None = None
+    active_skill_compaction: ActiveSkillCompactionOptions | None = None
 
     async def run(
         self,
@@ -62,10 +88,35 @@ class ToolLoopRuntime:
         *,
         cancellation: ToolCancellationSignal | None = None,
         opaque_tool_context: Mapping[str, object] | None = None,
+        active_skill_state: ActiveSkillCompactionState | None = None,
     ) -> ToolLoopRunResult:
         """Run the composed tool loop with registered tool definitions."""
+        active_command = command
+        if self.active_skill_compaction is not None:
+            rehydration = self.active_skill_compaction.rehydrator.rehydrate(
+                command,
+                state=active_skill_state,
+                run_id=self.active_skill_compaction.run_id,
+                registry_snapshot_id=self.active_skill_compaction.registry_snapshot_id,
+            )
+            if rehydration.status is not ActiveSkillContextRehydrationStatus.REHYDRATED:
+                status = (
+                    ToolLoopRunStatus.ACTIVE_SKILL_CONTEXT_OVERFLOW
+                    if rehydration.status is ActiveSkillContextRehydrationStatus.ACTIVE_SKILL_CONTEXT_OVERFLOW
+                    else ToolLoopRunStatus.ACTIVE_SKILL_CONTEXT_MALFORMED
+                )
+                return ToolLoopRunResult(
+                    status=status,
+                    observations=(RuntimeObservation(message=rehydration.status.value),),
+                )
+            if rehydration.command is None:
+                return ToolLoopRunResult(
+                    status=ToolLoopRunStatus.ACTIVE_SKILL_CONTEXT_MALFORMED,
+                    observations=(RuntimeObservation(message="active_skill_context_malformed"),),
+                )
+            active_command = rehydration.command
         return await self.runner.run(
-            command,
+            active_command,
             available_tools=self.available_tools,
             limits=self.limits,
             cancellation=cancellation,
@@ -117,6 +168,7 @@ def create_tool_loop_runtime(
     model: ToolAwareAgentModel,
     tools: tuple[RegisteredTool | AsyncRegisteredTool, ...] = (),
     limits: ToolLoopLimits | None = None,
+    active_skill_compaction: ActiveSkillCompactionOptions | None = None,
 ) -> ToolLoopRuntime:
     """Create an offline tool-loop runtime from explicit in-process tools.
 
@@ -129,6 +181,7 @@ def create_tool_loop_runtime(
         runner=RunToolLoop(model=model, tool_executor=executor),
         available_tools=executor.tool_definitions,
         limits=limits,
+        active_skill_compaction=active_skill_compaction,
     )
 
 

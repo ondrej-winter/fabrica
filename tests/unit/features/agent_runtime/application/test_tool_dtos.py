@@ -70,6 +70,8 @@ def test_tool_status_values_match_normalized_contracts() -> None:
         "adapter_error",
     }
     assert {status.value for status in ToolLoopRunStatus} == {
+        "active_skill_context_malformed",
+        "active_skill_context_overflow",
         "success",
         "model_error",
         "unknown_tool",

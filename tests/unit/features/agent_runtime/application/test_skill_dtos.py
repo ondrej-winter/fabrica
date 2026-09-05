@@ -14,7 +14,6 @@ from fabrica.features.agent_runtime.application.dtos import (
     DEFAULT_MAX_SKILL_RESOURCE_CONTEXT_CHARS,
     DEFAULT_MAX_TOTAL_SKILL_CONTEXT_CHARS,
     DEFAULT_MAX_TOTAL_SKILL_RESOURCE_CONTEXT_CHARS,
-    LoadedSkillContext,
     LoadedSkillResourceContext,
     SelectedSkill,
     SelectedSkillResource,
@@ -119,33 +118,6 @@ def test_selected_skill_rejects_unsafe_identifiers_and_labels() -> None:
         SelectedSkill(skill_id=" python-testing")
     with pytest.raises(ValueError, match="unsupported characters"):
         SelectedSkill(skill_id="python:testing")
-    with pytest.raises(ValueError, match="safe skill label bound"):
-        SelectedSkill(skill_id="x" * (DEFAULT_MAX_SAFE_SKILL_LABEL_CHARS + 1))
-    with pytest.raises(ValueError, match="unsupported characters"):
-        SelectedSkill(skill_id="python-testing", label="Python\nTesting")
-
-
-def test_loaded_skill_context_validates_markdown_and_safe_metadata() -> None:
-    loaded = LoadedSkillContext(
-        skill_id="python-testing",
-        label="Python Testing",
-        markdown="# Python Testing\n\nUse pytest-native assertions.",
-        metadata={"kind": "skill_markdown"},
-    )
-
-    assert loaded.display_label == "Python Testing"
-    assert loaded.markdown.startswith("# Python Testing")
-    assert loaded.metadata["kind"] == "skill_markdown"
-    with pytest.raises(TypeError):
-        cast("dict[str, object]", loaded.metadata)["kind"] = "changed"
-
-
-def test_loaded_skill_context_rejects_empty_or_unbounded_markdown() -> None:
-    with pytest.raises(ValueError, match="skill markdown must not be empty"):
-        LoadedSkillContext(skill_id="empty", markdown="  \n")
-
-    with pytest.raises(ValueError, match="context block bound"):
-        LoadedSkillContext(skill_id="oversized", markdown="x" * (MAX_CONTEXT_TEXT_CHARS + 1))
 
 
 def test_selected_skill_resource_is_path_free_safe_and_immutable() -> None:

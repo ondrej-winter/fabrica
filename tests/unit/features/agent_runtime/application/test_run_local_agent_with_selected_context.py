@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 import pytest
 
 from fabrica.features.agent_runtime.application.dtos import (
-    LoadedSkillContext,
     LoadedSkillResourceContext,
     LocalAgentContextBlock,
     LocalAgentRunCommand,
@@ -14,8 +13,9 @@ from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunStatus,
     SelectedSkill,
     SelectedSkillResource,
+    SkillDefinition,
 )
-from fabrica.features.agent_runtime.application.ports import SkillContextLoadError
+from fabrica.features.agent_runtime.application.ports import SkillContextLoadError, SkillDefinitionLoadError
 from fabrica.features.agent_runtime.application.use_cases import (
     LoadSkillContext,
     LoadSkillResourceContext,
@@ -36,15 +36,15 @@ class FakeRuntime:
 
 
 @dataclass
-class FakeSkillContextLoader:
-    loaded_by_id: dict[str, LoadedSkillContext]
+class FakeSkillDefinitionLoader:
+    loaded_by_id: dict[str, SkillDefinition]
 
-    def load(self, selection: SelectedSkill) -> LoadedSkillContext:
+    def load(self, selection: SelectedSkill) -> SkillDefinition:
         try:
             return self.loaded_by_id[selection.skill_id]
         except KeyError as err:
             msg = "selected skill is unavailable"
-            raise SkillContextLoadError(msg, skill_id=selection.skill_id, category="missing_skill") from err
+            raise SkillDefinitionLoadError(msg, skill_id=selection.skill_id, category="missing_skill") from err
 
 
 @dataclass
@@ -69,11 +69,13 @@ def test_selected_context_runtime_loads_context_before_running_local_agent() -> 
     use_case = RunLocalAgentWithSelectedContext(
         runtime=runtime,
         skill_context_loader=LoadSkillContext(
-            loader=FakeSkillContextLoader(
+            loader=FakeSkillDefinitionLoader(
                 loaded_by_id={
-                    "python-testing": LoadedSkillContext(
-                        skill_id="python-testing",
-                        markdown="# Python Testing",
+                    "python-testing": SkillDefinition(
+                        name="python-testing",
+                        description="Python testing guidance.",
+                        instructions="# Python Testing",
+                        revision="sha256:" + "a" * 64,
                     ),
                 },
             ),
@@ -109,7 +111,13 @@ def test_selected_context_runtime_loads_context_before_running_local_agent() -> 
                 LocalAgentContextBlock(
                     text="# Python Testing",
                     label="Agent Skill: python-testing",
-                    metadata={"source": "agent_skill", "skill_id": "python-testing"},
+                    metadata={
+                        "source": "agent_skill",
+                        "skill_id": "python-testing",
+                        "name": "python-testing",
+                        "description": "Python testing guidance.",
+                        "revision": "sha256:" + "a" * 64,
+                    },
                 ),
                 LocalAgentContextBlock(
                     text="Use focused tests.",

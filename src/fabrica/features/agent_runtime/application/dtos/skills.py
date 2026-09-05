@@ -113,33 +113,6 @@ class SelectedSkillResource:
 
     @property
     def display_label(self) -> str:
-        """Return the safe human-facing label for this selected resource."""
-        return self.label or f"{self.skill_id}/{self.resource_id}"
-
-
-@dataclass(frozen=True, slots=True)
-class LoadedSkillContext:
-    """Loaded markdown context for one selected Agent Skill."""
-
-    skill_id: str
-    markdown: str
-    label: str | None = None
-    metadata: Mapping[str, SafeRuntimeMetadataValue] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        _validate_safe_skill_text(self.skill_id, field_name="skill_id")
-        if self.label is not None:
-            _validate_safe_skill_text(self.label, field_name="label")
-        if not self.markdown.strip():
-            msg = "skill markdown must not be empty"
-            raise ValueError(msg)
-        if len(self.markdown) > MAX_CONTEXT_TEXT_CHARS:
-            msg = "skill markdown exceeds the local runtime context block bound"
-            raise ValueError(msg)
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
-
-    @property
-    def display_label(self) -> str:
         """Return the safe human-facing label for this loaded skill."""
         return self.label or self.skill_id
 

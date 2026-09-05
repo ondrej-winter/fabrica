@@ -21,8 +21,8 @@ from fabrica.features.agent_runtime.application.ports.registered_tool import (
     RegisteredToolRejectionError,
 )
 from fabrica.features.agent_runtime.application.ports.run_state import RunStateMachine
+from fabrica.features.agent_runtime.application.ports.skill_activation import SkillActivationAuditRecorder
 from fabrica.features.agent_runtime.application.ports.skill_context import (
-    SkillContextLoader,
     SkillContextLoadError,
     SkillResourceContextLoader,
 )
@@ -38,9 +38,19 @@ from fabrica.features.agent_runtime.application.ports.skill_execution import (
     SkillScriptMetadataLoadError,
     SkillScriptSnapshotLoader,
 )
+from fabrica.features.agent_runtime.application.ports.skill_registry import (
+    SkillRegistryProvider,
+    SkillRegistryProviderError,
+)
 from fabrica.features.agent_runtime.application.ports.skill_tools import (
     SkillToolPreparationError,
     SkillToolPreparer,
+)
+from fabrica.features.agent_runtime.application.ports.skill_trust import (
+    SkillRevisionDefinitionLoader,
+    SkillRevisionLoadError,
+    SkillTrustEvaluator,
+    SkillTrustLookup,
 )
 from fabrica.features.agent_runtime.application.ports.tool_aware_agent_model import (
     ToolAwareAgentModel,
@@ -63,11 +73,15 @@ __all__ = [
     "RegisteredToolRejectionError",
     "RunStateMachine",
     "SelectedContextLocalAgentRuntime",
+    "SkillActivationAuditRecorder",
     "SkillContextLoadError",
-    "SkillContextLoader",
     "SkillDefinitionLoadError",
     "SkillDefinitionLoader",
+    "SkillRegistryProvider",
+    "SkillRegistryProviderError",
     "SkillResourceContextLoader",
+    "SkillRevisionDefinitionLoader",
+    "SkillRevisionLoadError",
     "SkillScriptApprovalLookup",
     "SkillScriptExecutionError",
     "SkillScriptExecutor",
@@ -78,6 +92,8 @@ __all__ = [
     "SkillScriptSnapshotLoader",
     "SkillToolPreparationError",
     "SkillToolPreparer",
+    "SkillTrustEvaluator",
+    "SkillTrustLookup",
     "ToolAwareAgentModel",
     "ToolAwareAgentModelError",
     "ToolExecutionError",

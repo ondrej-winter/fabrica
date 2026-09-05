@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fabrica.features.agent_runtime.adapters.outbound.skill_markdown_file import (
-    SkillMarkdownFileContextLoader,
+    SkillMarkdownFileDefinitionLoader,
     SkillResourceFileContextLoader,
 )
 from fabrica.features.agent_runtime.application.dtos import (
@@ -52,7 +52,7 @@ def create_skill_context_loader(
     is called.
     """
     return LoadSkillContext(
-        loader=SkillMarkdownFileContextLoader(
+        loader=SkillMarkdownFileDefinitionLoader(
             skill_roots=skill_roots,
             verbose_diagnostics=verbose_diagnostics,
         ),

@@ -4,10 +4,8 @@ from collections.abc import Mapping
 from typing import Protocol
 
 from fabrica.features.agent_runtime.application.dtos import (
-    LoadedSkillContext,
     LoadedSkillResourceContext,
     SafeRuntimeMetadataValue,
-    SelectedSkill,
     SelectedSkillResource,
 )
 
@@ -27,14 +25,6 @@ class SkillContextLoadError(Exception):
         self.skill_id = skill_id
         self.category = category
         self.metadata = dict(metadata or {})
-
-
-class SkillContextLoader(Protocol):
-    """Outbound port for loading one explicitly selected Agent Skill."""
-
-    def load(self, selection: SelectedSkill) -> LoadedSkillContext:
-        """Load markdown context for an explicitly selected skill."""
-        ...
 
 
 class SkillResourceContextLoader(Protocol):

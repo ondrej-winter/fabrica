@@ -5,126 +5,16 @@ from pathlib import Path
 import pytest
 
 from fabrica.features.agent_runtime.adapters.outbound.skill_markdown_file import (
-    SkillMarkdownFileContextLoader,
     SkillResourceFileContextLoader,
 )
 from fabrica.features.agent_runtime.application.dtos import (
-    LoadedSkillContext,
     LoadedSkillResourceContext,
-    SelectedSkill,
     SelectedSkillResource,
 )
 from fabrica.features.agent_runtime.application.ports import SkillContextLoadError
 from tests.synthetic_values import PRIVATE_FILE_CONTENT
 
 SYNTHETIC_SECRET = PRIVATE_FILE_CONTENT
-
-
-def test_load_returns_loaded_skill_context_from_selected_skill_directory(tmp_path: Path) -> None:
-    skill_file = _write_skill(tmp_path, "python-testing", "# Python Testing\n\nUse pytest.")
-
-    loaded = SkillMarkdownFileContextLoader(skill_roots=(tmp_path,)).load(
-        SelectedSkill(skill_id="python-testing", label="Python Testing", metadata={"ignored": "selection"}),
-    )
-
-    assert skill_file.read_text(encoding="utf-8") == "# Python Testing\n\nUse pytest."
-    assert loaded == LoadedSkillContext(
-        skill_id="python-testing",
-        label="Python Testing",
-        markdown="# Python Testing\n\nUse pytest.",
-        metadata={"heading": "Python Testing"},
-    )
-
-
-def test_load_searches_configured_skill_roots_in_order(tmp_path: Path) -> None:
-    first_root = tmp_path / "first"
-    second_root = tmp_path / "second"
-    _write_skill(second_root, "hexagonal-architecture", "# Hexagonal Architecture\n\nKeep boundaries.")
-
-    loaded = SkillMarkdownFileContextLoader(skill_roots=(first_root, second_root)).load(
-        SelectedSkill(skill_id="hexagonal-architecture"),
-    )
-
-    assert loaded.markdown == "# Hexagonal Architecture\n\nKeep boundaries."
-    assert loaded.metadata["heading"] == "Hexagonal Architecture"
-
-
-def test_load_treats_script_references_as_inert_markdown_text(tmp_path: Path) -> None:
-    markdown = "# Script Reference\n\nRun `./scripts/setup.sh` if approved later."
-    _write_skill(tmp_path, "script-reference", markdown)
-
-    loaded = SkillMarkdownFileContextLoader(skill_roots=(tmp_path,)).load(
-        SelectedSkill(skill_id="script-reference"),
-    )
-
-    assert loaded.markdown == markdown
-
-
-def test_load_raises_safe_missing_skill_error_without_private_path(tmp_path: Path) -> None:
-    with pytest.raises(SkillContextLoadError) as exc_info:
-        SkillMarkdownFileContextLoader(skill_roots=(tmp_path,)).load(SelectedSkill(skill_id="missing"))
-
-    assert exc_info.value.skill_id == "missing"
-    assert exc_info.value.category == "missing_skill"
-    assert "path" not in exc_info.value.metadata
-    assert str(tmp_path) not in str(exc_info.value)
-
-
-def test_load_can_include_verbose_path_diagnostics_when_enabled(tmp_path: Path) -> None:
-    with pytest.raises(SkillContextLoadError) as exc_info:
-        SkillMarkdownFileContextLoader(skill_roots=(tmp_path,), verbose_diagnostics=True).load(
-            SelectedSkill(skill_id="missing"),
-        )
-
-    assert exc_info.value.category == "missing_skill"
-    assert exc_info.value.metadata == {"diagnostic_mode": "verbose"}
-
-
-def test_load_rejects_directory_where_skill_file_should_be(tmp_path: Path) -> None:
-    skill_file_directory = tmp_path / "directory-shape" / "SKILL.md"
-    skill_file_directory.mkdir(parents=True)
-
-    with pytest.raises(SkillContextLoadError) as exc_info:
-        SkillMarkdownFileContextLoader(skill_roots=(tmp_path,)).load(SelectedSkill(skill_id="directory-shape"))
-
-    assert exc_info.value.category == "invalid_skill_file"
-
-
-def test_load_rejects_invalid_utf8_markdown(tmp_path: Path) -> None:
-    skill_file = tmp_path / "invalid-utf8" / "SKILL.md"
-    skill_file.parent.mkdir(parents=True)
-    skill_file.write_bytes(b"\xff\xfe")
-
-    with pytest.raises(SkillContextLoadError) as exc_info:
-        SkillMarkdownFileContextLoader(skill_roots=(tmp_path,)).load(SelectedSkill(skill_id="invalid-utf8"))
-
-    assert exc_info.value.category == "decode_error"
-
-
-@pytest.mark.parametrize(
-    "markdown",
-    ["", "   \n\t", "## Not Top Level\n\nBody only."],
-)
-def test_load_rejects_empty_or_headingless_markdown(tmp_path: Path, markdown: str) -> None:
-    _write_skill(tmp_path, "invalid-markdown", markdown)
-
-    with pytest.raises(SkillContextLoadError) as exc_info:
-        SkillMarkdownFileContextLoader(skill_roots=(tmp_path,)).load(SelectedSkill(skill_id="invalid-markdown"))
-
-    assert exc_info.value.category == "invalid_skill_markdown"
-
-
-def test_load_rejects_path_traversal_without_exposing_file_contents(tmp_path: Path) -> None:
-    private_root = tmp_path / "private"
-    skill_root = tmp_path / "skills"
-    _write_skill(private_root, "escaped", f"# Escaped\n\n{SYNTHETIC_SECRET}")
-
-    with pytest.raises(SkillContextLoadError) as exc_info:
-        SkillMarkdownFileContextLoader(skill_roots=(skill_root,)).load(SelectedSkill(skill_id="../private/escaped"))
-
-    assert exc_info.value.category == "invalid_skill_path"
-    assert SYNTHETIC_SECRET not in str(exc_info.value)
-    assert SYNTHETIC_SECRET not in str(exc_info.value.metadata)
 
 
 def test_load_resource_returns_loaded_text_resource_from_selected_skill_directory(tmp_path: Path) -> None:
@@ -263,13 +153,6 @@ def test_load_resource_rejects_path_traversal_without_exposing_file_contents(tmp
     assert exc_info.value.category == "invalid_resource_path"
     assert SYNTHETIC_SECRET not in str(exc_info.value)
     assert SYNTHETIC_SECRET not in str(exc_info.value.metadata)
-
-
-def _write_skill(root: Path, skill_id: str, markdown: str) -> Path:
-    skill_file = root / skill_id / "SKILL.md"
-    skill_file.parent.mkdir(parents=True, exist_ok=True)
-    skill_file.write_text(markdown, encoding="utf-8")
-    return skill_file
 
 
 def _write_resource(root: Path, skill_id: str, resource_id: str, text: str) -> Path:

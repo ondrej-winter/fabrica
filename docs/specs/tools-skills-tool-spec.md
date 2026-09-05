@@ -3,9 +3,11 @@
 ## Status
 
 - State: Accepted.
-- Implementation status: Partially implemented; explicitly selected skill context
-  loading and policy-gated skill scripts exist, but the model-callable `skills`
-  tool and its run-scoped activation state are not implemented.
+- Implementation status: Implemented. Version 1 provides canonical
+  YAML-frontmatter parsing, configured global/workspace registry snapshots,
+  revision-bound trust evaluation, model-callable activation, bounded structured
+  transport, and ordered active-skill compaction. Resource routing, plugin or
+  managed providers, and automatic script execution remain out of scope.
 - Accepted by: Maintainer (interview approval).
 - Accepted on: September 5, 2026.
 - Revision: Accepted Version 1 scope on September 5, 2026: activation-only,

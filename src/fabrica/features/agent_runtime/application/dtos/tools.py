@@ -157,6 +157,8 @@ class ToolLoopRunStatus(StrEnum):
     TOOL_ADAPTER_ERROR = "tool_adapter_error"
     MAX_ITERATIONS_EXCEEDED = "max_iterations_exceeded"
     COMPLETION_TOOL_REQUIRED = "completion_tool_required"
+    ACTIVE_SKILL_CONTEXT_OVERFLOW = "active_skill_context_overflow"
+    ACTIVE_SKILL_CONTEXT_MALFORMED = "active_skill_context_malformed"
 
 
 @dataclass(frozen=True, slots=True)

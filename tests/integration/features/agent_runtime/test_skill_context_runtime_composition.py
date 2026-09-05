@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from fabrica.bootstrap import (
     SkillContextAugmentationOptions,
     create_skill_augmented_local_agent_command,
@@ -17,11 +19,12 @@ from fabrica.features.agent_runtime.application.dtos import (
     SkillContextBounds,
     SkillResourceContextBounds,
 )
+from fabrica.features.agent_runtime.application.ports import SkillDefinitionLoadError
 
 
 def test_skill_augmented_command_composition_loads_selected_skills_in_order(tmp_path: Path) -> None:
-    _write_skill(tmp_path, "python-testing", "# Python Testing\n\nUse focused pytest tests.")
-    _write_skill(tmp_path, "hexagonal-architecture", "# Hexagonal Architecture\n\nKeep adapters outside the core.")
+    _write_skill(tmp_path, "python-testing", "Use focused pytest tests.")
+    _write_skill(tmp_path, "hexagonal-architecture", "Keep adapters outside the core.")
     command = LocalAgentRunCommand(
         prompt="Use the selected skills.",
         context=(LocalAgentContextBlock(text="Existing context", label="notes"),),
@@ -39,40 +42,31 @@ def test_skill_augmented_command_composition_loads_selected_skills_in_order(tmp_
 
     assert augmented.prompt == command.prompt
     assert augmented.model_hint == "codex-compatible"
-    assert augmented.context == (
-        LocalAgentContextBlock(text="Existing context", label="notes"),
-        LocalAgentContextBlock(
-            text="# Python Testing\n\nUse focused pytest tests.",
-            label="Agent Skill: python-testing",
-            metadata={"source": "agent_skill", "skill_id": "python-testing", "heading": "Python Testing"},
-        ),
-        LocalAgentContextBlock(
-            text="# Hexagonal Architecture\n\nKeep adapters outside the core.",
-            label="Agent Skill: Hexagonal Architecture",
-            metadata={
-                "source": "agent_skill",
-                "skill_id": "hexagonal-architecture",
-                "heading": "Hexagonal Architecture",
-            },
-        ),
-    )
+    assert augmented.context[0] == LocalAgentContextBlock(text="Existing context", label="notes")
+    assert [block.text for block in augmented.context[1:]] == [
+        "Use focused pytest tests.",
+        "Keep adapters outside the core.",
+    ]
+    assert [block.label for block in augmented.context[1:]] == [
+        "Agent Skill: python-testing",
+        "Agent Skill: Hexagonal Architecture",
+    ]
+    assert [block.metadata["name"] for block in augmented.context[1:]] == ["python-testing", "hexagonal-architecture"]
+    assert all(str(block.metadata["revision"]).startswith("sha256:") for block in augmented.context[1:])
 
 
 def test_skill_context_loader_composition_keeps_script_references_inert(tmp_path: Path) -> None:
-    markdown = "# Script Reference\n\nRun `./scripts/setup.sh` only after a future approval policy exists."
-    _write_skill(tmp_path, "script-reference", markdown)
+    instructions = "# Script Reference\n\nRun `./scripts/setup.sh` only after a future approval policy exists."
+    _write_skill(tmp_path, "script-reference", instructions)
 
     context_blocks = create_skill_context_loader(skill_roots=(tmp_path,)).load(
         (SelectedSkill(skill_id="script-reference"),),
     )
 
-    assert context_blocks == (
-        LocalAgentContextBlock(
-            text=markdown,
-            label="Agent Skill: script-reference",
-            metadata={"source": "agent_skill", "skill_id": "script-reference", "heading": "Script Reference"},
-        ),
-    )
+    assert context_blocks[0].text == instructions
+    assert context_blocks[0].label == "Agent Skill: script-reference"
+    assert context_blocks[0].metadata["name"] == "script-reference"
+    assert str(context_blocks[0].metadata["revision"]).startswith("sha256:")
 
 
 def test_skill_context_composition_accepts_bounds_and_privacy_defaults(tmp_path: Path) -> None:
@@ -86,7 +80,18 @@ def test_skill_context_composition_accepts_bounds_and_privacy_defaults(tmp_path:
     )
 
     assert len(augmented.context) == 1
-    assert augmented.context[0].metadata["heading"] == "Bounded"
+    assert augmented.context[0].metadata["name"] == "bounded"
+
+
+def test_skill_context_composition_rejects_legacy_heading_only_skill_files(tmp_path: Path) -> None:
+    skill_file = tmp_path / "legacy" / "SKILL.md"
+    skill_file.parent.mkdir(parents=True)
+    skill_file.write_text("# Legacy\n\nHeading-only skill.", encoding="utf-8")
+
+    with pytest.raises(SkillDefinitionLoadError, match="YAML frontmatter") as exc_info:
+        create_skill_context_loader(skill_roots=(tmp_path,)).load((SelectedSkill(skill_id="legacy"),))
+
+    assert exc_info.value.category == "invalid_frontmatter"
 
 
 def test_skill_resource_context_loader_composition_loads_selected_resources_in_order(tmp_path: Path) -> None:
@@ -148,14 +153,18 @@ def test_combined_skill_context_composition_loads_markdown_then_resources(tmp_pa
     )
 
     assert [block.metadata["source"] for block in augmented.context] == ["agent_skill", "agent_skill_resource"]
-    assert augmented.context[0].metadata["heading"] == "Python Testing"
+    assert augmented.context[0].metadata["name"] == "python-testing"
     assert augmented.context[1].metadata["resource_id"] == "references/example.md"
 
 
-def _write_skill(root: Path, skill_id: str, markdown: str) -> Path:
+def _write_skill(root: Path, skill_id: str, instructions: str) -> Path:
     skill_file = root / skill_id / "SKILL.md"
     skill_file.parent.mkdir(parents=True, exist_ok=True)
-    skill_file.write_text(markdown, encoding="utf-8")
+    description = instructions.splitlines()[0].removeprefix("# ").strip()
+    skill_file.write_text(
+        f"---\nname: {skill_id}\ndescription: {description}\n---\n\n{instructions}",
+        encoding="utf-8",
+    )
     return skill_file
 
 
