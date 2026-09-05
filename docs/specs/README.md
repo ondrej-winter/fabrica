@@ -59,6 +59,10 @@ replacing those technical details.
   retrieval primitive for known URLs, including SSRF-safe destination and redirect
   validation, bounded textual-content extraction, structured result metadata, and
   explicit untrusted-content handling.
+- `tools-skills-tool-spec.md` defines the accepted Version 1 model-callable skill
+  activation primitive, including global/workspace registry snapshots, unified
+  `SKILL.md` parsing, trust, revision pinning, bounded activation transport, and
+  active-skill compaction state.
 
 ## Naming convention
 

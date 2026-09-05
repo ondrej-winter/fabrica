@@ -2,14 +2,16 @@
 
 ## Status
 
-- State: Draft — unconfirmed.
-- Implementation status: Partially implemented; selected-skill context, resources, and policy-gated scripts exist, but the model-callable `skills` tool is not implemented.
-- Accepted by: Not applicable until accepted
-- Accepted on: Not applicable until accepted
-- Revision: Audit remediation on September 3, 2026; clarified run-scoped registry
-  snapshots, revision-bound trust decisions, compaction state, and the required
-  cross-tool resource-routing acceptance dependency.
-- Supersedes: Not applicable.
+- State: Accepted.
+- Implementation status: Partially implemented; explicitly selected skill context
+  loading and policy-gated skill scripts exist, but the model-callable `skills`
+  tool and its run-scoped activation state are not implemented.
+- Accepted by: Maintainer (interview approval).
+- Accepted on: September 5, 2026.
+- Revision: Accepted Version 1 scope on September 5, 2026: activation-only,
+  global/workspace sources, unified frontmatter parsing, bounded transport, and
+  no `@skill/...` resource routing.
+- Supersedes: The unconfirmed skills-tool draft.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
 
@@ -21,8 +23,8 @@ orchestration tool.
 `skills` is the agent's on-demand procedural knowledge activation primitive. It
 allows a model to discover configured skills from concise metadata, activate one
 relevant skill by identifier, load that skill's complete instructions only when
-needed, pass optional invocation arguments as data, and access skill-bundled
-resources afterward through ordinary tools.
+needed and pass optional invocation arguments as data. Version 1 does not expose
+skill-bundled resources through ordinary tools.
 
 The governing principle is:
 
@@ -44,12 +46,10 @@ capability.
   load explicitly selected local `SKILL.md` markdown, selected text resources,
   and policy-gated selected skill scripts through application ports and adapters.
 - Existing selected skill context is composition-time context augmentation. This
-  spec defines a future model-facing `skills` orchestration primitive only. It
-  does not implement the tool.
-- The accepted `read_files` and `apply_patch` specifications currently expose
-  workspace-only paths. Logical `@skill/...` resource paths therefore remain a
-  proposed cross-tool extension until companion revisions of those specifications
-  accept the same resolver boundary and error contract.
+  specification makes its parser and definition model canonical for both that
+  path and future model-facing activation.
+- The accepted `read_files` and `apply_patch` specifications expose workspace-only
+  paths. Version 1 does not change those contracts or expose `@skill/...` paths.
 
 ## Assumptions
 
@@ -61,8 +61,8 @@ capability.
 - Skill files use Cline's established `SKILL.md` structure with optional bundled
   resources under sibling directories such as `docs/`, `templates/`, `scripts/`,
   `examples/`, and `schemas/`.
-- Runtime skill sources may include global, workspace, plugin, and managed
-  providers. Filesystem locations are provider configuration, not core identity.
+- Version 1 supports configured global and workspace providers only. Filesystem
+  locations are provider configuration, not core identity.
 - Documentation-only changes should be reviewed for clarity and consistency;
   implementation changes will require tests and the project quality gate.
 
@@ -99,11 +99,21 @@ permission and sandbox policy.
 
 ### In Scope
 
-- Configured procedural-skill discovery and activation without capability expansion.
+- Global and workspace procedural-skill discovery and activation without
+  capability expansion.
+- Immutable run-scoped registry snapshots, revision integrity, trust evaluation,
+  active-skill state, and compaction persistence.
+- One canonical YAML-frontmatter `SKILL.md` parser shared with explicitly
+  selected skill-context loading.
 
 ### Out of Scope
 
-The detailed exclusions already recorded below remain authoritative.
+- Plugin and managed providers.
+- `@skill/...` resource paths, resource sandbox mounts, and changes to
+  `read_files`, `apply_patch`, or `run_commands`.
+- Model-callable skill scripts, automatic script execution, dynamic discovery,
+  marketplace installation, and skill editing.
+- Compatibility support for heading-only `SKILL.md` files.
 
 ## Desired Behavior
 
@@ -121,9 +131,8 @@ The detailed exclusions already recorded below remain authoritative.
   root, instructions, and trust classification;
 - avoid repeated instruction injection when the same revision is already active;
 - keep active skill instructions available through context compaction;
-- access resources under read-only logical `@skill/...` paths only after the
-  owning skill is active, once the companion `read_files` contract has accepted
-  logical skill-root routing.
+- receive complete bounded instructions through a structured content part rather
+  than generic tool result text.
 
 The intended agent loop is:
 
@@ -213,12 +222,19 @@ Available skills:
 Descriptions must explain what the skill does and when to activate it. The model
 needs more than a list of names to choose safely.
 
+The model-facing description must fit the existing 1,000-character
+`ToolDefinition` description limit. Sort eligible skills by canonical ID, render
+complete `<name> — <description>` entries in that order, and stop before the next
+complete entry would exceed the bound. If entries remain, append a bounded notice
+that the visible catalog is partial; the model must not guess omitted skills.
+
 Recommended metadata budget:
 
 ```text
 MAX_SKILL_NAME_CHARS        = 64
 MAX_SKILL_DESCRIPTION_CHARS = 512
 MAX_ENABLED_SKILLS          = 50
+MAX_ADVERTISED_CATALOG_CHARS = 1,000
 ```
 
 ## Skill identifiers and resolution
@@ -234,8 +250,6 @@ Examples:
 ```text
 global:commit
 workspace:review-pr
-plugin:github:triage-issue
-managed:python-release
 ```
 
 The display name remains human-friendly, such as `commit`, `review-pr`, or
@@ -281,8 +295,7 @@ Maintain a registry instead of discovering files during every invocation:
 ```text
 SkillRegistry
     ├── GlobalSkillProvider
-    ├── WorkspaceSkillProvider
-    └── PluginSkillProvider
+    └── WorkspaceSkillProvider
 ```
 
 Each provider reports skill definitions. The registry owns discovery, metadata,
@@ -312,7 +325,6 @@ description
 source
 enabled
 revision
-resource_root
 trust
 ```
 
@@ -326,14 +338,13 @@ Example:
   "source": "workspace",
   "enabled": true,
   "revision": "sha256:8cbb...",
-  "resource_root": "@skill/workspace:review-pr/",
   "trust": "workspace"
 }
 ```
 
-Skill source values should be product-neutral: `global`, `workspace`, `plugin`,
-and `managed`. Avoid embedding Cline-specific storage locations in the domain
-model.
+Version 1 source values are exactly `global` and `workspace`. Plugin and managed
+provider identity is deferred. Avoid embedding Cline-specific storage locations
+in the domain model.
 
 The registry may hot reload skill metadata and revisions as files change for
 future snapshots. Each activation result must still include the exact loaded
@@ -418,10 +429,16 @@ Instruction size must be bounded. Recommended limits:
 ```text
 MAX_SKILL_INSTRUCTION_TOKENS = 5,000
 MAX_SKILL_INSTRUCTION_CHARS  = 20,000 when tokenizer information is unavailable
+MAX_SKILL_INSTRUCTION_CONTENT_CHARS = 48,000
 ```
 
 Large reference material belongs in supporting resources and should be loaded
 only when required.
+
+The successful serialized activation result, including metadata and instructions,
+must fit the provider-neutral structured text-content ceiling. Reject a definition
+whose successful activation result cannot fit this channel. Never silently
+truncate activated instructions.
 
 Calculate the instruction revision from exact UTF-8 `SKILL.md` bytes after
 rejecting a UTF-8 BOM and before parsing or newline normalization:
@@ -470,7 +487,6 @@ Success example:
     "description": "Review pull requests...",
     "revision": "sha256:8cbb...",
     "source": "workspace",
-    "resource_root": "@skill/workspace:review-pr/",
     "registry_snapshot_id": "..."
   },
   "args": "123",
@@ -478,6 +494,9 @@ Success example:
   "trust": "configured_skill_instructions"
 }
 ```
+
+The registered-tool adapter returns the structured activation result as one
+bounded `ToolTextContent` part rather than generic `result_text`.
 
 `args` are invocation-specific input data. They are not skill instructions and
 must not be concatenated into the instruction body. XML-like, JSON-like, quoted,
@@ -582,71 +601,19 @@ Skills cannot grant permissions. If a skill says to run a deployment script,
 read a secret, fetch a URL, or edit a protected file, ordinary tool permission,
 sandbox, network, credential, and filesystem policies still apply.
 
-## Resources
+## Resources and Scripts
 
-Skills may contain supporting resources such as `docs/`, `templates/`,
-`scripts/`, `examples/`, and `schemas/`.
+Version 1 does not return a model-usable `resource_root` and does not expose
+skill-bundled resources through `read_files`, `apply_patch`, or `run_commands`.
+The existing host-selected resource-context path remains separate and is not a
+model-callable logical namespace.
 
-Activation returns a logical resource root:
-
-```json
-{
-  "resource_root": "@skill/workspace:review-pr/"
-}
-```
-
-The model may then use ordinary tools to request paths such as:
-
-```text
-@skill/workspace:review-pr/docs/checklist.md
-@skill/workspace:review-pr/templates/report.md
-@skill/workspace:review-pr/scripts/validate.py
-```
-
-The intended common path resolver used by `read_files` has two authorized
-domains:
-
-```text
-workspace-relative paths
-@skill/... paths for activated skills
-```
-
-`@skill/...` paths resolve only into activated read-only skill roots. Resource
-resolution must enforce root containment and reject traversal or symlink escapes.
-
-This is a **cross-tool contract change**, not an implicit reinterpretation of
-workspace paths. Before `skills` may advertise a usable `resource_root`, accepted
-revisions of `tools-read-files-tool-spec.md` and
-`tools-apply-patch-tool-spec.md` must define and adopt a shared application-owned
-`AuthorizedReadPathResolver` boundary. That boundary receives the run-scoped
-`ActiveSkillSet` through opaque host context and returns either a contained,
-read-only resource descriptor or a stable rejection. It must preserve existing
-workspace-relative behavior unchanged.
-
-The companion contracts must define these exact outcomes:
-
-```text
-malformed @skill path              -> INVALID_PATH
-inactive or different-run root     -> SKILL_RESOURCE_UNAVAILABLE
-unknown resource                   -> FILE_NOT_FOUND
-traversal or symlink escape        -> PATH_OUTSIDE_ROOT
-attempted skill-root mutation      -> SKILL_RESOURCE_READ_ONLY
-```
-
-`read_files` must include the canonical logical path, byte digest, media type,
-and ordinary truncation/pagination metadata in a successful resource result.
-`apply_patch` must reject every source or destination that resolves to a skill
-root before planning or authorization. Until those companion revisions are
-accepted and implemented, Version 1 activation may return a resource-root label
-for diagnostics but must not advertise it as readable by ordinary tools.
-
-`apply_patch` must not mutate skill resources during an ordinary task. Editing or
-installing skills is a separate configuration operation.
-
-Activation never automatically executes scripts. If instructions reference a
-script, the agent must explicitly use `run_commands`, and normal command
-permissions apply. If a sandbox normally exposes only the workspace, activated
-skill roots may be mounted read-only into the process sandbox through a
+Future `@skill/...` routing requires coordinated accepted revisions to the
+affected tool specifications and a shared application-owned resolver. It is not
+an implicit extension of workspace-relative paths.
+If instructions reference a script, the agent must explicitly use `run_commands`,
+and normal command permissions apply. Activation itself never executes scripts or
+changes sandbox visibility.
 host-controlled mapping.
 
 ## Slash commands
@@ -700,11 +667,11 @@ run_id
 The decision is either `TRUSTED`, `APPROVED_FOR_RUN`, or `DENIED`. Workspace
 approval is valid only for the named workspace, exact instruction revision, and
 owning run; it expires when that run ends and cannot authorize a changed skill.
-Global and managed sources may be trusted by host policy without a per-run prompt.
-Plugin sources require an explicit host policy. Denied or unavailable decisions
-must not disclose hidden skill metadata. `SKILL_UNTRUSTED` denotes a source that
-requires approval but has none; `SKILL_NOT_ALLOWED` denotes a host allowlist
-rejection.
+Global sources may be trusted by host policy without a per-run prompt. Workspace
+sources require a trusted workspace or explicit revision-bound approval. Denied
+or unavailable decisions must not disclose hidden skill metadata.
+`SKILL_UNTRUSTED` denotes a source that requires approval but has none;
+`SKILL_NOT_ALLOWED` denotes a host allowlist rejection.
 
 ## Cancellation, timeouts, retries, and atomicity
 
@@ -813,7 +780,7 @@ Possible activation reasons are `model_selected`, `user_slash_command`, and
 `skills` loads procedural instructions; primitive tools perform external work.
 
 ```text
-read_files          reads workspace or activated skill resource files
+read_files          reads workspace files
 search_codebase     discovers workspace content
 run_commands        executes commands under permission and sandbox policy
 fetch_web_content   fetches URLs under network policy
@@ -851,10 +818,7 @@ Backed by:
 ```text
 SkillRegistry
     ├── WorkspaceSkillProvider
-    ├── GlobalSkillProvider
-    └── PluginSkillProvider
-
-SkillResourceResolver
+    └── GlobalSkillProvider
 ```
 
 Responsibilities:
@@ -867,28 +831,24 @@ Responsibilities:
   payload. It receives the host-owned revision-bound trust decision and does not
   execute other tools.
 - `ActiveSkillSet`: idempotent activation, revision pinning, run lifecycle,
-  ordered compaction serialization, resource authorization, and audit state.
-- `SkillResourceResolver`: logical `@skill/...` paths, root containment,
-  read-only enforcement, active-skill checks, and sandbox mount mapping. It is
-  consumed through a shared read-path port; it must not be imported directly by
-  workspace-reading or workspace-editing adapters.
+  ordered compaction serialization, and audit state.
+- `SkillDefinitionLoader`: loads and validates configured global/workspace skill
+  definitions without exposing filesystem paths to application use cases.
 
 Likely future implementation ownership:
 
 - Spec: `docs/specs/tools-skills-tool-spec.md`.
 - Runtime tool contracts, DTOs, and orchestration use cases: under
   `src/fabrica/features/agent_runtime/application/`.
-- Filesystem-backed global/workspace providers, `SKILL.md` parsing, resource
-  resolution, and read-only sandbox mapping: adapters under the agent runtime
-  slice or composition-root infrastructure. The accepted workspace-reading and
-  workspace-editing companion specs own their registered-tool integration.
+- Filesystem-backed global/workspace providers and `SKILL.md` parsing: adapters
+  under the agent runtime slice or composition-root infrastructure.
 - Composition and optional CLI wiring: under `src/fabrica/bootstrap/` or the
   relevant driving adapter.
 - Unit tests: under `tests/unit/features/agent_runtime/` for registry,
-  resolver, validator, activator, active-set, and resource resolver behavior.
-- Integration tests: under `tests/integration/features/agent_runtime/` for real
-  filesystem skill roots, workspace trust policy, resource containment, and
-  compaction rehydration wiring.
+  resolver, validator, activator, and active-set behavior.
+- Integration tests: under `tests/integration/features/agent_runtime/` for
+  synthetic filesystem skill roots, workspace trust policy, and compaction
+  rehydration wiring.
 
 Implementation must preserve hexagonal boundaries: domain and application code
 must not perform filesystem I/O directly, provider schemas must not leak into
@@ -937,9 +897,7 @@ Add these requirements beyond current Cline behavior:
 - explicit trust levels;
 - workspace trust policy;
 - permission non-escalation guarantee;
-- logical `@skill` resource namespace;
-- read-only resource roots;
-- resource containment;
+- deferred logical skill-resource namespace;
 - atomic activation;
 - activation audit events.
 
@@ -1042,7 +1000,7 @@ XML-like arguments must remain ordinary argument data.
 | Tests | `uv run pytest` | Required for implementation changes |
 | Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
 | Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
-| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
+| Manual acceptance | Confirm this accepted specification remains accurate when implementation uncovers a material scope change. | Required for material changes |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 
@@ -1066,9 +1024,8 @@ model-callable runtime adapter.
 - Always return structured activation results with exact revision metadata.
 - Always treat `args` as data, not instructions.
 - Always preserve active skill state through compaction.
-- Always keep skill resources read-only and available only through activated
-  logical `@skill/...` roots after accepted `read_files` and `apply_patch`
-  companion contracts provide the shared resolver boundary.
+- Always keep Version 1 free of model-callable skill resource roots and preserve
+  ordinary workspace-tool path semantics.
 - Ask before exposing untrusted workspace skills, broad filesystem locations,
   marketplace installation, skill editing, or any automatic script execution.
 - Never allow skills to grant permissions, bypass sandbox policy, or expand tool
@@ -1076,7 +1033,7 @@ model-callable runtime adapter.
 - Never activate arbitrary filesystem paths as skills.
 - Never silently shadow same-name skills across sources.
 - Never automatically load all resource files during activation.
-- Never mutate active skill roots during an ordinary agent task.
+- Never expose skill roots as mutable ordinary-task paths.
 
 ## Success Criteria
 
@@ -1095,9 +1052,8 @@ model-callable runtime adapter.
 - Active skill state covers idempotence, revision pinning, ordered compaction
   persistence, explicit overflow handling, multiple active skills, and conflict
   handling.
-- Resource access uses read-only logical `@skill/...` roots for activated skills
-  only after companion tool contracts adopt the shared resolver boundary, without
-  leaking absolute paths.
+- Version 1 does not expose `@skill/...` paths, resource roots, plugin/managed
+  providers, automatic scripts, or capability escalation.
 - Trust, revision-bound workspace approval, permission non-escalation,
   cancellation, timeouts, atomicity, audit events, and stable error codes are
   specified.
@@ -1107,23 +1063,15 @@ model-callable runtime adapter.
 
 | Question | Impact | Blocking? | Owner | Resolution |
 | --- | --- | --- | --- | --- |
-| See the detailed questions below; each requires maintainer triage before acceptance. | Requirement and implementation planning. | To be determined | Maintainer | Unresolved |
-
-- Should Version 1 reuse and evolve existing selected skill context DTOs, or add a
-  separate activation DTO family to keep legacy selection-time context injection
-  distinct from model-facing activation state?
-- Should skill metadata hot reload be mandatory in Version 1 or deferred until the
-  registry API is stable?
-- Should a future resource manifest/tree digest pin an entire activated resource
-  set, rather than returning a digest for each independently read resource?
-- After the shared `read_files` resolver contract is accepted, should a future
-  `run_commands` sandbox-mount contract expose activated roots read-only?
-- How should plugin-provided skills express trust and revision when their
-  definitions are not simple local files?
+| Should future `@skill/...` routing use resource manifests/tree digests? | Future resource-integrity design. | No | Maintainer | Deferred |
+| Should a future `run_commands` sandbox-mount contract expose activated roots read-only? | Future command-sandbox design. | No | Maintainer | Deferred |
+| How should plugin and managed providers express identity, trust, and revisions? | Future provider design. | No | Maintainer | Deferred |
 
 ## Acceptance and Planning Gate
 
-This is an unconfirmed draft. It is not ready for implementation planning until a human maintainer resolves any blocking questions and records acceptance in the Status section.
+This accepted Version 1 specification is ready for implementation planning. The
+deferred questions above must not expand Version 1 unless a maintainer updates and
+re-confirms this specification.
 
 ## Conventions and Constraints
 
@@ -1132,5 +1080,6 @@ Follow the project architecture, typing, logging, secret-safety, and validation 
 ## Project Structure
 
 - Specification: This file under `docs/specs/`.
+- Derived plan: `docs/plans/tools-skills-tool-v1-plan.md`.
 - Source and test ownership: The detailed architecture section in this specification remains authoritative.
-- Documentation ownership: `docs/specs/` and the relevant documentation indexes.
+- Documentation ownership: `docs/specs/`, `docs/plans/`, and the relevant indexes.
