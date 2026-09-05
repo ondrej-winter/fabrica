@@ -1,6 +1,9 @@
 """Tests for canonical Agent Skill definition DTOs."""
 
+import json
 from hashlib import sha256
+from types import MappingProxyType
+from typing import cast
 
 import pytest
 
@@ -19,6 +22,35 @@ def test_skill_definition_computes_exact_byte_sha256_revision() -> None:
 
     assert definition.revision == f"sha256:{sha256(source_bytes).hexdigest()}"
     assert '"instructions":"# Review\\n"' in definition.activation_content_json()
+
+
+def test_skill_definition_normalizes_metadata_and_includes_it_in_activation_content() -> None:
+    definition = SkillDefinition(
+        name="review-pr",
+        description="Review pull requests.",
+        instructions="# Review",
+        revision="sha256:" + "0" * 64,
+        metadata={"version": "1.0", "dependencies": {"skills": [{"name": "write-tests"}]}},
+    )
+
+    assert isinstance(definition.metadata, MappingProxyType)
+    assert isinstance(definition.metadata["dependencies"], MappingProxyType)
+    assert definition.metadata["dependencies"]["skills"] == ({"name": "write-tests"},)
+    assert json.loads(definition.activation_content_json())["skill"]["metadata"] == {
+        "version": "1.0",
+        "dependencies": {"skills": [{"name": "write-tests"}]},
+    }
+
+
+def test_skill_definition_rejects_non_mapping_metadata() -> None:
+    with pytest.raises(TypeError, match="metadata must be a mapping"):
+        SkillDefinition(
+            name="review-pr",
+            description="Review pull requests.",
+            instructions="# Review",
+            revision="sha256:" + "0" * 64,
+            metadata=cast("dict[str, object]", ()),
+        )
 
 
 @pytest.mark.parametrize(

@@ -52,6 +52,7 @@ class _SkillFrontmatter(TypedDict):
     name: str
     description: str
     disabled: bool
+    metadata: dict[str, object]
 
 
 class SkillMarkdownFileDefinitionLoader:
@@ -94,10 +95,11 @@ class SkillMarkdownFileDefinitionLoader:
                 name=frontmatter["name"],
                 description=frontmatter["description"],
                 disabled=frontmatter["disabled"],
+                metadata=frontmatter["metadata"],
                 instructions=instructions,
                 skill_file_bytes=source_bytes,
             )
-        except ValueError as err:
+        except (ValueError, TypeError) as err:
             category = "skill_too_large" if "exceed" in str(err) else "invalid_definition"
             raise self._load_error(str(err), selection=selection, category=category, path=skill_file) from err
 
@@ -165,7 +167,7 @@ class SkillMarkdownFileDefinitionLoader:
                 category="invalid_frontmatter",
                 path=skill_file,
             ) from err
-        if not isinstance(frontmatter, dict) or set(frontmatter) - {"name", "description", "disabled"}:
+        if not isinstance(frontmatter, dict) or set(frontmatter) - {"name", "description", "disabled", "metadata"}:
             raise self._load_error(
                 _INVALID_FRONTMATTER_FIELDS_MESSAGE,
                 selection=selection,
@@ -175,6 +177,13 @@ class SkillMarkdownFileDefinitionLoader:
         if not isinstance(frontmatter.get("name"), str) or not isinstance(frontmatter.get("description"), str):
             raise self._load_error(
                 _MISSING_FRONTMATTER_FIELDS_MESSAGE,
+                selection=selection,
+                category="invalid_definition",
+                path=skill_file,
+            )
+        if "metadata" in frontmatter and not isinstance(frontmatter["metadata"], dict):
+            raise self._load_error(
+                _INVALID_FRONTMATTER_FIELDS_MESSAGE,
                 selection=selection,
                 category="invalid_definition",
                 path=skill_file,
@@ -191,6 +200,7 @@ class SkillMarkdownFileDefinitionLoader:
                 "name": frontmatter["name"],
                 "description": frontmatter["description"],
                 "disabled": frontmatter.get("disabled", False),
+                "metadata": frontmatter.get("metadata", {}),
             },
             "".join(lines[closing_index + 1 :]).lstrip("\r\n"),
         )

@@ -736,7 +736,7 @@ When no root override is supplied, the default skill root is the working
 repository's `.agents/skills` directory. The file adapters read only explicitly
 selected `<skill_id>/SKILL.md` files and explicitly selected resource files under
 configured roots. `SKILL.md` files must contain UTF-8 (without a BOM), YAML frontmatter with
-lowercase-kebab-case `name` and non-empty `description` fields, a directory name
+lowercase-kebab-case `name`, non-empty `description`, and optional JSON-like mapping `metadata` fields, a directory name
 matching `name`, and non-empty markdown instructions. Resource loading is also UTF-8 text-only and
 allowlisted to `.md`, `.txt`, `.json`, `.yaml`, `.yml`, and `.toml` files;
 `SKILL.md`, script-like files, binary files, directories, absolute paths, and

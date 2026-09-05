@@ -12,7 +12,9 @@ from fabrica.features.agent_runtime.application.ports import SkillDefinitionLoad
 
 def test_load_returns_canonical_definition_and_exact_source_revision(tmp_path: Path) -> None:
     source = (
-        "---\nname: review-pr\ndescription: Review pull requests.\ndisabled: false\n---\n\n"
+        "---\nname: review-pr\ndescription: Review pull requests.\ndisabled: false\n"
+        "metadata:\n  version: 1\n  dependencies:\n    skills:\n"
+        "      - name: write-tests\n        required: false\n---\n\n"
         "# Review\n\nInspect changes.\n"
     )
     _write_skill(tmp_path, "review-pr", source)
@@ -23,6 +25,10 @@ def test_load_returns_canonical_definition_and_exact_source_revision(tmp_path: P
     assert definition.description == "Review pull requests."
     assert definition.instructions == "# Review\n\nInspect changes.\n"
     assert definition.disabled is False
+    assert definition.metadata == {
+        "version": 1,
+        "dependencies": {"skills": ({"name": "write-tests", "required": False},)},
+    }
     assert definition.revision == f"sha256:{sha256(source.encode()).hexdigest()}"
 
 
@@ -44,6 +50,11 @@ def test_load_returns_canonical_definition_and_exact_source_revision(tmp_path: P
         (
             "review-pr",
             "---\nname: review-pr\ndescription: Description.\nextra: value\n---\n\n# Body",
+            "invalid_definition",
+        ),
+        (
+            "review-pr",
+            "---\nname: review-pr\ndescription: Description.\nmetadata: invalid\n---\n\n# Body",
             "invalid_definition",
         ),
     ],

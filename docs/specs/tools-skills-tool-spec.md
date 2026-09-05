@@ -60,7 +60,7 @@ capability.
 - Cline compatibility matters for the public tool name and simple input shape:
   `skill` plus optional nullable `args`.
 - Internally, the operation should be named activation, not execution.
-- Skill files use Cline's established `SKILL.md` structure with optional bundled
+- Skill files use Cline's established `SKILL.md` structure with required `name` and `description`, optional boolean `disabled`, and optional JSON-like mapping `metadata` frontmatter fields, plus optional bundled
   resources under sibling directories such as `docs/`, `templates/`, `scripts/`,
   `examples/`, and `schemas/`.
 - Version 1 supports configured global and workspace providers only. Filesystem

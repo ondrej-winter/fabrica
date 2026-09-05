@@ -46,6 +46,7 @@ from fabrica.features.agent_runtime.application.dtos.skill_definitions import (
     MAX_SKILL_NAME_CHARS,
     SKILL_NAME_PATTERN,
     SkillDefinition,
+    SkillMetadataValue,
 )
 from fabrica.features.agent_runtime.application.dtos.skill_execution import (
     DEFAULT_MAX_SKILL_SCRIPT_BYTES,
@@ -269,6 +270,7 @@ __all__ = [
     "SkillActivationStatus",
     "SkillContextBounds",
     "SkillDefinition",
+    "SkillMetadataValue",
     "SkillRegistrySnapshot",
     "SkillResolution",
     "SkillResolutionStatus",
