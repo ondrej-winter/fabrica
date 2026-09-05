@@ -65,7 +65,7 @@ Compaction integration + full validation
 
 ## Progress Tracking
 
-- [ ] T1 Canonical skill definition and parser
+- [x] T1 Canonical skill definition and parser
 - [ ] T2 Selected-context migration
 - [ ] T3 Registry snapshots and provider adapters
 - [ ] T4 Trust and revision-integrity contract
@@ -92,11 +92,11 @@ Compaction integration + full validation
 
 **Acceptance and verification**
 
-- [ ] T1.A Valid files produce canonical definitions and exact revisions.
-- [ ] T1.B Invalid encoding, frontmatter, fields, names, directory matches, and
+- [x] T1.A Valid files produce canonical definitions and exact revisions.
+- [x] T1.B Invalid encoding, frontmatter, fields, names, directory matches, and
   size cases fail through application-safe errors.
-- [ ] T1.C Heading-only files without frontmatter are rejected.
-- [ ] T1.V Run focused parser/DTO tests and `uv run ruff format .` plus
+- [x] T1.C Heading-only files without frontmatter are rejected.
+- [x] T1.V Run focused parser/DTO tests and `uv run ruff format .` plus
   `uv run ruff check .`.
 
 ### T2 — Migrate selected-context loading

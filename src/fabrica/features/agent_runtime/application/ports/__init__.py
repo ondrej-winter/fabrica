@@ -26,6 +26,10 @@ from fabrica.features.agent_runtime.application.ports.skill_context import (
     SkillContextLoadError,
     SkillResourceContextLoader,
 )
+from fabrica.features.agent_runtime.application.ports.skill_definitions import (
+    SkillDefinitionLoader,
+    SkillDefinitionLoadError,
+)
 from fabrica.features.agent_runtime.application.ports.skill_execution import (
     SkillScriptApprovalLookup,
     SkillScriptExecutionError,
@@ -61,6 +65,8 @@ __all__ = [
     "SelectedContextLocalAgentRuntime",
     "SkillContextLoadError",
     "SkillContextLoader",
+    "SkillDefinitionLoadError",
+    "SkillDefinitionLoader",
     "SkillResourceContextLoader",
     "SkillScriptApprovalLookup",
     "SkillScriptExecutionError",

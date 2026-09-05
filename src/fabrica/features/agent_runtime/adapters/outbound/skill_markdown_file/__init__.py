@@ -5,6 +5,7 @@ from fabrica.features.agent_runtime.adapters.outbound.skill_markdown_file.adapte
     DEFAULT_SKILL_ROOT,
     SKILL_FILE_NAME,
     SkillMarkdownFileContextLoader,
+    SkillMarkdownFileDefinitionLoader,
     SkillResourceFileContextLoader,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "DEFAULT_SKILL_ROOT",
     "SKILL_FILE_NAME",
     "SkillMarkdownFileContextLoader",
+    "SkillMarkdownFileDefinitionLoader",
     "SkillResourceFileContextLoader",
 ]

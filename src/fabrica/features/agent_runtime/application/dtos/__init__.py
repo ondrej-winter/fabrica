@@ -29,6 +29,13 @@ from fabrica.features.agent_runtime.application.dtos.runtime import (
     RuntimeObservation,
     SafeRuntimeMetadataValue,
 )
+from fabrica.features.agent_runtime.application.dtos.skill_definitions import (
+    MAX_SKILL_DESCRIPTION_CHARS,
+    MAX_SKILL_INSTRUCTION_CHARS,
+    MAX_SKILL_NAME_CHARS,
+    SKILL_NAME_PATTERN,
+    SkillDefinition,
+)
 from fabrica.features.agent_runtime.application.dtos.skill_execution import (
     DEFAULT_MAX_SKILL_SCRIPT_BYTES,
     DEFAULT_MAX_SKILL_SCRIPT_DIGEST_CHARS,
@@ -166,6 +173,9 @@ __all__ = [
     "DEFAULT_SKILL_SCRIPT_TIMEOUT_SECONDS",
     "MAX_APPLY_PATCH_INPUT_CHARS",
     "MAX_COMPLETION_SUMMARY_CHARS",
+    "MAX_SKILL_DESCRIPTION_CHARS",
+    "MAX_SKILL_INSTRUCTION_CHARS",
+    "MAX_SKILL_NAME_CHARS",
     "MAX_TOOL_ARGUMENT_MAPPING_ENTRIES",
     "MAX_TOOL_ARGUMENT_NESTING_DEPTH",
     "MAX_TOOL_ARGUMENT_SEQUENCE_ENTRIES",
@@ -181,6 +191,7 @@ __all__ = [
     "RUN_ID_CONTEXT_KEY",
     "SAFE_ENVIRONMENT_NAME_CHARS",
     "SAFE_TOOL_IDENTIFIER_CHARS",
+    "SKILL_NAME_PATTERN",
     "SUBMIT_AND_EXIT_TOOL_DEFINITION",
     "SUBMIT_AND_EXIT_TOOL_DESCRIPTION",
     "SUBMIT_AND_EXIT_TOOL_NAME",
@@ -219,6 +230,7 @@ __all__ = [
     "SelectedSkillScript",
     "SelectedSkillToolDeclaration",
     "SkillContextBounds",
+    "SkillDefinition",
     "SkillResourceContextBounds",
     "SkillScriptApprovalBinding",
     "SkillScriptApprovalDecision",

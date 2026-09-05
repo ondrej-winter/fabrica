@@ -238,6 +238,7 @@ dependencies = [
     { name = "httpx" },
     { name = "markdownify" },
     { name = "pydantic-ai-slim" },
+    { name = "pyyaml" },
 ]
 
 [package.dev-dependencies]
@@ -257,6 +258,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "markdownify", specifier = ">=1.2.3" },
     { name = "pydantic-ai-slim", specifier = ">=2.33.0,<3" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [package.metadata.requires-dev]
