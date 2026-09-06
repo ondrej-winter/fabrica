@@ -22,7 +22,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolLoopRunStatus,
 )
 from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModelError, ToolExecutionError
-from fabrica.features.agent_runtime.application.use_cases import RunToolLoop
+from fabrica.features.agent_runtime.application.use_cases import RunToolLoop, run_tool_loop
 
 EXPECTED_REQUIRED_COMPLETION_MODEL_CALLS = 2
 
@@ -353,6 +353,22 @@ def test_run_tool_loop_invokes_terminal_hooks_before_reraising_task_cancellation
             await task
 
         assert cleaned_up.is_set()
+
+    asyncio.run(scenario())
+
+
+def test_default_cancellation_signal_remains_pending_until_its_waiter_is_cancelled() -> None:
+    async def scenario() -> None:
+        cancellation = run_tool_loop._NeverCancelledToolCancellationSignal()  # noqa: SLF001
+
+        assert cancellation.is_cancelled is False
+        waiting_task = asyncio.create_task(cancellation.wait_until_cancelled())
+        await asyncio.sleep(0)
+        assert waiting_task.done() is False
+
+        waiting_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await waiting_task
 
     asyncio.run(scenario())
 

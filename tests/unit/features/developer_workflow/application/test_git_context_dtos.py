@@ -1,5 +1,6 @@
 """Tests for read-only git context DTOs."""
 
+from collections.abc import Callable
 from dataclasses import FrozenInstanceError
 from typing import cast
 
@@ -24,6 +25,8 @@ from fabrica.features.developer_workflow.application.dtos import (
     GitContextLogCount,
     GitMergeBase,
     GitStatusSummary,
+    PreCommitRunResult,
+    PreCommitRunStatus,
     validate_git_context_relative_path,
 )
 
@@ -182,6 +185,40 @@ def test_commit_and_ref_result_dtos_are_immutable_boundary_values() -> None:
     assert merge_base.short_hash == "1234567"
     with pytest.raises(FrozenInstanceError):
         commit.subject = "changed"  # ty: ignore[invalid-assignment]
+
+
+def test_git_commit_log_rejects_empty_logs() -> None:
+    with pytest.raises(ValueError, match="must not be empty"):
+        GitCommitLog(commits=())
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda: GitCommitSummary(commit_hash=" ", short_hash="abcdef1", subject="Subject", author_date="2026-08-07"),
+        lambda: GitCommitDetails(
+            commit_hash="abcdef1234567890",
+            short_hash="abcdef1",
+            parents=(),
+            author=" ",
+            author_date="2026-08-07",
+            committer_date="2026-08-07",
+            subject="Subject",
+        ),
+        lambda: GitBranchAheadBehind(current_branch=" ", base_ref="origin/main", ahead_count=0, behind_count=0),
+        lambda: GitMergeBase(commit_hash=" ", short_hash="abcdef1"),
+    ],
+)
+def test_git_commit_and_ref_dtos_reject_whitespace_only_required_text(factory: Callable[[], object]) -> None:
+    with pytest.raises(ValueError, match="must not be empty"):
+        factory()
+
+
+def test_pre_commit_result_rejects_oversized_output() -> None:
+    with pytest.raises(ValueError, match="stdout exceeds"):
+        PreCommitRunResult(status=PreCommitRunStatus.PASSED, stdout="x" * 500_001)
+    with pytest.raises(ValueError, match="stderr exceeds"):
+        PreCommitRunResult(status=PreCommitRunStatus.PASSED, stderr="x" * 500_001)
 
 
 def test_commit_details_rejects_oversized_message_body() -> None:

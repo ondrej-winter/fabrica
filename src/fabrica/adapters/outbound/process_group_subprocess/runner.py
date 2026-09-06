@@ -216,15 +216,12 @@ def _cleanup_process_group_after_wait_failure(
     termination_grace_seconds: float,
     group_signal_sender: Callable[[int, signal.Signals], None],
 ) -> None:
-    try:
-        _terminate_process_group(
-            process=process,
-            process_group_id=process_group_id,
-            termination_grace_seconds=termination_grace_seconds,
-            group_signal_sender=group_signal_sender,
-        )
-    except subprocess.TimeoutExpired:
-        return
+    _terminate_process_group(
+        process=process,
+        process_group_id=process_group_id,
+        termination_grace_seconds=termination_grace_seconds,
+        group_signal_sender=group_signal_sender,
+    )
 
 
 def _bounded_final_communicate(

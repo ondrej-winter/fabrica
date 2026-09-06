@@ -90,6 +90,12 @@ def test_evidence_bundle_preserves_order_and_serializes_safe_structured_evidence
     )
 
 
+def test_evidence_bundle_serializes_optional_impact_when_provided() -> None:
+    bundle = CommitMessageEvidenceBundle(evidence=(_evidence(impact="Touches the public CLI."),))
+
+    assert "Impact: Touches the public CLI." in bundle.serialized_text
+
+
 def test_evidence_bundle_rejects_empty_bundle_and_invalid_bound() -> None:
     with pytest.raises(ValueError, match="must not be empty"):
         CommitMessageEvidenceBundle(evidence=())

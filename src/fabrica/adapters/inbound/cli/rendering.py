@@ -26,8 +26,7 @@ def write_line(stream: TextIO, text: str) -> None:
     """
     bounded = bound_text(text)
     stream.write(bounded)
-    if not bounded.endswith("\n"):
-        stream.write("\n")
+    stream.write("\n")
 
 
 def write_text(stream: TextIO, text: str) -> None:

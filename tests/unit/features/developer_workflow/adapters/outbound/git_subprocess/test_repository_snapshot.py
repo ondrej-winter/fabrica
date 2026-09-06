@@ -173,6 +173,31 @@ def test_adapter_rejects_oversized_tracked_worktree_output_before_hashing() -> N
     assert exc_info.value.category is GitRepositorySnapshotFailureCategory.MALFORMED_OUTPUT
 
 
+def test_adapter_maps_non_zero_tracked_worktree_command_failure() -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout=f"{INDEX_TREE_ID}\n"),
+            GitCommandResult(returncode=1, stderr="fatal: tracked diff failed"),
+        ]
+    )
+
+    with pytest.raises(GitRepositorySnapshotLoadError) as exc_info:
+        GitRepositorySnapshotSubprocessReader(runner=runner).load_snapshot()
+
+    assert exc_info.value.category is GitRepositorySnapshotFailureCategory.GIT_FAILED
+
+
+def test_adapter_includes_working_directory_only_in_verbose_diagnostics() -> None:
+    with pytest.raises(GitRepositorySnapshotLoadError) as exc_info:
+        GitRepositorySnapshotSubprocessReader(
+            working_directory=Path("repo"),
+            verbose_diagnostics=True,
+            runner=FakeGitRunner(results=[GitCommandResult(returncode=1, stderr="fatal: failed")]),
+        ).load_index_tree_id()
+
+    assert exc_info.value.metadata["working_directory"] == "repo"
+
+
 @pytest.mark.parametrize(
     ("error", "category"),
     [

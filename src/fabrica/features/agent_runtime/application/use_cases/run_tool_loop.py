@@ -61,9 +61,10 @@ class RunToolLoop:
         observations: tuple[RuntimeObservation, ...] = ()
         call_ledger: dict[str, _ToolCallLedgerEntry] = {}
         completion_reminder_sent = False
+        iteration = 0
 
         try:
-            for iteration in range(active_limits.max_tool_iterations + 1):
+            while True:
                 try:
                     model_response = await self._model.run_turn(
                         active_command,
@@ -101,6 +102,7 @@ class RunToolLoop:
                         return output_handling.result
                     completion_reminder_sent = True
                     active_command = _command_with_completion_reminder(command)
+                    iteration += 1
                     continue
 
                 if iteration >= active_limits.max_tool_iterations:
@@ -153,11 +155,10 @@ class RunToolLoop:
                         tool_results=tool_results,
                         observations=observations,
                     )
+                iteration += 1
         finally:
             for terminal_hook in self._terminal_hooks:
                 await terminal_hook(active_opaque_tool_context)
-
-        return ToolLoopRunResult(status=ToolLoopRunStatus.MAX_ITERATIONS_EXCEEDED, tool_results=tool_results)
 
     async def _execute_tool_call(
         self,

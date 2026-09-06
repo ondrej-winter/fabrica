@@ -20,12 +20,15 @@ from fabrica.features.workspace_editing.adapters.inbound.registered_tool import 
 )
 from fabrica.features.workspace_editing.adapters.inbound.registered_tool.adapter import patch_result_to_tool_outcome
 from fabrica.features.workspace_editing.application.dtos import (
+    PatchError,
+    PatchErrorPhase,
     PatchExecutionContext,
     PatchExecutionPhase,
     PatchLimits,
     PatchMutationGuarantee,
     PatchResult,
     PatchResultStatus,
+    PatchRuntimeMapping,
 )
 from fabrica.features.workspace_editing.application.errors import patch_error
 
@@ -137,6 +140,26 @@ def test_patch_result_mapping_stops_runtime_for_partial_or_uncertain_mutation() 
     assert outcome.runtime_disposition is ToolExecutionRuntimeDisposition.STOP_RUNTIME
     assert outcome.mutation_guarantee is ToolMutationGuarantee.PARTIAL_OR_UNCERTAIN_MUTATION
     assert outcome.details["plan_digest"] == PLAN_DIGEST
+
+
+def test_patch_result_mapping_stops_runtime_when_retained_effects_have_no_error() -> None:
+    error = PatchError(
+        code="RETAINED_EFFECTS",
+        phase=PatchErrorPhase.CLEANUP,
+        retryable=False,
+        mutation_guarantee=PatchMutationGuarantee.REVERSIBLE_EFFECTS_RETAINED,
+        runtime_mapping=PatchRuntimeMapping.REJECTED,
+    )
+    result = PatchResult(
+        status=PatchResultStatus.RECOVERY_REQUIRED,
+        mutation_guarantee=PatchMutationGuarantee.REVERSIBLE_EFFECTS_RETAINED,
+        error=error,
+    )
+
+    outcome = patch_result_to_tool_outcome(result)
+
+    assert outcome.status is ToolOutcomeStatus.FATAL
+    assert outcome.error_code == "RETAINED_EFFECTS"
 
 
 def _committed_result() -> PatchResult:

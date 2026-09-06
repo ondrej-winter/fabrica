@@ -104,6 +104,7 @@ def test_selected_skill_is_path_free_safe_and_immutable() -> None:
 
     assert selection.skill_id == "python-testing"
     assert selection.display_label == "Python Testing"
+    assert SelectedSkill(skill_id="python-testing").display_label == "python-testing"
     assert selection.metadata["priority"] == 1
     with pytest.raises(TypeError):
         cast("dict[str, object]", selection.metadata)["priority"] = 3
@@ -118,6 +119,8 @@ def test_selected_skill_rejects_unsafe_identifiers_and_labels() -> None:
         SelectedSkill(skill_id=" python-testing")
     with pytest.raises(ValueError, match="unsupported characters"):
         SelectedSkill(skill_id="python:testing")
+    with pytest.raises(ValueError, match="safe skill label bound"):
+        SelectedSkill(skill_id="x" * (DEFAULT_MAX_SAFE_SKILL_LABEL_CHARS + 1))
 
 
 def test_selected_skill_resource_is_path_free_safe_and_immutable() -> None:
@@ -134,6 +137,10 @@ def test_selected_skill_resource_is_path_free_safe_and_immutable() -> None:
     assert selection.skill_id == "python-testing"
     assert selection.resource_id == "references/example.md"
     assert selection.display_label == "Python Testing Example"
+    assert (
+        SelectedSkillResource(skill_id="python-testing", resource_id="references/example.md").display_label
+        == "python-testing"
+    )
     assert selection.metadata["priority"] == 1
     with pytest.raises(TypeError):
         cast("dict[str, object]", selection.metadata)["priority"] = 3

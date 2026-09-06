@@ -106,6 +106,14 @@ def test_write_text_preserves_existing_trailing_newline() -> None:
     assert stdout.getvalue() == "hello\n"
 
 
+def test_write_text_escapes_tabs_before_writing() -> None:
+    stdout = StringIO()
+
+    write_text(stdout, "left\tright")
+
+    assert stdout.getvalue() == r"left\tright" "\n"
+
+
 def test_bound_multiline_text_preserves_newlines_and_escapes_terminal_controls() -> None:
     assert bound_multiline_text("line 1\nline 2\x1b[2J") == "line 1\nline 2\\x1b[2J"
 

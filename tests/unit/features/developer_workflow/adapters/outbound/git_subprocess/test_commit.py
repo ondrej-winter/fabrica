@@ -176,6 +176,19 @@ def test_adapter_returns_success_without_hash_when_hash_lookup_start_fails() -> 
     assert result == GitCommitResult(short_hash=None)
 
 
+def test_adapter_includes_working_directory_only_in_verbose_diagnostics() -> None:
+    runner = FakeGitCommitRunner(result=GitCommandResult(returncode=1, stderr="fatal: hook declined"))
+
+    with pytest.raises(GitCommitError) as exc_info:
+        GitCommitSubprocessCreator(
+            working_directory=Path("repo"),
+            verbose_diagnostics=True,
+            runner=runner,
+        ).create_commit(CreateGitCommitCommand(message="feat: add commit flow"))
+
+    assert exc_info.value.metadata["working_directory"] == "repo"
+
+
 def test_adapter_rejects_non_positive_commit_timeout() -> None:
     with pytest.raises(ValueError, match="commit_timeout_seconds"):
         GitCommitSubprocessCreator(commit_timeout_seconds=0)

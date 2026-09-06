@@ -10,7 +10,11 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from fabrica.adapters.outbound.process_group_subprocess import ProcessGroupCommandSettings, run_process_group_command
+from fabrica.adapters.outbound.process_group_subprocess import (
+    ProcessGroupCommandSettings,
+    run_process_group_command,
+    runner,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -76,6 +80,42 @@ def test_runner_starts_command_in_new_session_without_shell(tmp_path: Path) -> N
         }
     ]
     assert process.communicate_calls == [3.0]
+
+
+def test_default_process_factory_delegates_to_subprocess_popen(monkeypatch: pytest.MonkeyPatch) -> None:
+    process = FakeProcess(outcomes=[])
+    observed_kwargs: dict[str, object] = {}
+
+    def open_process(*_args: object, **kwargs: object) -> FakeProcess:
+        observed_kwargs.update(kwargs)
+        return process
+
+    monkeypatch.setattr(runner.subprocess, "Popen", open_process)
+
+    assert (
+        runner._open_process(  # noqa: SLF001
+            ("tool", "--version"),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=None,
+            env={"PATH": "/bin"},
+            shell=False,
+            text=True,
+            start_new_session=True,
+        )
+        is process
+    )
+    assert observed_kwargs == {
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+        "cwd": None,
+        "env": {"PATH": "/bin"},
+        "shell": False,
+        "text": True,
+        "start_new_session": True,
+    }
 
 
 def test_runner_terminates_process_group_on_timeout_and_preserves_output() -> None:

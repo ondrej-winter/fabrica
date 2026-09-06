@@ -7,8 +7,14 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import httpx
+
+from fabrica.adapters.outbound.httpx_client import AsyncHttpxRetryClient
 from fabrica.bootstrap import (
+    DEFAULT_COMMIT_MESSAGE_CODEX_MODEL,
+    DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT,
     CommitMessageWorkflowOptions,
+    create_codex_confirmed_commit_workflow,
     create_confirmed_commit_workflow,
 )
 from fabrica.features.agent_runtime.application.dtos import (
@@ -44,6 +50,7 @@ from fabrica.features.developer_workflow.application.use_cases import ConfirmedC
 
 GIT_EXECUTABLE = shutil.which("git") or "git"
 SHORT_GIT_TIMEOUT_SECONDS = 2.5
+EXPECTED_CODEX_MODEL_CALLS = 2
 DEFAULT_CONFIRMED_COMMIT_PRE_COMMIT_TIMEOUT_SECONDS = 120.0
 DEFAULT_CONFIRMED_COMMIT_EXECUTION_TIMEOUT_SECONDS = 120.0
 DEFAULT_CONFIRMED_COMMIT_HASH_LOOKUP_TIMEOUT_SECONDS = 10.0
@@ -167,6 +174,44 @@ def test_confirmed_commit_options_allow_dedicated_timeout_overrides() -> None:
     assert options.pre_commit_timeout_seconds == CUSTOM_PRE_COMMIT_TIMEOUT_SECONDS
     assert options.git_commit_timeout_seconds == CUSTOM_COMMIT_EXECUTION_TIMEOUT_SECONDS
     assert options.git_hash_lookup_timeout_seconds == CUSTOM_COMMIT_HASH_LOOKUP_TIMEOUT_SECONDS
+
+
+def test_codex_confirmed_commit_workflow_uses_default_model_and_reasoning_with_mock_transport(tmp_path: Path) -> None:
+    auth_file_path = _write_synthetic_auth_file(tmp_path)
+    skill_root = _write_commit_message_skill(tmp_path)
+    git_repository = _create_repository_with_staged_diff(tmp_path)
+    _configure_git_identity(git_repository)
+    observed_payloads: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed_payloads.append(json.loads(request.content.decode("utf-8")))
+        output_text = (
+            _analysis_json()
+            if len(observed_payloads) == 1
+            else _synthesis_text(commit_message="chore: add example file")
+        )
+        return httpx.Response(200, json={"output_text": output_text})
+
+    workflow = create_codex_confirmed_commit_workflow(
+        CommitMessageWorkflowOptions(
+            codex_auth_file_path=auth_file_path,
+            codex_http_client=AsyncHttpxRetryClient(
+                client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+            ),
+            git_working_directory=git_repository,
+            skill_roots=(skill_root,),
+        )
+    )
+
+    result = asyncio.run(workflow.run())
+
+    assert result.succeeded
+    assert len(observed_payloads) == EXPECTED_CODEX_MODEL_CALLS
+    assert all(payload["model"] == DEFAULT_COMMIT_MESSAGE_CODEX_MODEL for payload in observed_payloads)
+    assert all(
+        payload["reasoning"] == {"effort": DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT}
+        for payload in observed_payloads
+    )
 
 
 def test_confirmed_commit_workflow_allows_repository_without_pre_commit_config(tmp_path: Path) -> None:
@@ -514,6 +559,23 @@ def _synthesis_text(
     rationale: str = "The structured evidence shows one staged maintenance change.",
 ) -> str:
     return f"Summary:\n{summary}\n\nRationale:\n{rationale}\n\nCommit message:\n{commit_message}"
+
+
+def _write_synthetic_auth_file(tmp_path: Path) -> Path:
+    auth_file_path = tmp_path / "auth.json"
+    auth_file_path.write_text(
+        json.dumps(
+            {
+                "auth_mode": "chatgpt",
+                "tokens": {
+                    "access_token": "synthetic-access-token",
+                    "account_id": "synthetic-account",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return auth_file_path
 
 
 def _usage_evidence(*, input_tokens: int, output_tokens: int) -> ModelUsageEvidence:

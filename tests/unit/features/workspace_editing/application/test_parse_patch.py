@@ -108,6 +108,25 @@ def test_parse_patch_rejects_input_over_limit_without_parsing() -> None:
     assert parsed.result.error.code == "LIMIT_EXCEEDED"
 
 
+def test_parse_patch_rejects_patch_without_actions() -> None:
+    parsed = ParsePatch().parse("*** Begin Patch\n*** End Patch")
+
+    assert parsed.plan is None
+    assert parsed.result.error is not None
+    assert parsed.result.error.code == "INVALID_PATCH"
+
+
+@pytest.mark.parametrize("line", ["", "?unknown"])
+def test_parse_patch_rejects_untagged_or_unknown_hunk_lines(line: str) -> None:
+    patch = f"*** Begin Patch\n*** Update File: src/existing.py\n@@\n{line}\n*** End Patch"
+
+    parsed = ParsePatch().parse(patch)
+
+    assert parsed.plan is None
+    assert parsed.result.error is not None
+    assert parsed.result.error.code == "INVALID_HUNK"
+
+
 def test_parse_patch_accepts_pure_rename_with_no_hunks() -> None:
     patch = "*** Begin Patch\n*** Update File: src/old.py\n*** Move to: src/new.py\n*** End Patch"
 

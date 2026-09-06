@@ -130,6 +130,13 @@ def test_redact_metadata_value_masks_auth_like_scalar_strings() -> None:
     assert redact_metadata_value("Basic synthetic-token") == REDACTED_VALUE
 
 
+def test_redact_metadata_value_describes_unknown_objects_without_exposing_content() -> None:
+    class SyntheticMetadata:
+        pass
+
+    assert redact_metadata_value(SyntheticMetadata()) == "<SyntheticMetadata>"
+
+
 def test_redact_value_returns_safe_descriptions_for_bytes_and_unknown_objects() -> None:
     class SyntheticDiagnostic:
         pass

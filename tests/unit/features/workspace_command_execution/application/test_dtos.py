@@ -103,6 +103,10 @@ def test_output_counts_and_aggregate_result_order_are_verified() -> None:
     assert RunCommandsResult(ExecutionPolicy.PARALLEL, (result,)).results == (result,)
     with pytest.raises(ValueError, match="output character counts"):
         CommandExecutionOutput(stdout="out", retained_output_chars=0)
+    with pytest.raises(ValueError, match="output character counts"):
+        CommandExecutionOutput(stdout="out", total_output_chars=2, retained_output_chars=3)
+    with pytest.raises(TypeError, match="stdout and stderr"):
+        CommandExecutionOutput(stdout=cast("str", b"out"))
     with pytest.raises(ValueError, match="ordered"):
         RunCommandsResult(ExecutionPolicy.PARALLEL, (CommandResult(1, "echo", CommandExecutionStatus.SPAWN_FAILED, 0),))
 
