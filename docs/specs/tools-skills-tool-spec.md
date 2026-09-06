@@ -1082,6 +1082,5 @@ Follow the project architecture, typing, logging, secret-safety, and validation 
 ## Project Structure
 
 - Specification: This file under `docs/specs/`.
-- Derived plan: `docs/plans/tools-skills-tool-v1-plan.md`.
 - Source and test ownership: The detailed architecture section in this specification remains authoritative.
-- Documentation ownership: `docs/specs/`, `docs/plans/`, and the relevant indexes.
+- Documentation ownership: `docs/specs/` and the relevant indexes.
