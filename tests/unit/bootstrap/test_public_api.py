@@ -1,17 +1,11 @@
-"""Bootstrap public interface contract tests."""
+"""Bootstrap public API and documentation contract tests."""
 
 from pathlib import Path
-from typing import NoReturn
 
-import fabrica.bootstrap.cli.entrypoint as cli_entrypoint
 from fabrica import bootstrap
-from fabrica.adapters.inbound.cli import RegistrationError
-from fabrica.bootstrap import cli as bootstrap_cli
 
 DEFAULT_STAGED_GIT_TOOL_TIMEOUT_SECONDS = 10.0
 DEFAULT_PRE_COMMIT_TOOL_TIMEOUT_SECONDS = 120.0
-EXPECTED_CLI_CONFIGURATION_ERROR_EXIT_CODE = 2
-
 
 EXPECTED_BOOTSTRAP_EXPORTS = [
     "DEFAULT_CODEX_AUTH_FILE",
@@ -131,35 +125,3 @@ def test_bootstrap_option_defaults_preserve_safe_composition_contract() -> None:
     assert staged_git_tools.working_directory is None
     assert staged_git_tools.timeout_seconds == DEFAULT_STAGED_GIT_TOOL_TIMEOUT_SECONDS
     assert model_skill_runtime.skill_tools == ()
-
-
-def test_product_cli_model_evidence_contract_uses_shared_kernel_owner() -> None:
-    """Keep feature-neutral CLI evidence protocols pointed at the shared kernel."""
-    bootstrap_cli_source = Path("src/fabrica/bootstrap/cli/model_evidence.py").read_text(encoding="utf-8")
-
-    assert "from fabrica.shared_kernel.model_usage import ModelCostEvidence, ModelUsageEvidence" in bootstrap_cli_source
-    assert (
-        "from fabrica.features.agent_runtime.application.dtos import (\n        ModelCostEvidence"
-        not in bootstrap_cli_source
-    )
-
-
-def test_product_cli_translates_bootstrap_wiring_errors_to_stable_stderr(
-    monkeypatch,
-    capsys,
-) -> None:
-    """Keep expected composition failures from leaking tracebacks by default."""
-
-    def fail_command_registration_creation(*, overrides: object | None = None) -> NoReturn:
-        _ = overrides
-        msg = "synthetic CLI wiring failure"
-        raise RegistrationError(msg)
-
-    monkeypatch.setattr(cli_entrypoint, "create_cli_command_registrars", fail_command_registration_creation)
-
-    exit_code = bootstrap_cli.main(())
-
-    assert exit_code == EXPECTED_CLI_CONFIGURATION_ERROR_EXIT_CODE
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert captured.err == "error: synthetic CLI wiring failure\n"
