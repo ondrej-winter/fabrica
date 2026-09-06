@@ -17,7 +17,7 @@ from fabrica.features.codex_transport.application.exceptions import (
     CodexCredentialUnavailableError,
 )
 from fabrica.features.codex_transport.application.use_cases import CompleteWithCodexTransport
-from tests.synthetic_values import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
+from tests.support.sentinels import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
 
 
 @dataclass

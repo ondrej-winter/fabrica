@@ -17,7 +17,7 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexTransportStatus,
     CodexUsageProbeCommand,
 )
-from tests.synthetic_values import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
+from tests.support.sentinels import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
 
 EXPECTED_ATTEMPT_COUNT = 2
 EXPECTED_RETRY_COUNT = 1

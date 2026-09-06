@@ -3,7 +3,7 @@
 import asyncio
 import json
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -16,11 +16,7 @@ from fabrica.bootstrap import (
 from fabrica.bootstrap.composition import workspace_command_execution
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
-    ToolAwareModelResponse,
     ToolCallRequest,
-    ToolCallResult,
-    ToolCancellationSignal,
-    ToolDefinition,
     ToolLoopLimits,
     ToolLoopRunStatus,
     ToolTextContent,
@@ -28,38 +24,9 @@ from fabrica.features.agent_runtime.application.dtos import (
 from fabrica.features.workspace_command_execution.adapters.inbound.registered_tool import RUN_COMMANDS_TOOL_NAME
 from fabrica.features.workspace_command_execution.application.dtos import CommandExecutionLimits, PlannedCommand
 from fabrica.features.workspace_command_execution.application.ports import CommandPermissionDecision
+from tests.integration.support.agent_runtime_tool_loop import SingleToolCallThenFinalModel
 
 EXPECTED_TOOL_LOOP_TURN_COUNT = 2
-
-
-@dataclass(slots=True)
-class RunCommandsToolAwareModel:
-    """Fake model that requests the explicitly composed command tool once."""
-
-    calls: list[tuple[LocalAgentRunCommand, tuple[ToolDefinition, ...], tuple[ToolCallResult, ...]]] = field(
-        default_factory=list,
-    )
-
-    async def run_turn(
-        self,
-        command: LocalAgentRunCommand,
-        available_tools: tuple[ToolDefinition, ...],
-        tool_results: tuple[ToolCallResult, ...] = (),
-        cancellation: ToolCancellationSignal | None = None,
-    ) -> ToolAwareModelResponse:
-        del cancellation
-        self.calls.append((command, available_tools, tool_results))
-        if not tool_results:
-            return ToolAwareModelResponse(
-                tool_calls=(
-                    ToolCallRequest(
-                        call_id="call-1",
-                        tool_name=RUN_COMMANDS_TOOL_NAME,
-                        arguments={"commands": ({"argv": (sys.executable, "-c", "print('composed')")},)},
-                    ),
-                ),
-            )
-        return ToolAwareModelResponse(output_text=f"final:{tool_results[0].result_text}")
 
 
 @dataclass(slots=True)
@@ -98,7 +65,13 @@ def test_run_commands_factory_composes_an_explicit_tool_loop_without_side_effect
 ) -> None:
     """Defer workspace inspection, policy evaluation, and execution until invocation."""
     policies = ExplicitHostPolicies()
-    model = RunCommandsToolAwareModel()
+    model = SingleToolCallThenFinalModel(
+        ToolCallRequest(
+            call_id="call-1",
+            tool_name=RUN_COMMANDS_TOOL_NAME,
+            arguments={"commands": ({"argv": (sys.executable, "-c", "print('composed')")},)},
+        )
+    )
 
     tool = create_run_commands_registered_tool_adapter(
         tmp_path,

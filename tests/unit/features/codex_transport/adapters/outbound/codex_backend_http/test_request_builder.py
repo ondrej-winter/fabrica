@@ -23,7 +23,7 @@ from fabrica.features.codex_transport.application.dtos import (
     CodexCredentials,
     CodexUsageProbeCommand,
 )
-from tests.synthetic_values import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
+from tests.support.sentinels import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
 
 
 def test_build_codex_backend_request_uses_default_backend_url_and_headers() -> None:

@@ -23,7 +23,7 @@ from fabrica.shared_kernel.model_usage import (
     ModelUsageEvidenceSource,
     ModelUsageObservation,
 )
-from tests.synthetic_values import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
+from tests.support.sentinels import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
 
 
 def test_transport_status_values_match_normalized_contract() -> None:

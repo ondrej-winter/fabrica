@@ -1,4 +1,4 @@
-"""Deterministic non-credential sentinels for tests."""
+"""Deterministic non-credential sentinels shared across tests."""
 
 CODEX_BEARER_VALUE = "synthetic-access-token"
 CODEX_ACCOUNT_ID = "synthetic-account"

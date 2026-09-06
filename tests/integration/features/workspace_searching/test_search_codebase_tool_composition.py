@@ -2,60 +2,32 @@
 
 import asyncio
 import json
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from fabrica.bootstrap import create_search_codebase_registered_tool_adapter, create_tool_loop_runtime
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
-    ToolAwareModelResponse,
     ToolCallRequest,
-    ToolCallResult,
-    ToolCancellationSignal,
-    ToolDefinition,
     ToolLoopLimits,
     ToolTextContent,
 )
 from fabrica.features.workspace_searching.adapters.inbound.registered_tool import SEARCH_CODEBASE_TOOL_NAME
 from fabrica.features.workspace_searching.application.dtos import SearchLimits
+from tests.integration.support.agent_runtime_tool_loop import SingleToolCallThenFinalModel
 
 EXPECTED_TOOL_LOOP_TURN_COUNT = 2
-
-
-@dataclass(slots=True)
-class SearchCodebaseToolAwareModel:
-    """Fake model that requests the explicitly composed search tool once."""
-
-    calls: list[tuple[LocalAgentRunCommand, tuple[ToolDefinition, ...], tuple[ToolCallResult, ...]]] = field(
-        default_factory=list,
-    )
-
-    async def run_turn(
-        self,
-        command: LocalAgentRunCommand,
-        available_tools: tuple[ToolDefinition, ...],
-        tool_results: tuple[ToolCallResult, ...] = (),
-        cancellation: ToolCancellationSignal | None = None,
-    ) -> ToolAwareModelResponse:
-        del cancellation
-        self.calls.append((command, available_tools, tool_results))
-        if not tool_results:
-            return ToolAwareModelResponse(
-                tool_calls=(
-                    ToolCallRequest(
-                        call_id="call-1",
-                        tool_name=SEARCH_CODEBASE_TOOL_NAME,
-                        arguments={"queries": ({"pattern": "needle"},)},
-                    ),
-                ),
-            )
-        return ToolAwareModelResponse(output_text=f"final:{tool_results[0].result_text}")
 
 
 def test_search_codebase_tool_factory_composes_an_explicit_offline_tool_loop_without_workspace_inspection(
     tmp_path: Path,
 ) -> None:
-    model = SearchCodebaseToolAwareModel()
+    model = SingleToolCallThenFinalModel(
+        ToolCallRequest(
+            call_id="call-1",
+            tool_name=SEARCH_CODEBASE_TOOL_NAME,
+            arguments={"queries": ({"pattern": "needle"},)},
+        )
+    )
 
     tool = create_search_codebase_registered_tool_adapter(
         tmp_path,

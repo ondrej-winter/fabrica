@@ -11,7 +11,7 @@ from fabrica.features.codex_transport.application.exceptions import (
     CodexCredentialAuthenticationError,
     CodexCredentialUnavailableError,
 )
-from tests.synthetic_values import CODEX_ACCOUNT_ID_WITH_SUFFIX, CODEX_BEARER_VALUE
+from tests.support.sentinels import CODEX_ACCOUNT_ID_WITH_SUFFIX, CODEX_BEARER_VALUE
 
 SYNTHETIC_ACCESS_TOKEN = CODEX_BEARER_VALUE
 SYNTHETIC_ACCOUNT_ID = CODEX_ACCOUNT_ID_WITH_SUFFIX

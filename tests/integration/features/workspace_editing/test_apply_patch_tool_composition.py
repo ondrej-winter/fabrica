@@ -25,40 +25,10 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchResultStatus,
 )
 from fabrica.features.workspace_editing.application.errors import patch_error
+from tests.integration.support.agent_runtime_tool_loop import SingleToolCallThenFinalModel
 
 PLAN_DIGEST = "sha256:" + "c" * 64
 EXPECTED_TOOL_LOOP_TURN_COUNT = 2
-
-
-@dataclass(slots=True)
-class ApplyPatchToolAwareModel:
-    """Fake model that requests the explicitly composed apply-patch tool once."""
-
-    calls: list[tuple[LocalAgentRunCommand, tuple[ToolDefinition, ...], tuple[ToolCallResult, ...]]] = field(
-        default_factory=list,
-    )
-
-    async def run_turn(
-        self,
-        command: LocalAgentRunCommand,
-        available_tools: tuple[ToolDefinition, ...],
-        tool_results: tuple[ToolCallResult, ...] = (),
-        cancellation: ToolCancellationSignal | None = None,
-    ) -> ToolAwareModelResponse:
-        """Request apply-patch, then return the tool result text."""
-        del cancellation
-        self.calls.append((command, available_tools, tool_results))
-        if not tool_results:
-            return ToolAwareModelResponse(
-                tool_calls=(
-                    ToolCallRequest(
-                        call_id="call-1",
-                        tool_name=APPLY_PATCH_TOOL_NAME,
-                        arguments={"input": "*** Begin Patch\n*** End Patch"},
-                    ),
-                ),
-            )
-        return ToolAwareModelResponse(output_text=f"final:{tool_results[0].result_text}")
 
 
 @dataclass(slots=True)
@@ -84,7 +54,13 @@ class _ScriptedApplyPatchToolAwareModel:
 
 
 def test_apply_patch_tool_helper_composes_explicit_use_case_without_mutating_during_construction() -> None:
-    model = ApplyPatchToolAwareModel()
+    model = SingleToolCallThenFinalModel(
+        ToolCallRequest(
+            call_id="call-1",
+            tool_name=APPLY_PATCH_TOOL_NAME,
+            arguments={"input": "*** Begin Patch\n*** End Patch"},
+        )
+    )
     use_case = _FakeApplyPatch(_committed_result())
 
     tool = create_apply_patch_registered_tool_adapter(use_case, limits=PatchLimits(max_output_chars=500))
@@ -119,7 +95,13 @@ def test_apply_patch_tool_helper_composes_explicit_use_case_without_mutating_dur
 
 
 def test_apply_patch_tool_loop_continues_after_recoverable_patch_rejection() -> None:
-    model = ApplyPatchToolAwareModel()
+    model = SingleToolCallThenFinalModel(
+        ToolCallRequest(
+            call_id="call-1",
+            tool_name=APPLY_PATCH_TOOL_NAME,
+            arguments={"input": "*** Begin Patch\n*** End Patch"},
+        )
+    )
     use_case = _FakeApplyPatch(_rejected_result())
     tool = create_apply_patch_registered_tool_adapter(use_case)
     runtime = create_tool_loop_runtime(model=model, tools=(tool,), limits=ToolLoopLimits(max_tool_iterations=2))
@@ -136,7 +118,13 @@ def test_apply_patch_tool_loop_continues_after_recoverable_patch_rejection() -> 
 
 
 def test_apply_patch_tool_loop_stops_after_fatal_mutation_state() -> None:
-    model = ApplyPatchToolAwareModel()
+    model = SingleToolCallThenFinalModel(
+        ToolCallRequest(
+            call_id="call-1",
+            tool_name=APPLY_PATCH_TOOL_NAME,
+            arguments={"input": "*** Begin Patch\n*** End Patch"},
+        )
+    )
     use_case = _FakeApplyPatch(_indeterminate_result())
     tool = create_apply_patch_registered_tool_adapter(use_case)
     runtime = create_tool_loop_runtime(model=model, tools=(tool,), limits=ToolLoopLimits(max_tool_iterations=2))

@@ -12,7 +12,7 @@ from fabrica.features.agent_runtime.application.dtos import (
     SelectedSkillResource,
 )
 from fabrica.features.agent_runtime.application.ports import SkillContextLoadError
-from tests.synthetic_values import PRIVATE_FILE_CONTENT
+from tests.support.sentinels import PRIVATE_FILE_CONTENT
 
 SYNTHETIC_SECRET = PRIVATE_FILE_CONTENT
 
