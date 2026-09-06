@@ -23,7 +23,10 @@ uv run pytest
 ```
 
 The default test suite is deterministic and offline. It does not read real Codex
-credentials and does not call the live Codex backend.
+credentials and does not call the live Codex backend. Each default `uv run pytest` run
+also writes a self-contained results report to `.reports/pytest/report.html` and a
+coverage HTML report to `.reports/coverage/index.html`. These local artifacts are
+ignored by Git.
 
 ## Interactive `ask_question` tool composition
 

@@ -46,6 +46,7 @@ dev = [
     "pre-commit>=4.6.2",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
+    "pytest-html>=4.1.1",
     "pytest-xdist>=3.8.0",
     "python-semantic-release>=10.5.2",
     "ruff>=0.16.4",
@@ -235,6 +236,9 @@ addopts = [
     "-n=auto",
     "--cov=src",
     "--cov-report=term-missing",
+    "--cov-report=html:.reports/coverage",
+    "--html=.reports/pytest/report.html",
+    "--self-contained-html",
 ]
 markers = [
     "live_codex: opt-in tests that read local Codex credentials and call the live Codex backend",
