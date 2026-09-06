@@ -98,6 +98,20 @@ def test_directory_descriptor_probe_failure_is_captured(tmp_path: Path, monkeypa
     assert probe.detail == "PermissionError: errno=13"
 
 
+def test_native_no_replace_probe_rejects_failed_backend_proof(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_proof(_workspace_root: Path) -> None:
+        raise capabilities.NativePatchOperationError(95, "operation not supported")
+
+    monkeypatch.setattr(capabilities, "native_no_replace_backend_available", lambda: True)
+    monkeypatch.setattr(capabilities, "prove_native_no_replace", fail_proof)
+
+    evidence = collect_posix_patch_workspace_capability_evidence(tmp_path)
+
+    probe = next(probe for probe in evidence.probes if probe.name == "native_no_replace")
+    assert probe.status is PosixPatchCapabilityStatus.UNSUPPORTED
+    assert probe.detail == "NativePatchOperationError: errno=95"
+
+
 def test_platform_specific_probe_selection_is_explicit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(capabilities.sys, "platform", "linux")
     monkeypatch.setattr(capabilities, "native_no_replace_backend_available", lambda: True)
