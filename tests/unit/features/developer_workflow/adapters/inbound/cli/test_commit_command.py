@@ -192,6 +192,25 @@ def test_commit_command_escapes_output_text_before_prompting() -> None:
     assert workflow.commit_calls == []
 
 
+def test_commit_command_prompts_without_rendering_an_empty_output_text() -> None:
+    workflow = FakeConfirmedCommitWorkflow(
+        generation_result=ConfirmedCommitWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
+            recommendation=_recommendation(),
+            output_text="",
+        )
+    )
+    stdout = StringIO()
+
+    exit_code = run_feature_cli_command(
+        CliCommitCommand(),
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO("n\n"), stdout=stdout, stderr=StringIO()),
+    )
+
+    assert exit_code == 0
+    assert stdout.getvalue().startswith("Commit with this message? [y/N] ")
+
+
 def test_commit_command_escapes_reported_commit_hash() -> None:
     recommendation = _recommendation()
     workflow = FakeConfirmedCommitWorkflow(
@@ -213,6 +232,28 @@ def test_commit_command_escapes_reported_commit_hash() -> None:
     assert exit_code == 0
     assert "\x1b" not in stdout.getvalue()
     assert r"Committed as abc1234\x1b[2J." in stdout.getvalue()
+
+
+def test_commit_command_reports_success_without_a_short_hash() -> None:
+    recommendation = _recommendation()
+    workflow = FakeConfirmedCommitWorkflow(
+        generation_result=_generation_success(recommendation),
+        commit_result=ConfirmedCommitWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
+            recommendation=recommendation,
+            commit_result=GitCommitResult(),
+            commit_attempted=True,
+        ),
+    )
+    stdout = StringIO()
+
+    exit_code = run_feature_cli_command(
+        CliCommitCommand(),
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO("y\n"), stdout=stdout, stderr=StringIO()),
+    )
+
+    assert exit_code == 0
+    assert "Committed.\n" in stdout.getvalue()
 
 
 def test_commit_command_rejects_no_without_invoking_commit() -> None:
@@ -283,6 +324,25 @@ def test_commit_command_generation_failure_skips_prompt_and_commit() -> None:
         stderr.getvalue()
         == "status: configuration_error\nobservation: no staged git changes category=no_staged_changes\n"
     )
+    assert workflow.commit_calls == []
+
+
+def test_commit_command_rejects_approved_recommendation_without_safety_binding() -> None:
+    workflow = FakeConfirmedCommitWorkflow(
+        generation_result=ConfirmedCommitWorkflowResult(
+            status=DeveloperWorkflowStatus.SUCCESS,
+            recommendation=_recommendation(),
+        )
+    )
+    stderr = StringIO()
+
+    exit_code = run_feature_cli_command(
+        CliCommitCommand(),
+        harness=CommitCommandHarness(workflow=workflow, stdin=StringIO("y\n"), stdout=StringIO(), stderr=stderr),
+    )
+
+    assert exit_code == EXPECTED_CONFIGURATION_ERROR_EXIT_CODE
+    assert "missing its staged-change safety binding" in stderr.getvalue()
     assert workflow.commit_calls == []
 
 

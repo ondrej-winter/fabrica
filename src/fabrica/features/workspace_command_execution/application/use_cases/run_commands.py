@@ -54,14 +54,18 @@ class RunCommands(RunCommandsPort):
                 active[asyncio.create_task(self.supervisor.run(planned, task_context))] = planned
                 if command.execution is ExecutionPolicy.SEQUENTIAL:
                     break
-            if not active:
+            if (
+                not active
+            ):  # pragma: no cover - validated limits and one planner entry per request keep queued work schedulable.
                 continue
             done, _ = await asyncio.wait(active, timeout=_SCHEDULER_POLL_SECONDS, return_when=asyncio.FIRST_COMPLETED)
             for task in done:
                 planned = active.pop(task)
                 results[planned.index] = _task_result(task, planned, batch_deadline_at)
 
-        if any(result is None for result in results):
+        if any(
+            result is None for result in results
+        ):  # pragma: no cover - planner and scheduler maintain one result per request.
             msg = "command scheduler did not produce an outcome for every command"
             raise RuntimeError(msg)
         completed = RunCommandsResult(command.execution, tuple(result for result in results if result is not None))

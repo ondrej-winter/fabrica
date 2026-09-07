@@ -43,6 +43,7 @@ def test_returns_command_scoped_invalid_results_before_spawn() -> None:
     assert isinstance(batch.entries[2], CommandResult)
     assert batch.entries[2].error is not None
     assert batch.entries[2].error.code is CommandErrorCode.COMMAND_INPUT_TOO_LARGE
+    assert batch.command is None
 
 
 def test_maps_timeout_limit_and_invalid_command_field_types_to_command_results() -> None:
@@ -69,6 +70,23 @@ def test_maps_timeout_limit_and_invalid_command_field_types_to_command_results()
     assert third.error.code is CommandErrorCode.INVALID_INPUT
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        "not-an-object",
+        {"unknown": True},
+        {"argv": ["ok"], "cwd": None},
+    ],
+)
+def test_maps_malformed_command_shapes_and_invalid_defaults_to_command_results(command: object) -> None:
+    batch = validate_run_commands_request({"commands": [command]}, limits=CommandExecutionLimits())
+
+    result = batch.entries[0]
+    assert isinstance(result, CommandResult)
+    assert result.error is not None
+    assert result.error.code is CommandErrorCode.INVALID_INPUT
+
+
 def test_rejects_invalid_execution_and_excessive_command_count() -> None:
     with pytest.raises(ValueError, match="execution"):
         validate_run_commands_request(
@@ -81,7 +99,7 @@ def test_rejects_invalid_execution_and_excessive_command_count() -> None:
         )
 
 
-@pytest.mark.parametrize("raw", [{}, {"commands": []}, {"commands": "bad"}, {"commands": [], "unknown": True}])
+@pytest.mark.parametrize("raw", [[], {}, {"commands": []}, {"commands": "bad"}, {"commands": [], "unknown": True}])
 def test_rejects_invalid_top_level_batch_shapes(raw: object) -> None:
     with pytest.raises((TypeError, ValueError)):
         validate_run_commands_request(raw, limits=CommandExecutionLimits())

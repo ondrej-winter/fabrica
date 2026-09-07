@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
+import pytest
+
 from fabrica.features.workspace_command_execution.application.dtos import (
     CommandError,
     CommandErrorCode,
@@ -18,7 +20,7 @@ from fabrica.features.workspace_command_execution.application.dtos import (
     RunCommandsCommand,
     SkippedCommandReason,
 )
-from fabrica.features.workspace_command_execution.application.ports import RunCommandsContext
+from fabrica.features.workspace_command_execution.application.ports import CommandSupervisor, RunCommandsContext
 from fabrica.features.workspace_command_execution.application.use_cases import PlanCommands, RunCommands
 
 MAX_CONCURRENT_COMMANDS = 2
@@ -75,6 +77,15 @@ class ControlledSupervisor:
             return CommandResult(command.index, _preview(command), CommandExecutionStatus.EXITED, 1, exit_code=0)
         finally:
             self.active -= 1
+
+
+@dataclass
+class FailingSupervisor:
+    error: BaseException
+
+    async def run(self, command: PlannedCommand, context: RunCommandsContext) -> CommandResult:
+        del command, context
+        raise self.error
 
 
 def test_parallel_scheduler_preserves_request_order_despite_out_of_order_completion_and_concurrency_bound() -> None:
@@ -151,7 +162,29 @@ def test_batch_timeout_maps_running_command_and_skips_unstarted_sequential_comma
     assert result.results[1].reason is SkippedCommandReason.BATCH_TIMED_OUT
 
 
-def _use_case(entries: tuple[PlannedCommand | CommandResult, ...], supervisor: ControlledSupervisor) -> RunCommands:
+@pytest.mark.parametrize(
+    ("error", "status", "code"),
+    [
+        (asyncio.CancelledError(), CommandExecutionStatus.CANCELLED, CommandErrorCode.COMMAND_CANCELLED),
+        (OSError("synthetic failure"), CommandExecutionStatus.SPAWN_FAILED, CommandErrorCode.INTERNAL_EXECUTION_ERROR),
+    ],
+)
+def test_scheduler_maps_cancelled_and_failed_supervisor_tasks(
+    error: BaseException,
+    status: CommandExecutionStatus,
+    code: CommandErrorCode,
+) -> None:
+    result = asyncio.run(
+        _use_case(_planned(1), FailingSupervisor(error)).run(_command(ExecutionPolicy.SEQUENTIAL, 1), _context())
+    )
+
+    command_result = result.results[0]
+    assert command_result.status is status
+    assert command_result.error is not None
+    assert command_result.error.code is code
+
+
+def _use_case(entries: tuple[PlannedCommand | CommandResult, ...], supervisor: CommandSupervisor) -> RunCommands:
     return RunCommands(planner=cast("PlanCommands", FakePlanner(entries)), supervisor=supervisor)
 
 

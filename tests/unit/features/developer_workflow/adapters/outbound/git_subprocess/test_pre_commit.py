@@ -10,6 +10,7 @@ import pytest
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess import (
     GitCommandResult,
     PreCommitSubprocessRunner,
+    pre_commit,
 )
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.pre_commit_commands import pre_commit_run_argv
 from fabrica.features.developer_workflow.adapters.outbound.git_subprocess.repository_snapshot_commands import (
@@ -198,6 +199,47 @@ def test_adapter_maps_not_repository_without_raw_stderr() -> None:
 
     assert exc_info.value.category is PreCommitFailureCategory.NOT_A_REPOSITORY
     assert "secret" not in str(exc_info.value.metadata)
+
+
+def test_adapter_includes_working_directory_in_verbose_not_repository_diagnostics() -> None:
+    runner = FakePreCommitRunner(
+        results=[
+            *_snapshot_results(),
+            GitCommandResult(returncode=1, stderr="fatal: not a git repository"),
+            *_snapshot_results(),
+        ]
+    )
+
+    with pytest.raises(PreCommitRunError) as exc_info:
+        PreCommitSubprocessRunner(
+            working_directory=Path("repo"),
+            runner=runner,
+            verbose_diagnostics=True,
+        ).run_pre_commit(PreCommitRunCommand())
+
+    assert exc_info.value.category is PreCommitFailureCategory.NOT_A_REPOSITORY
+    assert exc_info.value.metadata["working_directory"] == "repo"
+
+
+@pytest.mark.parametrize(
+    ("stderr", "category"),
+    [
+        ("fatal: not a git repository", PreCommitFailureCategory.NOT_A_REPOSITORY),
+        ("fatal: unexpected failure", PreCommitFailureCategory.EXECUTION_FAILED),
+    ],
+)
+def test_default_runner_path_maps_repository_root_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    stderr: str,
+    category: PreCommitFailureCategory,
+) -> None:
+    runner = FakePreCommitRunner(results=[GitCommandResult(returncode=128, stderr=stderr)])
+    monkeypatch.setattr(pre_commit, "run_git_command", runner)
+
+    with pytest.raises(PreCommitRunError) as exc_info:
+        PreCommitSubprocessRunner().run_pre_commit(PreCommitRunCommand())
+
+    assert exc_info.value.category is category
 
 
 @pytest.mark.parametrize(

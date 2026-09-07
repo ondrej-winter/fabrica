@@ -53,6 +53,11 @@ def test_adapter_invokes_read_only_staged_diff_command() -> None:
     assert runner.calls == [(("git", "--no-pager", "diff", "--staged"), Path("repo"), 2.5)]
 
 
+def test_adapter_rejects_non_positive_timeout() -> None:
+    with pytest.raises(ValueError, match="positive"):
+        GitStagedChangesSubprocessLoader(timeout_seconds=0)
+
+
 def test_adapter_lists_staged_files_with_statuses() -> None:
     runner = FakeGitRunner(
         result=GitCommandResult(
@@ -73,6 +78,29 @@ def test_adapter_lists_staged_files_with_statuses() -> None:
         (GitStagedFileStatus.DELETED, "old.py"),
     ]
     assert runner.calls == [(("git", "--no-pager", "diff", "--staged", "--name-status"), Path("repo"), 2.5)]
+
+
+@pytest.mark.parametrize("operation", ["load_diff", "list_files"])
+def test_adapter_maps_non_zero_git_results_for_full_diff_and_file_list(operation: str) -> None:
+    loader = GitStagedChangesSubprocessLoader(
+        runner=FakeGitRunner(result=GitCommandResult(returncode=128, stderr="fatal: not a git repository")),
+    )
+
+    with pytest.raises(GitStagedChangesLoadError) as exc_info:
+        getattr(loader, operation)()
+
+    assert exc_info.value.category is GitStagedChangesFailureCategory.NOT_A_REPOSITORY
+
+
+def test_adapter_includes_working_directory_only_in_verbose_diagnostics() -> None:
+    with pytest.raises(GitStagedChangesLoadError) as exc_info:
+        GitStagedChangesSubprocessLoader(
+            working_directory=Path("repo"),
+            runner=FakeGitRunner(result=GitCommandResult(returncode=1, stderr="fatal: failed")),
+            verbose_diagnostics=True,
+        ).load_diff()
+
+    assert exc_info.value.metadata["working_directory"] == "repo"
 
 
 def test_adapter_maps_oversized_staged_file_list_safely() -> None:
@@ -122,6 +150,20 @@ def test_adapter_loads_file_diff_after_validating_path_is_staged() -> None:
         (("git", "--no-pager", "diff", "--staged", "--name-status"), Path("repo"), 2.5),
         (("git", "--no-pager", "diff", "--staged", "--", "src/file.py"), Path("repo"), 2.5),
     ]
+
+
+def test_adapter_maps_non_zero_per_file_diff_after_staged_path_validation() -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="M\tsrc/file.py\n"),
+            GitCommandResult(returncode=128, stderr="fatal: not a git repository"),
+        ]
+    )
+
+    with pytest.raises(GitStagedChangesLoadError) as exc_info:
+        GitStagedChangesSubprocessLoader(runner=runner).load_file_diff("src/file.py")
+
+    assert exc_info.value.category is GitStagedChangesFailureCategory.NOT_A_REPOSITORY
 
 
 @pytest.mark.parametrize("path", ["", " file.py", "/absolute/file.py", "../file.py", "src/../file.py", "."])

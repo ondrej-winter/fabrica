@@ -24,7 +24,7 @@ COMMAND_COUNT = 2
 @dataclass
 class FakeResolver:
     resolved_cwd: str = "."
-    error: CommandPlanningError | None = None
+    error: Exception | None = None
 
     def resolve_cwd(self, requested_cwd: str) -> str:
         assert requested_cwd
@@ -129,6 +129,16 @@ def test_plan_returns_distinct_command_scoped_cwd_failures(
     assert isinstance(entry, CommandResult)
     assert entry.error is not None
     assert entry.error.code is expected_code
+
+
+def test_plan_maps_unexpected_boundary_errors_to_internal_failure() -> None:
+    command = RunCommandsCommand(ExecutionPolicy.PARALLEL, (CommandRequest(CommandExecutionMode.ARGV, argv=("pwd",)),))
+
+    entry = asyncio.run(_planner(resolver=FakeResolver(error=OSError("synthetic failure"))).plan(command))[0]
+
+    assert isinstance(entry, CommandResult)
+    assert entry.error is not None
+    assert entry.error.code is CommandErrorCode.INTERNAL_EXECUTION_ERROR
 
 
 def test_plan_maps_permission_denial_and_approval_rejection_without_sandbox_execution() -> None:
