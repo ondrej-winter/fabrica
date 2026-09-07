@@ -417,13 +417,13 @@ def _list_darwin_extended_attributes(path: Path) -> tuple[str, ...]:
     listxattr.restype = ctypes.c_ssize_t
     encoded_path = os.fsencode(path)
     required_size = listxattr(encoded_path, None, 0, 1)
-    if required_size < 0:
+    if required_size < 0:  # pragma: no cover - Darwin fallback runs only when native os.listxattr is absent.
         raise OSError(ctypes.get_errno(), os.strerror(ctypes.get_errno()), path)
-    if required_size == 0:
+    if required_size == 0:  # pragma: no cover - Darwin fallback runs only when native os.listxattr is absent.
         return ()
     names_buffer = ctypes.create_string_buffer(required_size)
     actual_size = listxattr(encoded_path, names_buffer, required_size, 1)
-    if actual_size < 0:
+    if actual_size < 0:  # pragma: no cover - Darwin fallback runs only when native os.listxattr is absent.
         raise OSError(ctypes.get_errno(), os.strerror(ctypes.get_errno()), path)
     return tuple(
         sorted(

@@ -14,6 +14,7 @@ from fabrica.features.web_content_fetching.application.dtos import (
     FetchError,
     FetchErrorCode,
     FetchFailure,
+    FetchResult,
     FetchSuccess,
     FetchWebContentCommand,
     FetchWebContentLimits,
@@ -24,6 +25,7 @@ from fabrica.features.web_content_fetching.application.ports import FetchWebCont
 from fabrica.features.web_content_fetching.application.use_cases import FetchWebContent
 from fabrica.features.web_content_fetching.application.use_cases.fetch_web_content import (
     _request_deadline,
+    _task_outcome,
     _wait_for_retry,
 )
 
@@ -273,6 +275,74 @@ def test_retry_wait_stops_when_cancellation_is_requested() -> None:
     )
 
     assert not asyncio.run(_wait_for_retry(1.0, context, float("inf")))
+
+
+def test_retry_wait_completes_when_the_deadline_allows_the_requested_delay() -> None:
+    context = FetchWebContentContext(
+        public_web_enabled=True,
+        cancellation=_Cancellation(),
+        deadline_at=None,
+        limits=FetchWebContentLimits(),
+    )
+
+    assert asyncio.run(_wait_for_retry(0.001, context, monotonic() + 1.0))
+
+
+def test_fetch_returns_timeout_when_retry_delay_exceeds_request_deadline() -> None:
+    request = FetchWebContentRequest("https://example.com/retry")
+    fetcher = _Fetcher(
+        {
+            request.url: (
+                FetchAttemptFailure(
+                    FetchError(FetchErrorCode.CONNECTION_FAILED),
+                    retryable=True,
+                    retry_after_seconds=1.0,
+                ),
+            )
+        }
+    )
+    context = _context_with_limits(per_request_timeout_seconds=0.001)
+
+    result = asyncio.run(
+        FetchWebContent(fetcher, _Processor()).fetch(FetchWebContentCommand((request,)), context)
+    ).results[0]
+
+    assert isinstance(result, FetchFailure)
+    assert result.error.code is FetchErrorCode.FETCH_TIMEOUT
+
+
+def test_fetch_one_returns_cancellation_before_starting_an_attempt() -> None:
+    cancellation = _Cancellation(cancelled=True)
+    context = FetchWebContentContext(
+        public_web_enabled=True,
+        cancellation=cancellation,
+        deadline_at=datetime.now(UTC) + timedelta(seconds=5),
+        limits=FetchWebContentLimits(),
+    )
+
+    result = asyncio.run(
+        FetchWebContent(_Fetcher({}), _Processor())._fetch_one(  # noqa: SLF001 - scheduler preflight makes this guard unreachable through fetch().
+            FetchWebContentRequest("https://example.com"), context
+        )
+    )
+
+    assert isinstance(result, FetchFailure)
+    assert result.error.code is FetchErrorCode.FETCH_CANCELLED
+
+
+def test_task_outcome_maps_cancelled_scheduler_task_to_a_failure() -> None:
+    async def cancelled_task() -> FetchFailure:
+        raise asyncio.CancelledError
+
+    async def run() -> FetchResult:
+        task = asyncio.create_task(cancelled_task())
+        await asyncio.sleep(0)
+        return _task_outcome(task, FetchWebContentRequest("https://example.com"))
+
+    result = asyncio.run(run())
+
+    assert isinstance(result, FetchFailure)
+    assert result.error.code is FetchErrorCode.FETCH_CANCELLED
 
 
 def test_request_deadline_uses_per_request_timeout_without_a_host_deadline() -> None:

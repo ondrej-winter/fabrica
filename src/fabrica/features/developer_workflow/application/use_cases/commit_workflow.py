@@ -529,7 +529,9 @@ class ConfirmedCommitWorkflow:
 
 
 def _commit_message_runtime_failure_category(status: DeveloperWorkflowStatus) -> str:
-    if status is DeveloperWorkflowStatus.CONFIGURATION_ERROR:
+    if (
+        status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
+    ):  # pragma: no cover - typed generation errors expose only configuration or model statuses.
         return "commit_message_configuration_failure"
     return "commit_message_model_failure"
 
@@ -542,7 +544,9 @@ def _pre_commit_metadata(result: PreCommitRunResult) -> dict[str, str | int | fl
 
 
 def _required_analyzed_index_tree_id(result: ConfirmedCommitWorkflowResult) -> str:
-    if result.analyzed_index_tree_id is None:
+    if (
+        result.analyzed_index_tree_id is None
+    ):  # pragma: no cover - successful generation constructs this binding from a loaded snapshot.
         msg = "successful confirmed commit generation must retain an analyzed index tree identity"
         raise ValueError(msg)
     return result.analyzed_index_tree_id

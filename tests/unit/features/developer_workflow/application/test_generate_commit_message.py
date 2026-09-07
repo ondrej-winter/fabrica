@@ -145,6 +145,18 @@ class FakeEvidenceRecorder:
         self.reset_count += 1
 
 
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"max_staged_files": 0}, "max_staged_files"),
+        ({"max_parallel_analysis": 0}, "max_parallel_analysis"),
+    ],
+)
+def test_generate_commit_message_options_reject_non_positive_bounds(kwargs: dict[str, int], message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        GenerateCommitMessageOptions(**kwargs)
+
+
 def test_generate_commit_message_lists_files_before_loading_and_preserves_evidence_order() -> None:
     events: list[str] = []
     first = GitStagedFile(path="src/file.py", status=GitStagedFileStatus.MODIFIED)

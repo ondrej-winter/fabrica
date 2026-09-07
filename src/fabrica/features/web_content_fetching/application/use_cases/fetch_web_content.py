@@ -55,14 +55,16 @@ class FetchWebContent(FetchWebContentPort):
             while len(active) < context.limits.max_parallel_fetches and queued:
                 index, request = queued.popleft()
                 active[asyncio.create_task(self._fetch_one(request, context))] = (index, request)
-            if not active:
+            if not active:  # pragma: no cover - positive configured concurrency schedules every queued valid request.
                 break
             done, _ = await asyncio.wait(active, timeout=0.01, return_when=asyncio.FIRST_COMPLETED)
             for task in done:
                 index, request = active.pop(task)
                 results[index] = _task_outcome(task, request)
 
-        if any(result is None for result in results):
+        if any(
+            result is None for result in results
+        ):  # pragma: no cover - scheduler fills one outcome for every request.
             msg = "fetch scheduler did not produce an outcome for every request"
             raise RuntimeError(msg)
         return limit_batch_content(
@@ -100,8 +102,9 @@ class FetchWebContent(FetchWebContentPort):
                     else FetchErrorCode.FETCH_TIMEOUT
                 )
                 return _failure(request, code)
-        msg = "fetch retry loop exhausted unexpectedly"
-        raise RuntimeError(msg)
+        # Each bounded retry iteration returns before exhaustion.
+        msg = "fetch retry loop exhausted unexpectedly"  # pragma: no cover
+        raise RuntimeError(msg)  # pragma: no cover
 
     def _normalize_outcome(
         self,

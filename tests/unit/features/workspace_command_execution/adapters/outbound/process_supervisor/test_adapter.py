@@ -2,10 +2,13 @@
 
 import asyncio
 import os
+import signal
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from time import monotonic, sleep
+from typing import cast
 
 import pytest
 
@@ -26,11 +29,37 @@ from fabrica.features.workspace_command_execution.application.ports import RunCo
 
 NON_ZERO_EXIT_CODE = 7
 PROCESS_CLEANUP_TIMEOUT_SECONDS = 2.0
+TEST_PROCESS_ID = 123
 
 
 @dataclass(frozen=True)
 class Cancellation:
     is_cancelled: bool = False
+
+
+@dataclass
+class _Stream:
+    content: bytes
+
+    async def read(self) -> bytes:
+        return self.content
+
+
+@dataclass
+class _Process:
+    stdout: _Stream | None = None
+    stderr: _Stream | None = None
+    returncode: int | None = 0
+    pid: int | None = TEST_PROCESS_ID
+
+    async def wait(self) -> int | None:
+        return self.returncode
+
+
+class _SlowProcess(_Process):
+    async def wait(self) -> int | None:
+        await asyncio.sleep(1)
+        return self.returncode
 
 
 def _command(*, mode: CommandExecutionMode = CommandExecutionMode.ARGV, timeout_ms: int = 1_000) -> PlannedCommand:
@@ -119,6 +148,168 @@ def test_supervisor_maps_missing_executable_to_spawn_failure(tmp_path: Path) -> 
     assert result.status is CommandExecutionStatus.SPAWN_FAILED
     assert result.error is not None
     assert result.error.code is CommandErrorCode.EXECUTABLE_NOT_FOUND
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_code"),
+    [
+        (PermissionError(), CommandErrorCode.PERMISSION_DENIED),
+        (OSError(), CommandErrorCode.SPAWN_FAILED),
+    ],
+)
+def test_supervisor_maps_other_spawn_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    error: OSError,
+    expected_code: CommandErrorCode,
+) -> None:
+    async def fail_spawn(*args: object, **kwargs: object) -> _Process:
+        del args, kwargs
+        raise error
+
+    monkeypatch.setattr(adapter.asyncio, "create_subprocess_exec", fail_spawn)
+
+    result = asyncio.run(_supervisor(tmp_path).run(_command(), _context()))
+
+    assert result.status is CommandExecutionStatus.SPAWN_FAILED
+    assert result.error is not None
+    assert result.error.code is expected_code
+
+
+def test_supervisor_rejects_processes_without_required_streams(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    process = _Process(stdout=None, stderr=_Stream(b"stderr"), pid=TEST_PROCESS_ID)
+
+    async def spawn(*args: object, **kwargs: object) -> _Process:
+        del args, kwargs
+        return process
+
+    async def terminate(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+
+    monkeypatch.setattr(adapter.asyncio, "create_subprocess_exec", spawn)
+    monkeypatch.setattr(adapter, "_terminate_process_group", terminate)
+
+    result = asyncio.run(_supervisor(tmp_path).run(_command(), _context()))
+
+    assert result.status is CommandExecutionStatus.SPAWN_FAILED
+    assert result.error is not None
+    assert result.error.code is CommandErrorCode.INTERNAL_EXECUTION_ERROR
+
+
+@pytest.mark.parametrize(
+    ("returncode", "expected_signal"),
+    [(None, None), (-signal.SIGTERM, "SIGTERM")],
+)
+def test_supervisor_maps_missing_return_code_and_signal_exit(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    returncode: int | None,
+    expected_signal: str | None,
+) -> None:
+    process = _Process(stdout=_Stream(b"out"), stderr=_Stream(b"err"), returncode=returncode)
+
+    async def spawn(*args: object, **kwargs: object) -> _Process:
+        del args, kwargs
+        return process
+
+    monkeypatch.setattr(adapter.asyncio, "create_subprocess_exec", spawn)
+    if returncode is None:
+
+        async def complete_without_return_code(*args: object, **kwargs: object) -> CommandExecutionStatus | None:
+            del args, kwargs
+            return None
+
+        monkeypatch.setattr(adapter, "_wait_for_completion", complete_without_return_code)
+
+    result = asyncio.run(_supervisor(tmp_path).run(_command(), _context()))
+
+    if expected_signal is None:
+        assert result.status is CommandExecutionStatus.SPAWN_FAILED
+        assert result.error is not None
+        assert result.error.code is CommandErrorCode.INTERNAL_EXECUTION_ERROR
+    else:
+        assert result.status is CommandExecutionStatus.EXITED
+        assert result.signal == expected_signal
+
+
+def test_supervisor_reaps_then_reraises_caller_cancellation(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    process = _Process(stdout=_Stream(b""), stderr=_Stream(b""), returncode=None)
+
+    async def spawn(*args: object, **kwargs: object) -> _Process:
+        del args, kwargs
+        return process
+
+    async def cancelled_wait(*args: object, **kwargs: object) -> CommandExecutionStatus | None:
+        del args, kwargs
+        raise asyncio.CancelledError
+
+    terminated: list[_Process] = []
+
+    async def terminate(candidate: _Process, grace_seconds: float) -> None:
+        del grace_seconds
+        terminated.append(candidate)
+
+    monkeypatch.setattr(adapter.asyncio, "create_subprocess_exec", spawn)
+    monkeypatch.setattr(adapter, "_wait_for_completion", cancelled_wait)
+    monkeypatch.setattr(adapter, "_terminate_process_group", terminate)
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(_supervisor(tmp_path).run(_command(), _context()))
+
+    assert terminated == [process]
+
+
+@pytest.mark.parametrize(
+    ("shell_executable", "termination_grace_seconds", "message"),
+    [
+        ("", 1.0, "shell_executable"),
+        ("/bin/sh\x00", 1.0, "shell_executable"),
+        ("/bin/sh", 0.0, "termination_grace_seconds"),
+    ],
+)
+def test_supervisor_settings_reject_invalid_values(
+    shell_executable: str, termination_grace_seconds: float, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        PosixCommandSupervisorSettings(shell_executable, termination_grace_seconds)
+
+
+def test_effective_deadline_honors_an_expired_host_deadline() -> None:
+    deadline = adapter._effective_deadline(  # noqa: SLF001 - regression test for host deadline bounding.
+        1_000,
+        datetime.now(UTC) - timedelta(seconds=1),
+    )
+
+    assert deadline <= monotonic()
+
+
+def test_termination_skips_processes_without_a_pid() -> None:
+    process = _Process(pid=None)
+
+    asyncio.run(
+        adapter._terminate_process_group(  # noqa: SLF001 - cleanup helper boundary.
+            cast("asyncio.subprocess.Process", process), 0.01
+        )
+    )
+
+
+def test_termination_retries_graceful_reap_after_a_poll_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    process = _SlowProcess(pid=TEST_PROCESS_ID)
+    signals: list[signal.Signals] = []
+    probe_results = iter((True, True, False))
+
+    monkeypatch.setattr(adapter, "_process_group_exists", lambda _process_group_id: next(probe_results))
+    monkeypatch.setattr(
+        adapter, "_send_group_signal", lambda _process_group_id, sent_signal: signals.append(sent_signal)
+    )
+
+    asyncio.run(
+        adapter._terminate_process_group(  # noqa: SLF001 - cleanup helper boundary.
+            cast("asyncio.subprocess.Process", process), 0.001
+        )
+    )
+
+    assert signals == [signal.SIGTERM]
 
 
 def test_process_group_probe_treats_permission_denial_as_not_supervisor_owned(monkeypatch: pytest.MonkeyPatch) -> None:

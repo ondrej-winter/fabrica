@@ -18,19 +18,25 @@ from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem impor
 )
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import adapter as posix_snapshot_adapter
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.adapter import (
+    _destination_parent_device,
     _list_extended_attribute_names,
     _list_extended_attributes,
     _reject_cross_device_move,
     _reject_path_alias,
     _reject_unsupported_metadata,
+    _snapshot_action_destination,
+    _snapshot_action_source,
+    _snapshot_optional_path,
     _unsupported_existing_path_result,
     _validate_existing_parent,
+    _validate_parent_chain,
 )
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
     PatchMutationGuarantee,
     PatchPathEvidence,
+    PatchPlan,
     PatchResult,
     PatchResultStatus,
 )
@@ -72,6 +78,223 @@ def test_posix_snapshot_adapter_fails_closed_without_production_capability(
     assert result.error.metadata["filesystem_type"]
     assert result.error.metadata["workspace_device"] == tmp_path.stat().st_dev
     assert "supervised_helper_ownership" in str(result.error.metadata["unsupported_reasons"])
+
+
+def test_posix_snapshot_adapter_reads_supported_text_and_rejects_binary_or_missing_sources(tmp_path: Path) -> None:
+    adapter = PosixPatchWorkspaceSnapshotAdapter(tmp_path)
+    (tmp_path / "source.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / "binary.py").write_bytes(b"\0")
+
+    snapshot = run(adapter.read_text_snapshot("source.py"))
+    binary_result = run(adapter.read_text_snapshot("binary.py"))
+    missing_result = run(adapter.read_text_snapshot("missing.py"))
+
+    assert not isinstance(snapshot, PatchResult)
+    assert snapshot.lines == ("value = 1",)
+    assert isinstance(binary_result, PatchResult)
+    assert binary_result.error is not None
+    assert binary_result.error.code == "BINARY_FILE"
+    assert isinstance(missing_result, PatchResult)
+    assert missing_result.error is not None
+    assert missing_result.error.code == "IO_ERROR"
+
+
+def test_posix_snapshot_adapter_rejects_missing_workspace_root_without_mutation(tmp_path: Path) -> None:
+    result = PosixPatchWorkspaceSnapshotAdapter(tmp_path / "missing").build_planning_snapshot(())
+
+    assert isinstance(result, PatchResult)
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "IO_ERROR"
+
+
+def test_posix_snapshot_adapter_rejects_path_alias_inspection_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def deny_scandir(_path: Path) -> object:
+        raise PermissionError(13, "denied")
+
+    monkeypatch.setattr(posix_snapshot_adapter.os, "scandir", deny_scandir)
+
+    result = _reject_path_alias(tmp_path, "new.py")
+
+    assert result is not None
+    assert result.error is not None
+    assert result.error.code == "IO_ERROR"
+
+
+def test_posix_snapshot_adapter_uses_existing_root_device_for_missing_destination_parents(tmp_path: Path) -> None:
+    assert _destination_parent_device(tmp_path, "generated/nested/new.py") == tmp_path.stat().st_dev
+
+
+def test_posix_snapshot_adapter_returns_none_for_accepted_capabilities(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        posix_snapshot_adapter,
+        "collect_posix_patch_workspace_capability_evidence",
+        lambda _root: capabilities.PosixPatchWorkspaceCapabilityEvidence(
+            platform="darwin",
+            machine="arm64",
+            workspace_device=1,
+            filesystem_type="apfs",
+            backend="native",
+            probes=(
+                capabilities.PosixPatchCapabilityProbe(
+                    "all_required", capabilities.PosixPatchCapabilityStatus.SUPPORTED, "supported"
+                ),
+            ),
+        ),
+    )
+
+    assert run(PosixPatchWorkspaceSnapshotAdapter(tmp_path).verify_workspace_capabilities()) is None
+
+
+def test_posix_snapshot_adapter_returns_current_revalidation_rejection(tmp_path: Path) -> None:
+    plan = PatchPlan(
+        plan_digest="sha256:" + "a" * 64,
+        actions=(PatchAction(index=0, kind=PatchActionKind.UPDATE, path="missing.py"),),
+    )
+
+    result = run(PosixPatchWorkspaceSnapshotAdapter(tmp_path).snapshot_plan_inputs(plan))
+
+    assert result is not None
+    assert result.error is not None
+    assert result.error.code == "SOURCE_NOT_FOUND"
+
+
+def test_posix_snapshot_adapter_returns_no_revalidation_result_for_current_plan(tmp_path: Path) -> None:
+    plan = PatchPlan(plan_digest="sha256:" + "a" * 64)
+
+    assert run(PosixPatchWorkspaceSnapshotAdapter(tmp_path).snapshot_plan_inputs(plan)) is None
+
+
+def test_posix_snapshot_adapter_returns_planning_snapshot_for_current_actions(tmp_path: Path) -> None:
+    snapshot = run(
+        PosixPatchWorkspaceSnapshotAdapter(tmp_path).snapshot_for_planning(
+            (PatchAction(index=0, kind=PatchActionKind.ADD, path="new.py", added_lines=("new",)),)
+        )
+    )
+
+    assert not isinstance(snapshot, PatchResult)
+    assert snapshot.evidence_by_path["new.py"].exists is False
+
+
+def test_posix_snapshot_adapter_rejects_path_alias_lstat_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def deny_lstat(_self: Path) -> os.stat_result:
+        raise PermissionError(13, "denied")
+
+    monkeypatch.setattr(Path, "lstat", deny_lstat)
+
+    result = _reject_path_alias(tmp_path, "new.py")
+
+    assert result is not None
+    assert result.error is not None
+    assert result.error.code == "IO_ERROR"
+
+
+def test_posix_snapshot_helpers_cover_missing_alias_entries_and_destination_alias_rejection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    missing_root = tmp_path / "missing"
+    assert _reject_path_alias(missing_root, "new.py") is None
+
+    alias_error = PatchResult(
+        status=PatchResultStatus.REJECTED,
+        mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
+        error=patch_error("PATH_ALIAS_COLLISION", message="alias"),
+    )
+    action = PatchAction(index=0, kind=PatchActionKind.ADD, path="new.py", added_lines=("new",))
+    monkeypatch.setattr(posix_snapshot_adapter, "_reject_path_alias", lambda _root, _path: alias_error)
+
+    assert _snapshot_action_destination(tmp_path, action, None, {}) is alias_error
+
+
+def test_posix_snapshot_helpers_reject_missing_root_device_symlink_parent_and_read_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(FileNotFoundError):
+        _destination_parent_device(tmp_path / "missing", "generated/new.py")
+
+    external = tmp_path / "external"
+    external.mkdir()
+    (tmp_path / "link").symlink_to(external, target_is_directory=True)
+    parent_result = _validate_parent_chain(tmp_path, "link/new.py")
+
+    assert parent_result is not None
+    assert parent_result.error is not None
+    assert parent_result.error.code == "SYMLINK_PATH_UNSUPPORTED"
+
+    target = tmp_path / "source.py"
+    target.write_text("source", encoding="utf-8")
+
+    def deny_read_bytes(_self: Path) -> bytes:
+        raise PermissionError(13, "denied")
+
+    monkeypatch.setattr(Path, "read_bytes", deny_read_bytes)
+    read_result = _snapshot_optional_path(tmp_path, "source.py")
+
+    assert isinstance(read_result, PatchResult)
+    assert read_result.error is not None
+    assert read_result.error.code == "IO_ERROR"
+
+
+def test_posix_snapshot_helpers_translate_source_destination_and_inspection_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    update = PatchAction(index=0, kind=PatchActionKind.UPDATE, path="missing.py")
+    move = PatchAction(index=1, kind=PatchActionKind.MOVE, path="source.py", destination_path="existing.py")
+    (tmp_path / "existing.py").write_text("existing", encoding="utf-8")
+
+    source_result = _snapshot_action_source(tmp_path, update)
+    destination_result = _snapshot_action_destination(
+        tmp_path,
+        move,
+        PatchPathEvidence(path="source.py", exists=True),
+        {},
+    )
+
+    assert isinstance(source_result, PatchResult)
+    assert source_result.error is not None
+    assert source_result.error.code == "SOURCE_NOT_FOUND"
+    assert isinstance(destination_result, PatchResult)
+    assert destination_result.error is not None
+    assert destination_result.error.code == "MOVE_TARGET_EXISTS"
+
+    def reject_optional_path(_root: Path, _path: str) -> PatchResult:
+        return PatchResult(
+            status=PatchResultStatus.REJECTED,
+            mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
+            error=patch_error("IO_ERROR", message="inspection failed"),
+        )
+
+    monkeypatch.setattr(posix_snapshot_adapter, "_snapshot_optional_path", reject_optional_path)
+    result = _snapshot_action_source(tmp_path, update)
+
+    assert isinstance(result, PatchResult)
+    assert result.error is not None
+    assert result.error.code == "IO_ERROR"
+
+
+def test_posix_snapshot_helpers_translate_parent_and_optional_path_os_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def reject_lstat(_self: Path) -> os.stat_result:
+        raise PermissionError(13, "denied")
+
+    monkeypatch.setattr(Path, "lstat", reject_lstat)
+
+    parent_result = _validate_parent_chain(tmp_path, "parent/new.py")
+    optional_result = _snapshot_optional_path(tmp_path, "file.py")
+
+    assert parent_result is not None
+    assert parent_result.error is not None
+    assert parent_result.error.code == "IO_ERROR"
+    assert isinstance(optional_result, PatchResult)
+    assert optional_result.error is not None
+    assert optional_result.error.code == "IO_ERROR"
 
 
 @pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")

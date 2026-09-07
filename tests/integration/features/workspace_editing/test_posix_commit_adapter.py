@@ -15,16 +15,28 @@ from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem impor
     PosixPatchWorkspaceSnapshotAdapter,
 )
 from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import commit as posix_commit_module
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.commit import (
+    _action_for_step,
+    _ancestor_digest,
+    _payload_mode,
+    _revalidate_staging,
+    _roll_back_file,
+)
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
+    PatchCommitOperation,
+    PatchCommitStep,
     PatchJournalRecord,
     PatchJournalState,
     PatchMutationGuarantee,
+    PatchPathEvidence,
     PatchPathOutcomeState,
+    PatchPlan,
     PatchRecoveryAction,
     PatchRecoveryStatus,
     PatchResultStatus,
+    PatchRollbackEntry,
 )
 from fabrica.features.workspace_editing.application.use_cases import PlanPatch
 
@@ -674,6 +686,171 @@ def test_posix_commit_adapter_recovers_after_interruption_at_each_visible_commit
     assert delete_path.read_text(encoding="utf-8") == "delete me\n"
     assert move_path.read_text(encoding="utf-8") == "old move\n"
     assert not (tmp_path / "generated" / "move.py").exists()
+
+
+@pytest.mark.parametrize(
+    ("state", "rollback_entry_mode", "expected_action", "expected_status"),
+    [
+        (PatchJournalState.PLANNED, "absent", PatchRecoveryAction.NO_ACTION, PatchRecoveryStatus.CLEAN),
+        (
+            PatchJournalState.PREPARED,
+            "absent",
+            PatchRecoveryAction.ROLL_BACK_PREPARATION,
+            PatchRecoveryStatus.ROLLED_BACK,
+        ),
+        (
+            PatchJournalState.COMMITTING,
+            "present",
+            PatchRecoveryAction.ROLL_BACK_COMMIT,
+            PatchRecoveryStatus.ROLLED_BACK,
+        ),
+        (
+            PatchJournalState.COMMITTING,
+            "absent",
+            PatchRecoveryAction.REQUIRE_OPERATOR_RECOVERY,
+            PatchRecoveryStatus.RECOVERY_REQUIRED,
+        ),
+    ],
+)
+def test_posix_commit_adapter_inspects_recovery_state_deterministically(
+    tmp_path: Path,
+    state: PatchJournalState,
+    rollback_entry_mode: str,
+    expected_action: PatchRecoveryAction,
+    expected_status: PatchRecoveryStatus,
+) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    rollback_entries = (
+        (
+            PatchRollbackEntry(
+                path="generated/add.py",
+                operation=PatchActionKind.ADD,
+                destination_path=None,
+                backup_path=None,
+                preimage=PatchPathEvidence(path="generated/add.py", exists=False),
+            ),
+        )
+        if rollback_entry_mode == "present"
+        else ()
+    )
+    inspected_journal = PatchJournalRecord(
+        journal_digest=journal.journal_digest,
+        plan_digest=plan.plan_digest,
+        state=state,
+        rollback_entries=rollback_entries,
+    )
+
+    decision = run(PosixPatchCommitAdapter(tmp_path).inspect(inspected_journal))
+
+    assert decision.action is expected_action
+    assert decision.status is expected_status
+
+
+def test_posix_commit_adapter_rejects_unreadable_durable_journal_before_commit(tmp_path: Path) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+    _journal_path(tmp_path, journal).unlink()
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert not (tmp_path / "generated" / "add.py").exists()
+
+
+def test_posix_commit_adapter_rejects_destination_parent_descriptor_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "generated").mkdir()
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+
+    def deny_fstat(_descriptor: int) -> os.stat_result:
+        raise OSError(13, "denied")
+
+    monkeypatch.setattr(posix_commit_module.os, "fstat", deny_fstat)
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    assert not (tmp_path / "generated" / "add.py").exists()
+
+
+def test_posix_commit_adapter_suppresses_stage_cleanup_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    stage_root = tmp_path / "stage"
+    stage_root.mkdir()
+
+    def fail_rmtree(_path: Path) -> None:
+        raise OSError(13, "denied")
+
+    monkeypatch.setattr(posix_commit_module.shutil, "rmtree", fail_rmtree)
+
+    posix_commit_module._remove_stage_root(stage_root)  # noqa: SLF001 - cleanup failure is intentionally suppressed.
+
+    assert stage_root.exists()
+
+
+def test_posix_commit_helpers_default_missing_or_invalid_source_modes() -> None:
+    action = PatchAction(index=0, kind=PatchActionKind.UPDATE, path="source.py", added_lines=("updated",))
+    missing_evidence_plan = PatchPlan(plan_digest="sha256:" + "a" * 64, actions=(action,))
+    invalid_mode_plan = PatchPlan(
+        plan_digest="sha256:" + "b" * 64,
+        actions=(action,),
+        path_evidence=(PatchPathEvidence(path="source.py", exists=True, metadata={"mode": "invalid"}),),
+    )
+
+    assert _payload_mode(missing_evidence_plan, action) == DEFAULT_ADD_MODE
+    assert _payload_mode(invalid_mode_plan, action) == DEFAULT_ADD_MODE
+
+
+def test_posix_commit_helpers_reject_changed_stage_shape_and_require_action_indices(tmp_path: Path) -> None:
+    action = PatchAction(index=0, kind=PatchActionKind.ADD, path="new.py", added_lines=("new",))
+    plan = PatchPlan(plan_digest="sha256:" + "a" * 64, actions=(action,))
+    stage_root = tmp_path / "stage"
+    stage_root.mkdir()
+    (stage_root / "000000.payload").mkdir()
+
+    result = _revalidate_staging(stage_root, plan, _payload_mode)
+
+    assert result is not None
+    assert result.error is not None
+    assert result.error.code == "STALE_PLAN"
+    with pytest.raises(ValueError, match="action index"):
+        _action_for_step(
+            PatchPlan(
+                plan_digest="sha256:" + "c" * 64,
+                commit_steps=(PatchCommitStep(PatchCommitOperation.WRITE_FILE, "new.py"),),
+            ),
+            None,
+        )
+
+
+def test_posix_commit_helpers_fall_back_to_root_ancestor_and_require_rollback_preimages(tmp_path: Path) -> None:
+    root_digest = _ancestor_digest(tmp_path, "missing/child.py")
+    assert root_digest
+
+    entry = PatchRollbackEntry(
+        path="source.py",
+        operation=PatchActionKind.UPDATE,
+        destination_path=None,
+        backup_path=None,
+        preimage=PatchPathEvidence(path="source.py", exists=True),
+        postimage=PatchPathEvidence(path="source.py", exists=True),
+    )
+    (tmp_path / "source.py").write_text("updated", encoding="utf-8")
+
+    outcome, recovery_required = _roll_back_file(tmp_path, entry)
+
+    assert recovery_required
+    assert outcome.final_state is PatchPathOutcomeState.UNKNOWN
 
 
 class _InjectedCommitInterruptionError(Exception):

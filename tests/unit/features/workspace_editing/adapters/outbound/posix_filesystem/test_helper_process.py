@@ -43,20 +43,26 @@ class _Process:
 
 
 class _ParentConnection:
-    def __init__(self, outcome: object | None) -> None:
+    def __init__(self, outcome: object | None, *, ready: bool | None = None) -> None:
         self.outcome = outcome
+        self.ready = outcome is not None if ready is None else ready
         self.closed = False
 
     def poll(self) -> bool:
-        return self.outcome is not None
+        return self.ready
 
     def recv(self) -> object:
         outcome = self.outcome
-        self.outcome = None
+        self.ready = False
         return outcome
 
     def close(self) -> None:
         self.closed = True
+
+
+class _EofParentConnection(_ParentConnection):
+    def recv(self) -> object:
+        raise EOFError
 
 
 class _ChildConnection:
@@ -116,6 +122,77 @@ def test_supervisor_reports_recovery_required_when_helper_exits_without_ipc_outc
 
     assert result.status is PatchResultStatus.RECOVERY_REQUIRED
     assert result.mutation_guarantee is PatchMutationGuarantee.PARTIAL_OR_UNCERTAIN_MUTATION
+    assert process.joined is True
+
+
+def test_supervisor_returns_preparation_outcome_with_matching_durable_evidence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    journal = _journal()
+    parent = _ParentConnection(None, ready=True)
+    process = _Process(alive=False)
+    durable = PatchJournalRecord(journal.journal_digest, journal.plan_digest, PatchJournalState.PREPARED)
+    monkeypatch.setattr(helper_process.multiprocessing, "Pipe", lambda **_kwargs: (parent, _ChildConnection()))
+    monkeypatch.setattr(helper_process, "load_durable_journal", lambda *_args: durable)
+
+    adapter = helper_process.PosixSupervisedPatchMutationAdapter(tmp_path, process_factory=lambda **_kwargs: process)
+    result = run(adapter._run(helper_process.PatchHelperOperation.PREPARE_FILES, _plan(), journal))  # noqa: SLF001
+
+    assert result is None
+    assert parent.closed is True
+    assert process.joined is True
+
+
+def test_supervisor_returns_rollback_outcome_with_matching_durable_evidence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    journal = _journal()
+    outcome = _rolled_back(journal)
+    parent = _ParentConnection(outcome)
+    process = _Process(alive=False)
+    durable = PatchJournalRecord(journal.journal_digest, journal.plan_digest, PatchJournalState.ROLLED_BACK)
+    monkeypatch.setattr(helper_process.multiprocessing, "Pipe", lambda **_kwargs: (parent, _ChildConnection()))
+    monkeypatch.setattr(helper_process, "load_durable_journal", lambda *_args: durable)
+
+    adapter = helper_process.PosixSupervisedPatchMutationAdapter(tmp_path, process_factory=lambda **_kwargs: process)
+    result = run(adapter._run(helper_process.PatchHelperOperation.ROLL_BACK, None, journal))  # noqa: SLF001
+
+    assert result is outcome
+    assert parent.closed is True
+    assert process.joined is True
+
+
+def test_supervisor_rejects_invalid_ipc_outcome_and_closes_helper_resources(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    journal = _journal()
+    parent = _ParentConnection("invalid")
+    process = _Process(alive=False)
+    monkeypatch.setattr(helper_process.multiprocessing, "Pipe", lambda **_kwargs: (parent, _ChildConnection()))
+
+    adapter = helper_process.PosixSupervisedPatchMutationAdapter(tmp_path, process_factory=lambda **_kwargs: process)
+    result = run(adapter._run(helper_process.PatchHelperOperation.COMMIT, _plan(), journal))  # noqa: SLF001
+
+    assert result is not None
+    assert result.status is PatchResultStatus.INDETERMINATE_COMMIT_STATE
+    assert parent.closed is True
+    assert process.joined is True
+
+
+def test_supervisor_requires_recovery_when_ipc_closes_before_receipt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    journal = _journal()
+    parent = _EofParentConnection(_committed(journal))
+    process = _Process(alive=False)
+    monkeypatch.setattr(helper_process.multiprocessing, "Pipe", lambda **_kwargs: (parent, _ChildConnection()))
+
+    adapter = helper_process.PosixSupervisedPatchMutationAdapter(tmp_path, process_factory=lambda **_kwargs: process)
+    result = run(adapter._run(helper_process.PatchHelperOperation.ROLL_BACK, None, journal))  # noqa: SLF001
+
+    assert result is not None
+    assert result.status is PatchResultStatus.RECOVERY_REQUIRED
+    assert parent.closed is True
     assert process.joined is True
 
 

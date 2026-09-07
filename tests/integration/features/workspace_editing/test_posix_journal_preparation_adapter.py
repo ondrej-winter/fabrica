@@ -1,13 +1,18 @@
 """Integration tests for POSIX apply-patch journaled preparation effects."""
 
 import json
+import os
 import sys
 from asyncio import run
 from pathlib import Path
 
 import pytest
 
-from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import PosixPatchJournalAndPreparationAdapter
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import (
+    PosixPatchJournalAndPreparationAdapter,
+)
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem import journal as journal_module
+from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem.journal import load_durable_journal
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
@@ -162,9 +167,121 @@ def test_posix_journal_round_trips_path_outcomes_and_rollback_entries(tmp_path: 
     assert restored.rollback_entries == (rollback_entry, absent_postimage_entry)
 
 
-def _plan(*directories: str) -> PatchPlan:
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX preparation adapter targets macOS/Linux")
+def test_posix_journal_lists_only_non_terminal_records(tmp_path: Path) -> None:
+    adapter = PosixPatchJournalAndPreparationAdapter(tmp_path)
+    planned = run(adapter.create(_plan("planned")))
+    committed = run(adapter.create(_plan("committed", plan_digest="sha256:" + "2" * 64)))
+    committed = run(adapter.transition(committed, PatchJournalState.PREPARING))
+    committed = run(adapter.transition(committed, PatchJournalState.PREPARED))
+    committed = run(adapter.transition(committed, PatchJournalState.COMMITTING))
+    run(adapter.transition(committed, PatchJournalState.COMMITTED))
+
+    incomplete = run(adapter.list_incomplete())
+
+    assert incomplete == (planned,)
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX preparation adapter targets macOS/Linux")
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "not-json",
+        json.dumps({"journal_digest": PLAN_DIGEST}),
+        json.dumps(
+            {
+                "created_directories": [],
+                "journal_digest": "sha256:" + "2" * 64,
+                "metadata": {},
+                "path_outcomes": [],
+                "plan_digest": PLAN_DIGEST,
+                "rollback_entries": [{"preimage": "invalid"}],
+                "state": PatchJournalState.PREPARED.value,
+            }
+        ),
+    ],
+)
+def test_posix_journal_load_durable_returns_none_for_invalid_record_payloads(tmp_path: Path, payload: str) -> None:
+    digest = "sha256:" + "2" * 64
+    journal_path = tmp_path / ".fabrica" / "apply-patch" / "journal" / f"{digest.removeprefix('sha256:')}.json"
+    journal_path.parent.mkdir(parents=True)
+    journal_path.write_text(payload, encoding="utf-8")
+
+    assert load_durable_journal(tmp_path, digest) is None
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX preparation adapter targets macOS/Linux")
+def test_posix_journal_prepare_rejects_directory_creation_io_errors(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    adapter = PosixPatchJournalAndPreparationAdapter(tmp_path)
+    plan = _plan("generated")
+    journal = run(adapter.create(plan))
+
+    def raise_io_error(_root: Path, _path: str, *, mode: int) -> os.stat_result:
+        _ = mode
+        raise OSError(13, "denied")
+
+    monkeypatch.setattr(journal_module, "create_directory", raise_io_error)
+
+    result = run(adapter.prepare(plan, journal))
+
+    assert result is not None
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "IO_ERROR"
+    assert run(adapter.list_incomplete()) == ()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX preparation adapter targets macOS/Linux")
+def test_posix_journal_prepare_rejects_non_directory_creation_result(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    regular_file = tmp_path / "regular-file"
+    regular_file.write_text("not a directory", encoding="utf-8")
+    adapter = PosixPatchJournalAndPreparationAdapter(tmp_path)
+    plan = _plan("generated")
+    journal = run(adapter.create(plan))
+    monkeypatch.setattr(journal_module, "create_directory", lambda *_args, **_kwargs: regular_file.stat())
+
+    result = run(adapter.prepare(plan, journal))
+
+    assert result is not None
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "DIRECTORY_CREATION_UNSAFE"
+    assert not (tmp_path / "generated").exists()
+
+
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX preparation adapter targets macOS/Linux")
+def test_posix_journal_requires_recovery_when_created_directory_identity_changes_before_rollback(
+    tmp_path: Path,
+) -> None:
+    adapter = PosixPatchJournalAndPreparationAdapter(tmp_path)
+    plan = _plan("generated")
+    journal = run(adapter.create(plan))
+    preparing = run(adapter.transition(journal, PatchJournalState.PREPARING))
+    generated = tmp_path / "generated"
+    generated.mkdir()
+    created = PatchDirectoryOutcome(
+        path="generated",
+        planned_effect=PatchDirectoryPlannedEffect.CREATE_DIRECTORY,
+        final_state=PatchDirectoryOutcomeState.CREATED,
+        reason="parent_for_destination",
+        identity_digest="sha256:" + "3" * 64,
+    )
+
+    result = run(adapter._roll_back_preparation(preparing, [created]))  # noqa: SLF001
+
+    assert result.status is PatchResultStatus.RECOVERY_REQUIRED
+    assert result.error is not None
+    assert result.error.code == "CREATED_DIRECTORY_REMOVAL_UNCERTAIN"
+    assert (tmp_path / "generated").is_dir()
+
+
+def _plan(*directories: str, plan_digest: str = PLAN_DIGEST) -> PatchPlan:
     return PatchPlan(
-        plan_digest=PLAN_DIGEST,
+        plan_digest=plan_digest,
         actions=(PatchAction(index=0, kind=PatchActionKind.ADD, path="src/generated/nested/new.py"),),
         created_directories=tuple(
             PatchDirectoryOutcome(

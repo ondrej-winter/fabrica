@@ -226,8 +226,9 @@ def _spawn_argv(command: PlannedCommand, shell_executable: str) -> tuple[str, ..
             return command.request.argv
     elif command.request.shell is not None:
         return (shell_executable, "-c", command.request.shell)
-    msg = "planned command is missing its validated invocation"
-    raise RuntimeError(msg)
+    # PlannedCommand originates from validated CommandRequest DTOs.
+    msg = "planned command is missing its validated invocation"  # pragma: no cover
+    raise RuntimeError(msg)  # pragma: no cover
 
 
 def _command_preview(command: PlannedCommand) -> str:

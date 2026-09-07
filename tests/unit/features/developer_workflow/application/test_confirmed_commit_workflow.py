@@ -201,6 +201,47 @@ def test_confirmed_commit_snapshot_error_fails_closed_before_generation() -> Non
     assert generator.skill_ids == []
 
 
+def test_confirmed_commit_snapshot_error_after_generation_retains_no_recommendation() -> None:
+    error = GitRepositorySnapshotLoadError(
+        "repository snapshot timed out",
+        category=GitRepositorySnapshotFailureCategory.TIMED_OUT,
+    )
+    generator = FakeGenerator(_generate_result(_recommendation()))
+    result = asyncio.run(
+        ConfirmedCommitWorkflow(
+            generator=generator,
+            committer=FakeCommitter(),
+            pre_commit_runner=FakePreCommitRunner(),
+            snapshot_reader=FakeSnapshotReader(["a" * 40, error]),
+        ).generate()
+    )
+
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
+    assert result.recommendation is None
+    assert result.observations[0].metadata["category"] is GitRepositorySnapshotFailureCategory.TIMED_OUT
+    assert generator.skill_ids == ["conventional-commits"]
+
+
+def test_confirmed_commit_snapshot_error_before_commit_retains_recommendation() -> None:
+    error = GitRepositorySnapshotLoadError(
+        "repository snapshot timed out",
+        category=GitRepositorySnapshotFailureCategory.TIMED_OUT,
+    )
+    recommendation = _recommendation()
+    committer = FakeCommitter()
+    result = ConfirmedCommitWorkflow(
+        generator=FakeGenerator(_generate_result(recommendation)),
+        committer=committer,
+        pre_commit_runner=FakePreCommitRunner(),
+        snapshot_reader=FakeSnapshotReader([error]),
+    ).commit(recommendation, analyzed_index_tree_id="a" * 40)
+
+    assert result.status is DeveloperWorkflowStatus.CONFIGURATION_ERROR
+    assert result.recommendation == recommendation
+    assert result.observations[0].metadata["category"] is GitRepositorySnapshotFailureCategory.TIMED_OUT
+    assert committer.calls == []
+
+
 def test_confirmed_commit_continues_when_pre_commit_is_not_configured() -> None:
     pre_commit = FakePreCommitRunner(PreCommitRunResult(status=PreCommitRunStatus.SKIPPED))
     generator = FakeGenerator(_generate_result(_recommendation()))
