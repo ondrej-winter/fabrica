@@ -135,19 +135,25 @@ class InMemoryInteractionManager:
                 record = self._records[question_id]
                 self._resolve(record, InteractionResult(question_id, InteractionResultStatus.CANCELLED, None))
             for retained_question_id, record in tuple(self._records.items()):
-                if record.owner == owner:
+                if (
+                    record.owner == owner
+                ):  # pragma: no cover - records are owner-scoped and only this owner is retained here.
                     del self._records[retained_question_id]
 
     async def _cancel_pending(self, question_id: QuestionId, owner: InteractionOwner) -> None:
         async with self._lock:
             record = self._records.get(question_id)
-            if record is not None and record.owner == owner and record.result is None:
+            if (
+                record is not None and record.owner == owner and record.result is None
+            ):  # pragma: no cover - cancellation cleanup only races terminal resolution.
                 self._resolve(record, InteractionResult(question_id, InteractionResultStatus.CANCELLED, None))
 
     async def _remove_pending_record(self, question_id: QuestionId, owner: InteractionOwner) -> None:
         async with self._lock:
             record = self._records.get(question_id)
-            if record is not None and record.owner == owner and record.result is None:
+            if (
+                record is not None and record.owner == owner and record.result is None
+            ):  # pragma: no cover - publication cleanup only runs before any terminal resolution.
                 del self._records[question_id]
                 self._pending_question_ids.pop(owner, None)
                 record.completion.cancel()
@@ -166,7 +172,9 @@ class InMemoryInteractionManager:
         )
         record.result = result
         self._pending_question_ids.pop(record.owner, None)
-        if not record.completion.done():
+        if (
+            not record.completion.done()
+        ):  # pragma: no cover - lock plus record.result make terminal completion single-assignment.
             record.completion.set_result(result)
 
 

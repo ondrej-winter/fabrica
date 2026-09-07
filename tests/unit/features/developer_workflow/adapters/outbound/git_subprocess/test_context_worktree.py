@@ -64,6 +64,20 @@ def test_worktree_status_summary_loads_status_and_head_hash_with_configured_runn
     ]
 
 
+def test_worktree_status_summary_maps_head_hash_lookup_failure_safely() -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="## feature/read-only\n"),
+            GitCommandResult(returncode=1, stderr="fatal: failed"),
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_status_summary()
+
+    assert exc_info.value.category is GitContextFailureCategory.GIT_FAILED
+
+
 def test_worktree_unstaged_files_lists_tracked_unstaged_changes() -> None:
     runner = FakeGitRunner(results=[GitCommandResult(returncode=0, stdout="M\tsrc/file.py\nR100\told.py\tnew.py\n")])
 
@@ -86,6 +100,23 @@ def test_worktree_unstaged_files_maps_oversized_file_list_safely() -> None:
 
     assert exc_info.value.category is GitContextFailureCategory.OVERSIZED_OUTPUT
     assert "src/file_" not in str(exc_info.value.metadata)
+
+
+@pytest.mark.parametrize(
+    ("method_name", "result"),
+    [
+        ("list_unstaged_files", GitCommandResult(returncode=1, stderr="fatal: failed")),
+        ("list_unstaged_files", GitCommandResult(returncode=0, stdout="unsupported")),
+        ("load_unstaged_diff", GitCommandResult(returncode=1, stderr="fatal: failed")),
+    ],
+)
+def test_worktree_context_maps_non_zero_and_malformed_outputs_safely(
+    method_name: str, result: GitCommandResult
+) -> None:
+    with pytest.raises(GitContextLoadError) as exc_info:
+        getattr(GitContextSubprocessLoader(runner=FakeGitRunner(results=[result])), method_name)()
+
+    assert exc_info.value.category is GitContextFailureCategory.GIT_FAILED
 
 
 @pytest.mark.parametrize("method_name", ["list_unstaged_files", "load_unstaged_diff"])
@@ -141,6 +172,22 @@ def test_worktree_unstaged_file_diff_validates_membership_before_diffing() -> No
         (("git", "--no-pager", "diff", "--name-status"), None, 10.0),
         (("git", "--no-pager", "diff", "--", "src/file.py"), None, 10.0),
     ]
+
+
+@pytest.mark.parametrize(
+    "file_diff_result",
+    [GitCommandResult(returncode=1, stderr="fatal: failed"), GitCommandResult(returncode=0, stdout="")],
+)
+def test_worktree_unstaged_file_diff_maps_non_zero_and_empty_output_safely(file_diff_result: GitCommandResult) -> None:
+    runner = FakeGitRunner(results=[GitCommandResult(returncode=0, stdout="M\tsrc/file.py\n"), file_diff_result])
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_unstaged_file_diff("src/file.py")
+
+    assert exc_info.value.category in {
+        GitContextFailureCategory.GIT_FAILED,
+        GitContextFailureCategory.NO_MATCHING_CHANGES,
+    }
 
 
 @pytest.mark.parametrize(

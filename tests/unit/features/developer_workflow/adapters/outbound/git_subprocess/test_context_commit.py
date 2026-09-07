@@ -365,3 +365,60 @@ def test_commit_log_maps_non_zero_git_failure_without_raw_stderr() -> None:
 
     assert exc_info.value.category is GitContextFailureCategory.GIT_FAILED
     assert "private path" not in str(exc_info.value.metadata)
+
+
+@pytest.mark.parametrize(
+    ("method_name", "results"),
+    [
+        (
+            "load_commit_details",
+            [
+                GitCommandResult(returncode=0, stdout="commit\n"),
+                GitCommandResult(returncode=1, stderr="fatal: failed"),
+            ],
+        ),
+        (
+            "list_commit_changed_files",
+            [
+                GitCommandResult(returncode=0, stdout="commit\n"),
+                GitCommandResult(returncode=1, stderr="fatal: failed"),
+            ],
+        ),
+        (
+            "load_commit_diff",
+            [
+                GitCommandResult(returncode=0, stdout="commit\n"),
+                GitCommandResult(returncode=1, stderr="fatal: failed"),
+            ],
+        ),
+    ],
+)
+def test_commit_context_maps_non_zero_command_results_safely(method_name: str, results: list[GitCommandResult]) -> None:
+    loader = GitContextSubprocessLoader(runner=FakeGitRunner(results=results))
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        getattr(loader, method_name)("commit")
+
+    assert exc_info.value.category is GitContextFailureCategory.GIT_FAILED
+
+
+@pytest.mark.parametrize(
+    "file_diff_result",
+    [GitCommandResult(returncode=1, stderr="fatal: failed"), GitCommandResult(returncode=0, stdout="")],
+)
+def test_commit_file_diff_maps_non_zero_and_empty_output_safely(file_diff_result: GitCommandResult) -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="commit\n"),
+            GitCommandResult(returncode=0, stdout="M\tsrc/file.py\n"),
+            file_diff_result,
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_commit_file_diff("commit", "src/file.py")
+
+    assert exc_info.value.category in {
+        GitContextFailureCategory.GIT_FAILED,
+        GitContextFailureCategory.NO_MATCHING_CHANGES,
+    }

@@ -87,6 +87,11 @@ def test_context_adapter_runner_uses_configured_cwd_timeout_and_fixed_argv() -> 
     assert runner.calls == [(("git", "--no-pager", "status", "--short", "--branch"), Path("repo"), 2.5)]
 
 
+def test_context_adapter_rejects_non_positive_timeout() -> None:
+    with pytest.raises(ValueError, match="positive"):
+        GitContextSubprocessLoader(timeout_seconds=0)
+
+
 @pytest.mark.parametrize(
     ("error", "category"),
     [

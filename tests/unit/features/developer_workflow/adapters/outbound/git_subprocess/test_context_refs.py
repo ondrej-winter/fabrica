@@ -161,6 +161,21 @@ def test_branch_ahead_behind_validates_explicit_base_ref() -> None:
     ]
 
 
+def test_branch_ahead_behind_maps_non_zero_count_command_safely() -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="## feature/read-only...origin/main\n"),
+            GitCommandResult(returncode=0, stdout="abc1234\n"),
+            GitCommandResult(returncode=1, stderr="fatal: failed"),
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_branch_ahead_behind()
+
+    assert exc_info.value.category is GitContextFailureCategory.GIT_FAILED
+
+
 def test_merge_base_validates_refs_before_loading_hashes() -> None:
     runner = FakeGitRunner(
         results=[
@@ -242,6 +257,78 @@ def test_ref_changed_files_maps_oversized_file_list_safely() -> None:
     assert "src/file_" not in str(exc_info.value.metadata)
 
 
+def test_ref_changed_files_maps_malformed_name_status_output_safely() -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="base\n"),
+            GitCommandResult(returncode=0, stdout="head\n"),
+            GitCommandResult(returncode=0, stdout="unsupported"),
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).list_ref_changed_files("origin/main", "HEAD")
+
+    assert exc_info.value.category is GitContextFailureCategory.GIT_FAILED
+
+
+@pytest.mark.parametrize(
+    "result", [GitCommandResult(returncode=1, stderr="fatal: failed"), GitCommandResult(returncode=0, stdout="")]
+)
+def test_ref_diff_maps_non_zero_and_empty_output_safely(result: GitCommandResult) -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="base\n"),
+            GitCommandResult(returncode=0, stdout="head\n"),
+            result,
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_ref_diff("origin/main", "HEAD")
+
+    assert exc_info.value.category in {
+        GitContextFailureCategory.GIT_FAILED,
+        GitContextFailureCategory.NO_MATCHING_CHANGES,
+    }
+
+
+@pytest.mark.parametrize(
+    "status_output",
+    ["## HEAD (no branch)\n", "## feature/read-only\n"],
+)
+def test_branch_ahead_behind_rejects_detached_or_upstream_less_branch(status_output: str) -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout=status_output),
+            GitCommandResult(returncode=0, stdout="abc1234\n"),
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_branch_ahead_behind()
+
+    assert exc_info.value.category is GitContextFailureCategory.INVALID_REF
+
+
+@pytest.mark.parametrize(
+    "result", [GitCommandResult(returncode=1, stderr="fatal: failed"), GitCommandResult(returncode=0, stdout="")]
+)
+def test_merge_base_maps_non_zero_and_empty_output_safely(result: GitCommandResult) -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="base\n"),
+            GitCommandResult(returncode=0, stdout="head\n"),
+            result,
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_merge_base("origin/main", "HEAD")
+
+    assert exc_info.value.category is GitContextFailureCategory.GIT_FAILED
+
+
 def test_ref_context_rejects_invalid_ref_before_inspection_without_raw_stderr() -> None:
     runner = FakeGitRunner(results=[GitCommandResult(returncode=1, stderr="fatal: private ref")])
 
@@ -251,6 +338,45 @@ def test_ref_context_rejects_invalid_ref_before_inspection_without_raw_stderr() 
     assert exc_info.value.category is GitContextFailureCategory.INVALID_REF
     assert "private ref" not in str(exc_info.value.metadata)
     assert runner.calls == [(("git", "--no-pager", "rev-parse", "--verify", "--quiet", "missing^{commit}"), None, 10.0)]
+
+
+@pytest.mark.parametrize("method_name", ["list_ref_changed_files", "load_ref_diff"])
+def test_ref_context_maps_non_zero_command_results_safely(method_name: str) -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="base\n"),
+            GitCommandResult(returncode=0, stdout="head\n"),
+            GitCommandResult(returncode=1, stderr="fatal: failed"),
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        getattr(GitContextSubprocessLoader(runner=runner), method_name)("origin/main", "HEAD")
+
+    assert exc_info.value.category is GitContextFailureCategory.GIT_FAILED
+
+
+@pytest.mark.parametrize(
+    "file_diff_result",
+    [GitCommandResult(returncode=1, stderr="fatal: failed"), GitCommandResult(returncode=0, stdout="")],
+)
+def test_ref_file_diff_maps_non_zero_and_empty_output_safely(file_diff_result: GitCommandResult) -> None:
+    runner = FakeGitRunner(
+        results=[
+            GitCommandResult(returncode=0, stdout="base\n"),
+            GitCommandResult(returncode=0, stdout="head\n"),
+            GitCommandResult(returncode=0, stdout="M\tsrc/file.py\n"),
+            file_diff_result,
+        ]
+    )
+
+    with pytest.raises(GitContextLoadError) as exc_info:
+        GitContextSubprocessLoader(runner=runner).load_ref_file_diff("origin/main", "HEAD", "src/file.py")
+
+    assert exc_info.value.category in {
+        GitContextFailureCategory.GIT_FAILED,
+        GitContextFailureCategory.NO_MATCHING_CHANGES,
+    }
 
 
 @pytest.mark.parametrize("ref", ["", "--all", "HEAD\nmain"])

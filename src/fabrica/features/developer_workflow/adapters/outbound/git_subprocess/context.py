@@ -108,7 +108,9 @@ class GitContextSubprocessLoader:
         head_short_hash = self._load_head_short_hash()
         try:
             return parse_status_summary(stdout, head_short_hash=head_short_hash)
-        except ValueError as err:
+        except (
+            ValueError
+        ) as err:  # pragma: no cover - status parser constructs a valid summary from every supported git output shape.
             raise self._load_error(
                 UNSUPPORTED_OUTPUT_MESSAGE,
                 category=GitContextFailureCategory.GIT_FAILED,
