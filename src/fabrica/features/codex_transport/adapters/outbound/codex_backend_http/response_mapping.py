@@ -569,7 +569,7 @@ def _extract_output_text(json_body: object) -> str | None:
 
 
 def _extract_completion_usage_facts(json_body: object) -> CodexCompletionUsageFacts | None:
-    if not isinstance(json_body, Mapping):
+    if not isinstance(json_body, Mapping):  # pragma: no cover - successful output extraction above requires a mapping.
         return None
     return _extract_completion_usage_facts_from_mapping(
         cast("Mapping[object, object]", json_body),

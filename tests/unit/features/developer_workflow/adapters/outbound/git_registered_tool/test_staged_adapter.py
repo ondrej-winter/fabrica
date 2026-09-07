@@ -150,7 +150,18 @@ def test_empty_schema_tools_reject_arguments(tool_name: str) -> None:
     assert loader.calls == []
 
 
-def test_loader_failures_map_to_safe_tool_failure_without_private_details() -> None:
+@pytest.mark.parametrize(
+    ("tool_name", "arguments"),
+    [
+        ("git_staged_files", {}),
+        ("git_staged_diff", {}),
+        ("git_staged_file_diff", {"path": "src/file.py"}),
+    ],
+)
+def test_loader_failures_map_to_safe_tool_failure_without_private_details(
+    tool_name: str,
+    arguments: dict[str, SafeRuntimeMetadataValue],
+) -> None:
     loader = FakeGitStagedChangesLoader(
         error=GitStagedChangesLoadError(
             "private stderr /Users/example/project secret diff",
@@ -159,7 +170,7 @@ def test_loader_failures_map_to_safe_tool_failure_without_private_details() -> N
         ),
     )
 
-    result = _execute("git_staged_diff", loader=loader)
+    result = _execute(tool_name, loader=loader, arguments=arguments)
 
     assert result.status is ToolCallResultStatus.TOOL_FAILURE
     assert result.error_message == "registered tool execution failed"

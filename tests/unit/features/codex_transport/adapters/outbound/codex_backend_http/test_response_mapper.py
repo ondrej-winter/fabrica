@@ -586,6 +586,93 @@ def test_map_usage_rate_limit_header_signal_to_rate_limited() -> None:
     assert result.status is CodexTransportStatus.RATE_LIMITED
 
 
+def test_map_usage_edge_challenge_and_unsuccessful_backend_response() -> None:
+    edge_result = map_codex_usage_response(
+        CodexUsageResponse(status_code=403, headers={"cf-mitigated": "challenge"}, json_body=None)
+    )
+    backend_result = map_codex_usage_response(
+        CodexUsageResponse(status_code=500, headers={}, json_body={"error": {"code": "backend_failure"}})
+    )
+
+    assert edge_result.status is CodexTransportStatus.TRANSPORT_ERROR
+    assert edge_result.observations[0].metadata["category"] == "edge_challenge"
+    assert backend_result.status is CodexTransportStatus.TRANSPORT_ERROR
+    assert backend_result.observations[0].metadata == {
+        "http_status": 500,
+        "category": "backend_error",
+        "header_count": 0,
+        "response_shape": "error",
+        "error_type": "backend_failure",
+    }
+
+
+def test_mapper_handles_sequence_and_non_mapping_bodies_without_unsafe_evidence() -> None:
+    quota_result = map_codex_backend_response(
+        CodexBackendResponse(status_code=429, headers={}, json_body=(1, "quota exhausted"))
+    )
+    sequence_result = map_codex_backend_response(CodexBackendResponse(status_code=500, headers={}, json_body=(1, 2)))
+    shape_result = map_codex_backend_response(CodexBackendResponse(status_code=200, headers={}, json_body=(1, 2)))
+    usage_result = map_codex_usage_response(CodexUsageResponse(status_code=200, headers={}, json_body=("unused",)))
+
+    assert quota_result.status is CodexTransportStatus.QUOTA_EXCEEDED
+    assert sequence_result.observations[0].metadata["response_shape"] == "sequence"
+    assert shape_result.status is CodexTransportStatus.BACKEND_SHAPE_MISMATCH
+    assert usage_result.status is CodexTransportStatus.BACKEND_SHAPE_MISMATCH
+
+
+def test_mapper_extracts_content_text_and_bounds_error_type() -> None:
+    success = map_codex_backend_response(
+        CodexBackendResponse(
+            status_code=200,
+            headers={},
+            json_body={"content": ({"type": "output_text", "text": "pong"}, "ignored")},
+        )
+    )
+    failure = map_codex_backend_response(
+        CodexBackendResponse(status_code=500, headers={}, json_body={"error": {"type": "x" * 100}})
+    )
+
+    assert success.output_text == "pong"
+    assert failure.observations[0].metadata["error_type"] == f"{'x' * 79}…"
+
+
+def test_mapper_ignores_non_mapping_and_non_text_output_items() -> None:
+    result = map_codex_backend_response(
+        CodexBackendResponse(
+            status_code=200,
+            headers={},
+            json_body={
+                "output": (
+                    "not-an-output-item",
+                    {"content": ({"type": "other"}, {"text": "pong"})},
+                )
+            },
+        )
+    )
+
+    assert result.status is CodexTransportStatus.SUCCESS
+    assert result.output_text == "pong"
+
+
+@pytest.mark.parametrize(
+    "stream",
+    [
+        (
+            'event: response.completed\ndata: {"type":"response.completed","response":{"output_text":"pong"}}\n\n'
+            'event: response.completed\ndata: {"type":"response.completed","response":{"output_text":"pong"}}\n\n'
+        ),
+        'event: response.created\nevent: response.in_progress\ndata: {"type":"response.created"}\n\n',
+        "event: response.completed\ndata: []\n\n",
+    ],
+)
+def test_mapper_rejects_duplicate_or_malformed_event_stream_frames(stream: str) -> None:
+    result = map_codex_backend_response(
+        CodexBackendResponse(status_code=200, headers={"content-type": "text/event-stream"}, json_body=stream)
+    )
+
+    assert result.status is CodexTransportStatus.BACKEND_SHAPE_MISMATCH
+
+
 def test_map_usage_unexpected_success_shape_to_backend_shape_mismatch() -> None:
     response = CodexUsageResponse(status_code=200, headers={}, json_body={"unexpected": "shape"})
 

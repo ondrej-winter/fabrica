@@ -77,6 +77,24 @@ def test_manager_replays_first_terminal_result_for_duplicate_answer_or_cancellat
     asyncio.run(scenario())
 
 
+def test_manager_cancels_pending_question_and_replays_the_terminal_result() -> None:
+    async def scenario() -> None:
+        transport = _FakeTransport()
+        manager = InMemoryInteractionManager(transport)
+        owner = InteractionOwner("owner_one")
+        task = asyncio.create_task(manager.ask(owner, _question()))
+        await transport.published.wait()
+        question_id = transport.publications[0].question_id
+
+        cancelled = await manager.cancel(owner, question_id.value)
+        replayed = await manager.cancel(owner, question_id.value)
+
+        assert cancelled.status is InteractionResultStatus.CANCELLED
+        assert replayed == cancelled == await task
+
+    asyncio.run(scenario())
+
+
 def test_manager_rejects_unknown_or_wrong_owner_without_disclosure() -> None:
     async def scenario() -> None:
         transport = _FakeTransport()
@@ -252,6 +270,30 @@ def test_manager_rejects_out_of_range_option_and_invalid_cancel_identifier() -> 
     asyncio.run(scenario())
 
 
+def test_manager_cancels_during_publication_and_ignores_owner_without_pending_question() -> None:
+    async def scenario() -> None:
+        transport = _BlockingTransport()
+        manager = InMemoryInteractionManager(transport)
+        owner = InteractionOwner("owner_one")
+        task = asyncio.create_task(manager.ask(owner, _question()))
+        await transport.started.wait()
+
+        await manager.cancel_owner(InteractionOwner("other_owner"))
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        replacement_transport = _FakeTransport()
+        manager.transport = replacement_transport
+        replacement = asyncio.create_task(manager.ask(owner, _question()))
+        await replacement_transport.published.wait()
+        await manager.cancel_owner(owner)
+        assert (await replacement).status is InteractionResultStatus.CANCELLED
+
+    asyncio.run(scenario())
+
+
 @dataclass(slots=True)
 class _FakeTransport:
     publications: list[InteractionPublication] = field(default_factory=list)
@@ -268,6 +310,16 @@ class _FailingTransport:
         del publication
         message = "host disconnected"
         raise RuntimeError(message)
+
+
+@dataclass(slots=True)
+class _BlockingTransport:
+    started: asyncio.Event = field(default_factory=asyncio.Event)
+
+    async def publish(self, publication: InteractionPublication) -> None:
+        del publication
+        self.started.set()
+        await asyncio.Event().wait()
 
 
 def _question() -> InteractionQuestion:

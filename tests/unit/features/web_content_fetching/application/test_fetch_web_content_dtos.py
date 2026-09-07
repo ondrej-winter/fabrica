@@ -133,6 +133,63 @@ def test_fetch_attempt_dtos_reject_invalid_content_and_body_types() -> None:
         FetchAttemptFailure(FetchError(FetchErrorCode.HTTP_ERROR), retryable=cast("bool", 1))
 
 
+def test_fetch_attempt_failure_accepts_retryable_delay_within_bound() -> None:
+    failure = FetchAttemptFailure(
+        FetchError(FetchErrorCode.HTTP_ERROR),
+        retryable=True,
+        retry_after_seconds=1,
+    )
+
+    assert failure.retry_after_seconds == 1
+
+
+def test_fetch_outcome_dtos_reject_invalid_result_contract_members() -> None:
+    with pytest.raises(ValueError, match="content_type"):
+        FetchSuccess(
+            requested_url="https://example.com",
+            final_url="https://example.com",
+            status=200,
+            content_type="",
+            media_type="text/plain",
+            size_bytes=0,
+            content_format=FetchContentFormat.TEXT,
+            content="",
+            content_chars=0,
+            returned_chars=0,
+            truncated=False,
+        )
+    with pytest.raises(ValueError, match="media_type"):
+        FetchSuccess(
+            requested_url="https://example.com",
+            final_url="https://example.com",
+            status=200,
+            content_type="text/plain",
+            media_type="",
+            size_bytes=0,
+            content_format=FetchContentFormat.TEXT,
+            content="",
+            content_chars=0,
+            returned_chars=0,
+            truncated=False,
+        )
+    with pytest.raises(TypeError, match="content_format"):
+        FetchSuccess(
+            requested_url="https://example.com",
+            final_url="https://example.com",
+            status=200,
+            content_type="text/plain",
+            media_type="text/plain",
+            size_bytes=0,
+            content_format=cast("FetchContentFormat", "text"),
+            content="",
+            content_chars=0,
+            returned_chars=0,
+            truncated=False,
+        )
+    with pytest.raises(TypeError, match="error must be a FetchError"):
+        FetchFailure("https://example.com", cast("FetchError", object()))
+
+
 @pytest.mark.parametrize(
     ("factory", "message"),
     [

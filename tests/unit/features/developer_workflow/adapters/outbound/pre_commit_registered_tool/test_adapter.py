@@ -70,6 +70,31 @@ def test_handler_maps_arguments_to_pre_commit_command_and_formats_result() -> No
     assert "side_effects\tpre-commit hooks may modify files or caches" in output
 
 
+def test_handler_uses_default_arguments_and_formats_stderr_without_duration() -> None:
+    port = FakePreCommitPort(
+        result=PreCommitRunResult(
+            status=PreCommitRunStatus.FAILED,
+            stderr="hook failed\n",
+            returncode=1,
+        )
+    )
+    tool = create_pre_commit_registered_tools(port)[0]
+
+    output = tool.handler({})
+
+    assert port.commands == [PreCommitRunCommand()]
+    assert "duration_seconds" not in output
+    assert "stderr\nhook failed" in output
+
+
+@pytest.mark.parametrize("arguments", [{"hook_id": 42}, {"all_files": "yes"}])
+def test_handler_rejects_invalid_optional_argument_types(arguments: dict[str, object]) -> None:
+    tool = create_pre_commit_registered_tools(FakePreCommitPort())[0]
+
+    with pytest.raises(TypeError, match="argument must be"):
+        tool.handler(cast("dict[str, ToolArgumentSchemaValue]", arguments))
+
+
 def test_handler_rejects_arbitrary_arguments() -> None:
     tool = create_pre_commit_registered_tools(FakePreCommitPort())[0]
 

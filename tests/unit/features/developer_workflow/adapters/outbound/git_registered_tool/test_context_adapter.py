@@ -292,6 +292,28 @@ def test_commit_tools_pass_validated_arguments_and_return_structured_text() -> N
     ]
 
 
+def test_commit_log_allows_omitted_count_and_commit_details_omits_empty_body() -> None:
+    loader = FakeGitContextLoader(
+        commit_details=GitCommitDetails(
+            commit_hash="abcdef1234567890",
+            short_hash="abcdef1",
+            parents=(),
+            author="Ada Lovelace <ada@example.com>",
+            author_date="2026-08-07T19:00:00+00:00",
+            committer_date="2026-08-07T19:01:00+00:00",
+            subject="Add thing",
+            body="",
+        )
+    )
+
+    log = _execute("git_commit_log", loader=loader)
+    details = _execute("git_commit_details", loader=loader, arguments={"commit": "HEAD"})
+
+    assert log.status is ToolCallResultStatus.SUCCESS
+    assert "body" not in (details.result_text or "")
+    assert loader.calls == [("list_commits", (None,)), ("load_commit_details", ("HEAD",))]
+
+
 def test_ref_tools_pass_validated_arguments_and_return_structured_text() -> None:
     loader = FakeGitContextLoader()
 
@@ -321,6 +343,15 @@ def test_ref_tools_pass_validated_arguments_and_return_structured_text() -> None
     ]
 
 
+def test_branch_ahead_behind_allows_omitted_base_ref() -> None:
+    loader = FakeGitContextLoader()
+
+    result = _execute("git_branch_ahead_behind", loader=loader)
+
+    assert result.status is ToolCallResultStatus.SUCCESS
+    assert loader.calls == [("load_branch_ahead_behind", (None,))]
+
+
 @pytest.mark.parametrize(
     ("tool_name", "arguments"),
     [
@@ -329,6 +360,7 @@ def test_ref_tools_pass_validated_arguments_and_return_structured_text() -> None
         ("git_unstaged_file_diff", {"path": "src/app.py", "extra": "nope"}),
         ("git_unstaged_file_diff", {"path": 123}),
         ("git_commit_log", {"count": True}),
+        ("git_commit_log", {"count": 3, "extra": "nope"}),
         ("git_commit_log", {"count": 999}),
         ("git_commit_details", {"commit": 123}),
         ("git_commit_file_diff", {"commit": "HEAD"}),
@@ -349,7 +381,29 @@ def test_invalid_arguments_map_to_safe_invalid_request_without_calling_loaders(
     assert loader.calls == []
 
 
-def test_loader_failures_map_to_safe_tool_failure_without_private_details() -> None:
+@pytest.mark.parametrize(
+    ("tool_name", "arguments"),
+    [
+        ("git_status_summary", {}),
+        ("git_unstaged_files", {}),
+        ("git_unstaged_diff", {}),
+        ("git_unstaged_file_diff", {"path": "src/app.py"}),
+        ("git_commit_log", {}),
+        ("git_commit_details", {"commit": "HEAD"}),
+        ("git_commit_changed_files", {"commit": "HEAD"}),
+        ("git_commit_diff", {"commit": "HEAD"}),
+        ("git_commit_file_diff", {"commit": "HEAD", "path": "src/app.py"}),
+        ("git_ref_changed_files", {"base_ref": "main", "head_ref": "HEAD"}),
+        ("git_ref_diff", {"base_ref": "main", "head_ref": "HEAD"}),
+        ("git_ref_file_diff", {"base_ref": "main", "head_ref": "HEAD", "path": "src/app.py"}),
+        ("git_branch_ahead_behind", {"base_ref": "main"}),
+        ("git_merge_base", {"base_ref": "main", "head_ref": "HEAD"}),
+    ],
+)
+def test_loader_failures_map_to_safe_tool_failure_without_private_details(
+    tool_name: str,
+    arguments: dict[str, SafeRuntimeMetadataValue],
+) -> None:
     loader = FakeGitContextLoader(
         error=GitContextLoadError(
             "private stderr /Users/example/project secret diff",
@@ -358,7 +412,7 @@ def test_loader_failures_map_to_safe_tool_failure_without_private_details() -> N
         ),
     )
 
-    result = _execute("git_ref_diff", loader=loader, arguments={"base_ref": "main", "head_ref": "HEAD"})
+    result = _execute(tool_name, loader=loader, arguments=arguments)
 
     assert result.status is ToolCallResultStatus.TOOL_FAILURE
     assert result.error_message == "registered tool execution failed"
