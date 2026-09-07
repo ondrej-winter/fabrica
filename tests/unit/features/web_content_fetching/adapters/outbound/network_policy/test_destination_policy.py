@@ -64,6 +64,19 @@ def test_validate_public_destination_rejects_non_public_answers(address: str) ->
 
     assert isinstance(result, FetchError)
     assert result.code is FetchErrorCode.DESTINATION_NOT_ALLOWED
+
+
+def test_validate_public_destination_rejects_invalid_dns_answer() -> None:
+    result = asyncio.run(
+        validate_public_destination(
+            _url("https://example.com"),
+            resolver=FakeResolver(answers=("not-an-address",)),
+            context=_context(),
+        )
+    )
+
+    assert isinstance(result, FetchError)
+    assert result.code is FetchErrorCode.DESTINATION_NOT_ALLOWED
     assert result.metadata == {"address_count": 1}
 
 

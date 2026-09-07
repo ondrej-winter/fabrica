@@ -11,6 +11,7 @@ from typing import cast
 import pytest
 
 from fabrica.features.agent_runtime.application.dtos import (
+    MAX_TOOL_CONTENT_PARTS,
     MAX_TOOL_CONTENT_TEXT_CHARS,
     RegisteredToolOutcome,
     ToolArgumentSchemaValue,
@@ -141,6 +142,22 @@ def test_fetch_web_content_registered_tool_rejects_invalid_arguments(
     assert outcome.error_code == "INVALID_ARGUMENTS"
 
 
+def test_fetch_web_content_registered_tool_rejects_too_many_or_non_object_requests() -> None:
+    for arguments in (
+        {"requests": tuple({"url": f"https://{index}.example"} for index in range(9))},
+        {"requests": ("not-an-object",)},
+    ):
+        adapter = FetchWebContentRegisteredToolAdapter(
+            use_case=_FakeFetchWebContent(_result()),
+            limits=FetchWebContentLimits(),
+            public_web_enabled=True,
+        )
+
+        outcome = run(adapter.handle(arguments, _context(arguments)))
+
+        assert outcome.error_code == "INVALID_ARGUMENTS"
+
+
 def test_fetch_web_content_result_serialization_chunks_without_losing_fields() -> None:
     content = "x" * (MAX_TOOL_CONTENT_TEXT_CHARS + 1)
     result = FetchWebContentResult((_success(content),))
@@ -154,6 +171,13 @@ def test_fetch_web_content_result_serialization_chunks_without_losing_fields() -
     payload = json.loads(_joined_text(outcome))
     assert payload["results"][0]["content"] == content
     assert payload["results"][0]["trust"] == "untrusted_web_content"
+
+
+def test_fetch_web_content_result_rejects_payloads_exceeding_runtime_part_bound() -> None:
+    content = "x" * (MAX_TOOL_CONTENT_TEXT_CHARS * (MAX_TOOL_CONTENT_PARTS + 1))
+
+    with pytest.raises(ValueError, match="multipart bounds"):
+        fetch_web_content_result_to_tool_outcome(FetchWebContentResult((_success(content),)))
 
 
 @dataclass(slots=True)

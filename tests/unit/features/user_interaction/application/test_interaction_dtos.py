@@ -56,6 +56,21 @@ def test_question_id_generation_and_validation_use_opaque_q_prefix() -> None:
         QuestionId("question-1")
     with pytest.raises(ValueError, match="safe length"):
         QuestionId(f"q_{'a' * MAX_QUESTION_ID_CHARS}")
+    with pytest.raises(ValueError, match="opaque URL-safe"):
+        QuestionId("q_")
+    with pytest.raises(ValueError, match="opaque URL-safe"):
+        QuestionId("q_é")
+
+
+@pytest.mark.parametrize("value", ["", "é", "owner space"])
+def test_interaction_owner_rejects_non_opaque_identifiers(value: str) -> None:
+    with pytest.raises(ValueError, match="opaque identifier"):
+        InteractionOwner(value)
+
+
+def test_answer_submission_rejects_non_string_answer() -> None:
+    with pytest.raises(TypeError, match="answer must be a string"):
+        AnswerSubmission(QuestionId("q_123"), 42)  # ty: ignore[invalid-argument-type]
 
 
 def test_answered_interaction_result_preserves_free_text_and_known_option_index() -> None:

@@ -211,6 +211,47 @@ def test_manager_task_cancellation_resolves_pending_question_and_allows_a_new_qu
     asyncio.run(scenario())
 
 
+def test_manager_rejects_selected_option_that_does_not_match_answer() -> None:
+    async def scenario() -> None:
+        transport = _FakeTransport()
+        manager = InMemoryInteractionManager(transport)
+        owner = InteractionOwner("owner_one")
+        task = asyncio.create_task(manager.ask(owner, _question()))
+        await transport.published.wait()
+        question_id = transport.publications[0].question_id
+
+        with pytest.raises(InteractionManagerError, match="exactly match") as error:
+            await manager.submit_answer(owner, AnswerSubmission(question_id, "SQLite", selected_option=0))
+
+        assert error.value.code is InteractionErrorCode.INVALID_INPUT
+        await manager.cancel_owner(owner)
+        await task
+
+    asyncio.run(scenario())
+
+
+def test_manager_rejects_out_of_range_option_and_invalid_cancel_identifier() -> None:
+    async def scenario() -> None:
+        transport = _FakeTransport()
+        manager = InMemoryInteractionManager(transport)
+        owner = InteractionOwner("owner_one")
+        task = asyncio.create_task(manager.ask(owner, _question()))
+        await transport.published.wait()
+        question_id = transport.publications[0].question_id
+
+        with pytest.raises(InteractionManagerError, match="does not identify") as option_error:
+            await manager.submit_answer(owner, AnswerSubmission(question_id, "SQLite", selected_option=2))
+        with pytest.raises(InteractionManagerError, match="not found") as cancel_error:
+            await manager.cancel(owner, "invalid")
+
+        assert option_error.value.code is InteractionErrorCode.INVALID_INPUT
+        assert cancel_error.value.code is InteractionErrorCode.INTERACTION_NOT_FOUND
+        await manager.cancel_owner(owner)
+        await task
+
+    asyncio.run(scenario())
+
+
 @dataclass(slots=True)
 class _FakeTransport:
     publications: list[InteractionPublication] = field(default_factory=list)

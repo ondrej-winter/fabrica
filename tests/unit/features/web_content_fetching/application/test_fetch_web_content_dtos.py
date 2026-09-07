@@ -118,8 +118,19 @@ def test_fetch_result_dtos_reject_impossible_content_and_retry_states() -> None:
         )
     with pytest.raises(ValueError, match="requires a retryable"):
         FetchAttemptFailure(FetchError(FetchErrorCode.CONNECTION_FAILED), retry_after_seconds=1)
+
+
+def test_fetch_attempt_dtos_reject_invalid_content_and_body_types() -> None:
+    with pytest.raises(TypeError, match="content_type must be a string"):
+        FetchAttemptSuccess("https://example.com", 200, 42, b"body")  # ty: ignore[invalid-argument-type]
+    with pytest.raises(TypeError, match="body must be bytes"):
+        FetchAttemptSuccess("https://example.com", 200, "text/plain", "body")  # ty: ignore[invalid-argument-type]
     with pytest.raises(ValueError, match="between 0 and 60"):
         FetchAttemptFailure(FetchError(FetchErrorCode.HTTP_ERROR), retryable=True, retry_after_seconds=61)
+    with pytest.raises(TypeError, match="error must be a FetchError"):
+        FetchAttemptFailure(cast("FetchError", object()))
+    with pytest.raises(TypeError, match="retryable must be a boolean"):
+        FetchAttemptFailure(FetchError(FetchErrorCode.HTTP_ERROR), retryable=cast("bool", 1))
 
 
 @pytest.mark.parametrize(

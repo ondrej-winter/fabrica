@@ -3,12 +3,14 @@
 import pytest
 
 from fabrica.features.workspace_command_execution.application.dtos import (
+    CommandErrorCode,
     CommandExecutionOutput,
     CommandExecutionStatus,
     CommandResult,
     ExecutionPolicy,
     RunCommandsResult,
 )
+from fabrica.features.workspace_command_execution.application.errors import CommandPlanningError
 from fabrica.features.workspace_command_execution.application.output_limiting import (
     _head_and_tail,
     _stream_caps,
@@ -70,6 +72,18 @@ def test_stream_limiting_preserves_stream_boundaries_and_handles_small_marker_bu
     assert _stream_caps("stdout", "", 9) == (9, 0)
     assert _head_and_tail("long output", cap=0, total_chars=11) == ""
     assert _head_and_tail("long output", cap=3, total_chars=11) == "\n[."
+
+
+def test_planning_error_returns_its_safe_message() -> None:
+    assert str(CommandPlanningError(CommandErrorCode.EXECUTABLE_NOT_FOUND, "safe message")) == "safe message"
+
+
+def test_limit_stops_after_each_output_reaches_its_cap() -> None:
+    result = RunCommandsResult(ExecutionPolicy.SEQUENTIAL, (_result(0, "output"),))
+
+    limited = limit_run_commands_result(result, max_serialized_chars=10_000, max_command_output_chars=1)
+
+    assert limited.results[0].output.retained_output_chars == 1
 
 
 def _result(index: int, stdout: str) -> CommandResult:
