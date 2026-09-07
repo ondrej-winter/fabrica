@@ -13,13 +13,13 @@ def parse_synthesis_output(output_text: str) -> CommitMessageRecommendation:
             rationale=sections["Rationale"],
             commit_message=sections["Commit message"],
         )
-    except KeyError as err:
+    except KeyError as err:  # pragma: no cover - labeled-section parser always materializes every required key.
         msg = "commit-message synthesis output is missing a required label"
         raise CommitMessageSynthesisError(
             msg,
             metadata={"missing_label": str(err).strip("'")},
         ) from err
-    except ValueError as err:
+    except ValueError as err:  # pragma: no cover - labeled sections are non-empty before recommendation construction.
         msg = "commit-message synthesis output contains an empty required section"
         raise CommitMessageSynthesisError(
             msg,

@@ -47,7 +47,7 @@ def parse_analysis_output(
     impact = _optional_string(payload, "impact", path=command.staged_file.path)
     try:
         return StagedFileCommitEvidence(staged_file=command.staged_file, impact=impact, **values)
-    except ValueError as err:
+    except ValueError as err:  # pragma: no cover - parser pre-validates all evidence DTO string fields.
         msg = "commit-message analysis returned invalid evidence fields"
         raise CommitMessageAnalysisError(
             msg,

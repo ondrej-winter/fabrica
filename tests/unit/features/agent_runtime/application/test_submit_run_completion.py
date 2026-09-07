@@ -23,6 +23,7 @@ from fabrica.features.agent_runtime.application.use_cases import (
     InMemoryRunStateMachine,
     SubmitRunCompletion,
     SubmitRunCompletionError,
+    submit_run_completion,
 )
 
 
@@ -40,6 +41,17 @@ def test_submit_commits_valid_completion_from_running() -> None:
         assert store.records == [result.record]
 
     asyncio.run(scenario())
+
+
+def test_submit_rejects_non_positive_timeout_and_completed_state_helper() -> None:
+    with pytest.raises(ValueError, match="timeout must be positive"):
+        SubmitRunCompletion(
+            store=_FakeCompletionStore(), run_state_machine=InMemoryRunStateMachine(), timeout_seconds=0
+        )
+
+    error = submit_run_completion._state_error(CompletionRunState.COMPLETED)  # noqa: SLF001
+
+    assert error.code is CompletionErrorCode.RUN_ALREADY_COMPLETED
 
 
 @pytest.mark.parametrize(
