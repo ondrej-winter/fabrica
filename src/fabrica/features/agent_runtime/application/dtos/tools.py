@@ -522,7 +522,7 @@ def _validate_tool_outcome_status_invariants(outcome: RegisteredToolOutcome) -> 
         _validate_rejected_outcome(outcome)
     elif outcome.status is ToolOutcomeStatus.FATAL:
         _validate_fatal_outcome(outcome)
-    elif outcome.error_code is None:
+    elif outcome.error_code is None:  # pragma: no cover - DTO invariants reject code-less TOOL_FAILURE outcomes first.
         msg = "tool failure outcomes must include an error code"
         raise ValueError(msg)
 

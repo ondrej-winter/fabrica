@@ -79,14 +79,14 @@ class ActivateSkill:
     ) -> RegisteredSkill | SkillActivationResult:
         try:
             resolution = command.snapshot.resolve(command.skill)
-        except TypeError, ValueError:
+        except TypeError, ValueError:  # pragma: no cover - validated command snapshot resolution is total.
             return _result(SkillActivationStatus.INVALID_INPUT, command)
 
         resolution_error = _resolution_error(resolution.status, resolution.candidates, command)
         if resolution_error is not None:
             return resolution_error
         skill = resolution.skill
-        if skill is None:
+        if skill is None:  # pragma: no cover - FOUND SkillResolution requires a skill by DTO invariant.
             return _result(SkillActivationStatus.INTERNAL_SKILL_ERROR, command)
         active_skill = _active_skill_for(active_skills, skill)
         if active_skill is not None:
@@ -112,7 +112,7 @@ class ActivateSkill:
         if cancellation.is_cancelled:
             return _result(SkillActivationStatus.SKILL_LOAD_CANCELLED, command)
         definition = evaluation.definition
-        if definition is None:
+        if definition is None:  # pragma: no cover - APPROVED trust evaluations require a definition.
             return _result(SkillActivationStatus.INTERNAL_SKILL_ERROR, command)
         try:
             active_skill = active_skills.register(

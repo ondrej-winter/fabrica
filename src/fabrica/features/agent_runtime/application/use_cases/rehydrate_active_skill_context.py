@@ -57,7 +57,7 @@ class RehydrateActiveSkillContext:
         """Return a command with required skills before retrieved command context."""
         if not _is_valid_state(state, run_id=run_id, registry_snapshot_id=registry_snapshot_id):
             return ActiveSkillContextRehydrationResult(ActiveSkillContextRehydrationStatus.MALFORMED_STATE)
-        if state is None:
+        if state is None:  # pragma: no cover - _is_valid_state returns false for None immediately above.
             return ActiveSkillContextRehydrationResult(ActiveSkillContextRehydrationStatus.MALFORMED_STATE)
         skill_context = tuple(_to_context_block(skill) for skill in state.skills)
         augmented = LocalAgentRunCommand(
