@@ -87,6 +87,11 @@ def test_map_codex_completion_evidence_maps_partial_usage_without_defaulting_mis
     assert usage.tokens.total_tokens is None
 
 
+def test_codex_completion_usage_facts_rejects_an_empty_model_when_provided() -> None:
+    with pytest.raises(ValueError, match="model must not be empty"):
+        CodexCompletionUsageFacts(source=ModelUsageEvidenceSource.RESPONSE_PAYLOAD, model="")
+
+
 def test_map_codex_completion_evidence_marks_success_without_usage_unavailable() -> None:
     evidence = map_codex_completion_evidence(status=CodexTransportStatus.SUCCESS)
 

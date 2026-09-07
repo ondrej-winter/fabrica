@@ -133,6 +133,24 @@ def test_script_execute_command_writes_bounded_failure_details_to_stderr() -> No
     assert "category=non_zero_exit" in stderr.getvalue()
 
 
+def test_script_execute_command_reports_truncated_stdout_and_stderr() -> None:
+    executor = FakeScriptExecutor(
+        result=SkillScriptExecutionResult(
+            status=SkillScriptExecutionStatus.EXECUTION_FAILED,
+            selection=_selection(),
+            stdout=SkillScriptExecutionOutput(text="partial stdout", truncated=True, max_chars=14),
+            stderr=SkillScriptExecutionOutput(text="partial stderr", truncated=True, max_chars=14),
+        ),
+    )
+    stdout = StringIO()
+    stderr = StringIO()
+
+    run_feature_cli_command(_command(), executor=executor, stdout=stdout, stderr=stderr)
+
+    assert "stdout: truncated max_chars=14\n" in stderr.getvalue()
+    assert "stderr: truncated max_chars=14\n" in stderr.getvalue()
+
+
 def test_script_execute_default_composition_executes_only_matching_approved_synthetic_script(tmp_path: Path) -> None:
     script = _write_script(tmp_path, "python-testing", "scripts/check.py", "print('cli-execution-ok')\n")
     binding = _binding(_selection(), script)

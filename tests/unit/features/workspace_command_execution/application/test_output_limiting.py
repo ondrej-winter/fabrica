@@ -55,6 +55,13 @@ def test_limit_rejects_non_positive_output_bounds(serialized_limit: int, command
         )
 
 
+def test_limit_rejects_result_metadata_that_exceeds_the_serialized_bound() -> None:
+    result = RunCommandsResult(ExecutionPolicy.PARALLEL, (_result(0, "output"),))
+
+    with pytest.raises(ValueError, match="metadata exceeds"):
+        limit_run_commands_result(result, max_serialized_chars=1, max_command_output_chars=10_000)
+
+
 def test_stream_limiting_preserves_stream_boundaries_and_handles_small_marker_budgets() -> None:
     stdout_cap, stderr_cap = _stream_caps("stdout", "stderr", 9)
 

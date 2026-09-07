@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 
 import httpx
 import pytest
 
+import fabrica.adapters.outbound.httpx_client.async_executor as async_executor_module
 from fabrica.adapters.outbound.httpx_client import (
     AsyncHttpxRetryExecutor,
     HttpTimeout,
@@ -21,6 +23,8 @@ EXPECTED_ATTEMPT_COUNT = 2
 EXPECTED_RETRY_COUNT = 1
 EXPECTED_FIRST_JITTERED_DELAY = 0.25
 SYNTHETIC_ERROR_MESSAGE = "synthetic secret url"
+REMAINING_BUDGET_SECONDS = 2.0
+EXPECTED_SECOND_JITTERED_DELAY = 0.5
 
 
 class AsyncMonotonicClock:
@@ -157,8 +161,243 @@ def test_raises_retry_error_with_diagnostics_after_exhausting_transport_errors()
     asyncio.run(execute())
 
 
+def test_raises_before_request_when_total_budget_is_exhausted() -> None:
+    clock = _budget_exhausted_clock()
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        pytest.fail("must not request")
+
+    async def execute() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(HttpxRetryError, match="before an attempt") as error_info:
+                await AsyncHttpxRetryExecutor(monotonic=clock, sleep=_no_sleep).request(
+                    client=client,
+                    request=HttpxRetryRequest(
+                        method="GET",
+                        url="https://example.invalid/resource",
+                        policy=RetryPolicy(total_budget_seconds=1.0),
+                    ),
+                )
+
+        assert error_info.value.diagnostics.attempt_count == 0
+
+    asyncio.run(execute())
+
+
+def test_stream_raises_before_request_when_total_budget_is_exhausted() -> None:
+    clock = _budget_exhausted_clock()
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        pytest.fail("must not request")
+
+    async def consume(_body) -> str:
+        pytest.fail("must not consume")
+
+    async def execute() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(HttpxRetryError, match="before an attempt") as error_info:
+                await AsyncHttpxRetryExecutor(monotonic=clock, sleep=_no_sleep).stream(
+                    client=client,
+                    request=HttpxRetryRequest(
+                        method="GET",
+                        url="https://example.invalid/resource",
+                        policy=RetryPolicy(total_budget_seconds=1.0),
+                    ),
+                    body_consumer=consume,
+                )
+
+        assert error_info.value.diagnostics.attempt_count == 0
+
+    asyncio.run(execute())
+
+
+def test_stream_raises_last_retryable_exception_after_retry_budget_is_consumed() -> None:
+    clock = AsyncMonotonicClock()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError(SYNTHETIC_ERROR_MESSAGE, request=request)
+
+    async def consume(_body) -> str:
+        pytest.fail("must not consume")
+
+    async def execute() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(HttpxRetryError) as error_info:
+                await _executor(clock).stream(
+                    client=client,
+                    request=HttpxRetryRequest(
+                        method="GET",
+                        url="https://example.invalid/resource",
+                        policy=RetryPolicy(initial_delay_seconds=1.0, total_budget_seconds=0.5),
+                    ),
+                    body_consumer=consume,
+                )
+
+        assert error_info.value.error_type == "ConnectError"
+        assert error_info.value.diagnostics.attempt_count == 1
+
+    asyncio.run(execute())
+
+
+def test_raises_last_retryable_exception_when_retry_delay_exhausts_budget() -> None:
+    clock = AsyncMonotonicClock()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError(SYNTHETIC_ERROR_MESSAGE, request=request)
+
+    async def execute() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(HttpxRetryError) as error_info:
+                await _executor(clock).request(
+                    client=client,
+                    request=HttpxRetryRequest(
+                        method="GET",
+                        url="https://example.invalid/resource",
+                        policy=RetryPolicy(initial_delay_seconds=1.0, total_budget_seconds=1.0),
+                    ),
+                )
+
+        assert error_info.value.error_type == "ConnectError"
+        assert error_info.value.diagnostics.attempt_count == EXPECTED_ATTEMPT_COUNT
+
+    asyncio.run(execute())
+
+
+def test_raises_non_retryable_httpx_error_without_retrying() -> None:
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        message = "synthetic decoding error"
+        raise httpx.DecodingError(message)
+
+    async def execute() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(HttpxRetryError) as error_info:
+                await _executor(AsyncMonotonicClock()).request(
+                    client=client,
+                    request=HttpxRetryRequest(
+                        method="GET",
+                        url="https://example.invalid/resource",
+                        policy=RetryPolicy(total_budget_seconds=10.0),
+                    ),
+                )
+
+        assert error_info.value.error_type == "DecodingError"
+        assert error_info.value.diagnostics.attempt_count == 1
+
+    asyncio.run(execute())
+
+
+def test_raises_generic_retry_error_when_retry_delay_exhausts_budget_after_http_status() -> None:
+    clock = AsyncMonotonicClock()
+
+    async def execute() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _request: httpx.Response(RETRYABLE_STATUS))
+        ) as client:
+            with pytest.raises(HttpxRetryError, match="before an attempt") as error_info:
+                await _executor(clock).request(
+                    client=client,
+                    request=HttpxRetryRequest(
+                        method="GET",
+                        url="https://example.invalid/resource",
+                        policy=RetryPolicy(initial_delay_seconds=1.0, total_budget_seconds=1.0),
+                    ),
+                )
+
+        assert error_info.value.diagnostics.last_http_status == RETRYABLE_STATUS
+
+    asyncio.run(execute())
+
+
+def test_retry_after_helpers_reject_blank_invalid_and_past_values() -> None:
+    executor = _executor(AsyncMonotonicClock())
+    policy = RetryPolicy()
+
+    assert executor._retry_after_delay(retry_after=" ", policy=policy) is None  # noqa: SLF001
+    assert executor._retry_after_delay(retry_after="not-a-date", policy=policy) is None  # noqa: SLF001
+    assert executor._retry_after_delay(retry_after="-1", policy=policy) is None  # noqa: SLF001
+
+
+def test_http_date_delay_treats_naive_dates_as_utc(monkeypatch: pytest.MonkeyPatch) -> None:
+    executor = _executor(AsyncMonotonicClock())
+    monkeypatch.setattr(
+        async_executor_module,
+        "parsedate_to_datetime",
+        lambda _value: datetime(2026, 1, 1),  # noqa: DTZ001
+    )
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # noqa: ANN206
+            return cls(2026, 1, 1, tzinfo=tz)
+
+    monkeypatch.setattr(async_executor_module, "datetime", FixedDateTime)
+
+    assert executor._http_date_delay("synthetic") == 0.0  # noqa: SLF001
+
+
+def test_http_date_delay_accepts_aware_dates(monkeypatch: pytest.MonkeyPatch) -> None:
+    executor = _executor(AsyncMonotonicClock())
+    aware_date = datetime(2026, 1, 1, tzinfo=async_executor_module.UTC)
+    monkeypatch.setattr(async_executor_module, "parsedate_to_datetime", lambda _value: aware_date)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # noqa: ANN206
+            return cls(2026, 1, 1, tzinfo=tz)
+
+    monkeypatch.setattr(async_executor_module, "datetime", FixedDateTime)
+
+    assert executor._http_date_delay("synthetic") == 0.0  # noqa: SLF001
+
+
+def test_jittered_backoff_grows_for_later_attempts() -> None:
+    assert (
+        _executor(AsyncMonotonicClock())._jittered_backoff(  # noqa: SLF001
+            2,
+            RetryPolicy(),
+        )
+        == EXPECTED_SECOND_JITTERED_DELAY
+    )
+
+
+def test_timeout_helpers_bound_numeric_and_missing_phase_values() -> None:
+    assert (
+        async_executor_module._timeout_with_budget(  # noqa: SLF001
+            timeout=10.0,
+            budget_seconds=REMAINING_BUDGET_SECONDS,
+        )
+        == REMAINING_BUDGET_SECONDS
+    )
+
+    timeout = async_executor_module._timeout_with_budget(  # noqa: SLF001
+        timeout=HttpTimeout(read_seconds=1.0),
+        budget_seconds=REMAINING_BUDGET_SECONDS,
+    )
+
+    assert isinstance(timeout, httpx.Timeout)
+    assert timeout.connect == REMAINING_BUDGET_SECONDS
+    assert timeout.read == 1.0
+    assert timeout.write == REMAINING_BUDGET_SECONDS
+    assert timeout.pool == REMAINING_BUDGET_SECONDS
+
+
 def _executor(clock: AsyncMonotonicClock) -> AsyncHttpxRetryExecutor:
     return AsyncHttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=_fixed_random)
+
+
+def _budget_exhausted_clock():
+    calls = 0
+
+    def monotonic() -> float:
+        nonlocal calls
+        calls += 1
+        return 0.0 if calls == 1 else 1.0
+
+    return monotonic
+
+
+async def _no_sleep(_delay: float) -> None:
+    return None
 
 
 def _fixed_random() -> float:

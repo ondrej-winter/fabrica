@@ -80,6 +80,22 @@ def test_submit_and_exit_rejects_invalid_arguments_and_missing_opaque_run_id_wit
     assert store.records == []
 
 
+def test_submit_and_exit_rejects_invalid_argument_types_and_values_without_submitting() -> None:
+    store = _FakeCompletionStore()
+    adapter = SubmitAndExitRegisteredToolAdapter(SubmitRunCompletion(store, InMemoryRunStateMachine()))
+    invalid_arguments = (
+        {"outcome": 1, "summary": "Work is complete.", "verification": "verified"},
+        {"outcome": "completed", "summary": 1, "verification": "verified"},
+        {"outcome": "completed", "summary": "Work is complete.", "verification": 1},
+        {"outcome": "unknown", "summary": "Work is complete.", "verification": "verified"},
+    )
+
+    outcomes = [asyncio.run(adapter.handle(arguments, _context(arguments))) for arguments in invalid_arguments]
+
+    assert [outcome.error_code for outcome in outcomes] == ["INVALID_ARGUMENTS"] * len(invalid_arguments)
+    assert store.records == []
+
+
 @dataclass(slots=True)
 class _FakeCompletionStore:
     records: list[CompletionRecord] = field(default_factory=list)

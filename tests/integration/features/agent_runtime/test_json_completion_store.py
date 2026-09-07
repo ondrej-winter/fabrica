@@ -2,6 +2,8 @@
 
 import asyncio
 
+import pytest
+
 from fabrica.features.agent_runtime.adapters.outbound.json_completion_store import JsonCompletionStore
 from fabrica.features.agent_runtime.application.dtos import (
     CompletionCommitStatus,
@@ -18,6 +20,12 @@ class _NeverCancelled:
 
     async def wait_until_cancelled(self) -> None:
         await asyncio.Event().wait()
+
+
+class _Cancelled(_NeverCancelled):
+    @property
+    def is_cancelled(self) -> bool:
+        return True
 
 
 def test_json_completion_store_reopens_committed_record_and_acknowledges_presentation_once(tmp_path) -> None:
@@ -57,3 +65,27 @@ def test_json_completion_store_replays_the_committed_record_for_the_same_run(tmp
 
     assert replay.status is CompletionCommitStatus.ALREADY_COMPLETED
     assert replay.record == record
+
+
+def test_json_completion_store_rejects_mismatched_runs_and_honors_cancellation(tmp_path) -> None:
+    record = CompletionRecord(
+        run_id="run-1",
+        tool_call_id="call-1",
+        payload_digest="sha256:" + "1" * 64,
+        outcome=CompletionOutcome.COMPLETED,
+        summary="Completed durable storage boundary.",
+        verification=CompletionVerification.NOT_APPLICABLE,
+    )
+    store = JsonCompletionStore(tmp_path)
+
+    with pytest.raises(ValueError, match="completion run id must match its record"):
+        asyncio.run(store.commit_completion("other-run", record, _NeverCancelled()))
+
+    cancelled = asyncio.run(store.commit_completion("run-1", record, _Cancelled()))
+
+    assert cancelled.status is CompletionCommitStatus.CANCELLED
+    assert asyncio.run(store.list_unpresented()) == ()
+
+
+def test_json_completion_store_lists_no_records_when_root_does_not_exist(tmp_path) -> None:
+    assert asyncio.run(JsonCompletionStore(tmp_path / "missing").list_unpresented()) == ()

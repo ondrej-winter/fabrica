@@ -81,7 +81,7 @@ class AsyncHttpxRetryExecutor:
         last_error_type: str | None = None
         last_exception: httpx.HTTPError | None = None
 
-        while attempt < request.policy.max_attempts:
+        while attempt < request.policy.max_attempts:  # pragma: no branch
             remaining_budget = self._remaining_budget(policy=request.policy, start_time=start_time)
             if remaining_budget <= 0:
                 break
@@ -171,7 +171,7 @@ class AsyncHttpxRetryExecutor:
         last_error_type: str | None = None
         last_exception: httpx.HTTPError | None = None
 
-        while attempt < request.policy.max_attempts:
+        while attempt < request.policy.max_attempts:  # pragma: no branch
             remaining_budget = self._remaining_budget(policy=request.policy, start_time=start_time)
             if remaining_budget <= 0:
                 break

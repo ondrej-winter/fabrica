@@ -3,11 +3,16 @@
 import asyncio
 from dataclasses import dataclass, field
 
+import pytest
+from pydantic_ai.exceptions import UnexpectedModelBehavior, UserError
+
 from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model import (
     PydanticAIAgentModel,
     PydanticAICompletionError,
     PydanticAICompletionRequest,
+    agent_model,
 )
+from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model.message_rendering import build_user_prompt
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentContextBlock,
     LocalAgentRunCommand,
@@ -112,3 +117,37 @@ def test_adapter_maps_completion_dependency_failure_to_safe_runtime_result() -> 
         ),
     )
     assert "do not leak raw backend payload" not in str(result.observations)
+
+
+@pytest.mark.parametrize(
+    ("error", "status", "message"),
+    [
+        (UserError("unsupported"), LocalAgentRunStatus.UNSUPPORTED_CAPABILITY, "unsupported capability"),
+        (UnexpectedModelBehavior("unexpected"), LocalAgentRunStatus.MODEL_ERROR, "model behavior failed"),
+    ],
+)
+def test_adapter_maps_pydanticai_execution_errors(
+    error: Exception, status: LocalAgentRunStatus, message: str, monkeypatch
+) -> None:
+    class FailingAgent:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+        async def run(self, _prompt: str) -> object:
+            raise error
+
+    monkeypatch.setattr(agent_model, "Agent", FailingAgent)
+
+    result = asyncio.run(PydanticAIAgentModel(completion=FakeCompletion()).run(LocalAgentRunCommand(prompt="ping")))
+
+    assert result.status is status
+    assert result.observations[0].message == f"pydanticai {message}"
+
+
+def test_prompt_rendering_uses_unlabeled_context_text_directly() -> None:
+    command = LocalAgentRunCommand(
+        prompt="Answer",
+        context=(LocalAgentContextBlock(text="context without a label"),),
+    )
+
+    assert build_user_prompt(command) == "Context:\ncontext without a label\n\nPrompt:\nAnswer"

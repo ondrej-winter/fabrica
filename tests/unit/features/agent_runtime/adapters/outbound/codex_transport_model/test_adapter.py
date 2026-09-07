@@ -95,6 +95,25 @@ def test_adapter_includes_runtime_context_as_bounded_prompt_text() -> None:
     ]
 
 
+def test_adapter_renders_unlabelled_context_without_a_heading() -> None:
+    transport = FakeCodexTransportCompletion(
+        result=CodexTransportResult(status=CodexTransportStatus.SUCCESS, output_text="pong"),
+    )
+
+    asyncio.run(
+        CodexTransportAgentModel(transport=transport).run(
+            LocalAgentRunCommand(
+                prompt="Answer from context only",
+                context=(LocalAgentContextBlock(text="The answer is pong."),),
+            ),
+        ),
+    )
+
+    assert transport.calls == [
+        CodexCompletionCommand(prompt="Context:\nThe answer is pong.\n\nPrompt:\nAnswer from context only"),
+    ]
+
+
 @pytest.mark.parametrize(
     "transport_status",
     [

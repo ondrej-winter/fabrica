@@ -1,8 +1,11 @@
 """Tests for safe extraction and normalization of textual web content."""
 
+import pytest
+
 from fabrica.features.web_content_fetching.adapters.outbound.content_processing import (
     WebContentKind,
     extract_web_content,
+    extraction,
 )
 from fabrica.features.web_content_fetching.application.dtos import FetchContentFormat, FetchError, FetchErrorCode
 
@@ -37,6 +40,22 @@ def test_extract_web_content_preserves_tables_and_recovers_malformed_html() -> N
     assert "Name" in result.content
     assert "limit" in result.content
     assert "Tail" in result.content
+
+
+def test_extract_web_content_translates_html_conversion_errors_to_safe_fetch_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def raise_conversion_error(*args: object, **kwargs: object) -> str:
+        del args, kwargs
+        raise ValueError
+
+    monkeypatch.setattr(extraction, "markdownify", raise_conversion_error)
+
+    result = extract_web_content("<p>Body</p>", kind=WebContentKind.HTML, final_url="https://example.com")
+
+    assert isinstance(result, FetchError)
+    assert result.code is FetchErrorCode.CONTENT_EXTRACTION_FAILED
+    assert result.message == "The HTML response could not be converted to readable content"
 
 
 def test_extract_web_content_pretty_prints_valid_json_with_stable_key_order() -> None:

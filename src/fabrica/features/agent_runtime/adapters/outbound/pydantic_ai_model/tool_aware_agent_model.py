@@ -118,7 +118,9 @@ def _tool_return_content(result: ToolCallResult) -> str | tuple[str | BinaryCont
     for part in result.content:
         if isinstance(part, ToolTextContent):
             content.append(part.text)
-        elif isinstance(part, ToolImageContent):
+        elif isinstance(
+            part, ToolImageContent
+        ):  # pragma: no branch - ToolCallResult validates the closed content union.
             content.append(BinaryContent(data=part.data, media_type=part.media_type))
     return tuple(content)
 

@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 import httpx
+import pytest
 
 from fabrica.bootstrap import FetchWebContentToolOptions, create_fetch_web_content_registered_tool_adapter
 from fabrica.features.agent_runtime.application.dtos import (
@@ -53,6 +54,28 @@ def test_fetch_web_content_factory_is_inert_and_disabled_access_performs_no_dns_
             "trust": "untrusted_web_content",
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("public_web_enabled", "headers", "expected_message"),
+    [
+        ("false", {"User-Agent": "fabrica-test"}, "public_web_enabled must be a boolean"),
+        (False, {"User-Agent": 1}, "headers must map strings to strings"),
+    ],
+)
+def test_fetch_web_content_options_reject_invalid_host_configuration(
+    public_web_enabled: object,
+    headers: Mapping[str, object],
+    expected_message: str,
+) -> None:
+    with pytest.raises(TypeError, match=expected_message):
+        FetchWebContentToolOptions(
+            public_web_enabled=public_web_enabled,  # ty: ignore[invalid-argument-type]
+            headers=headers,  # ty: ignore[invalid-argument-type]
+            resolver=_FailingResolver(),
+            client_factory=_FailingClientFactory(),
+            limits=FetchWebContentLimits(),
+        )
 
 
 @dataclass(slots=True)

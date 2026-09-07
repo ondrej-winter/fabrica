@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from fabrica.features.agent_runtime.adapters.outbound.skill_script_file import SkillScriptFileMetadataLoader
+from fabrica.features.agent_runtime.adapters.outbound.skill_script_file import adapter as script_file_adapter
 from fabrica.features.agent_runtime.application.dtos import SelectedSkillScript, SkillScriptSnapshot, SkillScriptType
 from fabrica.features.agent_runtime.application.ports import SkillScriptMetadataLoadError
 from tests.support.sentinels import PRIVATE_FILE_CONTENT
@@ -194,6 +195,43 @@ def test_load_metadata_treats_executable_looking_script_as_inert_bytes(tmp_path:
 
     assert metadata.binding.content_digest == f"sha256:{sha256(script_bytes).hexdigest()}"
     assert not (tmp_path / "shell-testing" / "scripts" / "created.txt").exists()
+
+
+def test_metadata_loader_rejects_absolute_identifier_before_filesystem_access() -> None:
+    with pytest.raises(SkillScriptMetadataLoadError, match="identifiers must be relative"):
+        script_file_adapter._relative_path_from_id("/private/script.py")  # noqa: SLF001
+
+
+def test_metadata_loader_translates_script_read_error(monkeypatch, tmp_path: Path) -> None:
+    script_file = _write_script(tmp_path, "python-testing", "scripts/check.py", b"print('ok')\n")
+    selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")
+
+    def raise_os_error(self: Path) -> bytes:
+        assert self == script_file
+        msg = "synthetic read error"
+        raise OSError(msg)
+
+    monkeypatch.setattr(Path, "read_bytes", raise_os_error)
+
+    with pytest.raises(SkillScriptMetadataLoadError) as exc_info:
+        SkillScriptFileMetadataLoader(skill_roots=(tmp_path,)).load_metadata(selection)
+
+    assert exc_info.value.category == "script_read_error"
+
+
+def test_metadata_loader_rejects_symlinked_script_outside_skill_directory(tmp_path: Path) -> None:
+    private_file = tmp_path / "private.py"
+    private_file.write_text("print('private')\n", encoding="utf-8")
+    script_link = tmp_path / "python-testing" / "scripts" / "check.py"
+    script_link.parent.mkdir(parents=True)
+    script_link.symlink_to(private_file)
+
+    with pytest.raises(SkillScriptMetadataLoadError) as exc_info:
+        SkillScriptFileMetadataLoader(skill_roots=(tmp_path,)).load_metadata(
+            SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py"),
+        )
+
+    assert exc_info.value.category == "invalid_script_path"
 
 
 def _write_script(root: Path, skill_id: str, script_id: str, script_bytes: bytes) -> Path:

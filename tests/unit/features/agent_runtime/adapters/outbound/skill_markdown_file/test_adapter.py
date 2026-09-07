@@ -1,12 +1,14 @@
 """Tests for the read-only Agent Skill markdown file adapter."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from fabrica.features.agent_runtime.adapters.outbound.skill_markdown_file import (
     SkillResourceFileContextLoader,
 )
+from fabrica.features.agent_runtime.adapters.outbound.skill_markdown_file import adapter as markdown_adapter
 from fabrica.features.agent_runtime.application.dtos import (
     LoadedSkillResourceContext,
     SelectedSkillResource,
@@ -153,6 +155,64 @@ def test_load_resource_rejects_path_traversal_without_exposing_file_contents(tmp
     assert exc_info.value.category == "invalid_resource_path"
     assert SYNTHETIC_SECRET not in str(exc_info.value)
     assert SYNTHETIC_SECRET not in str(exc_info.value.metadata)
+
+
+def test_resource_helpers_reject_absolute_skill_and_resource_paths() -> None:
+    with pytest.raises(SkillContextLoadError, match="skill path must be relative"):
+        markdown_adapter._skill_relative_path_from_id("/private")  # noqa: SLF001
+    with pytest.raises(SkillContextLoadError, match="resource path must be relative"):
+        markdown_adapter._resource_relative_path(  # noqa: SLF001
+            SimpleNamespace(skill_id="skill", resource_id="/private"),  # ty: ignore[invalid-argument-type]
+        )
+
+
+def test_load_resource_rejects_symlinked_skill_directory_outside_root(tmp_path: Path) -> None:
+    private_root = tmp_path / "private"
+    _write_resource(private_root, "escaped", "notes.txt", "private")
+    skill_root = tmp_path / "skills"
+    linked_private_root = skill_root / "linked-private"
+    linked_private_root.parent.mkdir(parents=True)
+    linked_private_root.symlink_to(private_root, target_is_directory=True)
+
+    with pytest.raises(SkillContextLoadError) as exc_info:
+        SkillResourceFileContextLoader(skill_roots=(skill_root,)).load(
+            SelectedSkillResource(skill_id="linked-private/escaped", resource_id="notes.txt"),
+        )
+
+    assert exc_info.value.category == "invalid_resource_path"
+
+
+def test_load_resource_rejects_symlinked_resource_outside_skill_directory(tmp_path: Path) -> None:
+    private_file = tmp_path / "private.txt"
+    private_file.write_text("private", encoding="utf-8")
+    resource_link = tmp_path / "skill" / "notes.txt"
+    resource_link.parent.mkdir()
+    resource_link.symlink_to(private_file)
+
+    with pytest.raises(SkillContextLoadError) as exc_info:
+        SkillResourceFileContextLoader(skill_roots=(tmp_path,)).load(
+            SelectedSkillResource(skill_id="skill", resource_id="notes.txt"),
+        )
+
+    assert exc_info.value.category == "invalid_resource_path"
+
+
+def test_load_resource_translates_read_error(tmp_path: Path, monkeypatch) -> None:
+    resource_file = _write_resource(tmp_path, "read-error", "notes.txt", "read me")
+
+    def raise_os_error(self: Path) -> bytes:
+        assert self == resource_file
+        msg = "synthetic read error"
+        raise OSError(msg)
+
+    monkeypatch.setattr(Path, "read_bytes", raise_os_error)
+
+    with pytest.raises(SkillContextLoadError) as exc_info:
+        SkillResourceFileContextLoader(skill_roots=(tmp_path,)).load(
+            SelectedSkillResource(skill_id="read-error", resource_id="notes.txt"),
+        )
+
+    assert exc_info.value.category == "invalid_resource_file"
 
 
 def _write_resource(root: Path, skill_id: str, resource_id: str, text: str) -> Path:

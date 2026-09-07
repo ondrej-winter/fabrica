@@ -5,12 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
+from types import SimpleNamespace
+from typing import cast
+
+import pytest
 
 from fabrica.features.agent_runtime.adapters.outbound.skill_script_file import SkillScriptFileMetadataLoader
 from fabrica.features.agent_runtime.adapters.outbound.skill_script_subprocess import (
     SkillScriptSubprocessExecutionSettings,
     SkillScriptSubprocessExecutor,
 )
+from fabrica.features.agent_runtime.adapters.outbound.skill_script_subprocess import adapter as subprocess_adapter
 from fabrica.features.agent_runtime.application.dtos import (
     SelectedSkillScript,
     SkillScriptApprovalBinding,
@@ -256,6 +261,62 @@ def test_constructing_executor_does_not_read_skill_roots_or_run_scripts(tmp_path
 
     assert executor is not None
     assert not missing_root.exists()
+
+
+def test_output_normalizes_none_and_bytes_and_truncates() -> None:
+    assert SkillScriptSubprocessExecutor._output(None, 10).text == ""  # noqa: SLF001
+    output = SkillScriptSubprocessExecutor._output(b"abcdef", 3)  # noqa: SLF001
+
+    assert output.text == "abc"
+    assert output.truncated is True
+
+
+def test_executor_returns_unsupported_for_unknown_script_type(tmp_path: Path) -> None:
+    del tmp_path
+    executor = SkillScriptSubprocessExecutor(snapshot_loader=SimpleNamespace())  # ty: ignore[invalid-argument-type]
+
+    binding = cast("SkillScriptApprovalBinding", SimpleNamespace(script_type=object()))
+
+    assert executor._interpreter_for_binding(binding) is None  # noqa: SLF001
+
+
+def test_executor_translates_subprocess_os_error(tmp_path: Path, monkeypatch) -> None:
+    script = _write_script(tmp_path, "python-testing", "scripts/check.py", "print('ok')\n")
+    selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")
+    binding = _binding(selection, script, SkillScriptType.PYTHON)
+    monkeypatch.setattr(
+        subprocess_adapter,
+        "run_process_group_command",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("nope")),
+    )
+
+    with pytest.raises(Exception, match="subprocess execution failed"):
+        _executor(tmp_path).execute(SkillScriptExecutionCommand(selection=selection), binding)
+
+
+def test_execution_error_and_result_include_safe_diagnostic_metadata(tmp_path: Path) -> None:
+    selection = SelectedSkillScript(skill_id="python-testing", script_id="scripts/check.py")
+    binding = _binding_for_content(selection, ".py", SkillScriptType.PYTHON, b"print('ok')")
+    executor = _executor(tmp_path)
+
+    error = executor._execution_error(  # noqa: SLF001
+        SkillScriptExecutionCommand(selection=selection),
+        "failed",
+        category="synthetic",
+    )
+    result = executor._result(  # noqa: SLF001
+        SkillScriptExecutionCommand(selection=selection),
+        binding,
+        subprocess_adapter._ExecutionResultDetails(  # noqa: SLF001
+            status=SkillScriptExecutionStatus.ADAPTER_ERROR,
+            message="failed",
+            category="synthetic",
+            metadata={"detail": "safe"},
+        ),
+    )
+
+    assert error.category == "synthetic"
+    assert result.observations[0].metadata["detail"] == "safe"
 
 
 def _write_script(root: Path, skill_id: str, script_id: str, text: str) -> Path:

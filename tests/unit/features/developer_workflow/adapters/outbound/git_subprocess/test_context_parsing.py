@@ -75,6 +75,12 @@ def test_status_summary_parser_handles_detached_head() -> None:
     assert summary.unstaged_count == 1
 
 
+def test_status_summary_parser_ignores_blank_lines() -> None:
+    status_output = chr(10) + "## main" + chr(10) * 2 + "?? notes.txt" + chr(10)
+    summary = parse_status_summary(status_output, head_short_hash="abc1234")
+    assert summary.untracked_paths == ("notes.txt",)
+
+
 def test_commit_log_parser_maps_records_and_ref_decorations() -> None:
     log = parse_commit_log(
         "abcdef123456\x1fabcdef1\x1fAdd parser\x1f2026-08-07T18:00:00+00:00\x1fHEAD -> main, tag: v1\x1e"
@@ -110,6 +116,11 @@ def test_ahead_behind_and_merge_base_parsers_map_fixed_outputs() -> None:
     assert ahead_behind.behind_count == EXPECTED_MULTIPLE_COUNT
     assert merge_base.commit_hash == "abcdef1234567890"
     assert merge_base.short_hash == "abcdef1"
+
+
+def test_merge_base_parser_rejects_empty_output() -> None:
+    with pytest.raises(ValueError, match="merge-base output must include a commit hash"):
+        parse_merge_base(" " + chr(10))
 
 
 @pytest.mark.parametrize("output", ["", "one-field", "a\x1ftoo-few"])

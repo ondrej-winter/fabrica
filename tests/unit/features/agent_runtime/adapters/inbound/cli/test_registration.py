@@ -138,6 +138,8 @@ def test_parse_run_command_rejects_malformed_resource_selection() -> None:
     ("args", "expected_message"),
     [
         (("run", "--prompt", ""), "prompt must not be empty"),
+        (("run", "--prompt", "pong", "--skill", " unsafe"), "skill_id must not contain leading or trailing whitespace"),
+        (("run", "--prompt", "pong", "--skill", "/unsafe"), "skill_id must be a relative identifier"),
         (("run", "--prompt", "pong", "--skill", "../unsafe"), "skill_id must not contain traversal segments"),
         (
             ("run", "--prompt", "pong", "--resource", "python-testing:../unsafe"),
@@ -200,6 +202,24 @@ def test_parse_run_command_rejects_malformed_resource_selection() -> None:
                 "sha256:abc123",
             ),
             "invalid literal for int",
+        ),
+        (
+            (
+                "script-execute",
+                "--skill-id",
+                "python-testing",
+                "--script-id",
+                "scripts/check.py",
+                "--approve-script-type",
+                "python",
+                "--approve-suffix",
+                ".py",
+                "--approve-byte-size",
+                "0",
+                "--approve-content-digest",
+                "sha256:abc123",
+            ),
+            "value must be at least 1",
         ),
     ],
 )

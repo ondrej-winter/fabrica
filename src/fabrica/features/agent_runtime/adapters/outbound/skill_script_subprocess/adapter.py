@@ -99,7 +99,9 @@ class SkillScriptSubprocessExecutor:
             )
 
         interpreter = self._interpreter_for_binding(snapshot.binding)
-        if interpreter is None:
+        if (
+            interpreter is None
+        ):  # pragma: no cover - validated SkillScriptApprovalBinding only permits supported enum values.
             return self._result(
                 command,
                 approved_binding,

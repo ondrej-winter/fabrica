@@ -8,6 +8,7 @@ from email.utils import format_datetime
 import httpx
 import pytest
 
+import fabrica.adapters.outbound.httpx_client.executor as executor_module
 from fabrica.adapters.outbound.httpx_client import (
     HttpTimeout,
     HttpxRetryError,
@@ -25,6 +26,7 @@ EXPECTED_FIRST_JITTERED_DELAY = 0.25
 RETRY_AFTER_CAP_SECONDS = 30.0
 HTTP_DATE_DELAY_SECONDS = 5.0
 SYNTHETIC_ERROR_MESSAGE = "synthetic secret url"
+REMAINING_BUDGET_SECONDS = 2.0
 
 
 class MonotonicClock:
@@ -232,8 +234,103 @@ def test_raises_retry_error_without_retrying_non_retryable_httpx_errors() -> Non
     assert error.diagnostics.last_error_type == "DecodingError"
 
 
+def test_raises_before_request_when_total_budget_is_exhausted() -> None:
+    clock = _budget_exhausted_clock()
+
+    with pytest.raises(HttpxRetryError, match="before an attempt") as error_info:
+        SyncHttpxRetryExecutor(monotonic=clock, sleep=lambda _delay: None).request(
+            client=httpx.Client(transport=httpx.MockTransport(lambda _request: pytest.fail("must not request"))),
+            request=HttpxRetryRequest(
+                method="GET",
+                url="https://example.invalid/resource",
+                policy=RetryPolicy(total_budget_seconds=1.0),
+            ),
+        )
+
+    assert error_info.value.diagnostics.attempt_count == 0
+
+
+def test_raises_last_retryable_exception_when_retry_delay_exhausts_budget() -> None:
+    clock = MonotonicClock()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError(SYNTHETIC_ERROR_MESSAGE, request=request)
+
+    with pytest.raises(HttpxRetryError) as error_info:
+        _executor(clock).request(
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+            request=HttpxRetryRequest(
+                method="GET",
+                url="https://example.invalid/resource",
+                policy=RetryPolicy(initial_delay_seconds=1.0, total_budget_seconds=1.0),
+            ),
+        )
+
+    assert error_info.value.error_type == "ConnectError"
+    assert error_info.value.diagnostics.attempt_count == EXPECTED_ATTEMPT_COUNT
+
+
+def test_retry_after_helpers_reject_blank_invalid_and_past_values() -> None:
+    executor = _executor(MonotonicClock())
+    policy = RetryPolicy()
+
+    assert executor._retry_after_delay(retry_after=" ", policy=policy) is None  # noqa: SLF001
+    assert executor._retry_after_delay(retry_after="not-a-date", policy=policy) is None  # noqa: SLF001
+    assert executor._retry_after_delay(retry_after="-1", policy=policy) is None  # noqa: SLF001
+
+
+def test_http_date_delay_treats_naive_dates_as_utc(monkeypatch: pytest.MonkeyPatch) -> None:
+    executor = _executor(MonotonicClock())
+    monkeypatch.setattr(
+        executor_module,
+        "parsedate_to_datetime",
+        lambda _value: datetime(2026, 1, 1),  # noqa: DTZ001
+    )
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # noqa: ANN206
+            return cls(2026, 1, 1, tzinfo=tz)
+
+    monkeypatch.setattr(executor_module, "datetime", FixedDateTime)
+
+    assert executor._http_date_delay("synthetic") == 0.0  # noqa: SLF001
+
+
+def test_timeout_helpers_bound_numeric_and_missing_phase_values() -> None:
+    assert (
+        executor_module._timeout_with_budget(  # noqa: SLF001
+            timeout=10.0,
+            budget_seconds=REMAINING_BUDGET_SECONDS,
+        )
+        == REMAINING_BUDGET_SECONDS
+    )
+
+    timeout = executor_module._timeout_with_budget(  # noqa: SLF001
+        timeout=HttpTimeout(read_seconds=1.0),
+        budget_seconds=REMAINING_BUDGET_SECONDS,
+    )
+
+    assert isinstance(timeout, httpx.Timeout)
+    assert timeout.connect == REMAINING_BUDGET_SECONDS
+    assert timeout.read == 1.0
+    assert timeout.write == REMAINING_BUDGET_SECONDS
+    assert timeout.pool == REMAINING_BUDGET_SECONDS
+
+
 def _executor(clock: MonotonicClock) -> SyncHttpxRetryExecutor:
     return SyncHttpxRetryExecutor(monotonic=clock.monotonic, sleep=clock.sleep, random=_fixed_random)
+
+
+def _budget_exhausted_clock():
+    calls = 0
+
+    def monotonic() -> float:
+        nonlocal calls
+        calls += 1
+        return 0.0 if calls == 1 else 1.0
+
+    return monotonic
 
 
 def _fixed_random() -> float:

@@ -48,6 +48,17 @@ def test_codex_completion_returns_successful_transport_output() -> None:
     assert transport.calls == [CodexCompletionCommand(prompt="Reply with pong")]
 
 
+def test_codex_completion_failure_without_observations_uses_safe_base_metadata() -> None:
+    transport = FakeCodexCompletionTransport(
+        result=CodexTransportResult(status=CodexTransportStatus.TRANSPORT_ERROR),
+    )
+
+    with pytest.raises(PydanticAICompletionError) as error_info:
+        asyncio.run(CodexTransportPydanticAICompletion(transport=transport).complete(_request()))
+
+    assert error_info.value.metadata == {"transport_status": "transport_error", "observation_count": 0}
+
+
 def test_codex_completion_maps_credential_failures_to_configuration_error() -> None:
     transport = FakeCodexCompletionTransport(
         result=CodexTransportResult(

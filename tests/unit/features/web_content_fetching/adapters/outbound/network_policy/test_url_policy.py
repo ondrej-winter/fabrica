@@ -43,3 +43,11 @@ def test_validate_web_url_normalizes_supported_hosts(url: str, normalized: str, 
     result = validate_web_url(url)
 
     assert result == ValidatedWebUrl(url=normalized, hostname=hostname)
+
+
+def test_validate_web_url_rejects_hostnames_that_cannot_be_idna_encoded() -> None:
+    result = validate_web_url("https://\ud800.example")
+
+    assert isinstance(result, FetchError)
+    assert result.code is FetchErrorCode.INVALID_URL
+    assert result.message == "URL hostname is invalid"

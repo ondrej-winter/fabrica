@@ -2,22 +2,30 @@
 
 import asyncio
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import cast
+
+import pytest
 
 from fabrica.features.agent_runtime.adapters.inbound.registered_tool import (
     SKILLS_TOOL_NAME,
     SkillActivationToolContext,
     create_skills_registered_tool,
+    skills,
 )
 from fabrica.features.agent_runtime.application.dtos import (
     ActiveSkillSet,
     RegisteredSkill,
+    SkillActivationResult,
+    SkillActivationStatus,
     SkillDefinition,
     SkillRegistrySnapshot,
     SkillSource,
     SkillTrustBinding,
     SkillTrustDecision,
     SkillTrustDecisionStatus,
+    ToolArgumentValue,
     ToolExecutionContext,
     ToolOutcomeStatus,
     ToolTextContent,
@@ -81,7 +89,8 @@ def test_skills_tool_returns_idempotent_metadata_without_reinjecting_instruction
     arguments = {"skill": "workspace:review-pr", "args": "second"}
 
     asyncio.run(tool.handler({"skill": "review-pr"}, _tool_context({"skill": "review-pr"})))
-    outcome = asyncio.run(tool.handler(arguments, _tool_context(arguments)))
+    typed_arguments = cast("Mapping[str, ToolArgumentValue]", arguments)
+    outcome = asyncio.run(tool.handler(typed_arguments, _tool_context(typed_arguments)))
 
     assert outcome.status is ToolOutcomeStatus.SUCCESS
     assert len(outcome.content) == 1
@@ -120,6 +129,59 @@ def test_skills_tool_rejects_malformed_missing_ambiguous_and_denied_invocations_
         "SKILL_NOT_ALLOWED",
     ]
     assert context.active_skills.skills == ()
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"skill": ""},
+        {"skill": "review-pr" * 100},
+        {"skill": "review-pr", "args": 1},
+        {"skill": "review-pr", "args": "x" * 6_001},
+        {"skill": "review-pr", "unexpected": "value"},
+    ],
+)
+def test_skills_tool_rejects_invalid_argument_shapes(arguments: dict[str, object]) -> None:
+    snapshot = _snapshot()
+    tool = create_skills_registered_tool(_activator(snapshot), _context(snapshot))
+
+    typed_arguments = cast("Mapping[str, ToolArgumentValue]", arguments)
+    outcome = asyncio.run(tool.handler(typed_arguments, _tool_context(typed_arguments)))
+
+    assert outcome.error_code == "INVALID_ARGUMENTS"
+
+
+def test_skill_activation_context_rejects_mismatched_active_state() -> None:
+    snapshot = _snapshot()
+
+    with pytest.raises(ValueError, match="configured run"):
+        SkillActivationToolContext(
+            workspace_identity="workspace-1",
+            run_id="other-run",
+            snapshot=snapshot,
+            active_skills=ActiveSkillSet(run_id="run-1", registry_snapshot_id=snapshot.snapshot_id),
+        )
+
+    with pytest.raises(ValueError, match="configured registry snapshot"):
+        SkillActivationToolContext(
+            workspace_identity="workspace-1",
+            run_id="run-1",
+            snapshot=snapshot,
+            active_skills=ActiveSkillSet(run_id="run-1", registry_snapshot_id="other-snapshot"),
+        )
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        SkillActivationResult(status=SkillActivationStatus.ACTIVATED, args=None),
+        SkillActivationResult(status=SkillActivationStatus.ALREADY_ACTIVE, args=None),
+    ],
+)
+def test_skills_tool_maps_malformed_success_results_to_internal_rejections(result: SkillActivationResult) -> None:
+    outcome = skills._activation_outcome(result, "snapshot-1")  # noqa: SLF001
+
+    assert outcome.error_code == "INTERNAL_SKILL_ERROR"
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,7 +226,7 @@ def _context(
     )
 
 
-def _tool_context(arguments: dict[str, str]) -> ToolExecutionContext:
+def _tool_context(arguments: Mapping[str, ToolArgumentValue]) -> ToolExecutionContext:
     return ToolExecutionContext(
         call_id="call-1",
         argument_digest=canonical_tool_arguments_digest(arguments),

@@ -270,6 +270,27 @@ def test_registered_tool_executor_maps_async_fatal_outcome_to_stop_disposition()
     assert '"fatal":true' in result.result_text
 
 
+@pytest.mark.parametrize(
+    ("error", "expected_status"),
+    [
+        (ValueError("invalid"), ToolCallResultStatus.INVALID_ARGUMENTS),
+        (TimeoutError(), ToolCallResultStatus.TIMEOUT),
+        (RuntimeError("failed"), ToolCallResultStatus.TOOL_FAILURE),
+    ],
+)
+def test_registered_tool_executor_maps_async_handler_errors(
+    error: Exception, expected_status: ToolCallResultStatus
+) -> None:
+    async def failing_tool(
+        _arguments: Mapping[str, ToolArgumentValue], _context: ToolExecutionContext
+    ) -> RegisteredToolOutcome:
+        raise error
+
+    result = _execute_async_tool_with_handler(failing_tool)
+
+    assert result.status is expected_status
+
+
 def test_registered_tool_executor_fails_closed_for_unknown_tool() -> None:
     executor = RegisteredToolExecutor()
 

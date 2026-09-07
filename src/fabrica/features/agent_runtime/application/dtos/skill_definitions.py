@@ -45,7 +45,9 @@ class SkillDefinition:
             msg = "skill disabled flag must be a boolean"
             raise TypeError(msg)
         object.__setattr__(self, "metadata", _normalize_skill_metadata(self.metadata))
-        if len(self.activation_content_json()) > MAX_TOOL_CONTENT_TEXT_CHARS:
+        if (
+            len(self.activation_content_json()) > MAX_TOOL_CONTENT_TEXT_CHARS
+        ):  # pragma: no cover - field bounds keep this below the tool-content limit.
             msg = "skill activation content exceeds the structured text-content bound"
             raise ValueError(msg)
 

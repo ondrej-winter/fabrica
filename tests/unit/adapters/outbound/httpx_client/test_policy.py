@@ -20,3 +20,22 @@ def test_rejects_non_http_retry_exception_types() -> None:
 def test_rejects_zero_retry_budget() -> None:
     with pytest.raises(ValueError, match="total_budget_seconds"):
         RetryPolicy(total_budget_seconds=0.0)
+
+
+def test_rejects_zero_max_attempts() -> None:
+    with pytest.raises(ValueError, match="max_attempts"):
+        RetryPolicy(max_attempts=0)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "initial_delay_seconds",
+        "max_delay_seconds",
+        "retry_after_cap_seconds",
+        "total_budget_seconds",
+    ],
+)
+def test_rejects_negative_timing_values(field_name: str) -> None:
+    with pytest.raises(ValueError, match=field_name):
+        RetryPolicy(**{field_name: -0.1})  # ty: ignore[invalid-argument-type]

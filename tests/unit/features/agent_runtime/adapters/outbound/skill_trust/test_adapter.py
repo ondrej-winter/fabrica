@@ -34,6 +34,11 @@ def test_metadata_bound_lookup_requires_exact_workspace_run_skill_source_and_rev
         assert lookup.get_decision(changed_binding).status is SkillTrustDecisionStatus.DENIED
 
 
+def test_metadata_bound_lookup_rejects_denied_configured_status() -> None:
+    with pytest.raises(ValueError, match="non-denied"):
+        MetadataBoundSkillTrustLookup(expected_binding=_binding(), approved_status=SkillTrustDecisionStatus.DENIED)
+
+
 def test_source_mapped_loader_rereads_canonical_definition_without_exposing_paths(tmp_path: Path) -> None:
     source = "---\nname: review-pr\ndescription: Review pull requests.\n---\n\n# Instructions\n"
     skill_file = tmp_path / "review-pr" / "SKILL.md"

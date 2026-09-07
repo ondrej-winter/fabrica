@@ -142,6 +142,19 @@ class TerminationTimeoutProcess(FakeProcess):
             await asyncio.sleep(2)
         return self.returncode
 
+    def terminate(self) -> None:
+        """Record graceful termination while keeping the fake process active."""
+        self.terminated = True
+
+
+class CompletedButSlowWaitProcess(FakeProcess):
+    """Completed process whose delayed reap reaches no-op forced cleanup."""
+
+    async def wait(self) -> int | None:
+        """Delay the first reap beyond the termination grace period."""
+        await asyncio.sleep(2)
+        return self.returncode
+
 
 def test_backend_returns_hydrated_matches_from_incremental_json_events(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -222,6 +235,34 @@ def test_backend_rejects_cancelled_queries_without_launching_a_process(tmp_path:
     assert isinstance(result, SearchQueryFailure)
     assert result.error.code is SearchErrorCode.SEARCH_CANCELLED
     assert runner.received is None
+
+
+def test_backend_preserves_search_scope_rejection_codes(tmp_path: Path) -> None:
+    backend = adapter.PinnedRipgrepWorkspaceSearchBackend(tmp_path)
+
+    result = asyncio.run(backend.search_query(SearchQuery("needle", path="missing.py"), _context()))
+
+    assert isinstance(result, SearchQueryFailure)
+    assert result.error.code is SearchErrorCode.NOT_FOUND
+    assert result.error.metadata == {}
+
+
+def test_backend_maps_an_unavailable_pinned_ripgrep_binary_to_a_stable_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def unavailable_command(*args: object, **kwargs: object) -> tuple[str, ...]:
+        del args, kwargs
+        message = "unavailable"
+        raise adapter.PinnedRipgrepUnavailableError(message)
+
+    monkeypatch.setattr(adapter.PinnedRipgrepCommandBuilder, "command_for", unavailable_command)
+    backend = adapter.PinnedRipgrepWorkspaceSearchBackend(tmp_path)
+
+    result = asyncio.run(backend.search_query(SearchQuery("needle"), _context()))
+
+    assert isinstance(result, SearchQueryFailure)
+    assert result.error.code is SearchErrorCode.SEARCH_BACKEND_UNAVAILABLE
+    assert result.error.metadata == {}
 
 
 def test_backend_maps_malformed_backend_events_to_a_transient_io_failure(
@@ -415,6 +456,45 @@ def test_async_runner_force_kills_a_timed_out_linux_process_group(monkeypatch: p
         )
 
     assert received_signals == [signal.SIGTERM, signal.SIGKILL]
+
+
+def test_async_runner_force_kills_a_timed_out_macos_process(monkeypatch: pytest.MonkeyPatch) -> None:
+    process = TerminationTimeoutProcess()
+    _install_process(monkeypatch, process)
+    monkeypatch.setattr(adapter.sys, "platform", "darwin")
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(
+            adapter.AsyncioPinnedRipgrepCommandRunner().run(
+                ("verified-rg",),
+                cancellation=Cancelled(),
+                timeout_seconds=1,
+                max_matching_lines=1,
+            )
+        )
+
+    assert process.terminated is True
+    assert process.killed is True
+
+
+def test_async_runner_does_not_signal_an_already_completed_linux_process(monkeypatch: pytest.MonkeyPatch) -> None:
+    process = CompletedButSlowWaitProcess(())
+    received_signals: list[signal.Signals] = []
+    _install_process(monkeypatch, process)
+    monkeypatch.setattr(adapter.sys, "platform", "linux")
+    monkeypatch.setattr(adapter.os, "killpg", lambda _pid, sent_signal: received_signals.append(sent_signal))
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(
+            adapter.AsyncioPinnedRipgrepCommandRunner().run(
+                ("verified-rg",),
+                cancellation=Cancelled(),
+                timeout_seconds=1,
+                max_matching_lines=1,
+            )
+        )
+
+    assert received_signals == []
 
 
 def test_posix_source_loader_reads_workspace_relative_utf8_source(tmp_path: Path) -> None:

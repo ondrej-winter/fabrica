@@ -319,6 +319,18 @@ def test_argparse_command_registry_rejects_missing_registration_lookup() -> None
     assert isinstance(exc_info.value.__cause__, KeyError)
 
 
+def test_argparse_command_registry_ignores_non_parser_nested_subcommand_choices() -> None:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
+    registry = ArgparseCommandRegistry(subparsers.add_parser)
+
+    def configure(command_parser: argparse.ArgumentParser) -> None:
+        nested_subparsers = command_parser.add_subparsers()
+        nested_subparsers.choices["synthetic"] = cast("argparse.ArgumentParser", object())
+
+    registry.register(_synthetic_command_with_parser(configure))
+
+
 @pytest.mark.parametrize("command_value", [None, "", 42])
 def test_command_name_from_namespace_rejects_invalid_shell_command_destinations(command_value: object) -> None:
     namespace = argparse.Namespace(_fabrica_cli_command=command_value)

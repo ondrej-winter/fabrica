@@ -257,3 +257,55 @@ def test_tool_aware_adapter_normalizes_dependency_failure() -> None:
     assert error_info.value.category == "pydanticai_tool_aware_error"
     assert error_info.value.metadata == {"error_type": "RuntimeError"}
     assert "do not leak details" not in str(error_info.value)
+
+
+def test_tool_aware_adapter_reraises_normalized_model_errors() -> None:
+    expected = ToolAwareAgentModelError("already normalized", category="synthetic")
+    turn = FakeToolAwareTurn(error=expected)
+
+    with pytest.raises(ToolAwareAgentModelError) as error_info:
+        asyncio.run(PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(LocalAgentRunCommand(prompt="ping"), ()))
+
+    assert error_info.value is expected
+
+
+def test_tool_aware_adapter_renders_list_arguments_as_immutable_tuples() -> None:
+    turn = FakeToolAwareTurn(
+        response=ModelResponse(parts=[ToolCallPart(tool_name="lookup", args={"items": [1, 2]}, tool_call_id="call-1")])
+    )
+
+    result = asyncio.run(
+        PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(LocalAgentRunCommand(prompt="ping"), ())
+    )
+
+    assert result.tool_calls[0].arguments == {"items": (1, 2)}
+
+
+def test_tool_aware_adapter_translates_non_object_tool_arguments(monkeypatch) -> None:
+    def raise_value_error(self: ToolCallPart) -> dict[str, object]:
+        del self
+        msg = "not an object"
+        raise ValueError(msg)
+
+    monkeypatch.setattr(ToolCallPart, "args_as_dict", raise_value_error)
+    turn = FakeToolAwareTurn(
+        response=ModelResponse(parts=[ToolCallPart(tool_name="lookup", args="[]", tool_call_id="call-1")]),
+    )
+
+    with pytest.raises(ToolAwareAgentModelError) as error_info:
+        asyncio.run(PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(LocalAgentRunCommand(prompt="ping"), ()))
+
+    assert error_info.value.category == "invalid_tool_arguments"
+
+
+def test_tool_aware_adapter_translates_arguments_rejected_by_application_dto() -> None:
+    turn = FakeToolAwareTurn(
+        response=ModelResponse(
+            parts=[ToolCallPart(tool_name="lookup", args={"value": float("inf")}, tool_call_id="call-1")],
+        ),
+    )
+
+    with pytest.raises(ToolAwareAgentModelError) as error_info:
+        asyncio.run(PydanticAIToolAwareAgentModel(turn_runner=turn).run_turn(LocalAgentRunCommand(prompt="ping"), ()))
+
+    assert error_info.value.category == "invalid_tool_arguments"

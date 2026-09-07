@@ -96,6 +96,62 @@ def test_load_rejects_invalid_utf8_and_oversized_instruction_content(tmp_path: P
     assert size_error.value.category == "skill_too_large"
 
 
+def test_definition_loader_rejects_symlinked_skill_directory_outside_root(tmp_path: Path) -> None:
+    private_root = tmp_path / "private"
+    _write_skill(private_root, "escaped", "---\nname: escaped\ndescription: Private.\n---\n\n# Private\n")
+    skill_root = tmp_path / "skills"
+    linked_private_root = skill_root / "linked-private"
+    linked_private_root.parent.mkdir(parents=True)
+    linked_private_root.symlink_to(private_root, target_is_directory=True)
+
+    with pytest.raises(SkillDefinitionLoadError) as exc_info:
+        SkillMarkdownFileDefinitionLoader(skill_roots=(skill_root,)).load(
+            SelectedSkill(skill_id="linked-private/escaped"),
+        )
+
+    assert exc_info.value.category == "invalid_skill_path"
+
+
+def test_definition_loader_rejects_directory_read_errors_and_unclosed_frontmatter(tmp_path: Path, monkeypatch) -> None:
+    directory = tmp_path / "directory-shape" / "SKILL.md"
+    directory.mkdir(parents=True)
+
+    with pytest.raises(SkillDefinitionLoadError) as directory_error:
+        SkillMarkdownFileDefinitionLoader(skill_roots=(tmp_path,)).load(SelectedSkill(skill_id="directory-shape"))
+
+    assert directory_error.value.category == "invalid_skill_file"
+
+    skill_file = _write_skill(
+        tmp_path, "read-error", "---\nname: read-error\ndescription: Read error.\n---\n\n# Body\n"
+    )
+
+    def raise_os_error(self: Path) -> bytes:
+        assert self == skill_file
+        msg = "synthetic read error"
+        raise OSError(msg)
+
+    monkeypatch.setattr(Path, "read_bytes", raise_os_error)
+
+    with pytest.raises(SkillDefinitionLoadError) as read_error:
+        SkillMarkdownFileDefinitionLoader(skill_roots=(tmp_path,)).load(SelectedSkill(skill_id="read-error"))
+
+    assert read_error.value.category == "invalid_skill_file"
+
+
+def test_definition_loader_reports_unclosed_frontmatter_and_verbose_path(tmp_path: Path) -> None:
+    _write_skill(tmp_path, "unclosed", "---\nname: unclosed\ndescription: Missing closing delimiter.\n# Body\n")
+
+    with pytest.raises(SkillDefinitionLoadError) as exc_info:
+        SkillMarkdownFileDefinitionLoader(skill_roots=(tmp_path,), verbose_diagnostics=True).load(
+            SelectedSkill(skill_id="unclosed"),
+        )
+
+    assert exc_info.value.category == "invalid_frontmatter"
+    assert exc_info.value.metadata["diagnostic_mode"] == "verbose"
+    assert isinstance(exc_info.value.metadata["path"], str)
+    assert exc_info.value.metadata["path"].endswith("unclosed/SKILL.md")
+
+
 def _write_skill(root: Path, skill_id: str, source: str) -> Path:
     skill_file = root / skill_id / "SKILL.md"
     skill_file.parent.mkdir(parents=True, exist_ok=True)

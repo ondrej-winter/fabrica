@@ -185,7 +185,7 @@ class SkillScriptSandboxPolicy:
         if len(environment_allowlist) > DEFAULT_MAX_SKILL_SCRIPT_ENVIRONMENT_NAMES:
             msg = "environment allowlist exceeds the default deny-by-default bound"
             raise ValueError(msg)
-        for name in environment_allowlist:
+        for name in environment_allowlist:  # pragma: no cover - Version 1 policy permits zero environment names.
             _validate_environment_name(name)
         object.__setattr__(self, "writable_path_labels", writable_path_labels)
         object.__setattr__(self, "environment_allowlist", environment_allowlist)
@@ -377,7 +377,9 @@ def _validate_environment_name(value: str) -> None:
     if value[0].isdigit():
         msg = "environment name must not start with a digit"
         raise ValueError(msg)
-    if any(character not in SAFE_ENVIRONMENT_NAME_CHARS for character in value):
+    if any(
+        character not in SAFE_ENVIRONMENT_NAME_CHARS for character in value
+    ):  # pragma: no branch - generator exhaustion is not a separate decision.
         msg = "environment name contains unsupported characters"
         raise ValueError(msg)
 

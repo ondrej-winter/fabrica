@@ -271,6 +271,34 @@ def test_run_command_appends_requested_usage_and_price_evidence() -> None:
     )
 
 
+def test_selected_context_run_appends_requested_evidence() -> None:
+    selected_context_runtime = FakeSelectedContextRuntime(
+        result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="context-ok"),
+    )
+    calls: list[tuple[bool, bool]] = []
+
+    def evidence_writer(
+        result: LocalAgentRunResult,
+        *,
+        include_usage: bool,
+        include_prices: bool,
+        stdout: TextIO,
+    ) -> None:
+        _ = result, stdout
+        calls.append((include_usage, include_prices))
+
+    exit_code = run_selected_context_agent_cli_command(
+        CliRunCommand(prompt="Use selected context", skill_ids=("python-testing",)),
+        options=AgentRuntimeCliOptions(print_usage=True),
+        streams=AgentRuntimeCliStreams(stdout=StringIO(), stderr=StringIO()),
+        runtime=selected_context_runtime,
+        evidence_writer=evidence_writer,
+    )
+
+    assert exit_code == 0
+    assert calls == [(True, False)]
+
+
 def test_run_command_skips_augmentation_when_no_context_is_selected() -> None:
     runtime = FakeRuntime(
         result=LocalAgentRunResult(status=LocalAgentRunStatus.SUCCESS, output_text="pong"),
