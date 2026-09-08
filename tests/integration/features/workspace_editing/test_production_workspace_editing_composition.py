@@ -9,8 +9,8 @@ import fabrica.bootstrap.composition.workspace_editing as workspace_editing_comp
 from fabrica.features.agent_runtime.application.dtos import RegisteredToolOutcome, ToolDefinition
 from fabrica.features.agent_runtime.application.ports import AsyncRegisteredTool
 from fabrica.features.workspace_editing.adapters.inbound.registered_tool import APPLY_PATCH_TOOL_NAME
-from fabrica.features.workspace_editing.adapters.outbound.authorization import PatchApprovalDecision
 from fabrica.features.workspace_editing.application.dtos import (
+    PatchApprovalDecision,
     PatchApprovalPreview,
     PatchError,
     PatchPlan,

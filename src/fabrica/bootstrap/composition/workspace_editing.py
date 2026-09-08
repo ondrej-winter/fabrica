@@ -11,7 +11,6 @@ from fabrica.features.workspace_editing.adapters.inbound.registered_tool import 
 )
 from fabrica.features.workspace_editing.adapters.outbound.authorization import (
     InProcessPatchMutationLeaseManager,
-    PatchApprovalDecision,
     StaticPatchApprovalRequester,
     WorkspacePatchPolicyEvaluator,
 )
@@ -23,7 +22,12 @@ from fabrica.features.workspace_editing.adapters.outbound.posix_filesystem impor
     PosixSupervisedPatchMutationAdapter,
     PosixSupervisedPatchPreparationAdapter,
 )
-from fabrica.features.workspace_editing.application.dtos import PatchLimits, PatchPlan, WorkspaceMutationStartupGate
+from fabrica.features.workspace_editing.application.dtos import (
+    PatchApprovalDecision,
+    PatchLimits,
+    PatchPlan,
+    WorkspaceMutationStartupGate,
+)
 from fabrica.features.workspace_editing.application.use_cases import ApplyPatch, RecoverWorkspaceMutation
 
 type PatchApprovalCallback = Callable[[PatchPlan], Awaitable[PatchApprovalDecision]]

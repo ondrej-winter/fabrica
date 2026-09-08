@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Self
 
 from fabrica.features.workspace_editing.application.dtos import (
+    PatchApprovalDecision,
     PatchMutationGuarantee,
     PatchPlan,
     PatchResult,
@@ -57,15 +58,6 @@ class WorkspacePatchPolicyEvaluator:
                     metadata={"path": path},
                 )
         return None
-
-
-@dataclass(frozen=True, slots=True)
-class PatchApprovalDecision:
-    """Host decision for one digest-bound immutable patch plan."""
-
-    approved: bool
-    plan_digest: str
-    reason: str | None = None
 
 
 type PatchApprovalCallback = Callable[[PatchPlan], Awaitable[PatchApprovalDecision]]
@@ -122,7 +114,6 @@ def _rejected(code: str, message: str, *, metadata: dict[str, str] | None = None
 
 __all__ = [
     "InProcessPatchMutationLeaseManager",
-    "PatchApprovalDecision",
     "StaticPatchApprovalRequester",
     "WorkspacePatchPolicyEvaluator",
 ]

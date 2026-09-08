@@ -4,13 +4,13 @@ import asyncio
 
 from fabrica.features.workspace_editing.adapters.outbound.authorization import (
     InProcessPatchMutationLeaseManager,
-    PatchApprovalDecision,
     StaticPatchApprovalRequester,
     WorkspacePatchPolicyEvaluator,
 )
 from fabrica.features.workspace_editing.application.dtos import (
     PatchAction,
     PatchActionKind,
+    PatchApprovalDecision,
     PatchApprovalPreview,
     PatchPlan,
 )

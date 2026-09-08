@@ -86,7 +86,7 @@ tool output contracts remain authoritative.
 ## Progress Tracking
 
 - [x] **CAS-01** Define session DTOs, ports, and final disposition model.
-- [ ] **CAS-02** Build terminal adapters for questions and approvals.
+- [x] **CAS-02** Build terminal adapters for questions and approvals.
 - [ ] **CAS-03** Generalize interactive tool-loop composition for explicit tools.
 - [ ] **CAS-04** Compose the workspace-scoped coding-agent runtime.
 - [ ] **CAS-05** Add feature-owned `agent` CLI parsing, rendering, and exit codes.
@@ -147,7 +147,7 @@ src/fabrica/features/coding_agent_session/application/use_cases/__init__.py
 
 ### CAS-02 — Build terminal question and approval adapters
 
-- [ ] **CAS-02** Build terminal adapters for questions and approvals.
+- [x] **CAS-02** Build terminal adapters for questions and approvals.
 
 **Likely files**
 

@@ -326,6 +326,15 @@ class PatchApprovalPreview:
 
 
 @dataclass(frozen=True, slots=True)
+class PatchApprovalDecision:
+    """Host decision explicitly bound to one immutable patch plan digest."""
+
+    approved: bool
+    plan_digest: str
+    reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class PatchChangeSummary:
     """Compact result summary for one planned or committed file action."""
 
