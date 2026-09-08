@@ -87,7 +87,7 @@ tool output contracts remain authoritative.
 
 - [x] **CAS-01** Define session DTOs, ports, and final disposition model.
 - [x] **CAS-02** Build terminal adapters for questions and approvals.
-- [ ] **CAS-03** Generalize interactive tool-loop composition for explicit tools.
+- [x] **CAS-03** Generalize interactive tool-loop composition for explicit tools.
 - [ ] **CAS-04** Compose the workspace-scoped coding-agent runtime.
 - [ ] **CAS-05** Add feature-owned `agent` CLI parsing, rendering, and exit codes.
 - [ ] **CAS-06** Register bootstrap handlers and production composition.
@@ -191,7 +191,7 @@ src/fabrica/features/coding_agent_session/adapters/inbound/terminal/__init__.py
 
 ### CAS-03 — Generalize interactive tool-loop composition
 
-- [ ] **CAS-03** Generalize interactive tool-loop composition for explicit tools.
+- [x] **CAS-03** Generalize interactive tool-loop composition for explicit tools.
 
 **Likely files**
 

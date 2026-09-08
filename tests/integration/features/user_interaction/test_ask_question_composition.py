@@ -2,13 +2,16 @@
 
 import asyncio
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 import pytest
 
 from fabrica.bootstrap import create_interactive_tool_loop_runtime, create_tool_loop_runtime
+from fabrica.features.agent_runtime.adapters.outbound.registered_tool import RegisteredTool
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
+    ToolArgumentValue,
     ToolAwareModelResponse,
     ToolCallRequest,
     ToolCallResult,
@@ -97,6 +100,50 @@ def test_headless_tool_loop_does_not_implicitly_expose_ask_question() -> None:
     runtime = create_tool_loop_runtime(model=_QuestionModel())
 
     assert runtime.available_tools == ()
+
+
+def test_interactive_runtime_exposes_supplied_tools_and_ask_question_without_execution() -> None:
+    model = _QuestionModel()
+    tool_called = False
+
+    def lookup_note(_arguments: Mapping[str, ToolArgumentValue]) -> str:
+        nonlocal tool_called
+        tool_called = True
+        return "note"
+
+    supplied_tool = RegisteredTool(
+        definition=ToolDefinition(name="lookup_note", description="Look up a note."),
+        handler=lookup_note,
+    )
+
+    runtime = create_interactive_tool_loop_runtime(
+        model=model,
+        transport=_FakeTransport(),
+        tools=(supplied_tool,),
+    )
+
+    assert tuple(tool.name for tool in runtime.available_tools) == ("lookup_note", "ask_question")
+    assert model.calls == []
+    assert tool_called is False
+
+
+@pytest.mark.parametrize("duplicate_name", ["ask_question", "lookup_note"])
+def test_interactive_runtime_rejects_duplicate_tool_names(duplicate_name: str) -> None:
+    def lookup_note(_arguments: Mapping[str, ToolArgumentValue]) -> str:
+        return "note"
+
+    tool = RegisteredTool(
+        definition=ToolDefinition(name=duplicate_name, description="Duplicate tool."),
+        handler=lookup_note,
+    )
+    tools = (tool,) if duplicate_name == "ask_question" else (tool, tool)
+
+    with pytest.raises(ValueError, match="registered tool names must be unique"):
+        create_interactive_tool_loop_runtime(
+            model=_QuestionModel(),
+            transport=_FakeTransport(),
+            tools=tools,
+        )
 
 
 def test_cancelled_interactive_run_releases_pending_question_before_reraising() -> None:

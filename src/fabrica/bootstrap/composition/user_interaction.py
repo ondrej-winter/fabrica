@@ -5,7 +5,11 @@ from dataclasses import dataclass
 from secrets import token_urlsafe
 
 from fabrica.bootstrap.composition.tool_loop import ToolLoopRuntime
-from fabrica.features.agent_runtime.adapters.outbound.registered_tool import RegisteredToolExecutor
+from fabrica.features.agent_runtime.adapters.outbound.registered_tool import (
+    AsyncRegisteredTool,
+    RegisteredTool,
+    RegisteredToolExecutor,
+)
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     ToolCancellationSignal,
@@ -95,10 +99,16 @@ def create_interactive_tool_loop_runtime(
     *,
     model: ToolAwareAgentModel,
     transport: InteractionTransport,
+    tools: tuple[RegisteredTool | AsyncRegisteredTool, ...] = (),
 ) -> InteractiveToolLoopRuntime:
-    """Create an opt-in interactive runtime from explicit model and host transport."""
+    """Create an interactive runtime from explicit tools, model, and host transport.
+
+    The runtime always exposes its host-owned ``ask_question`` tool in addition
+    to the supplied registrations. Duplicate tool names, including a supplied
+    ``ask_question`` registration, fail during construction.
+    """
     manager = InMemoryInteractionManager(transport)
-    executor = RegisteredToolExecutor((create_ask_question_registered_tool(manager),))
+    executor = RegisteredToolExecutor((*tools, create_ask_question_registered_tool(manager)))
 
     async def release_interaction_owner(opaque_context: Mapping[str, object]) -> None:
         owner = opaque_context.get(INTERACTION_OWNER_CONTEXT_KEY)
