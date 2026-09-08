@@ -1,6 +1,7 @@
 """Tests for apply-patch application DTO contracts."""
 
 from dataclasses import FrozenInstanceError
+from datetime import UTC, datetime
 from typing import cast
 
 import pytest
@@ -17,6 +18,8 @@ from fabrica.features.workspace_editing.application.dtos import (
     PatchDirectoryPlannedEffect,
     PatchError,
     PatchErrorPhase,
+    PatchExecutionContext,
+    PatchExecutionPhase,
     PatchHunk,
     PatchLimits,
     PatchMatchQuality,
@@ -356,4 +359,58 @@ def test_error_message_length_is_bounded() -> None:
             mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
             runtime_mapping=PatchRuntimeMapping.REJECTED,
             message="x" * 1_001,
+        )
+
+
+def test_patch_execution_context_rejects_invalid_deadlines() -> None:
+    class _Cancellation:
+        is_cancelled = False
+
+    invalid_deadlines = cast("dict[PatchExecutionPhase, datetime]", {"planning": datetime.now(UTC)})
+    with pytest.raises(TypeError, match="execution phases"):
+        PatchExecutionContext(_Cancellation(), phase_deadlines=invalid_deadlines)
+    naive_deadline = datetime.now(UTC).replace(tzinfo=None)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        PatchExecutionContext(_Cancellation(), phase_deadlines={PatchExecutionPhase.PLANNING: naive_deadline})
+
+
+def test_patch_result_serialization_falls_back_to_mandatory_fields_when_optional_fields_exceed_bound() -> None:
+    result = PatchResult(
+        status=PatchResultStatus.COMMITTED,
+        mutation_guarantee=PatchMutationGuarantee.COMMITTED,
+        warnings=("x" * 200,),
+    )
+
+    serialized = result.to_bounded_json(max_chars=80)
+
+    assert '"status":"committed"' in serialized
+    assert '"warnings"' not in serialized
+    with pytest.raises(ValueError, match="at least 1"):
+        result.to_bounded_json(max_chars=0)
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["", "x" * 4_097],
+)
+def test_patch_boundary_dtos_reject_empty_or_oversized_paths(path: str) -> None:
+    with pytest.raises(ValueError, match="path"):
+        PatchPathEvidence(path=path, exists=False)
+
+
+@pytest.mark.parametrize("digest", ["sha256:" + "A" * 64, "sha256:" + "a" * 63])
+def test_patch_boundary_dtos_reject_invalid_digest_encodings(digest: str) -> None:
+    with pytest.raises(ValueError, match=r"sha256 digest|lowercase hexadecimal"):
+        PatchPathEvidence(path="source.py", exists=True, content_digest=digest)
+
+
+@pytest.mark.parametrize("code", ["", "X" * 81])
+def test_patch_errors_reject_empty_or_oversized_codes(code: str) -> None:
+    with pytest.raises(ValueError, match="patch error code"):
+        PatchError(
+            code=code,
+            phase=PatchErrorPhase.PARSING,
+            retryable=True,
+            mutation_guarantee=PatchMutationGuarantee.NO_MUTATION,
+            runtime_mapping=PatchRuntimeMapping.REJECTED,
         )

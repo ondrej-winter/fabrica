@@ -116,6 +116,32 @@ def test_posix_commit_adapter_persists_committed_journal_with_path_outcomes(tmp_
     ]
 
 
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX commit adapter targets macOS/Linux")
+def test_posix_commit_adapter_rolls_back_when_initial_committing_journal_write_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    actions = (PatchAction(index=0, kind=PatchActionKind.ADD, path="generated/add.py", added_lines=("added",)),)
+    plan, journal = _prepared_plan_and_journal(tmp_path, actions)
+    adapter = PosixPatchCommitAdapter(tmp_path)
+    assert run(adapter.prepare(plan, journal)) is None
+    original_write_record = posix_commit_module._write_record  # noqa: SLF001 - inject the durable record failure boundary.
+    write_attempts = 0
+
+    def fail_first_write(path: Path, record: PatchJournalRecord) -> None:
+        nonlocal write_attempts
+        write_attempts += 1
+        if write_attempts == 1:
+            raise OSError(5, "injected journal write failure")
+        original_write_record(path, record)
+
+    monkeypatch.setattr(posix_commit_module, "_write_record", fail_first_write)
+
+    result = run(adapter.commit(plan, journal))
+
+    assert result.status is PatchResultStatus.COMMIT_FAILED_ROLLED_BACK
+    assert not (tmp_path / "generated" / "add.py").exists()
+
+
 @pytest.mark.skipif(
     sys.platform not in {"darwin", "linux"},
     reason="AP-02 native no-replace commit backend targets macOS/Linux",

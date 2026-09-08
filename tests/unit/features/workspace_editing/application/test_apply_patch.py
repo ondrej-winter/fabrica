@@ -144,6 +144,30 @@ def test_apply_patch_returns_capability_rejection_before_parsing() -> None:
     assert harness.events == ["lease_enter", "capability", "lease_exit"]
 
 
+def test_apply_patch_rejects_cancellation_before_planning() -> None:
+    cancellation = _MutableCancellation(cancelled=True)
+    harness = _Harness()
+
+    result = run(harness.use_case.apply(_add_file_patch(), execution=_execution(cancellation)))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "PLANNING_TIMEOUT"
+    assert harness.events == ["lease_enter", "lease_exit"]
+
+
+def test_apply_patch_rolls_back_when_cancelled_after_directory_preparation() -> None:
+    cancellation = _MutableCancellation()
+    harness = _Harness(preparation_stager_callback=lambda: setattr(cancellation, "cancelled", True))
+
+    result = run(harness.use_case.apply(_add_file_patch(), execution=_execution(cancellation)))
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert result.error is not None
+    assert result.error.code == "STAGING_TIMEOUT"
+    assert harness.events[-3:] == ["prepare_directories", "rollback", "lease_exit"]
+
+
 def test_apply_patch_returns_parser_rejection_before_snapshot() -> None:
     harness = _Harness()
 

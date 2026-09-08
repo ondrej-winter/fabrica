@@ -288,6 +288,36 @@ def test_helper_requires_matching_durable_journal_before_mutation(tmp_path: Path
     assert connection.outcomes[0].status is PatchResultStatus.RECOVERY_REQUIRED
 
 
+def test_helper_translates_owned_operation_failures_to_recovery_required(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    journal = _journal()
+    connection = _RecordingConnection()
+
+    class _FailingCommitAdapter:
+        def __init__(self, _workspace_root: Path) -> None:
+            pass
+
+        async def commit(self, _plan: PatchPlan, _journal: PatchJournalRecord) -> PatchResult:
+            message = "injected helper failure"
+            raise RuntimeError(message)
+
+    monkeypatch.setattr(helper_process, "_load_durable_journal", lambda *_args: journal)
+    monkeypatch.setattr(helper_process, "PosixPatchCommitAdapter", _FailingCommitAdapter)
+
+    helper_process.run_patch_operation_in_helper(
+        connection,
+        str(tmp_path),
+        helper_process.PatchHelperOperation.COMMIT,
+        _plan(),
+        journal,
+    )
+
+    assert connection.closed is True
+    assert connection.outcomes[0] is not None
+    assert connection.outcomes[0].status is PatchResultStatus.RECOVERY_REQUIRED
+
+
 @pytest.mark.parametrize(
     ("outcome_status", "state", "expected_status"),
     [

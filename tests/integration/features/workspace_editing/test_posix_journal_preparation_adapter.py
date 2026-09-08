@@ -279,6 +279,28 @@ def test_posix_journal_requires_recovery_when_created_directory_identity_changes
     assert (tmp_path / "generated").is_dir()
 
 
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX preparation adapter targets macOS/Linux")
+def test_posix_journal_rolls_back_matching_created_directory(tmp_path: Path) -> None:
+    adapter = PosixPatchJournalAndPreparationAdapter(tmp_path)
+    plan = _plan("generated")
+    journal = run(adapter.create(plan))
+    preparing = run(adapter.transition(journal, PatchJournalState.PREPARING))
+    generated = tmp_path / "generated"
+    generated.mkdir()
+    created = PatchDirectoryOutcome(
+        path="generated",
+        planned_effect=PatchDirectoryPlannedEffect.CREATE_DIRECTORY,
+        final_state=PatchDirectoryOutcomeState.CREATED,
+        reason="parent_for_destination",
+        identity_digest=journal_module._identity_digest(generated.lstat()),  # noqa: SLF001 - constructs durable evidence.
+    )
+
+    result = run(adapter._roll_back_preparation(preparing, [created]))  # noqa: SLF001
+
+    assert result.status is PatchResultStatus.REJECTED
+    assert not generated.exists()
+
+
 def _plan(*directories: str, plan_digest: str = PLAN_DIGEST) -> PatchPlan:
     return PatchPlan(
         plan_digest=plan_digest,

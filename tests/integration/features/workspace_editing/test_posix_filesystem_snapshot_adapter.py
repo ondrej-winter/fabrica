@@ -603,6 +603,19 @@ def test_posix_snapshot_adapter_fails_closed_when_alias_directory_scan_fails(
     assert result.error.code == "IO_ERROR"
 
 
+@pytest.mark.skipif(sys.platform not in {"darwin", "linux"}, reason="POSIX snapshot adapter targets macOS/Linux")
+def test_posix_snapshot_adapter_allows_disappearing_alias_directory_scan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing_scandir(_path: Path) -> object:
+        raise FileNotFoundError
+
+    monkeypatch.setattr(os, "scandir", missing_scandir)
+
+    assert _reject_path_alias(tmp_path, "new.py") is None
+
+
 def test_posix_snapshot_adapter_allows_files_without_posix_flags() -> None:
     assert _reject_unsupported_metadata("src/example.py", flags=0) is None
 
