@@ -85,7 +85,7 @@ tool output contracts remain authoritative.
 
 ## Progress Tracking
 
-- [ ] **CAS-01** Define session DTOs, ports, and final disposition model.
+- [x] **CAS-01** Define session DTOs, ports, and final disposition model.
 - [ ] **CAS-02** Build terminal adapters for questions and approvals.
 - [ ] **CAS-03** Generalize interactive tool-loop composition for explicit tools.
 - [ ] **CAS-04** Compose the workspace-scoped coding-agent runtime.
@@ -103,7 +103,7 @@ changes, and newly discovered work in the affected task.
 
 ### CAS-01 — Define the session boundary
 
-- [ ] **CAS-01** Define session DTOs, ports, and final disposition model.
+- [x] **CAS-01** Define session DTOs, ports, and final disposition model.
 
 **Likely files**
 
