@@ -641,10 +641,13 @@ persisted, printed, or logged by the runtime path. Runtime failures return
 normalized statuses and bounded, redacted observations.
 
 Still-deferred runtime work remains explicit: streaming support, OAuth refresh or
-credential mutation, production sandboxing, and UI entry points. Tool loops,
-PydanticAI-shaped composition proofs, and model-driven selected Agent Skills
-composition are documented below as explicit, bounded Python API paths rather
-than ambient runtime powers.
+credential mutation, production sandboxing, and UI entry points. The accepted
+first-class terminal coding-agent workflow is specified in
+[`docs/specs/coding-agent-session-spec.md`](docs/specs/coding-agent-session-spec.md),
+but `fabrica agent` is not implemented yet. Tool loops, PydanticAI-shaped
+composition proofs, and model-driven selected Agent Skills composition are
+documented below as explicit, bounded Python API paths rather than ambient runtime
+powers.
 
 ## Offline PydanticAI runtime compatibility proof
 

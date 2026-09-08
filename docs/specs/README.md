@@ -33,6 +33,9 @@ replacing those technical details.
 
 - `agent-runtime-spec.md` defines the local Python agent runtime direction and its
   provider-agnostic runtime boundaries.
+- `coding-agent-session-spec.md` defines the accepted, planned terminal-hosted
+  `fabrica agent` product composition, including workspace scope, default tool
+  exposure, explicit patch approval, terminal interaction, and validation.
 - `codex-transport-spec.md` defines the subscription-backed Codex transport support
   path, private-backend constraints, credential safety, and opt-in live
   validation rules.

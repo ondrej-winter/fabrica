@@ -29,6 +29,8 @@ This directory contains durable project documentation and current reference note
 - `specs/README.md` explains the concern-oriented spec taxonomy.
 - `specs/agent-runtime-spec.md` defines the local Python agent runtime direction and
   its provider-agnostic boundaries.
+- `specs/coding-agent-session-spec.md` defines the accepted, planned terminal-hosted
+  workspace coding-agent session and its tool/approval composition contract.
 - `specs/codex-transport-spec.md` defines the subscription-backed Codex transport
   support path and preserves private-backend errata.
 - `specs/model-usage-and-cost-evidence-spec.md` defines the generic usage and pricing

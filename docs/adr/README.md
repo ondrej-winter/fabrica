@@ -10,3 +10,4 @@ This directory contains accepted architecture decisions for Fabrica.
 | [0004](./0004-use-bounded-multimodal-read-tool-runtime-contracts.md) | Use Bounded Multimodal Read Tool Runtime Contracts | 2026-08-28 | Accepted |
 | [0008](./0008-use-native-ripgrep-with-best-effort-containment-on-supported-platforms.md) | Use Native Ripgrep With Best-Effort Containment on Supported Platforms | 2026-08-30 | Accepted |
 | [0009](./0009-use-capability-proven-native-patch-mutation-and-supervised-helper-ownership.md) | Use Capability-Proven Native Patch Mutation and Supervised Helper Ownership | 2026-09-02 | Accepted |
+| [0010](./0010-use-terminal-hosted-workspace-scoped-coding-agent-composition.md) | Use Terminal-Hosted Workspace-Scoped Coding-Agent Composition | 2026-09-08 | Accepted |
