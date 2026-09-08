@@ -113,9 +113,11 @@ apply_patch
 
 - `read_files` and `search_codebase` are enabled as bounded, read-only workspace
   inspection primitives.
-- `run_commands` is enabled only with the terminal host's explicit default-deny
-  permission, environment, approval, sandbox-preflight, timeout, and process
-  supervision policy.
+- `run_commands` is enabled only with the terminal host's explicit static policy,
+  filtered environment, per-command approval, sandbox-preflight, timeout, and
+  process supervision. Prohibited forms return `DENY`; every eligible command
+  returns `REQUIRE_APPROVAL`; and no command returns `ALLOW` in Version 1. The
+  host approves only the resolved `PlannedCommand`.
 - `ask_question` is enabled only for an interactive terminal session.
 - `apply_patch` is exposed only when production workspace mutation startup
   recovery and actual-workspace capability verification succeed. If the mutation
@@ -141,12 +143,18 @@ The terminal host must distinguish information requests from permission requests
   pending interaction through the interaction contract. The host must not invent
   a default answer.
 
-The initial command policy must be explicit and documented before implementation.
-At minimum it must reject interactive commands and preserve the existing command
-tool's workspace containment, filtered environment, timeout, cancellation, and
-default-deny requirements. The host may require per-command approval; whether a
-safe allowlist can run without confirmation is an implementation-plan decision,
-not an implicit grant of unrestricted shell access.
+Version 1 uses a per-command approval policy. The host must reject prohibited
+forms before approval and preserve the existing command tool's workspace
+containment, filtered environment, timeout, cancellation, sandbox-preflight, and
+process-supervision requirements. The permission evaluator returns `DENY` for
+prohibited forms and `REQUIRE_APPROVAL` for every eligible command; no command
+may return `ALLOW` in Version 1. Any future no-prompt allowlist requires a
+separate accepted policy decision and coverage. This is not an implicit grant of
+unrestricted shell access.
+
+Version 1 patch approval renders only the existing immutable, bounded approval
+preview, affected workspace-relative paths, derived effects, and plan digest.
+Unified-diff rendering is deferred and is not a condition of patch approval.
 
 ### Session Lifecycle
 
@@ -254,15 +262,13 @@ outside the default test suite and CI.
 
 | Question | Impact | Blocking? | Owner | Resolution |
 | --- | --- | --- | --- | --- |
-| Which direct argv commands, if any, may run without per-command terminal approval? | Defines the usability/safety trade-off for the initial command policy. | Yes, before implementation | Maintainer | Unresolved; default-deny policy remains mandatory. |
-| Should the initial terminal host render a unified diff in addition to the immutable patch-plan summary? | Affects approval usability, not patch authorization semantics. | No | Maintainer | Resolve during implementation planning. |
 | Should a non-interactive `--read-only` session be included in Version 1? | May support CI-like investigation without terminal interaction. | No | Maintainer | Deferred; interactive terminal session is the accepted first surface. |
 
 ## Acceptance and Planning Gate
 
-This accepted specification is ready for implementation planning. The command
-permission decision is the only blocking design question; the implementation plan
-must resolve and record it before coding begins.
+This accepted specification is ready for implementation. The Version 1 command
+permission and patch-preview decisions are recorded above; no blocking design
+question remains.
 
 ## Execution Boundaries
 
