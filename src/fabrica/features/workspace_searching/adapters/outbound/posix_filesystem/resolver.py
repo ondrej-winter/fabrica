@@ -1,37 +1,12 @@
 """Canonical, fail-closed literal workspace search-scope resolution."""
 
-from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 
+from fabrica.features.workspace_searching.adapters.outbound.posix_filesystem.errors import (
+    SearchScopeResolutionError,
+)
+from fabrica.features.workspace_searching.adapters.outbound.posix_filesystem.scope import SearchScope, SearchScopeKind
 from fabrica.features.workspace_searching.application.dtos import SearchErrorCode
-
-
-class SearchScopeKind(StrEnum):
-    """The filesystem object that bounds one literal search query."""
-
-    FILE = "file"
-    DIRECTORY = "directory"
-
-
-@dataclass(frozen=True, slots=True)
-class SearchScope:
-    """A canonical existing scope known to remain below the workspace root."""
-
-    canonical_path: Path
-    workspace_relative_path: str
-    kind: SearchScopeKind
-
-
-@dataclass(frozen=True, slots=True)
-class SearchScopeResolutionError(Exception):
-    """Stable application error category for a rejected search scope."""
-
-    code: SearchErrorCode
-    message: str
-
-    def __str__(self) -> str:
-        return self.message
 
 
 def resolve_search_scope(workspace_root: Path, requested_path: str) -> SearchScope:
@@ -52,12 +27,10 @@ def resolve_search_scope(workspace_root: Path, requested_path: str) -> SearchSco
     if not canonical_path.is_relative_to(root):
         raise SearchScopeResolutionError(SearchErrorCode.PATH_OUTSIDE_WORKSPACE, "path escapes the workspace")
     try:
+        _reject_symlinked_directory_components(root, requested_path)
         if canonical_path.is_file():
             kind = SearchScopeKind.FILE
         elif canonical_path.is_dir():
-            if requested_path != "." and candidate.is_symlink():
-                msg = "symlinked directories are not valid recursive search scopes"
-                raise SearchScopeResolutionError(SearchErrorCode.INVALID_PATH, msg)
             kind = SearchScopeKind.DIRECTORY
         else:
             raise SearchScopeResolutionError(SearchErrorCode.INVALID_PATH, "path is not a regular file or directory")
@@ -77,6 +50,19 @@ def _validate_requested_path(requested_path: str) -> None:
         raise SearchScopeResolutionError(SearchErrorCode.PATH_OUTSIDE_WORKSPACE, "path escapes the workspace")
 
 
+def _reject_symlinked_directory_components(root: Path, requested_path: str) -> None:
+    if requested_path == ".":
+        return
+    component_path = root
+    for component in requested_path.split("/"):
+        if component in {"", "."}:
+            continue
+        component_path /= component
+        if component_path.is_symlink() and component_path.resolve(strict=True).is_dir():
+            msg = "symlinked directories are not valid recursive search scopes"
+            raise SearchScopeResolutionError(SearchErrorCode.INVALID_PATH, msg)
+
+
 def _resolve_workspace_root(workspace_root: Path) -> Path:
     try:
         root = workspace_root.resolve(strict=True)
@@ -89,4 +75,4 @@ def _resolve_workspace_root(workspace_root: Path) -> Path:
     return root
 
 
-__all__ = ["SearchScope", "SearchScopeKind", "SearchScopeResolutionError", "resolve_search_scope"]
+__all__ = ["resolve_search_scope"]

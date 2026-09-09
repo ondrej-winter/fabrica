@@ -63,6 +63,17 @@ def test_resolve_search_scope_rejects_symlink_escape_special_files_and_directory
         assert exc_info.value.code is expected_code
 
 
+def test_resolve_search_scope_rejects_descendants_of_a_symlinked_directory(tmp_path: Path) -> None:
+    nested_directory = tmp_path / "internal" / "nested"
+    nested_directory.mkdir(parents=True)
+    (tmp_path / "directory-link").symlink_to("internal", target_is_directory=True)
+
+    with pytest.raises(SearchScopeResolutionError) as exc_info:
+        resolve_search_scope(tmp_path, "directory-link/nested")
+
+    assert exc_info.value.code is SearchErrorCode.INVALID_PATH
+
+
 def test_resolve_search_scope_allows_an_explicit_internal_symlinked_file(tmp_path: Path) -> None:
     target = tmp_path / "src" / "app.py"
     target.parent.mkdir()
