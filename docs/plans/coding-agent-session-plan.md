@@ -89,7 +89,7 @@ tool output contracts remain authoritative.
 - [x] **CAS-02** Build terminal adapters for questions and approvals.
 - [x] **CAS-03** Generalize interactive tool-loop composition for explicit tools.
 - [x] **CAS-04** Compose the workspace-scoped coding-agent runtime.
-- [ ] **CAS-05** Add feature-owned `agent` CLI parsing, rendering, and exit codes.
+- [x] **CAS-05** Add feature-owned `agent` CLI parsing, rendering, and exit codes.
 - [ ] **CAS-06** Register bootstrap handlers and production composition.
 - [ ] **CAS-07** Add deterministic offline tests and optional live-smoke scaffold.
 - [ ] **CAS-08** Update user-facing documentation and specification status.
@@ -284,7 +284,7 @@ src/fabrica/features/coding_agent_session/application/use_cases/run_coding_agent
 
 ### CAS-05 — Add the feature-owned CLI boundary
 
-- [ ] **CAS-05** Add feature-owned `agent` CLI parsing, rendering, and exit codes.
+- [x] **CAS-05** Add feature-owned `agent` CLI parsing, rendering, and exit codes.
 
 **Likely files**
 
