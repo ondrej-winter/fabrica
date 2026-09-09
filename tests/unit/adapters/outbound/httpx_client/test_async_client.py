@@ -103,9 +103,10 @@ def test_stream_retries_retryable_status_before_consuming_a_body() -> None:
     http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     retry_client = AsyncHttpxRetryClient(client_factory=lambda: http_client)
     request = HttpxRetryRequest(
-        method="GET",
+        method="POST",
         url="https://example.invalid/resource",
         policy=RetryPolicy(max_attempts=EXPECTED_ATTEMPT_COUNT, initial_delay_seconds=0.0),
+        replay_safe=True,
     )
 
     result = asyncio.run(retry_client.stream(request, consume))
@@ -134,9 +135,10 @@ def test_stream_retries_connection_failure_before_opening_a_body() -> None:
     http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     retry_client = AsyncHttpxRetryClient(client_factory=lambda: http_client)
     request = HttpxRetryRequest(
-        method="GET",
+        method="POST",
         url="https://example.invalid/resource",
         policy=RetryPolicy(max_attempts=EXPECTED_ATTEMPT_COUNT, initial_delay_seconds=0.0),
+        replay_safe=True,
     )
 
     result = asyncio.run(retry_client.stream(request, consume))
@@ -167,6 +169,7 @@ def test_stream_wraps_non_retryable_connection_failure_without_opening_a_body() 
         method="GET",
         url="https://example.invalid/resource",
         policy=RetryPolicy(retryable_exception_types=()),
+        replay_safe=True,
     )
 
     with pytest.raises(HttpxRetryError) as error_info:
@@ -195,6 +198,7 @@ def test_stream_stops_after_retryable_connection_failure_exhausts_attempts() -> 
         method="GET",
         url="https://example.invalid/resource",
         policy=RetryPolicy(max_attempts=EXPECTED_RETRY_COUNT),
+        replay_safe=True,
     )
 
     with pytest.raises(HttpxRetryError) as error_info:
@@ -225,6 +229,7 @@ def test_stream_consumes_final_retryable_response_without_another_replay() -> No
         method="GET",
         url="https://example.invalid/resource",
         policy=RetryPolicy(max_attempts=EXPECTED_ATTEMPT_COUNT, initial_delay_seconds=0.0),
+        replay_safe=True,
     )
 
     result = asyncio.run(retry_client.stream(request, consume))
@@ -256,6 +261,7 @@ def test_stream_consumes_unretryable_response_once() -> None:
         method="GET",
         url="https://example.invalid/resource",
         policy=RetryPolicy(max_attempts=EXPECTED_ATTEMPT_COUNT, initial_delay_seconds=0.0),
+        replay_safe=True,
     )
 
     result = asyncio.run(retry_client.stream(request, consume))
@@ -285,6 +291,7 @@ def test_stream_closes_client_when_body_read_fails_without_replaying_request() -
         method="GET",
         url="https://example.invalid/resource",
         policy=RetryPolicy(retryable_exception_types=(httpx.ReadError,)),
+        replay_safe=True,
     )
 
     with pytest.raises(httpx.ReadError):

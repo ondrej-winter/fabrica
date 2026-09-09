@@ -49,7 +49,12 @@ class HttpTimeout:
 
 @dataclass(frozen=True, slots=True)
 class HttpxRetryRequest:
-    """HTTP request parameters and retry policy for one execution."""
+    """HTTP request parameters, retry policy, and replay authorization.
+
+    ``replay_safe`` is an explicit assertion by the owning adapter that repeating
+    this operation is safe. RetryPolicy has no effect beyond the first attempt
+    unless this authorization is enabled.
+    """
 
     method: str
     url: str
@@ -57,6 +62,7 @@ class HttpxRetryRequest:
     headers: Mapping[str, str] | None = None
     json: Mapping[str, object] | None = None
     timeout: float | HttpTimeout | None = None
+    replay_safe: bool = False
 
 
 type AsyncHttpBodyConsumer = Callable[[AsyncIterable[bytes]], Awaitable[str]]

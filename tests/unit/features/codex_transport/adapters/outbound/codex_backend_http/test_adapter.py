@@ -100,7 +100,7 @@ def test_complete_allows_timeout_and_request_setting_overrides() -> None:
     assert result.status is CodexTransportStatus.SUCCESS
 
 
-def test_complete_retries_429_with_custom_policy_and_records_summary() -> None:
+def test_complete_does_not_replay_429_with_custom_policy() -> None:
     clock = MonotonicClock()
     calls = 0
 
@@ -109,7 +109,7 @@ def test_complete_retries_429_with_custom_policy_and_records_summary() -> None:
         calls += 1
         if calls == 1:
             return httpx.Response(RATE_LIMIT_STATUS)
-        return _completed_stream_response("pong")
+        return _completed_stream_response("must not replay")
 
     adapter = CodexBackendHttpAdapter(
         http_client=_http_client(handler, clock=clock),
@@ -126,18 +126,15 @@ def test_complete_retries_429_with_custom_policy_and_records_summary() -> None:
         )
     )
 
-    assert result.status is CodexTransportStatus.SUCCESS
-    assert result.output_text == "pong"
-    assert calls == EXPECTED_ATTEMPT_COUNT
-    assert clock.sleeps == [EXPECTED_FIRST_JITTERED_DELAY]
+    assert result.status is CodexTransportStatus.RATE_LIMITED
+    assert calls == 1
+    assert clock.sleeps == []
     retry_observation = result.observations[-1]
-    assert retry_observation.message == "HTTP retry policy completed"
-    assert retry_observation.metadata["attempt_count"] == EXPECTED_ATTEMPT_COUNT
-    assert retry_observation.metadata["retry_count"] == EXPECTED_RETRY_COUNT
+    assert retry_observation.metadata["attempt_count"] == 1
+    assert retry_observation.metadata["retry_count"] == 0
     assert retry_observation.metadata["last_retry_reason"] == "http_status"
-    assert retry_observation.metadata["last_http_status"] == SUCCESS_STATUS
+    assert retry_observation.metadata["last_http_status"] == RATE_LIMIT_STATUS
     assert retry_observation.metadata["last_error_type"] is None
-    assert retry_observation.metadata["elapsed_seconds"] == EXPECTED_FIRST_JITTERED_DELAY
     assert retry_observation.metadata["budget_exhausted"] is False
     assert CODEX_BEARER_VALUE not in str(retry_observation)
     assert CODEX_ACCOUNT_ID not in str(retry_observation)

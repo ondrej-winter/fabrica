@@ -42,6 +42,70 @@ class AsyncMonotonicClock:
         self.current += delay
 
 
+def test_does_not_retry_retryable_status_without_replay_authorization() -> None:
+    clock = AsyncMonotonicClock()
+    calls = 0
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(RETRYABLE_STATUS)
+
+    async def execute() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            outcome = await _executor(clock).request(
+                client=client,
+                request=HttpxRetryRequest(
+                    method="POST",
+                    url="https://example.invalid/resource",
+                    policy=RetryPolicy(total_budget_seconds=10.0),
+                ),
+            )
+
+        assert outcome.response.status_code == RETRYABLE_STATUS
+        assert outcome.diagnostics.attempt_count == 1
+        assert outcome.diagnostics.retry_count == 0
+
+    asyncio.run(execute())
+
+    assert calls == 1
+    assert clock.sleeps == []
+
+
+def test_stream_does_not_retry_retryable_exception_without_replay_authorization() -> None:
+    clock = AsyncMonotonicClock()
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        raise httpx.ConnectError(SYNTHETIC_ERROR_MESSAGE, request=request)
+
+    async def consume(_body) -> str:
+        pytest.fail("must not consume")
+
+    async def execute() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with pytest.raises(HttpxRetryError) as error_info:
+                await _executor(clock).stream(
+                    client=client,
+                    request=HttpxRetryRequest(
+                        method="POST",
+                        url="https://example.invalid/resource",
+                        policy=RetryPolicy(total_budget_seconds=10.0),
+                    ),
+                    body_consumer=consume,
+                )
+
+        assert error_info.value.diagnostics.attempt_count == 1
+        assert error_info.value.diagnostics.retry_count == 0
+
+    asyncio.run(execute())
+
+    assert calls == 1
+    assert clock.sleeps == []
+
+
 def test_retries_transport_error_then_returns_success() -> None:
     clock = AsyncMonotonicClock()
     calls = 0
@@ -58,9 +122,10 @@ def test_retries_transport_error_then_returns_success() -> None:
             outcome = await _executor(clock).request(
                 client=client,
                 request=HttpxRetryRequest(
-                    method="GET",
+                    method="POST",
                     url="https://example.invalid/resource",
                     policy=RetryPolicy(total_budget_seconds=10.0),
+                    replay_safe=True,
                 ),
             )
 
@@ -93,6 +158,7 @@ def test_preserves_zero_retry_after_without_falling_back_to_jitter() -> None:
                     method="GET",
                     url="https://example.invalid/resource",
                     policy=RetryPolicy(total_budget_seconds=40.0),
+                    replay_safe=True,
                 ),
             )
 
@@ -122,6 +188,7 @@ def test_bounds_per_attempt_timeout_to_remaining_retry_budget() -> None:
                     url="https://example.invalid/resource",
                     policy=RetryPolicy(max_attempts=2, initial_delay_seconds=0.0, total_budget_seconds=10.0),
                     timeout=HttpTimeout(connect_seconds=10.0, read_seconds=10.0, write_seconds=10.0, pool_seconds=10.0),
+                    replay_safe=True,
                 ),
             )
 
@@ -148,6 +215,7 @@ def test_raises_retry_error_with_diagnostics_after_exhausting_transport_errors()
                         method="GET",
                         url="https://example.invalid/resource",
                         policy=RetryPolicy(max_attempts=2, total_budget_seconds=10.0),
+                        replay_safe=True,
                     ),
                 )
 
@@ -176,6 +244,7 @@ def test_raises_before_request_when_total_budget_is_exhausted() -> None:
                         method="GET",
                         url="https://example.invalid/resource",
                         policy=RetryPolicy(total_budget_seconds=1.0),
+                        replay_safe=True,
                     ),
                 )
 
@@ -202,6 +271,7 @@ def test_stream_raises_before_request_when_total_budget_is_exhausted() -> None:
                         method="GET",
                         url="https://example.invalid/resource",
                         policy=RetryPolicy(total_budget_seconds=1.0),
+                        replay_safe=True,
                     ),
                     body_consumer=consume,
                 )
@@ -229,6 +299,7 @@ def test_stream_raises_last_retryable_exception_after_retry_budget_is_consumed()
                         method="GET",
                         url="https://example.invalid/resource",
                         policy=RetryPolicy(initial_delay_seconds=1.0, total_budget_seconds=0.5),
+                        replay_safe=True,
                     ),
                     body_consumer=consume,
                 )
@@ -254,6 +325,7 @@ def test_raises_last_retryable_exception_when_retry_delay_exhausts_budget() -> N
                         method="GET",
                         url="https://example.invalid/resource",
                         policy=RetryPolicy(initial_delay_seconds=1.0, total_budget_seconds=1.0),
+                        replay_safe=True,
                     ),
                 )
 
@@ -277,6 +349,7 @@ def test_raises_non_retryable_httpx_error_without_retrying() -> None:
                         method="GET",
                         url="https://example.invalid/resource",
                         policy=RetryPolicy(total_budget_seconds=10.0),
+                        replay_safe=True,
                     ),
                 )
 
@@ -300,6 +373,7 @@ def test_raises_generic_retry_error_when_retry_delay_exhausts_budget_after_http_
                         method="GET",
                         url="https://example.invalid/resource",
                         policy=RetryPolicy(initial_delay_seconds=1.0, total_budget_seconds=1.0),
+                        replay_safe=True,
                     ),
                 )
 

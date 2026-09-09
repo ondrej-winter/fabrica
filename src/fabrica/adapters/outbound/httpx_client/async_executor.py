@@ -100,7 +100,7 @@ class AsyncHttpxRetryExecutor:
                 last_status = None
                 last_error_type = type(err).__name__
                 state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
-                if not self._should_retry(attempt=attempt, policy=request.policy, start_time=start_time):
+                if not self._should_retry(request=request, attempt=attempt, start_time=start_time):
                     raise HttpxRetryError(err, self._diagnostics(state=state, policy=request.policy)) from err
                 await self._sleep_before_retry(
                     policy=request.policy,
@@ -127,7 +127,7 @@ class AsyncHttpxRetryExecutor:
 
             last_reason = "http_status"
             state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
-            if not self._should_retry(attempt=attempt, policy=request.policy, start_time=start_time):
+            if not self._should_retry(request=request, attempt=attempt, start_time=start_time):
                 return HttpxRetryResult(
                     response=_to_http_response(response),
                     diagnostics=self._diagnostics(state=state, policy=request.policy),
@@ -191,7 +191,7 @@ class AsyncHttpxRetryExecutor:
                 last_status = None
                 last_error_type = type(err).__name__
                 state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
-                if not self._should_retry(attempt=attempt, policy=request.policy, start_time=start_time):
+                if not self._should_retry(request=request, attempt=attempt, start_time=start_time):
                     raise HttpxRetryError(err, self._diagnostics(state=state, policy=request.policy)) from err
                 await self._sleep_before_retry(
                     policy=request.policy,
@@ -213,7 +213,7 @@ class AsyncHttpxRetryExecutor:
                 if response.status_code in request.policy.retryable_status_codes:
                     last_reason = "http_status"
                     state = AsyncRetryState(attempt, start_time, last_reason, last_status, last_error_type)
-                    if self._should_retry(attempt=attempt, policy=request.policy, start_time=start_time):
+                    if self._should_retry(request=request, attempt=attempt, start_time=start_time):
                         await self._sleep_before_retry(
                             policy=request.policy,
                             delay=AsyncRetryDelay(
@@ -248,8 +248,12 @@ class AsyncHttpxRetryExecutor:
             self._diagnostics(state=state, policy=request.policy),
         )
 
-    def _should_retry(self, *, attempt: int, policy: RetryPolicy, start_time: float) -> bool:
-        return attempt < policy.max_attempts and self._remaining_budget(policy=policy, start_time=start_time) > 0
+    def _should_retry(self, *, request: HttpxRetryRequest, attempt: int, start_time: float) -> bool:
+        return (
+            request.replay_safe
+            and attempt < request.policy.max_attempts
+            and self._remaining_budget(policy=request.policy, start_time=start_time) > 0
+        )
 
     async def _sleep_before_retry(self, *, policy: RetryPolicy, delay: AsyncRetryDelay) -> None:
         remaining_budget = self._remaining_budget(policy=policy, start_time=delay.state.start_time)

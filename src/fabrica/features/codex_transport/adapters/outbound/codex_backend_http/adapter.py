@@ -361,6 +361,7 @@ class CodexBackendHttpAdapter:
                 policy=self.usage_retry_policy,
                 headers=request.headers,
                 timeout=self.usage_timeout,
+                replay_safe=True,
             )
         )
 
