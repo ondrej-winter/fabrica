@@ -1,6 +1,7 @@
 """Retry policy defaults and validation for HTTPX retry requests."""
 
 from dataclasses import dataclass, field
+from math import isfinite
 
 import httpx
 
@@ -31,8 +32,8 @@ class RetryPolicy:
             "total_budget_seconds",
         ):
             value = getattr(self, field_name)
-            if value < 0:
-                msg = f"{field_name} must not be negative"
+            if not isfinite(value) or value < 0:
+                msg = f"{field_name} must be a finite non-negative number"
                 raise ValueError(msg)
         if self.total_budget_seconds == 0:
             msg = "total_budget_seconds must be greater than 0"

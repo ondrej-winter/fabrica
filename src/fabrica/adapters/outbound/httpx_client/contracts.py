@@ -5,6 +5,7 @@ from __future__ import annotations
 import json as json_library
 from collections.abc import AsyncIterable, Awaitable, Callable
 from dataclasses import dataclass
+from math import isfinite
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Self
 
@@ -22,6 +23,18 @@ class HttpTimeout:
     read_seconds: float | None = None
     write_seconds: float | None = None
     pool_seconds: float | None = None
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "connect_seconds",
+            "read_seconds",
+            "write_seconds",
+            "pool_seconds",
+        ):
+            value = getattr(self, field_name)
+            if value is not None and (not isfinite(value) or value < 0):
+                msg = f"{field_name} must be a finite non-negative number"
+                raise ValueError(msg)
 
     @classmethod
     def same(cls, seconds: float) -> Self:
