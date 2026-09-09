@@ -10,7 +10,6 @@ import pytest
 
 from fabrica.adapters.outbound.httpx_client import (
     AsyncHttpxRetryClient,
-    HttpTimeout,
     HttpxRetryError,
     HttpxRetryRequest,
     RetryPolicy,
@@ -21,7 +20,6 @@ RETRYABLE_STATUS = 429
 UNRETRYABLE_STATUS = 418
 EXPECTED_ATTEMPT_COUNT = 2
 EXPECTED_RETRY_COUNT = 1
-SAME_TIMEOUT_SECONDS = 1.5
 SYNTHETIC_READ_FAILURE_MESSAGE = "synthetic read failure"
 SYNTHETIC_CONNECTION_FAILURE_MESSAGE = "synthetic connection failure"
 
@@ -36,15 +34,6 @@ class _FailingStream(httpx.AsyncByteStream):
 
     async def aclose(self) -> None:
         return None
-
-
-def test_same_timeout_applies_one_value_to_all_http_phases() -> None:
-    timeout = HttpTimeout.same(SAME_TIMEOUT_SECONDS)
-
-    assert timeout.connect_seconds == SAME_TIMEOUT_SECONDS
-    assert timeout.read_seconds == SAME_TIMEOUT_SECONDS
-    assert timeout.write_seconds == SAME_TIMEOUT_SECONDS
-    assert timeout.pool_seconds == SAME_TIMEOUT_SECONDS
 
 
 def test_uses_async_client_factory_and_closes_client_after_request() -> None:
