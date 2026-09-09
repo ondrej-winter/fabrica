@@ -76,6 +76,49 @@ def test_map_tool_turn_response_extracts_function_calls_with_stable_ids() -> Non
     assert result.tool_calls[0].arguments_json == '{"path":"README.md"}'
 
 
+def test_map_tool_turn_response_extracts_function_calls_from_completed_stream_items() -> None:
+    result = map_codex_tool_turn_response(
+        CodexBackendResponse(
+            status_code=200,
+            headers={"content-type": "text/event-stream"},
+            json_body=(
+                "event: response.output_item.done\n"
+                "data: {"
+                '"type":"response.output_item.done",'
+                '"item":{"type":"function_call","call_id":"call-1","name":"read_files",'
+                '"arguments":"{\\"path\\":\\"README.md\\"}"}'
+                "}\n\n"
+                "event: response.completed\n"
+                'data: {"type":"response.completed","response":{"output":[]}}\n\n'
+            ),
+        ),
+    )
+
+    assert result.status is CodexTransportStatus.SUCCESS
+    assert result.output_text is None
+    assert result.tool_calls[0].call_id == "call-1"
+    assert result.tool_calls[0].arguments_json == '{"path":"README.md"}'
+
+
+def test_map_tool_turn_response_extracts_final_text_from_completed_stream_item() -> None:
+    result = map_codex_tool_turn_response(
+        CodexBackendResponse(
+            status_code=200,
+            headers={"content-type": "text/event-stream"},
+            json_body=(
+                "event: response.output_text.done\n"
+                'data: {"type":"response.output_text.done","text":"ahoj"}\n\n'
+                "event: response.completed\n"
+                'data: {"type":"response.completed","response":{"output":[]}}\n\n'
+            ),
+        ),
+    )
+
+    assert result.status is CodexTransportStatus.SUCCESS
+    assert result.output_text == "ahoj"
+    assert result.tool_calls == ()
+
+
 def test_map_success_response_with_nested_responses_output_content() -> None:
     response = CodexBackendResponse(
         status_code=200,

@@ -113,7 +113,7 @@ def map_codex_tool_turn_response(response: CodexBackendResponse) -> CodexToolTur
     payload = _terminal_response_payload(response.json_body)
     if payload is None:
         return _tool_turn_shape_mismatch()
-    calls = _extract_function_calls(payload)
+    calls = _extract_tool_turn_function_calls(response.json_body, payload)
     if calls is None:
         return _tool_turn_shape_mismatch()
     if calls:
@@ -122,7 +122,7 @@ def map_codex_tool_turn_response(response: CodexBackendResponse) -> CodexToolTur
             tool_calls=calls,
             observations=(CodexTransportObservation(message="Codex tool turn requested tools"),),
         )
-    output_text = _extract_output_text(payload)
+    output_text = _extract_tool_turn_output_text(response.json_body, payload)
     if output_text is None:
         return _tool_turn_shape_mismatch()
     return CodexToolTurnResult(
@@ -246,27 +246,90 @@ def _sse_frames_or_none(response_body: object) -> tuple[tuple[str | None, str], 
         return None
 
 
+def _extract_tool_turn_function_calls(
+    response_body: object,
+    terminal_payload: Mapping[object, object],
+) -> tuple[CodexToolCall, ...] | None:
+    calls = _extract_function_calls(terminal_payload)
+    if calls is None or calls:
+        return calls
+    frames = _sse_frames_or_none(response_body)
+    if frames is None:
+        return calls
+    streamed_calls: list[CodexToolCall] = []
+    for event_name, event_data in frames:
+        if event_name != "response.output_item.done":
+            continue
+        try:
+            payload = json.loads(event_data)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(payload, Mapping):
+            return None
+        function_call = _function_call_from_item(payload.get("item"))
+        if function_call is None:
+            continue
+        streamed_calls.append(function_call)
+    return tuple(streamed_calls)
+
+
+def _extract_tool_turn_output_text(
+    response_body: object,
+    terminal_payload: Mapping[object, object],
+) -> str | None:
+    output_text = _extract_output_text(terminal_payload)
+    if output_text is not None:
+        return output_text
+    frames = _sse_frames_or_none(response_body)
+    if frames is None:
+        return None
+    completed_text: str | None = None
+    for event_name, event_data in frames:
+        if event_name != "response.output_text.done":
+            continue
+        try:
+            payload = json.loads(event_data)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(payload, Mapping) or payload.get("type") != "response.output_text.done":
+            return None
+        text = payload.get("text")
+        if not isinstance(text, str) or not text.strip() or completed_text is not None:
+            return None
+        completed_text = text
+    return completed_text
+
+
 def _extract_function_calls(payload: Mapping[object, object]) -> tuple[CodexToolCall, ...] | None:
     output = payload.get("output")
     if not isinstance(output, Sequence) or isinstance(output, str | bytes):
         return ()
     calls: list[CodexToolCall] = []
     for item in output:
-        if not isinstance(item, Mapping) or item.get("type") != "function_call":
+        function_call = _function_call_from_item(item)
+        if function_call is None:
+            if isinstance(item, Mapping) and item.get("type") == "function_call":
+                return None
             continue
-        call_id = item.get("call_id")
-        tool_name = item.get("name")
-        arguments = item.get("arguments")
-        if not isinstance(call_id, str) or not isinstance(tool_name, str) or not isinstance(arguments, str):
-            return None
-        try:
-            decoded_arguments = json.loads(arguments)
-        except json.JSONDecodeError:
-            return None
-        if not isinstance(decoded_arguments, Mapping):
-            return None
-        calls.append(CodexToolCall(call_id=call_id, tool_name=tool_name, arguments_json=arguments))
+        calls.append(function_call)
     return tuple(calls)
+
+
+def _function_call_from_item(item: object) -> CodexToolCall | None:
+    if not isinstance(item, Mapping) or item.get("type") != "function_call":
+        return None
+    call_id = item.get("call_id")
+    tool_name = item.get("name")
+    arguments = item.get("arguments")
+    if not isinstance(call_id, str) or not isinstance(tool_name, str) or not isinstance(arguments, str):
+        return None
+    try:
+        decoded_arguments = json.loads(arguments)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(decoded_arguments, Mapping):
+        return None
+    return CodexToolCall(call_id=call_id, tool_name=tool_name, arguments_json=arguments)
 
 
 def _tool_turn_shape_mismatch() -> CodexToolTurnResult:

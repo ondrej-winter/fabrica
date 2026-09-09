@@ -1,17 +1,21 @@
 """Adapt normalized Codex tool turns to the provider-neutral runtime model port."""
 
 import json
-from typing import Protocol
+from typing import Protocol, cast
 
 from fabrica.features.agent_runtime.adapters.outbound.codex_transport_model.adapter import _build_transport_prompt
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
     RuntimeObservation,
+    ToolArgumentValue,
     ToolAwareModelResponse,
     ToolCallRequest,
     ToolCallResult,
+    ToolCallResultStatus,
     ToolCancellationSignal,
     ToolDefinition,
+    ToolTextContent,
+    canonical_tool_arguments_json,
 )
 from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModelError
 from fabrica.features.codex_transport.application.dtos import (
@@ -59,6 +63,7 @@ class CodexTransportToolAwareAgentModel:
                 msg,
                 category=result.status.value,
                 metadata={"transport_status": result.status.value},
+                observations=_observations(result),
             )
         if result.output_text is not None:
             return ToolAwareModelResponse(
@@ -85,8 +90,18 @@ def _tool_result(result: ToolCallResult) -> CodexToolResult:
     return CodexToolResult(
         call_id=result.call_id,
         tool_name=result.tool_name,
-        result_text=result.result_text or result.status.value,
+        arguments_json=canonical_tool_arguments_json(result.arguments, tool_name=result.tool_name),
+        result_text=_tool_result_text(result),
     )
+
+
+def _tool_result_text(result: ToolCallResult) -> str:
+    if result.status is not ToolCallResultStatus.SUCCESS:
+        return result.error_message or result.status.value
+    text_parts = tuple(part.text for part in result.content if isinstance(part, ToolTextContent))
+    if text_parts:
+        return "\n".join(text_parts)
+    return result.result_text or result.status.value
 
 
 def _tool_call(call_id: str, tool_name: str, arguments_json: str) -> ToolCallRequest:
@@ -99,10 +114,22 @@ def _tool_call(call_id: str, tool_name: str, arguments_json: str) -> ToolCallReq
         msg = "Codex tool-call arguments were not a JSON object"
         raise ToolAwareAgentModelError(msg, category="invalid_tool_arguments")
     try:
-        return ToolCallRequest(call_id=call_id, tool_name=tool_name, arguments=arguments)
+        return ToolCallRequest(
+            call_id=call_id,
+            tool_name=tool_name,
+            arguments=cast("dict[str, ToolArgumentValue]", _immutable_json_value(arguments)),
+        )
     except (TypeError, ValueError) as err:
         msg = "Codex tool-call arguments were invalid"
         raise ToolAwareAgentModelError(msg, category="invalid_tool_arguments") from err
+
+
+def _immutable_json_value(value: object) -> ToolArgumentValue:
+    if isinstance(value, dict):
+        return cast("dict[str, ToolArgumentValue]", {key: _immutable_json_value(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return tuple(_immutable_json_value(item) for item in value)
+    return cast("ToolArgumentValue", value)
 
 
 def _observations(result: CodexToolTurnResult) -> tuple[RuntimeObservation, ...]:

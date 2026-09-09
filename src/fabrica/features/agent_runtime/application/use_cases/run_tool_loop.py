@@ -78,8 +78,9 @@ class RunToolLoop:
                         tool_results=tool_results,
                         observations=(
                             *observations,
+                            *err.observations,
                             RuntimeObservation(
-                                message="tool-aware model dependency failed",
+                                message=str(err),
                                 metadata={"category": err.category, **err.metadata},
                             ),
                         ),
@@ -176,6 +177,7 @@ class RunToolLoop:
                 call_id=tool_call.call_id,
                 tool_name=tool_call.tool_name,
                 status=ToolCallResultStatus.ADAPTER_ERROR,
+                arguments=tool_call.arguments,
                 error_message="tool execution adapter failed",
                 observations=(
                     RuntimeObservation(
@@ -197,7 +199,10 @@ class RunToolLoop:
         if entry is not None:
             return entry.result
 
-        result = await self._execute_tool_call(tool_call, limits, cancellation, opaque_context)
+        result = _bind_tool_call_arguments(
+            await self._execute_tool_call(tool_call, limits, cancellation, opaque_context),
+            tool_call,
+        )
         call_ledger[tool_call.call_id] = _ToolCallLedgerEntry(
             argument_digest=canonical_tool_arguments_digest(tool_call.arguments, tool_name=tool_call.tool_name),
             tool_name=tool_call.tool_name,
@@ -234,6 +239,20 @@ class _ToolCallLedgerEntry:
     argument_digest: str
     tool_name: str
     result: ToolCallResult
+
+
+def _bind_tool_call_arguments(result: ToolCallResult, tool_call: ToolCallRequest) -> ToolCallResult:
+    return ToolCallResult(
+        call_id=result.call_id,
+        tool_name=result.tool_name,
+        status=result.status,
+        arguments=tool_call.arguments,
+        runtime_disposition=result.runtime_disposition,
+        result_text=result.result_text,
+        content=result.content,
+        error_message=result.error_message,
+        observations=result.observations,
+    )
 
 
 @dataclass(frozen=True, slots=True)

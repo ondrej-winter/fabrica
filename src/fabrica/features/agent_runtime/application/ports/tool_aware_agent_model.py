@@ -5,6 +5,7 @@ from typing import Protocol
 
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
+    RuntimeObservation,
     SafeRuntimeMetadataValue,
     ToolAwareModelResponse,
     ToolCallResult,
@@ -22,10 +23,12 @@ class ToolAwareAgentModelError(Exception):
         *,
         category: str = "model_error",
         metadata: Mapping[str, SafeRuntimeMetadataValue] | None = None,
+        observations: tuple[RuntimeObservation, ...] = (),
     ) -> None:
         super().__init__(message)
         self.category = category
         self.metadata = dict(metadata or {})
+        self.observations = tuple(observations)
 
 
 class ToolAwareAgentModel(Protocol):

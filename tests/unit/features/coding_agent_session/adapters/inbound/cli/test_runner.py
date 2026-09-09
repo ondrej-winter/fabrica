@@ -4,7 +4,12 @@ from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
 
-from fabrica.features.agent_runtime.application.dtos import ToolCancellationSignal, ToolLoopRunResult, ToolLoopRunStatus
+from fabrica.features.agent_runtime.application.dtos import (
+    RuntimeObservation,
+    ToolCancellationSignal,
+    ToolLoopRunResult,
+    ToolLoopRunStatus,
+)
 from fabrica.features.coding_agent_session.adapters.inbound.cli import (
     CliCodingAgentSessionCommand,
     CodingAgentSessionCliStreams,
@@ -88,7 +93,13 @@ def test_runner_renders_read_only_fallback_with_success_exit_code() -> None:
 
 
 def test_runner_maps_failed_tool_loop_to_stable_failure_exit_code() -> None:
-    runtime = FakeSessionRuntime(_result(ToolLoopRunStatus.MODEL_ERROR, mutation_enabled=True))
+    runtime = FakeSessionRuntime(
+        _result(
+            ToolLoopRunStatus.MODEL_ERROR,
+            mutation_enabled=True,
+            observations=(RuntimeObservation(message="Codex backend returned an unsuccessful response"),),
+        ),
+    )
     stderr = StringIO()
 
     exit_code = run_coding_agent_session_cli_command(
@@ -98,7 +109,9 @@ def test_runner_maps_failed_tool_loop_to_stable_failure_exit_code() -> None:
     )
 
     assert exit_code == EXPECTED_SESSION_FAILURE_EXIT_CODE
-    assert stderr.getvalue() == "tool-loop status: model_error\n"
+    assert stderr.getvalue() == (
+        "tool-loop status: model_error\ndiagnostic: Codex backend returned an unsuccessful response\n"
+    )
 
 
 def test_result_writer_maps_cancelled_session_to_stable_exit_code() -> None:
@@ -122,9 +135,14 @@ def _result(
     *,
     mutation_enabled: bool,
     output_text: str | None = None,
+    observations: tuple[RuntimeObservation, ...] = (),
 ) -> CodingAgentSessionRuntimeResult:
     return CodingAgentSessionRuntimeResult(
-        tool_loop_result=ToolLoopRunResult(status=tool_loop_status, output_text=output_text),
+        tool_loop_result=ToolLoopRunResult(
+            status=tool_loop_status,
+            output_text=output_text,
+            observations=observations,
+        ),
         mutation_gate=(
             MutationGateEvidence(mutation_enabled=True)
             if mutation_enabled

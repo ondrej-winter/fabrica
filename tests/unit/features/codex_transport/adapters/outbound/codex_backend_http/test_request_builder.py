@@ -83,7 +83,14 @@ def test_build_codex_tool_turn_request_serializes_tools_and_prior_results() -> N
                     argument_schema={"type": "object", "properties": {"path": {"type": "string"}}},
                 ),
             ),
-            tool_results=(CodexToolResult(call_id="call-1", tool_name="read_files", result_text="contents"),),
+            tool_results=(
+                CodexToolResult(
+                    call_id="call-1",
+                    tool_name="read_files",
+                    arguments_json='{"path":"README.md"}',
+                    result_text="contents",
+                ),
+            ),
         ),
         credentials=CodexCredentials(access_token=CODEX_BEARER_VALUE, account_id=CODEX_ACCOUNT_ID),
     )
@@ -99,6 +106,12 @@ def test_build_codex_tool_turn_request_serializes_tools_and_prior_results() -> N
     payload_input = cast("list[object]", request.json_payload["input"])
 
     assert payload_input[1] == {
+        "type": "function_call",
+        "call_id": "call-1",
+        "name": "read_files",
+        "arguments": '{"path":"README.md"}',
+    }
+    assert payload_input[2] == {
         "type": "function_call_output",
         "call_id": "call-1",
         "output": "contents",

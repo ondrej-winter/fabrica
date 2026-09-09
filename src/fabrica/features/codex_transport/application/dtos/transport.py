@@ -78,11 +78,12 @@ class CodexToolResult:
 
     call_id: str
     tool_name: str
+    arguments_json: str
     result_text: str
 
     def __post_init__(self) -> None:
-        if not self.call_id or not self.tool_name:
-            msg = "Codex tool results require a call ID and tool name"
+        if not self.call_id or not self.tool_name or not self.arguments_json:
+            msg = "Codex tool results require a call ID, tool name, and JSON arguments"
             raise ValueError(msg)
 
 

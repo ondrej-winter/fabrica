@@ -33,6 +33,8 @@ def write_session_result(result: CodingAgentSessionResult, *, stdout: TextIO, st
 
     if result.status is SessionStatus.FAILED:
         write_line(stderr, f"tool-loop status: {tool_loop_result.status.value}")
+        for observation in tool_loop_result.observations:
+            write_line(stderr, f"diagnostic: {observation.message}")
     elif result.status is SessionStatus.CANCELLED:
         write_line(stderr, "session cancelled")
     elif runtime_result.mutation_disposition.status is MutationDispositionStatus.INDETERMINATE:

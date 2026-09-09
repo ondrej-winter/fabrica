@@ -182,9 +182,17 @@ def test_run_tool_loop_executes_tool_and_returns_result_to_model() -> None:
 
     assert result.status is ToolLoopRunStatus.SUCCESS
     assert result.output_text == "note contents"
-    assert result.tool_results == (tool_result,)
+    assert result.tool_results == (
+        ToolCallResult(
+            call_id="call-1",
+            tool_name="lookup_note",
+            status=ToolCallResultStatus.SUCCESS,
+            arguments={"note_id": "abc"},
+            result_text="note contents",
+        ),
+    )
     assert executor.calls == [(tool_call, limits)]
-    assert model.calls == [(command, (tool,), ()), (command, (tool,), (tool_result,))]
+    assert model.calls == [(command, (tool,), ()), (command, (tool,), result.tool_results)]
 
 
 def test_run_tool_loop_executes_all_calls_at_per_turn_limit() -> None:
@@ -465,7 +473,14 @@ def test_run_tool_loop_rejects_reused_call_id_with_different_arguments_before_ex
     )
 
     assert result.status is ToolLoopRunStatus.INVALID_TOOL_REQUEST
-    assert result.tool_results == (first_result,)
+    assert result.tool_results == (
+        ToolCallResult(
+            call_id="call-1",
+            tool_name="lookup_note",
+            status=ToolCallResultStatus.SUCCESS,
+            arguments={"value": "one"},
+        ),
+    )
     assert executor.calls == [
         (first_call, ToolLoopLimits(max_tool_iterations=2, max_tool_calls_per_turn=1, max_tool_result_chars=100))
     ]
@@ -534,13 +549,20 @@ def test_run_tool_loop_stops_on_timeout_limit_and_adapter_statuses() -> None:
 
 def test_run_tool_loop_normalizes_model_failure() -> None:
     command = LocalAgentRunCommand(prompt="Use a tool")
-    model = FakeToolAwareModel(error=ToolAwareAgentModelError("unavailable", category="configuration"))
+    model = FakeToolAwareModel(
+        error=ToolAwareAgentModelError(
+            "unavailable",
+            category="configuration",
+            observations=(RuntimeObservation(message="backend unavailable", metadata={"http_status": 503}),),
+        ),
+    )
 
     result = asyncio.run(RunToolLoop(model=model, tool_executor=FakeToolExecutor()).run(command))
 
     assert result.status is ToolLoopRunStatus.MODEL_ERROR
     assert result.observations == (
-        RuntimeObservation(message="tool-aware model dependency failed", metadata={"category": "configuration"}),
+        RuntimeObservation(message="backend unavailable", metadata={"http_status": 503}),
+        RuntimeObservation(message="unavailable", metadata={"category": "configuration"}),
     )
 
 

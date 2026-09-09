@@ -9,6 +9,7 @@ import pytest
 
 from fabrica.features.agent_runtime.application.dtos import (
     MAX_TOOL_CONTENT_PARTS,
+    MAX_TOOL_CONTENT_TEXT_CHARS,
     RegisteredToolOutcome,
     ToolArgumentSchemaValue,
     ToolArgumentValue,
@@ -165,6 +166,32 @@ def test_read_files_registered_tool_returns_ordered_text_image_and_failure_parts
     assert json.loads(image_metadata.text)["media_type"] == "image/png"
     assert image.data == b"\x89PNG\r\n\x1a\nimage"
     assert json.loads(failure.text)["error"]["code"] == "NOT_FOUND"
+
+
+def test_read_files_registered_tool_serializes_default_maximum_text_content_within_tool_part_bound() -> None:
+    content = "x" * ReadFilesLimits().max_output_chars_per_file
+    result = ReadFilesResult(
+        results=(
+            TextFileResult(
+                path="README.md",
+                content=content,
+                start_line=1,
+                end_line=1,
+                complete=True,
+                next_start_line=None,
+                total_lines=1,
+                total_lines_exact=True,
+            ),
+        ),
+    )
+
+    adapter = ReadFilesRegisteredToolAdapter(_FakeReadFiles(result), ReadFilesLimits())
+
+    outcome = run(adapter.handle(_arguments(), _context()))
+
+    text = _text_part(outcome).text
+    assert len(text) <= MAX_TOOL_CONTENT_TEXT_CHARS
+    assert json.loads(text)["content"] == content
 
 
 def test_read_files_registered_tool_supports_the_full_twenty_image_batch_with_metadata() -> None:

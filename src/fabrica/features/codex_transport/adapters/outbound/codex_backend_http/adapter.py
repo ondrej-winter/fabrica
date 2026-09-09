@@ -194,14 +194,24 @@ def build_codex_tool_turn_request(
     input_items: list[dict[str, object]] = [
         {"role": "user", "content": [{"type": "input_text", "text": command.prompt}]}
     ]
-    input_items.extend(
-        {
+    for result in command.tool_results:
+        function_call_item: dict[str, object] = {
+            "type": "function_call",
+            "call_id": result.call_id,
+            "name": result.tool_name,
+            "arguments": result.arguments_json,
+        }
+        function_call_output_item: dict[str, object] = {
             "type": "function_call_output",
             "call_id": result.call_id,
             "output": result.result_text,
         }
-        for result in command.tool_results
-    )
+        input_items.extend(
+            (
+                function_call_item,
+                function_call_output_item,
+            ),
+        )
     payload: dict[str, object] = {
         "model": request_settings.model,
         "input": input_items,

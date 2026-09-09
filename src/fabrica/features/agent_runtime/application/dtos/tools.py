@@ -418,6 +418,7 @@ class ToolCallResult:
     call_id: str
     tool_name: str
     status: ToolCallResultStatus
+    arguments: Mapping[str, ToolArgumentValue] = field(default_factory=dict)
     runtime_disposition: ToolExecutionRuntimeDisposition = ToolExecutionRuntimeDisposition.CONTINUE_MODEL
     result_text: str | None = None
     content: tuple[ToolContentPart, ...] = field(default_factory=tuple)
@@ -427,6 +428,7 @@ class ToolCallResult:
     def __post_init__(self) -> None:
         _validate_tool_identifier(self.call_id, field_name="tool call id", max_chars=MAX_TOOL_CALL_ID_CHARS)
         _validate_tool_identifier(self.tool_name, field_name="tool name", max_chars=MAX_TOOL_NAME_CHARS)
+        object.__setattr__(self, "arguments", _normalize_tool_arguments(self.arguments, tool_name=self.tool_name))
         if self.result_text is not None and len(self.result_text) > MAX_TOOL_RESPONSE_TEXT_CHARS:
             msg = "tool result text exceeds the safe response bound"
             raise ValueError(msg)
@@ -445,6 +447,7 @@ class ToolCallResult:
             call_id=self.call_id,
             tool_name=self.tool_name,
             status=self.status,
+            arguments=self.arguments,
             runtime_disposition=self.runtime_disposition,
             result_text=self.result_text[: limits.max_tool_result_chars],
             content=self.content,
