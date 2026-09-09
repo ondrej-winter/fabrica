@@ -88,7 +88,7 @@ tool output contracts remain authoritative.
 - [x] **CAS-01** Define session DTOs, ports, and final disposition model.
 - [x] **CAS-02** Build terminal adapters for questions and approvals.
 - [x] **CAS-03** Generalize interactive tool-loop composition for explicit tools.
-- [ ] **CAS-04** Compose the workspace-scoped coding-agent runtime.
+- [x] **CAS-04** Compose the workspace-scoped coding-agent runtime.
 - [ ] **CAS-05** Add feature-owned `agent` CLI parsing, rendering, and exit codes.
 - [ ] **CAS-06** Register bootstrap handlers and production composition.
 - [ ] **CAS-07** Add deterministic offline tests and optional live-smoke scaffold.
@@ -228,13 +228,13 @@ tests/unit/features/agent_runtime/... or tests/unit/features/user_interaction/..
 
 ### Checkpoint A — Core host boundaries
 
-- [ ] **CAS-CP-A** Confirm CAS-01 through CAS-03 expose no extra tools, preserve
+- [x] **CAS-CP-A** Confirm CAS-01 through CAS-03 expose no extra tools, preserve
   cancellation/approval boundaries, and pass focused tests before production
   workspace composition begins.
 
 ### CAS-04 — Compose the workspace-scoped coding session
 
-- [ ] **CAS-04** Compose the workspace-scoped coding-agent runtime.
+- [x] **CAS-04** Compose the workspace-scoped coding-agent runtime.
 
 **Likely files**
 

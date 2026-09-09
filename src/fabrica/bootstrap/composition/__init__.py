@@ -8,6 +8,11 @@ from fabrica.bootstrap.composition.codex_runtime import (
     create_codex_runtime,
     create_pydantic_ai_runtime,
 )
+from fabrica.bootstrap.composition.coding_agent_session import (
+    CodingAgentSessionOptions,
+    WorkspaceCodingAgentSessionRuntime,
+    create_workspace_coding_agent_session_runtime,
+)
 from fabrica.bootstrap.composition.completion_runtime import CompletionToolLoopRun, CompletionToolLoopRuntime
 from fabrica.bootstrap.composition.developer_workflow import (
     CommitMessageRuntime,
@@ -74,6 +79,7 @@ __all__ = [
     "DEFAULT_COMMIT_MESSAGE_CODEX_MODEL",
     "DEFAULT_COMMIT_MESSAGE_CODEX_REASONING_EFFORT",
     "ActiveSkillCompactionOptions",
+    "CodingAgentSessionOptions",
     "CommitMessageRuntime",
     "CommitMessageWorkflowOptions",
     "CompletionToolLoopRun",
@@ -94,6 +100,7 @@ __all__ = [
     "SkillScriptPolicyEvaluationOptions",
     "StagedGitToolOptions",
     "ToolLoopRuntime",
+    "WorkspaceCodingAgentSessionRuntime",
     "create_apply_patch_registered_tool_adapter",
     "create_codex_commit_message_workflow",
     "create_codex_confirmed_commit_workflow",
@@ -123,4 +130,5 @@ __all__ = [
     "create_skill_script_policy_evaluator",
     "create_staged_git_registered_tools",
     "create_tool_loop_runtime",
+    "create_workspace_coding_agent_session_runtime",
 ]
