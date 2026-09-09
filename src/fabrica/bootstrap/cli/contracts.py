@@ -12,6 +12,7 @@ if TYPE_CHECKING:
         SkillScriptPolicyEvaluator,
         SkillScriptRunner,
     )
+    from fabrica.features.coding_agent_session.application.ports import CodingAgentSessionRuntime
     from fabrica.features.developer_workflow.application.ports import (
         CommitMessageWorkflowRunner,
         ConfirmedCommitWorkflowRunner,
@@ -28,3 +29,4 @@ class CliDependencyOverrides:
     script_executor: SkillScriptRunner | None = None
     commit_message_workflow: CommitMessageWorkflowRunner | None = None
     confirmed_commit_workflow: ConfirmedCommitWorkflowRunner | None = None
+    coding_agent_session_runtime: CodingAgentSessionRuntime | None = None

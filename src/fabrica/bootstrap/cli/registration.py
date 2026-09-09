@@ -10,8 +10,12 @@ from fabrica.bootstrap.cli.features.agent_runtime import (
     run_script_execute_command,
     run_script_policy_command,
 )
+from fabrica.bootstrap.cli.features.coding_agent_session import run_coding_agent_session_command
 from fabrica.bootstrap.cli.features.developer_workflow import run_commit_message_command, run_confirmed_commit_command
 from fabrica.features.agent_runtime.adapters.inbound.cli.registration import register_agent_runtime_cli_commands
+from fabrica.features.coding_agent_session.adapters.inbound.cli.registration import (
+    register_coding_agent_session_cli_commands,
+)
 from fabrica.features.developer_workflow.adapters.inbound.cli.registration import (
     register_developer_workflow_cli_commands,
 )
@@ -40,5 +44,9 @@ def create_cli_command_registrars(
             subparsers,
             commit_message_command=run_commit_message_command(dependency_overrides.commit_message_workflow),
             commit_command=run_confirmed_commit_command(dependency_overrides.confirmed_commit_workflow),
+        ),
+        lambda subparsers: register_coding_agent_session_cli_commands(
+            subparsers,
+            agent_command=run_coding_agent_session_command(dependency_overrides.coding_agent_session_runtime),
         ),
     )
