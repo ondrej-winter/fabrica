@@ -8,13 +8,13 @@ from email.utils import format_datetime
 import httpx
 import pytest
 
-import fabrica.adapters.outbound.httpx_client.executor as executor_module
 from fabrica.adapters.outbound.httpx_client import (
     HttpTimeout,
     HttpxRetryError,
     HttpxRetryRequest,
     RetryPolicy,
     SyncHttpxRetryExecutor,
+    retry_support,
 )
 
 SUCCESS_STATUS = 200
@@ -331,18 +331,16 @@ def test_raises_last_retryable_exception_when_retry_delay_exhausts_budget() -> N
 
 
 def test_retry_after_helpers_reject_blank_invalid_and_past_values() -> None:
-    executor = _executor(MonotonicClock())
     policy = RetryPolicy()
 
-    assert executor._retry_after_delay(retry_after=" ", policy=policy) is None  # noqa: SLF001
-    assert executor._retry_after_delay(retry_after="not-a-date", policy=policy) is None  # noqa: SLF001
-    assert executor._retry_after_delay(retry_after="-1", policy=policy) is None  # noqa: SLF001
+    assert retry_support.retry_after_delay(retry_after=" ", policy=policy) is None
+    assert retry_support.retry_after_delay(retry_after="not-a-date", policy=policy) is None
+    assert retry_support.retry_after_delay(retry_after="-1", policy=policy) is None
 
 
 def test_http_date_delay_treats_naive_dates_as_utc(monkeypatch: pytest.MonkeyPatch) -> None:
-    executor = _executor(MonotonicClock())
     monkeypatch.setattr(
-        executor_module,
+        retry_support,
         "parsedate_to_datetime",
         lambda _value: datetime(2026, 1, 1),  # noqa: DTZ001
     )
@@ -352,21 +350,21 @@ def test_http_date_delay_treats_naive_dates_as_utc(monkeypatch: pytest.MonkeyPat
         def now(cls, tz=None):  # noqa: ANN206
             return cls(2026, 1, 1, tzinfo=tz)
 
-    monkeypatch.setattr(executor_module, "datetime", FixedDateTime)
+    monkeypatch.setattr(retry_support, "datetime", FixedDateTime)
 
-    assert executor._http_date_delay("synthetic") == 0.0  # noqa: SLF001
+    assert retry_support.http_date_delay("synthetic") == 0.0
 
 
 def test_timeout_helpers_bound_numeric_and_missing_phase_values() -> None:
     assert (
-        executor_module._timeout_with_budget(  # noqa: SLF001
+        retry_support.timeout_with_budget(
             timeout=10.0,
             budget_seconds=REMAINING_BUDGET_SECONDS,
         )
         == REMAINING_BUDGET_SECONDS
     )
 
-    timeout = executor_module._timeout_with_budget(  # noqa: SLF001
+    timeout = retry_support.timeout_with_budget(
         timeout=HttpTimeout(read_seconds=1.0),
         budget_seconds=REMAINING_BUDGET_SECONDS,
     )
