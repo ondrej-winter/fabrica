@@ -5,6 +5,7 @@ from io import StringIO
 from pathlib import Path
 
 from fabrica.bootstrap.cli import CliDependencyOverrides, run_cli
+from fabrica.bootstrap.cli.features import coding_agent_session as coding_agent_session_bootstrap
 from fabrica.features.agent_runtime.application.dtos import ToolCancellationSignal, ToolLoopRunResult, ToolLoopRunStatus
 from fabrica.features.coding_agent_session.application.dtos import (
     CodingAgentSessionCommand,
@@ -72,3 +73,27 @@ def test_invalid_agent_workspace_does_not_construct_or_invoke_session_runtime() 
     assert exit_code == ARGPARSE_USAGE_ERROR_EXIT_CODE
     assert "workspace cannot be resolved" in stderr.getvalue()
     assert runtime.calls == []
+
+
+def test_agent_uses_default_runtime_factory_when_no_override_is_supplied(monkeypatch, tmp_path: Path) -> None:
+    runtime = FakeSessionRuntime()
+    calls: list[tuple[Path, tuple[Path, ...]]] = []
+
+    def create_runtime(*, workspace_root: Path, skill_roots: tuple[Path, ...], **_kwargs: object) -> FakeSessionRuntime:
+        calls.append((workspace_root, skill_roots))
+        return runtime
+
+    monkeypatch.setattr(coding_agent_session_bootstrap, "_create_default_runtime", create_runtime)
+
+    exit_code = run_cli(
+        ("agent", "--workspace", str(tmp_path), "--prompt", "Inspect this workspace"),
+        stdin=StringIO(),
+        stdout=StringIO(),
+        stderr=StringIO(),
+    )
+
+    assert exit_code == 0
+    assert calls == [(tmp_path.resolve(), ())]
+    assert runtime.calls == [
+        CodingAgentSessionCommand(workspace_root=tmp_path.resolve(), prompt="Inspect this workspace")
+    ]

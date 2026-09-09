@@ -2,6 +2,8 @@
 
 from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
+    CodexToolTurnCommand,
+    CodexToolTurnResult,
     CodexTransportObservation,
     CodexTransportResult,
     CodexTransportStatus,
@@ -15,6 +17,7 @@ from fabrica.features.codex_transport.application.exceptions import (
 from fabrica.features.codex_transport.application.ports import (
     CodexBackend,
     CodexCredentialStore,
+    CodexToolTurnBackend,
     CodexUsageBackend,
 )
 
@@ -73,6 +76,24 @@ class ProbeCodexUsage:
         return await self._backend.fetch_usage(command=command, credentials=credentials)
 
 
+class RunCodexToolTurn:
+    """Orchestrate credential loading and one normalized Codex tool-aware turn."""
+
+    def __init__(self, credential_store: CodexCredentialStore, backend: CodexToolTurnBackend) -> None:
+        self._credential_store = credential_store
+        self._backend = backend
+
+    async def run_turn(self, command: CodexToolTurnCommand) -> CodexToolTurnResult:
+        """Run one tool-aware Codex turn through the configured backend."""
+        try:
+            credentials = self._credential_store.load()
+        except CodexCredentialAuthenticationError as err:
+            return _credential_tool_turn_failure_result(CodexTransportStatus.AUTHENTICATION_FAILED, err)
+        except CodexCredentialStoreError as err:
+            return _credential_tool_turn_failure_result(CodexTransportStatus.CREDENTIAL_ERROR, err)
+        return await self._backend.run_tool_turn(command=command, credentials=credentials)
+
+
 def _credential_transport_failure_result(
     *,
     status: CodexTransportStatus,
@@ -94,6 +115,16 @@ def _credential_usage_failure_result(
     return CodexUsageResult(
         status=status,
         observations=(_credential_failure_observation(message=message, err=err),),
+    )
+
+
+def _credential_tool_turn_failure_result(
+    status: CodexTransportStatus,
+    err: CodexCredentialStoreError,
+) -> CodexToolTurnResult:
+    return CodexToolTurnResult(
+        status=status,
+        observations=(_credential_failure_observation(message="credential loading failed", err=err),),
     )
 
 

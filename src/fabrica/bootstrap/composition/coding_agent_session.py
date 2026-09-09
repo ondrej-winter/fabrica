@@ -1,16 +1,18 @@
 """Bootstrap composition for the restricted workspace coding-agent session."""
 
 import json
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, TextIO
 
+from fabrica.bootstrap.composition.codex_runtime import create_codex_tool_aware_model
 from fabrica.bootstrap.composition.skill_context import (
     SkillContextAugmentationOptions,
     create_skill_context_augmented_local_agent_command,
 )
-from fabrica.bootstrap.composition.user_interaction import create_interactive_tool_loop_runtime
+from fabrica.bootstrap.composition.user_interaction import active_interactive_run, create_interactive_tool_loop_runtime
 from fabrica.bootstrap.composition.workspace_command_execution import (
     RunCommandsToolOptions,
     create_run_commands_registered_tool_adapter,
@@ -28,6 +30,11 @@ from fabrica.features.agent_runtime.application.dtos import (
     ToolLoopRunResult,
 )
 from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModel
+from fabrica.features.coding_agent_session.adapters.inbound.terminal import (
+    TerminalCommandApprovalResolver,
+    TerminalPatchApproval,
+    TerminalQuestionTransport,
+)
 from fabrica.features.coding_agent_session.application.dtos import (
     CodingAgentSessionCommand,
     CodingAgentSessionRuntimeResult,
@@ -36,6 +43,13 @@ from fabrica.features.coding_agent_session.application.dtos import (
     MutationGateEvidence,
 )
 from fabrica.features.user_interaction.application.ports import InteractionTransport
+from fabrica.features.workspace_command_execution.adapters.outbound.authorization import (
+    HostCommandPermissionEvaluator,
+    HostCommandSandboxPreflight,
+)
+from fabrica.features.workspace_command_execution.adapters.outbound.environment import FilteredCommandEnvironmentBuilder
+from fabrica.features.workspace_command_execution.application.dtos import CommandExecutionMode, PlannedCommand
+from fabrica.features.workspace_command_execution.application.ports import CommandPermissionDecision
 from fabrica.features.workspace_editing.application.dtos import WorkspaceMutationStartupGate
 from fabrica.features.workspace_reading.application.dtos import ReadFilesLimits
 from fabrica.features.workspace_searching.application.dtos import SearchLimits
@@ -160,6 +174,64 @@ async def create_workspace_coding_agent_session_runtime(
     )
 
 
+async def create_terminal_workspace_coding_agent_session_runtime(
+    *,
+    workspace_root: Path,
+    stdin: TextIO,
+    stdout: TextIO,
+    skill_roots: tuple[Path, ...] = (),
+) -> WorkspaceCodingAgentSessionRuntime:
+    """Compose the production terminal session with explicit command admission policy."""
+    command_approval = TerminalCommandApprovalResolver(stdin=stdin, stdout=stdout)
+    patch_approval = TerminalPatchApproval(stdin=stdin, stdout=stdout)
+    interaction_transport = TerminalQuestionTransport(
+        stdin=stdin,
+        stdout=stdout,
+        submit_answer=lambda submission: active_interactive_run().submit_answer(submission),
+        cancel_question=lambda question_id: active_interactive_run().cancel_question(question_id.value),
+    )
+    command_options = RunCommandsToolOptions(
+        shell_executable="/bin/sh",
+        environment_builder=FilteredCommandEnvironmentBuilder(
+            inherited_environment={"PATH": os.environ.get("PATH", "")},
+            allowed_override_keys=frozenset(),
+        ),
+        permission_evaluator=HostCommandPermissionEvaluator(_terminal_command_permission),
+        approval_resolver=command_approval,
+        sandbox_preflight=HostCommandSandboxPreflight(_allow_terminal_sandbox),
+    )
+    return await create_workspace_coding_agent_session_runtime(
+        options=CodingAgentSessionOptions(
+            workspace_root=workspace_root,
+            model_factory=create_codex_tool_aware_model,
+            interaction_transport=interaction_transport,
+            command_options=command_options,
+            mutation_options=ProductionWorkspaceEditingOptions(approval_callback=patch_approval.decide),
+            read_files_external_authorized=False,
+            read_files_image_input_supported=False,
+            selected_context_options=SkillContextAugmentationOptions(skill_roots=skill_roots),
+        )
+    )
+
+
+async def _terminal_command_permission(command: PlannedCommand) -> CommandPermissionDecision:
+    if command.request.mode is not CommandExecutionMode.ARGV:
+        return CommandPermissionDecision.DENY
+    argv = command.request.argv or ()
+    if not argv or argv[0] == "git" or _has_interactive_or_background_form(argv):
+        return CommandPermissionDecision.DENY
+    return CommandPermissionDecision.REQUIRE_APPROVAL
+
+
+async def _allow_terminal_sandbox(command: PlannedCommand) -> bool:
+    del command
+    return True
+
+
+def _has_interactive_or_background_form(argv: tuple[str, ...]) -> bool:
+    return any(argument in {"&", "-i", "--interactive"} for argument in argv)
+
+
 def _augment_selected_context(
     command: LocalAgentRunCommand,
     session_command: CodingAgentSessionCommand,
@@ -227,5 +299,6 @@ def _mutation_guarantee(result_text: str | None) -> str | None:
 __all__ = [
     "CodingAgentSessionOptions",
     "WorkspaceCodingAgentSessionRuntime",
+    "create_terminal_workspace_coding_agent_session_runtime",
     "create_workspace_coding_agent_session_runtime",
 ]

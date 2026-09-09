@@ -3,6 +3,11 @@
 from fabrica.features.codex_transport.application.dtos.credentials import CodexCredentials
 from fabrica.features.codex_transport.application.dtos.transport import (
     CodexCompletionCommand,
+    CodexToolCall,
+    CodexToolDefinition,
+    CodexToolResult,
+    CodexToolTurnCommand,
+    CodexToolTurnResult,
     CodexTransportObservation,
     CodexTransportResult,
     CodexTransportStatus,
@@ -16,6 +21,11 @@ from fabrica.features.codex_transport.application.dtos.transport import (
 __all__ = [
     "CodexCompletionCommand",
     "CodexCredentials",
+    "CodexToolCall",
+    "CodexToolDefinition",
+    "CodexToolResult",
+    "CodexToolTurnCommand",
+    "CodexToolTurnResult",
     "CodexTransportObservation",
     "CodexTransportResult",
     "CodexTransportStatus",

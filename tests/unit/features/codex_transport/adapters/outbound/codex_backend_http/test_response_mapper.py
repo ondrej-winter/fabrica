@@ -9,6 +9,7 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.respo
     CodexUsageResponse,
     map_codex_backend_response,
     map_codex_backend_transport_error,
+    map_codex_tool_turn_response,
     map_codex_usage_response,
     map_codex_usage_transport_error,
 )
@@ -49,6 +50,30 @@ def test_map_success_response_with_direct_output_text() -> None:
         "response_shape": "responses_output_text",
         "error_type": None,
     }
+
+
+def test_map_tool_turn_response_extracts_function_calls_with_stable_ids() -> None:
+    result = map_codex_tool_turn_response(
+        CodexBackendResponse(
+            status_code=200,
+            headers={},
+            json_body={
+                "output": [
+                    {
+                        "type": "function_call",
+                        "call_id": "call-1",
+                        "name": "read_files",
+                        "arguments": '{"path":"README.md"}',
+                    }
+                ]
+            },
+        )
+    )
+
+    assert result.status is CodexTransportStatus.SUCCESS
+    assert result.output_text is None
+    assert result.tool_calls[0].call_id == "call-1"
+    assert result.tool_calls[0].arguments_json == '{"path":"README.md"}'
 
 
 def test_map_success_response_with_nested_responses_output_content() -> None:

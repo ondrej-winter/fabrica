@@ -15,12 +15,16 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http impor
 )
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.adapter import (
     build_codex_backend_request,
+    build_codex_tool_turn_request,
     build_codex_usage_request,
 )
 from fabrica.features.codex_transport.adapters.outbound.redaction import REDACTED_VALUE
 from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
     CodexCredentials,
+    CodexToolDefinition,
+    CodexToolResult,
+    CodexToolTurnCommand,
     CodexUsageProbeCommand,
 )
 from tests.support.sentinels import CODEX_ACCOUNT_ID, CODEX_BEARER_VALUE
@@ -65,6 +69,39 @@ def test_build_codex_backend_request_produces_stream_backed_responses_payload() 
         ],
         "stream": True,
         "store": False,
+    }
+
+
+def test_build_codex_tool_turn_request_serializes_tools_and_prior_results() -> None:
+    request = build_codex_tool_turn_request(
+        command=CodexToolTurnCommand(
+            prompt="Inspect the repository",
+            tools=(
+                CodexToolDefinition(
+                    name="read_files",
+                    description="Read workspace files",
+                    argument_schema={"type": "object", "properties": {"path": {"type": "string"}}},
+                ),
+            ),
+            tool_results=(CodexToolResult(call_id="call-1", tool_name="read_files", result_text="contents"),),
+        ),
+        credentials=CodexCredentials(access_token=CODEX_BEARER_VALUE, account_id=CODEX_ACCOUNT_ID),
+    )
+
+    assert request.json_payload["tools"] == [
+        {
+            "type": "function",
+            "name": "read_files",
+            "description": "Read workspace files",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string"}}},
+        }
+    ]
+    payload_input = cast("list[object]", request.json_payload["input"])
+
+    assert payload_input[1] == {
+        "type": "function_call_output",
+        "call_id": "call-1",
+        "output": "contents",
     }
 
 

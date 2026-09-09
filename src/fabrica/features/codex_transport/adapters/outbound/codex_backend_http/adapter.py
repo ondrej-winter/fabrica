@@ -22,6 +22,8 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http.respo
     CodexUsageResponse,
     map_codex_backend_response,
     map_codex_backend_transport_error,
+    map_codex_tool_turn_response,
+    map_codex_tool_turn_transport_error,
     map_codex_usage_response,
     map_codex_usage_transport_error,
 )
@@ -29,6 +31,8 @@ from fabrica.features.codex_transport.adapters.outbound.redaction import redact_
 from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
     CodexCredentials,
+    CodexToolTurnCommand,
+    CodexToolTurnResult,
     CodexTransportObservation,
     CodexTransportResult,
     CodexUsageProbeCommand,
@@ -179,6 +183,54 @@ def build_codex_backend_request(
     )
 
 
+def build_codex_tool_turn_request(
+    *,
+    command: CodexToolTurnCommand,
+    credentials: CodexCredentials,
+    settings: CodexBackendRequestSettings | None = None,
+) -> CodexBackendRequest:
+    """Build one private Codex Responses request from a normalized tool transcript."""
+    request_settings = settings or CodexBackendRequestSettings()
+    input_items: list[dict[str, object]] = [
+        {"role": "user", "content": [{"type": "input_text", "text": command.prompt}]}
+    ]
+    input_items.extend(
+        {
+            "type": "function_call_output",
+            "call_id": result.call_id,
+            "output": result.result_text,
+        }
+        for result in command.tool_results
+    )
+    payload: dict[str, object] = {
+        "model": request_settings.model,
+        "input": input_items,
+        "tools": [
+            {
+                "type": "function",
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": dict(tool.argument_schema),
+            }
+            for tool in command.tools
+        ],
+        "stream": True,
+        "store": False,
+    }
+    if request_settings.reasoning_effort is not None:
+        payload["reasoning"] = {"effort": request_settings.reasoning_effort}
+    return CodexBackendRequest(
+        url=_join_url(base_url=request_settings.base_url, path=request_settings.path),
+        headers={
+            "Authorization": f"Bearer {credentials.access_token}",
+            "ChatGPT-Account-ID": credentials.account_id,
+            "Content-Type": "application/json",
+            "OAI-Product-Sku": request_settings.product_sku,
+        },
+        json_payload=payload,
+    )
+
+
 def build_codex_usage_request(
     *,
     command: CodexUsageProbeCommand,
@@ -249,6 +301,33 @@ class CodexBackendHttpAdapter:
                 )
             ),
             result.diagnostics,
+        )
+
+    async def run_tool_turn(
+        self,
+        command: CodexToolTurnCommand,
+        credentials: CodexCredentials,
+    ) -> CodexToolTurnResult:
+        """Execute one normalized client-managed tool-aware Codex turn."""
+        request = build_codex_tool_turn_request(
+            command=command,
+            credentials=credentials,
+            settings=self.request_settings,
+        )
+        try:
+            result = await self._post(request)
+        except HttpxRetryError as err:
+            return map_codex_tool_turn_transport_error(err.error_type)
+        except asyncio.CancelledError:
+            return map_codex_tool_turn_transport_error("CancelledError")
+        except httpx.HTTPError as err:
+            return map_codex_tool_turn_transport_error(type(err).__name__)
+        return map_codex_tool_turn_response(
+            CodexBackendResponse(
+                status_code=result.response.status_code,
+                headers=dict(result.response.headers),
+                json_body=_safe_json_body(result.response),
+            )
         )
 
     async def _post(self, request: CodexBackendRequest) -> HttpxRetryResult:

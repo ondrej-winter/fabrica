@@ -7,6 +7,8 @@ from types import MappingProxyType
 from typing import cast
 
 from fabrica.features.codex_transport.application.dtos import (
+    CodexToolCall,
+    CodexToolTurnResult,
     CodexTransportObservation,
     CodexTransportResult,
     CodexTransportStatus,
@@ -103,6 +105,39 @@ def map_codex_backend_transport_error(error_type: str) -> CodexTransportResult:
     )
 
 
+def map_codex_tool_turn_response(response: CodexBackendResponse) -> CodexToolTurnResult:
+    """Map one terminal Codex tool-aware response to the normalized turn contract."""
+    if not _is_success_status_code(response.status_code):
+        completion = map_codex_backend_response(response)
+        return CodexToolTurnResult(status=completion.status, observations=completion.observations)
+    payload = _terminal_response_payload(response.json_body)
+    if payload is None:
+        return _tool_turn_shape_mismatch()
+    calls = _extract_function_calls(payload)
+    if calls is None:
+        return _tool_turn_shape_mismatch()
+    if calls:
+        return CodexToolTurnResult(
+            status=CodexTransportStatus.SUCCESS,
+            tool_calls=calls,
+            observations=(CodexTransportObservation(message="Codex tool turn requested tools"),),
+        )
+    output_text = _extract_output_text(payload)
+    if output_text is None:
+        return _tool_turn_shape_mismatch()
+    return CodexToolTurnResult(
+        status=CodexTransportStatus.SUCCESS,
+        output_text=output_text,
+        observations=(CodexTransportObservation(message="Codex tool turn returned final text"),),
+    )
+
+
+def map_codex_tool_turn_transport_error(error_type: str) -> CodexToolTurnResult:
+    """Map a transport exception to one safe tool-turn failure."""
+    completion = map_codex_backend_transport_error(error_type)
+    return CodexToolTurnResult(status=completion.status, observations=completion.observations)
+
+
 def map_codex_usage_response(response: CodexUsageResponse) -> CodexUsageResult:
     """Map a usage response into safe status and allowlisted usage evidence."""
     if _is_edge_challenge_response(response.headers):
@@ -176,6 +211,68 @@ def _map_success_response(response: CodexBackendResponse) -> CodexTransportResul
         outcome=("Codex backend returned expected response shape", "success"),
         output_text=output_text,
         usage_facts=_extract_completion_usage_facts(response_body),
+    )
+
+
+def _terminal_response_payload(response_body: object) -> Mapping[object, object] | None:
+    if isinstance(response_body, Mapping):
+        return cast("Mapping[object, object]", response_body)
+    frames = _sse_frames_or_none(response_body)
+    if frames is None:
+        return None
+    terminal: Mapping[object, object] | None = None
+    for event_name, event_data in frames:
+        if event_name != _TERMINAL_SUCCESS_EVENT_TYPE:
+            continue
+        try:
+            payload = json.loads(event_data)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(payload, Mapping) or payload.get("type") != _TERMINAL_SUCCESS_EVENT_TYPE:
+            return None
+        response = payload.get("response")
+        if not isinstance(response, Mapping) or terminal is not None:
+            return None
+        terminal = cast("Mapping[object, object]", response)
+    return terminal
+
+
+def _sse_frames_or_none(response_body: object) -> tuple[tuple[str | None, str], ...] | None:
+    if not isinstance(response_body, str):
+        return None
+    try:
+        return _parse_sse_frames(response_body)
+    except ValueError:
+        return None
+
+
+def _extract_function_calls(payload: Mapping[object, object]) -> tuple[CodexToolCall, ...] | None:
+    output = payload.get("output")
+    if not isinstance(output, Sequence) or isinstance(output, str | bytes):
+        return ()
+    calls: list[CodexToolCall] = []
+    for item in output:
+        if not isinstance(item, Mapping) or item.get("type") != "function_call":
+            continue
+        call_id = item.get("call_id")
+        tool_name = item.get("name")
+        arguments = item.get("arguments")
+        if not isinstance(call_id, str) or not isinstance(tool_name, str) or not isinstance(arguments, str):
+            return None
+        try:
+            decoded_arguments = json.loads(arguments)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(decoded_arguments, Mapping):
+            return None
+        calls.append(CodexToolCall(call_id=call_id, tool_name=tool_name, arguments_json=arguments))
+    return tuple(calls)
+
+
+def _tool_turn_shape_mismatch() -> CodexToolTurnResult:
+    return CodexToolTurnResult(
+        status=CodexTransportStatus.BACKEND_SHAPE_MISMATCH,
+        observations=(CodexTransportObservation(message="Codex tool turn response shape was unexpected"),),
     )
 
 

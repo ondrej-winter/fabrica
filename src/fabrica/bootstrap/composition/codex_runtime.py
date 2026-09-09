@@ -4,11 +4,15 @@ from pathlib import Path
 
 from fabrica.adapters.outbound.httpx_client import AsyncHttpxRetryClient, HttpTimeout
 from fabrica.features.agent_runtime.adapters.outbound.codex_transport_model import CodexTransportAgentModel
+from fabrica.features.agent_runtime.adapters.outbound.codex_transport_tool_aware_model import (
+    CodexTransportToolAwareAgentModel,
+)
 from fabrica.features.agent_runtime.adapters.outbound.pydantic_ai_model import (
     CodexTransportPydanticAICompletion,
     PydanticAIAgentModel,
     PydanticAICompletion,
 )
+from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModel
 from fabrica.features.agent_runtime.application.use_cases import RunLocalAgent
 from fabrica.features.codex_transport.adapters.outbound.codex_auth_file import CodexAuthFileCredentialStore
 from fabrica.features.codex_transport.adapters.outbound.codex_backend_http import (
@@ -16,7 +20,7 @@ from fabrica.features.codex_transport.adapters.outbound.codex_backend_http impor
     CodexBackendRequestSettings,
     CodexUsageRequestSettings,
 )
-from fabrica.features.codex_transport.application.use_cases import CompleteWithCodexTransport
+from fabrica.features.codex_transport.application.use_cases import CompleteWithCodexTransport, RunCodexToolTurn
 
 DEFAULT_CODEX_AUTH_FILE = Path.home() / ".codex" / "auth.json"
 DEFAULT_COMMIT_MESSAGE_CODEX_MODEL = "gpt-5.3-codex-spark"
@@ -57,6 +61,28 @@ def create_codex_runtime(
         backend=backend,
     )
     return RunLocalAgent(model=CodexTransportAgentModel(transport=transport))
+
+
+def create_codex_tool_aware_model(
+    *,
+    auth_file_path: Path | None = None,
+    http_client: AsyncHttpxRetryClient | None = None,
+    timeout: float | HttpTimeout | None = None,
+    request_settings: CodexBackendRequestSettings | None = None,
+) -> ToolAwareAgentModel:
+    """Create a production Codex-backed tool-aware model without performing I/O."""
+    backend_kwargs: dict[str, object] = {
+        "request_settings": request_settings,
+        "http_client": http_client or AsyncHttpxRetryClient(),
+    }
+    if timeout is not None:
+        backend_kwargs["completion_timeout"] = timeout
+    backend = CodexBackendHttpAdapter(**backend_kwargs)  # ty: ignore[invalid-argument-type]
+    transport = RunCodexToolTurn(
+        credential_store=CodexAuthFileCredentialStore(auth_file_path or DEFAULT_CODEX_AUTH_FILE),
+        backend=backend,
+    )
+    return CodexTransportToolAwareAgentModel(transport=transport)
 
 
 def create_pydantic_ai_runtime(

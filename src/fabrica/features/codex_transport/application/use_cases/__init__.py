@@ -3,6 +3,7 @@
 from fabrica.features.codex_transport.application.use_cases.transport import (
     CompleteWithCodexTransport,
     ProbeCodexUsage,
+    RunCodexToolTurn,
 )
 
-__all__ = ["CompleteWithCodexTransport", "ProbeCodexUsage"]
+__all__ = ["CompleteWithCodexTransport", "ProbeCodexUsage", "RunCodexToolTurn"]

@@ -3,10 +3,10 @@
 ## Status
 
 - State: Accepted — Version 1 runtime baseline.
-- Implementation status: Substantially implemented before formal Version 1 acceptance; this revision records the confirmed runtime baseline and its ownership boundaries.
+- Implementation status: The provider-neutral tool-loop contract and production Codex-backed tool-aware adapter are implemented with deterministic offline coverage.
 - Accepted by: Maintainer
-- Accepted on: September 4, 2026
-- Revision: Accepted Version 1 runtime-baseline clarification on September 4, 2026.
+- Accepted on: September 9, 2026
+- Revision: Accepted production tool-aware-provider clarification on September 9, 2026.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
@@ -91,6 +91,20 @@ Fabrica should expose a local Python agent runtime that can:
 - keep default automated tests deterministic and offline.
 
 ### Shared tool-loop lifecycle contract
+
+`ToolAwareAgentModel` is the provider-neutral boundary for model turns. For each
+turn, the runtime supplies the application command, the current explicit tool
+definitions, prior normalized tool results, and cancellation. The model adapter
+returns final text, normalized tool calls, or a normalized failure. Runtime DTOs
+must not contain provider conversation identifiers, private request schemas, or
+provider response objects.
+
+A provider-backed adapter must preserve tool-call IDs exactly across its returned
+tool calls and the runtime's subsequent tool results. It must serialize the
+runtime-owned bounded transcript into provider wire form and normalize the next
+terminal instruction back into the provider-neutral contract. The runtime retains
+duplicate-call protection, tool-result bounds, cancellation propagation, and
+terminal disposition logic; the provider adapter does not reimplement them.
 
 The runtime baseline owns the following rules for every registered model-facing
 tool:
@@ -188,6 +202,9 @@ tool:
   propagation, duplicate-call protection, outcome disposition, and
   status-prioritized result bounding without provider credentials.
 - Keep provider adapter tests in the provider-owning feature slice.
+- Add deterministic provider-adapter fixtures for a production tool-aware path;
+  synthetic runtime models alone do not prove provider turn serialization or
+  normalization.
 - Keep live backend checks opt-in and isolated from the default `uv run pytest`
   suite.
 - Optional Agent Skills tests, including script policy, snapshot binding, and
@@ -228,6 +245,8 @@ remains owned by the Codex transport specification.
   and continue, terminal, and fatal dispositions.
 - The first provider support path can be Codex without making the runtime Codex
   specific.
+- A production provider adapter can execute the established tool-aware turn
+  contract without exposing private provider state to the runtime core.
 - Core runtime compositions do not require Agent Skills discovery, activation, or
   script execution.
 - Concrete Python import paths and bootstrap factories remain experimental in

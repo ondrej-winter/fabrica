@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import asyncio
+from pathlib import Path
+from typing import TYPE_CHECKING, TextIO
 
+from fabrica.bootstrap.composition.coding_agent_session import create_terminal_workspace_coding_agent_session_runtime
 from fabrica.features.coding_agent_session.adapters.inbound.cli.contracts import CodingAgentSessionCliStreams
 from fabrica.features.coding_agent_session.adapters.inbound.cli.runner import run_coding_agent_session_cli_command
 
@@ -27,17 +30,37 @@ def run_coding_agent_session_command(
         composition_options: CodingAgentSessionCliCompositionOptions,
         context: CommandContext,
     ) -> int:
-        del composition_options
-        if runtime_override is None:
-            msg = "coding-agent session runtime is not configured"
-            raise RuntimeError(msg)
         return run_coding_agent_session_cli_command(
             command,
             streams=CodingAgentSessionCliStreams(stdout=context.stdout, stderr=context.stderr),
-            runtime=runtime_override,
+            runtime=runtime_override
+            or _create_default_runtime(
+                workspace_root=command.workspace_root,
+                stdin=context.stdin,
+                stdout=context.stdout,
+                skill_roots=composition_options.skill_roots,
+            ),
         )
 
     return run
+
+
+def _create_default_runtime(
+    *,
+    workspace_root: Path,
+    stdin: TextIO,
+    stdout: TextIO,
+    skill_roots: tuple[Path, ...],
+) -> CodingAgentSessionRuntime:
+    """Create the default terminal session runtime after CLI validation."""
+    return asyncio.run(
+        create_terminal_workspace_coding_agent_session_runtime(
+            workspace_root=workspace_root,
+            stdin=stdin,
+            stdout=stdout,
+            skill_roots=skill_roots,
+        )
+    )
 
 
 __all__ = ["run_coding_agent_session_command"]

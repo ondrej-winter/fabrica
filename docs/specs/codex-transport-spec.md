@@ -2,11 +2,11 @@
 
 ## Status
 
-- State: Accepted and implemented — Version 1 technical contract.
-- Implementation status: Implemented; the Version 1 transport boundary enforces final-result-only completion handling and conservative completion retries.
+- State: Accepted — Version 1 technical contract, revised for tool-aware turn support.
+- Implementation status: One-shot completion and client-managed tool-aware turn support are implemented with deterministic offline request/response fixtures. Live Codex tool-turn validation remains opt-in.
 - Accepted by: Maintainer
-- Accepted on: September 4, 2026
-- Revision: Accepted Version 1 technical-contract clarification on September 4, 2026.
+- Accepted on: September 9, 2026
+- Revision: Accepted tool-aware-turn contract clarification on September 9, 2026.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
@@ -44,9 +44,10 @@ Provider-neutral usage and pricing evidence is owned by
 - Codex transport source lives under `src/fabrica/features/codex_transport/`.
 - Runtime source lives under `src/fabrica/features/agent_runtime/` and should
   consume Codex through application-level transport contracts only.
-- Current implementation includes a thin PydanticAI completion bridge and
-  composition experiment, but the Codex transport slice remains the boundary for
-  private backend details.
+- Current implementation includes a one-shot completion adapter and a thin
+  PydanticAI completion bridge. It does not yet include a Codex-backed
+  `ToolAwareAgentModel` adapter; the Codex transport slice remains the boundary
+  for all private backend details required by that work.
 - Default automated tests must remain deterministic and offline.
 
 ## Assumptions
@@ -116,18 +117,39 @@ Codex transport support should:
 - expose an application API that the runtime can reuse without depending on
   private Codex backend schemas.
 
+The transport must support two application-level operation shapes:
+
+1. **One-shot completion:** preserve the existing final-text result contract used
+   by `fabrica run`.
+2. **Tool-aware turn:** accept a normalized client-managed transcript comprising
+   the original prompt/context, currently available tool definitions, and prior
+   validated tool calls and tool results. Return exactly one terminal normalized
+   model instruction: final text, one or more tool calls with stable call IDs, or
+   a normalized non-success result.
+
+Tool-aware turns must use the same default Codex credential source, model
+selection, request settings, and effort-related defaults as `fabrica run` unless
+a later accepted configuration policy explicitly changes them. They may use a
+different provider wire payload, but that difference remains adapter-private.
+
+The client-managed normalized transcript is the authoritative continuity model.
+The adapter may use backend response or conversation identifiers as an internal
+optimization only; correctness must not depend on retaining an opaque provider
+conversation identifier between turns. Provider identifiers and private wire
+objects must not cross into `agent_runtime` DTOs or ports.
+
 Streaming is an adapter implementation detail in Version 1. The adapter may use
 the observed streaming wire protocol internally, but it must consume that
-protocol before returning one final normalized result. It must not expose
-incremental events or partial output through the application boundary. A stream
-is successful only after an accepted completed response shape, using either its
-non-empty final output or recognized text events buffered internally before that
-completion. Malformed stream framing, unrecognized required event shapes, a
-terminal backend error, cancellation, EOF before a completed result, or output
-that cannot be safely normalized must produce a non-success result without
-partial output. These cases must be classified as
-`backend_shape_mismatch` when the observed protocol shape is unsupported and as
-`transport_error` when delivery or completion is indeterminate.
+protocol before returning one terminal normalized completion or tool-aware turn
+instruction. It must not expose incremental events or partial output through the
+application boundary. A stream is successful only after an accepted completed
+response shape that can be normalized into non-empty final text or validated tool
+calls. Malformed stream framing, unrecognized required event shapes, a terminal
+backend error, cancellation, EOF before a completed result, duplicate or missing
+tool-call IDs, invalid tool arguments, or output that cannot be safely normalized
+must produce a non-success result without partial output. These cases must be
+classified as `backend_shape_mismatch` when the observed protocol shape is
+unsupported and as `transport_error` when delivery or completion is indeterminate.
 
 Technical viability should be judged strictly. Direct Codex transport is
 technically viable only if the support path demonstrates:
@@ -197,6 +219,8 @@ Before accepting a changed wire assumption, maintainers must:
 - Treating `codex exec` as the main integration path.
 - OAuth refresh or mutation of Codex credentials.
 - Incremental streaming events or partial output in application/runtime APIs.
+- Opaque provider conversation identifiers as the required runtime continuity
+  mechanism.
 - Billing-source, subscription-attribution, or per-call pricing conclusions.
 - Full PydanticAI agent orchestration beyond thin bridge experiments.
 - Custom PydanticAI `Model` implementation beyond explicit runtime composition
@@ -255,6 +279,10 @@ Before accepting a changed wire assumption, maintainers must:
 - Unit-test successful final-result extraction and non-success normalization for
   accepted stream fixtures, malformed stream framing, terminal backend errors,
   truncated or partial streams, and unsupported required event shapes.
+- Unit-test tool-aware turn serialization and normalization against synthetic
+  fixtures, including declared tools, multi-call turns, stable call IDs, prior
+  tool-result continuity, invalid arguments, unsupported event shapes, and
+  secret-safe observations.
 - Add contract-style tests if multiple transport adapters or credential stores are
   introduced.
 - Keep live backend checks opt-in and isolated from the default `uv run pytest`
@@ -274,7 +302,7 @@ Before accepting a changed wire assumption, maintainers must:
 | Tests | `uv run pytest` | Required for implementation changes |
 | Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
 | Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
-| Opt-in live validation | Run a redacted live completion after `codex login`; record only the command outcome, normalized status, and safe observations. | Required operational check; not a documentary acceptance gate |
+| Opt-in live validation | Run a redacted live completion and, after tool-turn support exists, a disposable-workspace tool-aware turn after `codex login`; record only normalized outcomes and safe observations. | Required operational check; not a documentary acceptance gate |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 Implementation changes should use the project quality gate:
@@ -285,9 +313,9 @@ Implementation changes should use the project quality gate:
 - Test: `uv run pytest`
 
 Live backend validation, when intentionally performed, must be manual or
-explicitly opt-in. It must not be part of the default local or CI test suite.
-It validates authentication and final-result behavior only. It must not be used
-to claim or infer a billing source.
+explicitly opt-in. It must not be part of the default local or CI test suite. It
+validates authentication and the selected normalized one-shot or tool-aware
+operation only. It must not be used to claim or infer a billing source.
 
 ## Execution Boundaries
 
@@ -313,6 +341,8 @@ to claim or infer a billing source.
   default tests, or quality gates.
 - Never couple the application core to private Codex CLI internals, ChatGPT
   backend headers, OpenAI transport schemas, or PydanticAI implementation details.
+- Never make an opaque backend response or conversation identifier a required
+  field in provider-neutral runtime state.
 
 ## Success Criteria
 
@@ -324,9 +354,10 @@ to claim or infer a billing source.
 - The spec defines secret-safe handling expectations for local Codex credentials.
 - The spec records default validation commands and clarifies that live backend
   calls are opt-in only.
-- The spec defines final-result-only streaming behavior, partial-stream failure
-  handling, and private-backend drift handling without exposing private wire
-  schemas through the application boundary.
+- The spec defines terminal-result-only streaming behavior for one-shot
+  completions and tool-aware turns, partial-stream failure handling, and private-
+  backend drift handling without exposing private wire schemas through the
+  application boundary.
 - A successful streamed completion requires matching SSE and JSON
   `response.completed` identifiers plus non-whitespace final output in that
   terminal payload. Earlier deltas, done-text events, or EOF alone never prove
@@ -340,16 +371,18 @@ to claim or infer a billing source.
 
 | Question | Impact | Blocking? | Owner | Resolution |
 | --- | --- | --- | --- | --- |
-| Should Version 1 expose incremental streaming to the runtime? | Application API shape and runtime complexity. | No | Maintainer | Resolved: streaming stays adapter-internal; return one final normalized result only. |
+| Should Version 1 expose incremental streaming to the runtime? | Application API shape and runtime complexity. | No | Maintainer | Resolved: streaming stays adapter-internal; return one terminal normalized completion or tool-turn instruction only. |
+| Should tool-aware continuity depend on opaque Codex conversation identifiers? | Provider coupling, deterministic fixtures, and recovery from backend drift. | No | Maintainer | Resolved: no. The client owns a bounded normalized transcript; provider identifiers remain optional adapter-private optimizations. |
 | Can this spec conclude that calls are subscription-billed or not public-API-billed? | Product and billing claims. | No | Maintainer | Deferred: technical viability does not establish billing attribution. |
 | What follows a backend `401` or `403` without OAuth refresh? | Authentication recovery behavior. | No | Maintainer | Resolved: return `authentication_failed`; do not reread, refresh, or replay; instruct the operator to run `codex login`. |
 | Which observed headers and private stream details are strictly required? | Backend compatibility. | No | Maintainer | Ongoing operational observation governed by the backend drift policy. |
 
 ## Acceptance and Operational Validation
 
-This accepted Version 1 specification is ready for implementation planning and
-maintenance work. It accepts the documented technical contract, not the volatile
-backend facts forever and not any billing-attribution conclusion.
+This accepted Version 1 specification is ready for maintenance work. One-shot
+and tool-aware Codex transport paths are implemented with deterministic offline
+coverage. It accepts the documented technical contract, not the volatile backend
+facts forever and not any billing-attribution conclusion.
 
 Before an operator relies on the direct transport in a local environment, they
 must authenticate through `codex login` and perform the documented opt-in live

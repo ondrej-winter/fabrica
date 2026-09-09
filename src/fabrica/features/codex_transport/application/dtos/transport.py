@@ -58,6 +58,63 @@ class CodexCompletionCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class CodexToolDefinition:
+    """Provider-neutral tool declaration accepted by the Codex transport boundary."""
+
+    name: str
+    description: str
+    argument_schema: Mapping[str, object] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.name or not self.description:
+            msg = "Codex tool definitions require a name and description"
+            raise ValueError(msg)
+        object.__setattr__(self, "argument_schema", MappingProxyType(dict(self.argument_schema)))
+
+
+@dataclass(frozen=True, slots=True)
+class CodexToolResult:
+    """Bounded normalized result correlated to one prior model tool call."""
+
+    call_id: str
+    tool_name: str
+    result_text: str
+
+    def __post_init__(self) -> None:
+        if not self.call_id or not self.tool_name:
+            msg = "Codex tool results require a call ID and tool name"
+            raise ValueError(msg)
+
+
+@dataclass(frozen=True, slots=True)
+class CodexToolTurnCommand:
+    """Application command for one client-managed Codex tool-aware turn."""
+
+    prompt: str
+    tools: tuple[CodexToolDefinition, ...] = field(default_factory=tuple)
+    tool_results: tuple[CodexToolResult, ...] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        _validate_prompt(self.prompt)
+        object.__setattr__(self, "tools", tuple(self.tools))
+        object.__setattr__(self, "tool_results", tuple(self.tool_results))
+
+
+@dataclass(frozen=True, slots=True)
+class CodexToolCall:
+    """One normalized Codex tool call with a stable backend-provided identifier."""
+
+    call_id: str
+    tool_name: str
+    arguments_json: str
+
+    def __post_init__(self) -> None:
+        if not self.call_id or not self.tool_name or not self.arguments_json:
+            msg = "Codex tool calls require a call ID, tool name, and JSON arguments"
+            raise ValueError(msg)
+
+
+@dataclass(frozen=True, slots=True)
 class CodexTransportResult:
     """Normalized, application-safe result of a Codex transport completion."""
 
@@ -82,6 +139,31 @@ class CodexTransportResult:
     def succeeded(self) -> bool:
         """Return whether the completion finished successfully."""
         return self.status is CodexTransportStatus.SUCCESS
+
+
+@dataclass(frozen=True, slots=True)
+class CodexToolTurnResult:
+    """Terminal normalized result of one Codex tool-aware turn."""
+
+    status: CodexTransportStatus
+    output_text: str | None = None
+    tool_calls: tuple[CodexToolCall, ...] = field(default_factory=tuple)
+    observations: tuple[CodexTransportObservation, ...] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        if self.status is CodexTransportStatus.SUCCESS:
+            if (self.output_text is None) == (not self.tool_calls):
+                msg = "successful Codex tool turns require final text or tool calls, but not both"
+                raise ValueError(msg)
+        elif self.output_text is not None or self.tool_calls:
+            msg = "non-success Codex tool turns must not include output"
+            raise ValueError(msg)
+        call_ids = tuple(call.call_id for call in self.tool_calls)
+        if len(call_ids) != len(set(call_ids)):
+            msg = "Codex tool turns must not contain duplicate call IDs"
+            raise ValueError(msg)
+        object.__setattr__(self, "tool_calls", tuple(self.tool_calls))
+        object.__setattr__(self, "observations", tuple(self.observations))
 
 
 def _validate_prompt(prompt: str) -> None:

@@ -1,6 +1,7 @@
 """Opt-in composition for live human interaction in a tool-loop run."""
 
 from collections.abc import Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass
 from secrets import token_urlsafe
 
@@ -30,6 +31,8 @@ from fabrica.features.user_interaction.application.dtos import (
 from fabrica.features.user_interaction.application.ports import InteractionManager, InteractionTransport
 from fabrica.features.user_interaction.application.use_cases import InMemoryInteractionManager
 
+_ACTIVE_INTERACTIVE_RUN: ContextVar[InteractiveToolLoopRun | None] = ContextVar("active_interactive_run", default=None)
+
 
 @dataclass(frozen=True, slots=True)
 class InteractiveToolLoopRun:
@@ -46,11 +49,15 @@ class InteractiveToolLoopRun:
         cancellation: ToolCancellationSignal | None = None,
     ) -> ToolLoopRunResult:
         """Run until completion with this run's opaque interaction authorization."""
-        return await self._runtime.run(
-            command,
-            cancellation=cancellation,
-            opaque_tool_context={INTERACTION_OWNER_CONTEXT_KEY: self.owner},
-        )
+        token = _ACTIVE_INTERACTIVE_RUN.set(self)
+        try:
+            return await self._runtime.run(
+                command,
+                cancellation=cancellation,
+                opaque_tool_context={INTERACTION_OWNER_CONTEXT_KEY: self.owner},
+            )
+        finally:
+            _ACTIVE_INTERACTIVE_RUN.reset(token)
 
     async def submit_answer(self, submission: AnswerSubmission) -> InteractionResult:
         """Submit a structured answer authorized for this run only."""
@@ -122,3 +129,12 @@ def create_interactive_tool_loop_runtime(
         ),
         _interaction_manager=manager,
     )
+
+
+def active_interactive_run() -> InteractiveToolLoopRun:
+    """Return the host-owned interactive run currently publishing a question."""
+    run = _ACTIVE_INTERACTIVE_RUN.get()
+    if run is None:
+        msg = "no interactive run is active"
+        raise RuntimeError(msg)
+    return run

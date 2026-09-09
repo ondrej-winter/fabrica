@@ -5,6 +5,8 @@ from typing import Protocol
 from fabrica.features.codex_transport.application.dtos import (
     CodexCompletionCommand,
     CodexCredentials,
+    CodexToolTurnCommand,
+    CodexToolTurnResult,
     CodexTransportResult,
     CodexUsageProbeCommand,
     CodexUsageResult,
@@ -32,6 +34,18 @@ class CodexUsageBackend(Protocol):
         credentials: CodexCredentials,
     ) -> CodexUsageResult:
         """Fetch usage evidence with application-owned command and credentials."""
+        ...
+
+
+class CodexToolTurnBackend(Protocol):
+    """Outbound port for one normalized Codex tool-aware turn."""
+
+    async def run_tool_turn(
+        self,
+        command: CodexToolTurnCommand,
+        credentials: CodexCredentials,
+    ) -> CodexToolTurnResult:
+        """Run one client-managed tool-aware turn."""
         ...
 
 

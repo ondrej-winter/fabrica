@@ -2,11 +2,11 @@
 
 ## Status
 
-- State: Accepted — implementation planned.
-- Implementation status: The primitive runtime, workspace tools, and production patch composition exist; no first-class coding-session CLI or terminal host is implemented yet.
+- State: Accepted and implemented.
+- Implementation status: The normal CLI path composes a production Codex-backed `ToolAwareAgentModel`, terminal interaction/approval adapters, filtered command environment, per-command approval, and supervised workspace tools. Live Codex validation remains opt-in.
 - Accepted by: Maintainer
-- Accepted on: September 8, 2026
-- Revision: Initial accepted composition contract on September 8, 2026.
+- Accepted on: September 9, 2026
+- Revision: Accepted production-runtime dependency clarification on September 9, 2026.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the coding-agent session product
@@ -40,8 +40,13 @@ replacement for the provider-neutral runtime and tool contracts.
 - The public `fabrica run` command currently performs one direct runtime prompt
   with optional selected-skill context. It does not expose a workspace coding tool
   loop, terminal interaction transport, or terminal patch-approval host.
+- The `fabrica agent` CLI command and its terminal/session components are present,
+  but the normal path currently fails closed because it has no production
+  tool-aware Codex runtime composition.
 - ADR 0010 records the decision to ship this composition as a terminal-hosted,
   workspace-scoped product workflow.
+- ADR 0011 records the client-managed normalized transcript boundary required for
+  Codex-backed tool-aware turns.
 
 ## Assumptions
 
@@ -64,6 +69,9 @@ replacement for the provider-neutral runtime and tool contracts.
 - Explicit workspace selection, tool exposure, terminal interaction, approval
   behavior, safe defaults, session output, and validation requirements.
 - Composition of existing primitives into one tool-aware Codex-backed session.
+- A production runtime factory for `fabrica agent` that uses the same default
+  Codex credential source, model selection, request settings, and effort-related
+  defaults as `fabrica run`.
 
 ### Out of Scope
 
@@ -176,6 +184,14 @@ or completed read-only because mutation was unavailable. It must not claim that 
 requested edit was applied when the patch gate failed, approval was denied, or the
 patch result was indeterminate.
 
+For a normal CLI invocation, the bootstrap must construct this runtime after
+workspace validation. A `CliDependencyOverrides.coding_agent_session_runtime`
+value remains a test/composition override only; its absence must select the
+default production composition rather than raise a configuration error. The
+default composition must use the Codex-backed tool-aware turn transport defined
+by `docs/specs/codex-transport-spec.md`, not the one-shot runtime used directly
+by `fabrica run`.
+
 ## Boundaries and Constraints
 
 - The CLI and terminal adapters belong at the composition boundary. Domain and
@@ -194,6 +210,10 @@ patch result was indeterminate.
   environment value may be printed, stored, or included in tool/model diagnostics.
 - The terminal host must not run model-supplied commands through an interactive
   shell or prompt for operating-system escalation.
+- Version 1 production command composition must provide a filtered child
+  environment, deny shell mode, interactive/background forms, and Git mutation
+  before terminal approval, return `REQUIRE_APPROVAL` for every remaining argv
+  command, and run sandbox preflight only after that command-specific approval.
 
 ## Implementation Structure
 
@@ -211,7 +231,8 @@ Expected implementation responsibilities:
   adapter.
 - Command permission/approval/environment/sandbox policy: command-execution
   composition and host adapters.
-- Tool-aware Codex runtime wiring: bootstrap composition.
+- Tool-aware Codex turn transport and provider normalization: `codex_transport`.
+- Product runtime and terminal command-policy wiring: bootstrap composition.
 
 ## Validation
 
@@ -227,6 +248,11 @@ Required deterministic offline coverage includes:
 6. Command policy rejects disallowed or interactive execution and retains bounded
    timeout/cancellation behavior.
 7. No default test reads Codex credentials or calls a live backend.
+8. Normal CLI composition uses its production runtime factory when no test
+   override is supplied; it does not raise `coding-agent session runtime is not
+   configured`.
+9. Offline Codex tool-aware fixtures verify normalized transcript continuity and
+   tool-call/result ID preservation before session wiring is considered complete.
 
 One small, explicitly opt-in live smoke test may verify the assembled Codex-backed
 session after `codex login`. It must run in a disposable workspace, make no Git
@@ -250,6 +276,9 @@ outside the default test suite and CI.
   command, not a custom-host-only composition recipe.
 - The session uses the tool-aware runtime and exposes only its policy-approved
   tools.
+- A normal `fabrica agent` invocation constructs the default production runtime
+  using the same Codex defaults as `fabrica run`, while test overrides remain
+  available for deterministic coverage.
 - Patch mutation is explicitly previewed and approved per digest-bound plan.
 - A failed mutation gate produces a usable read-only session with accurate final
   evidence.
@@ -263,12 +292,14 @@ outside the default test suite and CI.
 | Question | Impact | Blocking? | Owner | Resolution |
 | --- | --- | --- | --- | --- |
 | Should a non-interactive `--read-only` session be included in Version 1? | May support CI-like investigation without terminal interaction. | No | Maintainer | Deferred; interactive terminal session is the accepted first surface. |
+| How does the production session retain tool-turn continuity? | Required Codex adapter and runtime composition boundary. | No | Maintainer | Resolved: use the client-managed normalized transcript in ADR 0011; opaque provider identifiers are adapter-private only. |
 
 ## Acceptance and Planning Gate
 
-This accepted specification is ready for implementation. The Version 1 command
-permission and patch-preview decisions are recorded above; no blocking design
-question remains.
+This accepted specification is implemented. The Version 1 command-permission,
+patch-preview, default-Codex-configuration, and transcript continuity decisions
+are recorded above. Ongoing work must preserve the offline deterministic test
+suite and keep live Codex validation explicitly opt-in.
 
 ## Execution Boundaries
 
