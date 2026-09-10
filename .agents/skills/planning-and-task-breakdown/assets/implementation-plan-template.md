@@ -1,140 +1,144 @@
 # Implementation Plan: [Feature/Project Name]
 
-## Overview
+## Outcome and basis
 
-[One paragraph summary of what is being built.]
+[Desired behavior and relevant current behavior.]
 
-## Scope
+**Requirements source:** [Canonical spec, issue, or user instruction; revision
+when available.]
 
-### In scope
+**Readiness:** [Ready | Needs revision | Blocked — choose one, with rationale.]
 
-- [Behavior, component, workflow, or artifact included in this plan.]
+**Next action:** [Ready task IDs or the exact condition needed to proceed. State
+any existing execution boundary that applies.]
 
-### Out of scope
+## Scope and decisions
 
-- [Explicit non-goal or deferred work.]
+- **In scope:** [Required outcomes.]
+- **Out of scope:** [Non-goals and authorized deferrals.]
+- **Binding constraints:** [Compatibility, interfaces, data, or execution limits.]
+- **Implementation decisions:** [Choices and their evidence or rationale.]
 
-## Assumptions
+## Assumptions and unresolved questions
 
-- [Assumption that affects implementation, and how or when it will be confirmed.]
+| ID | Assumption or question | Affected tasks and blocking point | Resolution or evidence needed | Owner or source when known |
+| --- | --- | --- | --- | --- |
+| Q1 | [Decision, technical uncertainty, or working assumption] | [Tasks; what can proceed meanwhile] | [How and when to resolve; discovery task if needed] | [Known resolver or unassigned] |
 
-## Architecture Decisions
+[Write "None" when no material unknowns remain. Do not use N/A for unresolved
+questions.]
 
-- [Key decision and rationale.]
+## Requirement coverage
+
+| Requirement or requested outcome | Tasks | Acceptance and verification |
+| --- | --- | --- |
+| [Existing ID or brief outcome reference] | T1 | T1-AC1, T1-V1 |
+
+[For short plans, task basis fields can supply this mapping instead.]
 
 ## Progress Tracking
 
-This dashboard mirrors every task, acceptance criterion, verification item, and
-checkpoint checkbox in the detailed plan. Keep both copies synchronized whenever
-either copy changes. The detailed sections remain the source of context; this
-dashboard is the at-a-glance completion view.
+Mirror every detailed task, acceptance, verification, and checkpoint checkbox
+here with the same ID, meaning, and state. Each ID labels one checkbox here and
+one in the details. Preserve IDs when reordering; add fresh IDs for new work.
 
-Mark a parent task complete only when all required child items are resolved.
-Items explicitly marked not applicable do not block completion. Unknown,
-unresolved, or unapproved deferred items remain unchecked and block completion.
+- [ ] `T1` — [Task title]
+  - [ ] `T1-AC1` — [Observable acceptance condition]
+  - [ ] `T1-V1` — [Focused verification and expected result]
+- [ ] `CP1` — [Integration or risk checkpoint and pass condition]
+- [ ] `CP-FINAL-1` — All required acceptance criteria met
+- [ ] `CP-FINAL-2` — Final handoff checks resolved with evidence
 
-### Phase 1: [First coherent slice or necessary prerequisite]
+After each completed task or meaningful change, update both views and the status
+notes. Check items only with evidence or an explicit `Not applicable — <reason>`;
+N/A records applicability, not a passing check. Complete a parent only when all
+required child items are resolved. Unknown, failed, unverified, blocked, and
+unapproved deferred items remain unchecked. Move authorized deferrals out of
+required scope in both views and record their disposition without marking them
+completed. Reopen items whose evidence is invalidated by later changes.
 
-- [ ] `T1` — [Task 1 title]
-  - [ ] `T1-AC1` — [Acceptance criterion]
-  - [ ] `T1-V1` — [Focused verification]
-  - [ ] `T1-V2` — [Final or broader verification]
-  - [ ] `T1-V3` — [Manual verification]
-- [ ] `CP1` — [Meaningful checkpoint]
+## Task details
 
-### Phase 2: [Next coherent slice]
+[Repeat this task block as needed, adding its IDs to the dashboard. Group tasks
+into phases only when the boundaries help execution.]
 
-- [ ] `T2` — [Task 2 title]
-  - [ ] `T2-AC1` — [Acceptance criterion]
-  - [ ] `T2-V1` — [Focused verification]
-  - [ ] `T2-V2` — [Final or broader verification]
-  - [ ] `T2-V3` — [Manual verification]
+### T1: [Short outcome title]
 
-### Completion
+- [ ] `T1` — [Task title; complete when all required child items are resolved]
 
-- [ ] `CP-FINAL-1` — All acceptance criteria met
-- [ ] `CP-FINAL-2` — Focused and final handoff checks resolved
-- [ ] `CP-FINAL-3` — Ready for review
+**Outcome and basis:** [What this accomplishes; requirement reference or the task
+it enables. Explain a separate prerequisite task when needed.]
 
-After each completed task or meaningful plan change, update this dashboard and
-the matching detailed checkboxes, add newly discovered work, adjust sequencing,
-and note blockers or deviations without waiting for the user to ask.
+**Dependencies and entry conditions:** [None, or task IDs with the required
+artifact/condition; include external prerequisites and unresolved questions.]
 
-## Task List
+**Files or components:** [Confirmed project-relative targets and labeled proposed
+new files; distinguish source from generated or installed copies.]
 
-### Phase 1: [First coherent slice or necessary prerequisite]
-
-#### Task 1: [Short descriptive title]
-
-**Task completion:**
-
-- [ ] `T1` — All required acceptance and verification items are resolved
-
-**Description:** [What this task accomplishes and why it is sequenced here.]
+**Estimated scope:** [XS / S / M / L / XL, with rationale for uncertainty or a
+retained large atomic task.]
 
 **Acceptance criteria:**
 
-- [ ] `T1-AC1` — [Specific, testable condition.]
+- [ ] `T1-AC1` — [Given conditions/input, when an action occurs, observable result;
+      include relevant failure behavior as additional criteria.]
 
 **Verification:**
 
-- [ ] `T1-V1` — Focused check: `<confirmed_test_or_check_command>`
-- [ ] `T1-V2` — Final or broader check when applicable: `<confirmed_command>`
-- [ ] `T1-V3` — Manual check when applicable: [description]
+- [ ] `T1-V1` — [Confirmed command or manual procedure; expected result. Include
+      source, working directory, and prerequisites when needed.]
 
-**Dependencies:** [None or task numbers]
+[Add checks only when applicable. For unknown commands, specify the intended
+evidence and use "Unknown — discover in <task ID> before <task or checkpoint>".
+Distinguish planned checks from executed results. Reference shared checks below
+instead of repeating broad suites in every task.]
 
-**Files likely touched:**
+**Evidence and status:** [Pending initially; later record results, evidence
+location, blockers, or an explicit N/A reason.]
 
-- `<project-relative-path>`
+[For a discovery task, also state its question, investigation limit, evidence
+deliverable, and decision needed to unlock dependent work.]
 
-**Estimated scope:** [XS | S | M | L | XL, with rationale when L]
+### CP1: [Meaningful integration or risk boundary]
 
-### Checkpoint: [Meaningful boundary]
+**Prerequisites:** [Task IDs and entry conditions.]
 
-- [ ] `CP1` — [Relevant integration, quality, approval, or risk check.]
+- [ ] `CP1` — [Check or procedure and observable pass condition.]
 
-### Phase 2: [Next coherent slice]
+**Evidence and status:** [Pending; record results when executed.]
 
-#### Task 2: [Short descriptive title]
+[Add checkpoints at actual boundaries, or remove CP1 here and in the dashboard
+if final handoff is the only useful checkpoint.]
 
-**Task completion:**
+### Final handoff
 
-- [ ] `T2` — All required acceptance and verification items are resolved
+**Prerequisites:** [All required task IDs and preceding checkpoint IDs.]
 
-**Description:** [What this task accomplishes and why it is sequenced here.]
+- [ ] `CP-FINAL-1` — Every in-scope requirement is covered and all required
+      acceptance criteria have supporting evidence.
+- [ ] `CP-FINAL-2` — [Confirmed final commands or manual procedures and pass
+      conditions; required checks pass or are explicitly N/A with reasons.]
 
-**Acceptance criteria:**
+**Evidence and status:** [Pending; unresolved required checks prevent completion.]
 
-- [ ] `T2-AC1` — [Specific, testable condition.]
+## Parallel execution
 
-**Verification:**
+[Omit when execution is sequential. Identify actual independence, including tests
+and docs, before assigning work. Branch acceptance must be achievable before the
+join; reserve combined behavior for the integration check.]
 
-- [ ] `T2-V1` — Focused check: `<confirmed_test_or_check_command>`
-- [ ] `T2-V2` — Final or broader check when applicable: `<confirmed_command>`
-- [ ] `T2-V3` — Manual check when applicable: [description]
+| Tasks | Entry contract or artifact | Owner and write boundaries | Shared state constraints | Integration task, owner, and check |
+| --- | --- | --- | --- | --- |
+| [Concurrent task IDs] | [Prerequisite] | [Known assignment or unassigned; paths/components] | [Serialized operations, if any] | [Explicit join and combined verification] |
 
-**Dependencies:** [None or task numbers]
+## Risks and fallback
 
-**Files likely touched:**
+[Include material risks only; identify affected tasks and the trigger for a
+mitigation, fallback, or recovery action. For data changes, distinguish data
+recovery from reverting code. Omit when no additional risks need tracking.]
 
-- `<project-relative-path>`
+## Status and scope changes
 
-**Estimated scope:** [XS | S | M | L | XL, with rationale when L]
-
-### Checkpoint: Complete
-
-- [ ] `CP-FINAL-1` — All acceptance criteria met
-- [ ] `CP-FINAL-2` — Focused and final handoff checks pass or are explicitly not
-      applicable; no required check remains unknown
-- [ ] `CP-FINAL-3` — Ready for review
-
-## Risks and Mitigations
-
-| Risk   | Impact         | Mitigation |
-| ------ | -------------- | ---------- |
-| [Risk] | [High/Med/Low] | [Strategy] |
-
-## Open Questions
-
-- [Question needing human input.]
+[After each task or meaningful change, record affected IDs, evidence or blocker,
+deviation and its basis, any authorized deferral, and the next action. Update
+readiness and both checkbox views when needed; do not renumber existing IDs.]

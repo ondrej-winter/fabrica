@@ -1,8 +1,8 @@
 ---
 name: planning-and-task-breakdown
-description: Breaks work into ordered tasks. Use when you have a spec or clear requirements and need to break work into implementable tasks. Use when a task feels too large to start, when you need to estimate scope, or when parallel work is possible.
+description: Create or revise an implementation plan from clear requirements, with ordered tasks, acceptance criteria, dependencies, verification, and progress tracking. Use when scope needs decomposition, sequencing is uncertain, or work must be coordinated across agents or sessions.
 metadata:
-  version: "1.4.1"
+  version: "2.0.0"
   dependencies:
     tools: []
     skills:
@@ -16,270 +16,243 @@ metadata:
 
 # Planning and Task Breakdown
 
-## Overview
+Turn agreed outcomes into small, verifiable tasks that another person or agent
+can execute without inventing requirements or rediscovering dependencies. Prefer
+complete feature slices, explicit evidence of completion, and a plan that remains
+useful across sessions.
 
-Decompose work into small, verifiable tasks with explicit acceptance criteria. Good task breakdown helps an agent complete work reliably without turning related changes into one tangled implementation pass. Every task should be small enough to implement, test, and verify in a single focused session.
+For a small change with obvious scope and checks, a short task list is enough;
+do not create a separate plan merely because several files are involved. When an
+existing spec or plan already has executable tasks, reuse and repair that
+breakdown instead of creating a competing document.
 
-Use `spec-driven-development` first when requirements, success criteria, or scope
-boundaries are unclear. Use `review-implementation-plan` after drafting the plan
-when sequencing, dependencies, risk, or validation strategy need an independent
-readiness check.
-
-## When to use this skill
-
-- You have a spec and need to break it into implementable units
-- A task feels too large or vague to start
-- Work needs to be parallelized across multiple agents or sessions
-- You need to communicate scope to a human
-- The implementation order isn't obvious
-
-Do not use this skill for single-file changes with obvious scope, or when the spec already contains well-defined tasks.
-
-## Expected output
-
-Produce a written implementation plan that includes:
-
-- ordered tasks with acceptance criteria and verification steps
-- dependencies, checkpoints, and sequencing constraints
-- likely files or components touched, using portable placeholders when needed
-- scope boundaries, risks, assumptions, and open questions that affect safe
-  implementation
-- explicit instructions to keep the plan current during implementation by
-  updating checkboxes, status, scope changes, and newly discovered work
-
-By default, create the plan at `docs/plans/<kebab-case-name>-plan.md`, where
-`<kebab-case-name>` is a short name derived from the feature, project, or task.
+A planning-only request ends with the plan and its handoff. When planning is a
+phase of authorized implementation, finish the relevant planning first, then
+continue with ready tasks under the existing authorization. Creating a plan does
+not introduce an additional approval gate or authorize new external actions.
 
 ## Steps
 
-### Step 1: Gather context before planning
+### 1. Establish the outcome and canonical sources
 
-Before writing any code or content changes, inspect enough context to understand the requested outcome and likely constraints:
+Read the request, prior decisions, specification, and relevant code, tests, and
+repository guidance. Inspect enough context to establish:
 
-- Read the spec and relevant codebase sections
-- Identify existing patterns and conventions
-- Map dependencies between components
-- Note risks and unknowns
-- Capture assumptions and open questions that affect sequencing or scope
+- the desired behavior, scope boundaries, and binding constraints
+- the canonical requirements source and revision when available
+- existing implementation patterns, affected contracts, and relevant checks
+- source files versus generated or installed copies, and how derived files update
+- assumptions and unresolved decisions that affect the work
 
-Do not implement while drafting the plan. The output is a plan document, not code or content changes.
+Use `spec-driven-development` when available if required outcomes or scope need
+resolution. A clear request can supply the requirements directly; do not require
+a separate spec for every plan. Resolve technical details from available evidence
+before asking the user to repeat settled information.
 
-### Step 2: Identify the dependency graph
+Reuse the established plan path. For a new plan without a requested location or
+repository convention, use `docs/plans/<kebab-case-name>-plan.md`. Respect a
+requested inline format. Link requirements and decisions rather than copying
+them into a second specification.
 
-Map what depends on what:
+### 2. Map requirements, unknowns, and dependencies
 
-```
-Foundational data or state model
-  - Shared contract or interface
-    - Producer or service behavior
-      - Consumer or user-facing workflow
-    - Validation or policy logic
-  - Supporting setup, migration, or seed data
-```
+Associate each task with the requirement it fulfills or the prerequisite it
+enables. Preserve existing requirement IDs; for a short request without IDs, a
+brief reference to the requested outcome is enough. Check coverage in both
+directions: every in-scope requirement has work and verification, and every task
+has a scope basis. Keep optional enhancements and unrelated cleanup outside the
+required work.
 
-Implementation order follows dependencies from foundations outward, but only add
-prerequisite work that cannot safely belong to the first complete feature slice.
-Use the graph to order work within and between slices; do not build every lower
-layer before delivering any working behavior.
+For each material unknown, identify the affected tasks, how it can be resolved,
+who or what can resolve it when known, and the point by which it must be settled:
 
-### Step 3: Slice vertically
+- **Outcome or scope decision:** resolve before implementing the affected
+  behavior. Record a proposal separately from an agreed requirement.
+- **Technical uncertainty:** inspect available evidence or add a bounded
+  discovery task with a question, investigation limit, evidence to produce, and
+  decision that unlocks dependent work. A spike delivers a finding, not an
+  implied production implementation.
+- **Working assumption:** state its basis, impact if false, and when to check it.
+  It permits progress only where its uncertainty does not invalidate that work.
 
-Instead of building every foundation layer, then every interface, then every user-facing surface, build one complete feature path at a time:
+Use stable task IDs for dependencies. Name the actual prerequisite artifact or
+condition, including external dependencies, instead of writing only "after T1".
+Check for missing references and cycles. If tasks depend on each other, extract
+the shared prerequisite or combine them into one justified atomic task. Resolve
+questions from evidence or existing authority; ask for a material decision only
+when neither settles it, and continue independent planning while it is pending.
 
-Bad horizontal slicing:
+### 3. Slice and size the work
 
-```
-Task 1: Build the entire data or state model
-Task 2: Build all external interfaces
-Task 3: Build all user-facing surfaces
-Task 4: Connect everything
-```
+Prefer one complete, testable behavior per task, including its relevant failure
+cases. For example, given agreed requirements for a record workflow:
 
-Good vertical slicing:
-
-```
-Task 1: User can create a record (state model + interface + creation surface)
-Task 2: User can authenticate or identify themselves (identity model + interface + entry surface)
-Task 3: User can add an item (item model + interface + creation workflow)
-Task 4: User can view item history (query path + interface + list or report surface)
-```
-
-Each vertical slice delivers working, testable functionality. A small enabling
-foundation, shared contract, migration, or risk-reduction spike may come first
-when it is a true prerequisite; record why it cannot be included in the first
-slice.
-
-### Step 4: Write tasks
-
-Each task follows this structure:
-
-```markdown
-### Task [N]: [Short descriptive title]
-
-**Task completion:**
-
-- [ ] `T<N>` — All required acceptance and verification items are resolved
-
-**Description:** One paragraph explaining what this task accomplishes.
-
-**Acceptance criteria:**
-
-- [ ] `T<N>-AC1` — [Specific, testable condition]
-- [ ] `T<N>-AC2` — [Specific, testable condition]
-
-**Verification:**
-
-- [ ] `T<N>-V1` — Focused check: `<confirmed_test_or_check_command>`
-- [ ] `T<N>-V2` — Build, static, or integration check when applicable: `<confirmed_command>`
-- [ ] `T<N>-V3` — Manual check when applicable: [description of what to verify]
-
-Use only commands confirmed from repository documentation or configuration. If a
-needed command is not yet known, write `Unknown — discover before implementation`.
-For an inapplicable check, write `Not applicable — <reason>` rather than inventing
-a command. Distinguish focused iteration checks from final handoff checks.
-
-**Dependencies:** [Task numbers this depends on, or "None"]
-
-**Files likely touched:**
-
-- `<module_path>`
-- `<test_path>`
-
-**Estimated scope:** [XS: 1 file | S: 1-2 files | M: 3-5 files | L: 6-8 files | XL: 9+ files]
+```text
+T1: Create a valid record; reject invalid input without persisting it.
+    Includes the storage path, interface, user entry point, and focused checks.
+T2: List saved records, including the agreed empty-state behavior.
+    Depends on the record contract established in T1.
+T3: Edit a record while preserving the agreed validation rules.
+    Depends on T1; depends on T2 only if listing is the required entry point.
 ```
 
-### Step 5: Order and checkpoint
+Avoid tasks that build all models, then all services, then all interfaces and
+leave integration to the end. A shared contract, migration, setup task, or
+feasibility spike may precede the first slice when it is a true prerequisite;
+record why it cannot be included in that slice.
 
-Arrange tasks so that:
+Size by cohesion, uncertainty, review effort, and verification cost:
 
-1. Dependencies are satisfied with the smallest necessary prerequisite work
-2. Each task leaves the system in a working state
-3. Checkpoints follow meaningful integration, risk, approval, or phase boundaries
-4. High-risk tasks are early (fail fast)
+| Size | Meaning | Planning action |
+| --- | --- | --- |
+| XS / S | Localized change with known checks | Keep it concise. |
+| M | One coherent slice with understood boundaries | Identify interfaces and integration checks. |
+| L | Broad, costly to verify, or materially uncertain | Split or investigate; justify retaining an atomic task. |
+| XL | Several outcomes or too little knowledge to execute | Decompose before treating it as ready. |
 
-For a long plan with no natural boundary, add a checkpoint after a few tasks.
+More than about five independently edited files is a prompt to review the split,
+not a hard limit. Generated or mechanical changes may add little independent
+work. Do not split a coherent task solely because its title contains "and", it
+needs several acceptance criteria, or it crosses layers. If estimates are
+requested, state their basis and uncertainty; file counts and size labels are
+not elapsed-time estimates.
 
-Add explicit checkpoints:
+### 4. Make each task executable and verifiable
 
-```markdown
-## Checkpoint: After Tasks 1-3
+Use [assets/implementation-plan-template.md](assets/implementation-plan-template.md)
+as the starting structure for a written plan. Adapt task count and phases to the
+work; omit inapplicable optional sections. Each task needs:
 
-- [ ] All tests pass
-- [ ] Relevant build or static checks pass without errors
-- [ ] Core user flow works end-to-end
-- [ ] Review before proceeding when risk, scope, or uncertainty is high
-```
+- a stable ID, outcome, and requirement or prerequisite basis
+- observable acceptance criteria, including relevant boundaries and failures
+- verification steps with expected results
+- dependencies and entry conditions, or an explicit statement that none apply
+- likely project-relative files or components and estimated scope
 
-## Task Sizing Guidelines
+Distinguish paths confirmed by inspection from proposed new files. Use component
+names or labeled placeholders where paths are unknown; do not present guessed
+paths as existing files. Add ownership and write boundaries when delegating.
 
-| Size   | Typical files | Scope                                      | Example                                          |
-| ------ | ------------- | ------------------------------------------ | ------------------------------------------------ |
-| **XS** | 1             | Single function or config change           | Add a validation rule                            |
-| **S**  | 1-2           | One component, interface, or workflow step | Add a new command handler or interface operation |
-| **M**  | 3-5           | One coherent feature slice                 | User registration flow                           |
-| **L**  | 6-8           | Multi-component or uncertain change        | Search with filtering and pagination             |
-| **XL** | 9+             | Likely too large; review for decomposition | Break into smaller tasks                         |
+Acceptance criteria describe what must hold; verification explains how to prove
+it. "Tests added" or "tests pass" alone does not establish the requested outcome.
+For a behavior fix, include a check that distinguishes the corrected behavior
+from the original failure. Use tests, inspection, measurements, or manual checks
+in proportion to the change; do not prescribe new tests for every task.
 
-Size tasks by logical cohesion, uncertainty, reviewability, and verification
-cost—not file count alone. More than about five independently edited files should
-trigger a decomposition review, not automatically invalidate a task. Exclude
-generated or mechanical updates when they do not add independent implementation
-or verification work.
+Use commands confirmed from repository documentation, configuration, or existing
+scripts. Record their source, working directory, prerequisites, and expected
+result where needed to reproduce them. A confirmed command has been found, not
+necessarily run. For an unknown check, specify the intended evidence and write
+`Unknown — discover in <task ID> before <dependent task or checkpoint>`.
+Discovery may proceed; the unknown check prevents claiming verified completion.
+Use `Not applicable — <reason>` only when a check truly does not apply.
+Plan new coverage under an existing confirmed check when possible. Proposed test
+files do not need to exist yet for their runner command to be known.
 
-If a task is L or larger, break it down unless it is an atomic change that cannot
-be safely separated. Record the reason when retaining an L task. An agent performs
-best on S and M tasks.
+Keep focused iteration checks with their tasks. Put shared build, static, or
+integration checks at meaningful checkpoints and final handoff, referencing them
+from affected tasks when appropriate. Required task-level verification must be
+resolved before that task is complete; a later shared integration checkpoint
+still gates overall completion. Do not run a broad suite after every task by
+default or treat a failed or unavailable required check as not applicable.
 
-**When to break a task down further:**
+### 5. Order work and coordinate parallel execution
 
-- It would take more than one focused session (roughly 2+ hours of agent work)
-- You cannot describe the acceptance criteria in 3 or fewer bullet points
-- It touches two or more independent subsystems, such as identity and payment processing
-- You find yourself writing "and" in the task title (a sign it is two tasks)
+Follow dependencies while testing the riskiest assumptions early. Each completed
+slice should leave a working, reviewable state. Include compatibility, migration,
+recovery, and rollout work when the requested change requires them; do not assume
+that reverting code reverses a data change.
 
-## Plan Document Template
+Add checkpoints at meaningful integration, risk, or phase boundaries, plus final
+handoff. Each checkpoint states its prerequisite tasks, check, and pass condition.
+Identify a human review or execution permission only when the user, project, or
+environment actually requires it. Preserve permissions already granted.
 
-Write the plan to `docs/plans/<kebab-case-name>-plan.md` by default unless the
-user or repository conventions specify another location.
+For work that can run concurrently, record:
 
-Use `assets/implementation-plan-template.md` as the starting structure. Adapt its
-phases and task count to the work, and remove or mark placeholder sections that
-are not applicable. Keep the task fields defined in Step 4 even when the plan is
-short.
+- the tasks, shared contract or fixture, and conditions for starting each branch
+- ownership or assignment needs, including disjoint write boundaries or an
+  explicit coordination arrangement for shared files
+- shared state or environment constraints that require serialized operations
+- the integration task, its owner when known, and the combined verification
 
-Give every task, acceptance criterion, verification item, and checkpoint
-checkbox a stable progress ID. Duplicate each detailed checkbox in the Progress
-Tracking dashboard with the same ID, and update both copies together whenever
-status or scope changes. The detailed sections remain the source of context; the
-dashboard is the at-a-glance completion view.
+Different task names or worktrees do not establish independence. Tests and
+documentation can depend on unfinished behavior or edit the same files. Contract
+design may unblock parallel producers and consumers; combining their results
+still needs an explicit integration step. Do not invent people, assignments, or
+availability.
 
-Mark a parent task complete only when all required acceptance and verification
-items are resolved. Items explicitly marked not applicable do not block
-completion. Unknown, unresolved, or unapproved deferred items remain unchecked
-and block completion.
+When splitting a slice into parallel branches, define branch completion against
+the established contract and fixtures, and put combined behavior at the join.
+If a branch's acceptance requires a shared entry point, schedule that wiring
+before branch completion. A join cannot both depend on completed branches and
+supply work required for those branches to be complete.
 
-Treat the plan as a living document during implementation. Update task and
-checkpoint checkboxes as work is completed, and keep unfinished or unverified
-items unchecked. Record brief status notes, blockers, deviations, changed
-sequencing, and newly discovered work when they affect the remaining plan. Make
-these updates after each completed task or meaningful plan change without
-waiting for the user to ask for progress updates.
+### 6. Review readiness and hand off
 
-## Parallelization Opportunities
+Use the project's lifecycle when one exists; otherwise assign one plan readiness
+label with a brief rationale:
 
-When multiple agents or sessions are available:
+- **Ready:** required outcomes, sequencing, and validation are specific enough
+  to execute, with no unresolved blocking decisions.
+- **Needs revision:** gaps remain, but evidence gathering or independent tasks
+  can proceed; identify those tasks and what must be settled for the rest.
+- **Blocked:** the next executable work requires a missing decision, dependency,
+  or permission; name the condition that would unblock it.
 
-- **Safe to parallelize:** Independent feature slices, tests for already-implemented features, documentation
-- **Must be sequential:** state migrations, shared contract changes, dependency chains
-- **Needs coordination:** features that share a contract or interface (define the contract first, then parallelize)
+Readiness describes the plan, not implementation progress or permission to take
+an external action. Label affected tasks explicitly so a downstream blocker does
+not freeze independent work. Do not label the whole plan ready while concealing
+unknown validation or unresolved requirements.
 
-## Common Rationalizations
+Use `review-implementation-plan` when available and an independent readiness
+check would help with sequencing, dependencies, risk, or validation. Otherwise
+perform the final checklist below directly. Keep this review within the requested
+scope and existing authorization.
 
-| Rationalization                | Reality                                                                                      |
-| ------------------------------ | -------------------------------------------------------------------------------------------- |
-| "I'll figure it out as I go"   | That's how you end up with a tangled mess and rework. 10 minutes of planning saves hours.    |
-| "The tasks are obvious"        | Write them down anyway. Explicit tasks surface hidden dependencies and forgotten edge cases. |
-| "Planning is overhead"         | Planning is the task. Implementation without a plan is just typing.                          |
-| "I can hold it all in my head" | Context windows are finite. Written plans survive session boundaries and compaction.         |
+Return the plan location or inline plan, readiness and rationale, the next
+executable tasks, unresolved decisions and their impact, and required validation.
+For planning-only requests, stop there. For broader authorized work, continue
+with ready tasks and pause only the work that depends on unresolved decisions.
 
-## Red Flags
+## Maintain progress during implementation
 
-- Starting implementation without a written task list
-- Tasks that say "implement the feature" without acceptance criteria
-- No verification steps in the plan
-- All tasks are XL-sized
-- No checkpoints between tasks
-- Dependency order isn't considered
+Give every task, acceptance criterion, verification item, and checkpoint checkbox
+a stable ID. Each ID labels exactly two checkboxes: one in the detailed plan and
+one in the Progress Tracking dashboard, with matching meaning and state. The details
+carry context and evidence; the dashboard mirrors completion. Preserve IDs on
+reorder and revision, and allocate new IDs for newly discovered work.
 
-## Handoff before implementation
+After each completed task or meaningful change, synchronize both copies, record
+brief evidence or blockers, and update dependencies, scope, and the next action.
+Do not wait for a progress request. Check an item only when its condition holds
+with evidence, or it is explicitly `Not applicable — <reason>`. A checked N/A
+item records applicability, not a successful test. Mark a parent task complete
+only when all its required acceptance and verification items are resolved.
 
-Before handing the plan to an implementer or starting implementation yourself, include:
+Unknown, failed, unverified, blocked, or unapproved deferred items stay unchecked
+and block completion of the affected task or checkpoint. An authorized deferral
+must record its basis and move the item out of required scope in both views;
+retain its ID and disposition without representing it as completed work. Update
+the canonical requirements if the deferral changes the agreed outcome.
 
-- the ordered task list
-- dependencies and sequencing constraints
-- acceptance criteria for each task
-- likely files or components touched, using portable project-relative placeholders when needed
-- confirmed validation commands or manual checks for each task, plus explicit
-  unknown or not-applicable states where necessary
-- open questions that need human input before work can proceed safely
-- assumptions that an implementer should confirm or preserve
-- explicit in-scope and out-of-scope work
+Preserve completed work and evidence when revising a plan. If a change invalidates
+an earlier check, reopen the affected items in both views and explain why. Record
+material deviations and changed assumptions so the next session can resume
+without repeating completed work or trusting stale verification.
 
-## Verification
+## Final checklist
 
-Before starting implementation, confirm:
-
-- [ ] Every task has acceptance criteria
-- [ ] Every task has a verification step
-- [ ] Task dependencies are identified and ordered correctly
-- [ ] Tasks are small enough to implement, review, and verify coherently; tasks
-      with more than ~5 independently edited files have a recorded decomposition
-      review or atomicity rationale
-- [ ] Checkpoints exist between major phases
-- [ ] The plan says how and when its checkboxes and status will be updated during implementation
-- [ ] Every detailed task, acceptance, verification, and checkpoint checkbox has
-      a matching Progress Tracking checkbox with the same unique ID
-- [ ] Parent tasks are complete only when all required child items are resolved
-- [ ] Required reviews or approvals are identified before implementation starts
-- [ ] Open questions and assumptions are captured or marked not applicable
-- [ ] Scope boundaries and non-goals are captured or marked not applicable
+- The canonical plan and requirements basis are identifiable; existing IDs,
+  decisions, and valid progress have been preserved.
+- Every required outcome maps to tasks and observable checks; every task has a
+  scope basis, dependencies, likely targets, and proportionate sizing.
+- Unknowns have resolution steps and identify the work they block; no paths,
+  commands, owners, approvals, or completion evidence have been invented.
+- Dependencies are acyclic, prerequisites are actionable, and parallel work has
+  write boundaries and an integration step.
+- Focused and final checks have pass conditions; unknown or unavailable required
+  verification remains unresolved.
+- Every progress ID has one detailed checkbox and one matching dashboard
+  checkbox; parent completion follows required child completion.
+- Readiness, affected blockers, and the next authorized action are explicit.
