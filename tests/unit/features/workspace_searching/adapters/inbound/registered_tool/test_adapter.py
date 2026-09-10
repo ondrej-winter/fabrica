@@ -11,6 +11,7 @@ from typing import cast
 import pytest
 
 from fabrica.features.agent_runtime.application.dtos import (
+    MAX_TOOL_CONTENT_TEXT_CHARS,
     RegisteredToolOutcome,
     ToolArgumentSchemaValue,
     ToolArgumentValue,
@@ -137,6 +138,30 @@ def test_search_codebase_registered_tool_rejects_malformed_top_level_arguments_w
     assert use_case.command is None
     assert outcome.status is ToolOutcomeStatus.REJECTED
     assert outcome.error_code == "INVALID_ARGUMENTS"
+
+
+def test_search_codebase_registered_tool_rejects_queries_above_its_configured_limit() -> None:
+    use_case = _FakeSearchCodebase(_result())
+    adapter = SearchCodebaseRegisteredToolAdapter(
+        use_case=use_case,
+        limits=SearchLimits(max_parallel_searches=1, max_queries_per_call=1),
+    )
+    arguments = {"queries": ({"pattern": "first"}, {"pattern": "second"})}
+
+    outcome = run(adapter.handle(arguments, _context(arguments)))
+
+    assert use_case.command is None
+    assert outcome.status is ToolOutcomeStatus.REJECTED
+    assert outcome.error_code == "INVALID_ARGUMENTS"
+    assert outcome.error_message == "search_codebase accepts at most 1 queries"
+
+
+def test_search_codebase_registered_tool_rejects_an_output_limit_above_its_content_limit() -> None:
+    with pytest.raises(ValueError, match="exceeds the registered-tool content limit"):
+        SearchCodebaseRegisteredToolAdapter(
+            use_case=_FakeSearchCodebase(_result()),
+            limits=SearchLimits(max_output_chars_per_tool_call=MAX_TOOL_CONTENT_TEXT_CHARS + 1),
+        )
 
 
 @pytest.mark.parametrize(

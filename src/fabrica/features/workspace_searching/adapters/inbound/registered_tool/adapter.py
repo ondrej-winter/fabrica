@@ -5,16 +5,19 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from fabrica.features.agent_runtime.application.dtos import (
+    MAX_TOOL_CONTENT_TEXT_CHARS,
     RegisteredToolOutcome,
     ToolArgumentValue,
-    ToolDefinition,
     ToolExecutionContext,
     ToolMutationGuarantee,
     ToolTextContent,
 )
 from fabrica.features.agent_runtime.application.ports import AsyncRegisteredTool
+from fabrica.features.workspace_searching.adapters.inbound.registered_tool.definitions import (
+    SEARCH_CODEBASE_TOOL_DEFINITION,
+    SEARCH_CODEBASE_TOOL_NAME,
+)
 from fabrica.features.workspace_searching.application.dtos import (
-    DEFAULT_MAX_QUERIES_PER_CALL,
     SearchCodebaseCommand,
     SearchCodebaseResult,
     SearchLimits,
@@ -22,53 +25,6 @@ from fabrica.features.workspace_searching.application.dtos import (
 )
 from fabrica.features.workspace_searching.application.ports import SearchCodebasePort, WorkspaceSearchContext
 from fabrica.features.workspace_searching.application.result_formatting import search_codebase_result_payload
-
-SEARCH_CODEBASE_TOOL_NAME = "search_codebase"
-SEARCH_CODEBASE_TOOL_DESCRIPTION = """Search file contents across the workspace using regular expressions.
-
-Run multiple independent searches together in one call. Each query may
-optionally restrict the search to a workspace-relative path or file glob.
-
-Results contain workspace-relative file paths, one-based line/column
-locations, and surrounding context.
-
-Searches are case-insensitive by default. Use case_sensitive when exact
-case matters.
-
-Use this tool to locate definitions, references, imports, configuration,
-tests, error strings, and other code patterns. After locating relevant
-files, use read_files for broader context.
-
-Search output is bounded. If a query reaches the result/output limit,
-narrow its regex, path, or glob rather than repeatedly requesting broad
-results."""
-SEARCH_CODEBASE_TOOL_DEFINITION = ToolDefinition(
-    name=SEARCH_CODEBASE_TOOL_NAME,
-    description=SEARCH_CODEBASE_TOOL_DESCRIPTION,
-    argument_schema={
-        "type": "object",
-        "properties": {
-            "queries": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": DEFAULT_MAX_QUERIES_PER_CALL,
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "pattern": {"type": "string", "minLength": 1, "maxLength": 4_000},
-                        "path": {"type": "string", "minLength": 1},
-                        "glob": {"type": ("string", "null"), "minLength": 1},
-                        "case_sensitive": {"type": "boolean"},
-                    },
-                    "required": ("pattern",),
-                    "additionalProperties": False,
-                },
-            },
-        },
-        "required": ("queries",),
-        "additionalProperties": False,
-    },
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +34,11 @@ class SearchCodebaseRegisteredToolAdapter:
     use_case: SearchCodebasePort
     limits: SearchLimits
 
+    def __post_init__(self) -> None:
+        if self.limits.max_output_chars_per_tool_call > MAX_TOOL_CONTENT_TEXT_CHARS:
+            msg = "max_output_chars_per_tool_call exceeds the registered-tool content limit"
+            raise ValueError(msg)
+
     async def handle(
         self,
         arguments: Mapping[str, ToolArgumentValue],
@@ -85,7 +46,7 @@ class SearchCodebaseRegisteredToolAdapter:
     ) -> RegisteredToolOutcome:
         """Validate one request and return its stable structured search result."""
         try:
-            command = _command_from_arguments(arguments)
+            command = _command_from_arguments(arguments, max_queries=self.limits.max_queries_per_call)
         except (TypeError, ValueError) as err:
             return RegisteredToolOutcome.recoverable_rejection(
                 error_code="INVALID_ARGUMENTS",
@@ -123,7 +84,11 @@ def search_codebase_result_to_tool_outcome(result: SearchCodebaseResult) -> Regi
     )
 
 
-def _command_from_arguments(arguments: Mapping[str, ToolArgumentValue]) -> SearchCodebaseCommand:
+def _command_from_arguments(
+    arguments: Mapping[str, ToolArgumentValue],
+    *,
+    max_queries: int,
+) -> SearchCodebaseCommand:
     if set(arguments) != {"queries"}:
         msg = "search_codebase requires exactly one queries argument"
         raise ValueError(msg)
@@ -133,8 +98,8 @@ def _command_from_arguments(arguments: Mapping[str, ToolArgumentValue]) -> Searc
     if not isinstance(raw_queries, tuple) or not raw_queries:
         msg = "search_codebase requires a non-empty queries array"
         raise ValueError(msg)
-    if len(raw_queries) > DEFAULT_MAX_QUERIES_PER_CALL:
-        msg = f"search_codebase accepts at most {DEFAULT_MAX_QUERIES_PER_CALL} queries"
+    if len(raw_queries) > max_queries:
+        msg = f"search_codebase accepts at most {max_queries} queries"
         raise ValueError(msg)
     return SearchCodebaseCommand(queries=tuple(_query_from_value(value) for value in raw_queries))
 
@@ -168,9 +133,6 @@ def _query_from_value(value: ToolArgumentValue) -> SearchQuery:
 
 
 __all__ = [
-    "SEARCH_CODEBASE_TOOL_DEFINITION",
-    "SEARCH_CODEBASE_TOOL_DESCRIPTION",
-    "SEARCH_CODEBASE_TOOL_NAME",
     "SearchCodebaseRegisteredToolAdapter",
     "create_search_codebase_registered_tool",
     "search_codebase_result_to_tool_outcome",
