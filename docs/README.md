@@ -24,6 +24,12 @@ This directory contains durable project documentation and current reference note
   native-helper option for restoring stronger supported-platform workspace-search containment
   without an external container runtime.
 
+### Ideas
+
+- `ideas/mature-agent-product-roadmap.md` records the proposed direction for
+  evolving the Version 1 terminal coding session into a durable, observable,
+  measurable, and more strongly contained agent product.
+
 ### Specs
 
 - `specs/README.md` explains the concern-oriented spec taxonomy.
