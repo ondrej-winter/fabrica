@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from time import monotonic
 from typing import TYPE_CHECKING, Protocol
 
-from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.command import PinnedRipgrepCommandBuilder
+from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.command import build_pinned_ripgrep_command
 from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.json_parser import (
     RipgrepJsonEventError,
     parse_ripgrep_json_events,
@@ -97,15 +97,12 @@ class AsyncioPinnedRipgrepCommandRunner:
             raise OSError(msg)
         stderr_task = asyncio.create_task(process.stderr.read())
         deadline = monotonic() + timeout_seconds
-        output_events: list[str] = []
+        matching_events: list[str] = []
         matching_lines = 0
         limit_reached = False
         try:
             while True:
-                if _is_cancelled(cancellation):
-                    _raise_cancelled()
-                if monotonic() >= deadline:
-                    _raise_timeout()
+                _raise_if_interrupted(cancellation, deadline)
                 try:
                     output = await asyncio.wait_for(process.stdout.readline(), timeout=_POLL_INTERVAL_SECONDS)
                 except TimeoutError:
@@ -113,8 +110,8 @@ class AsyncioPinnedRipgrepCommandRunner:
                 if not output:
                     break
                 event = output.decode("utf-8", errors="replace").rstrip("\n")
-                output_events.append(event)
                 if _is_match_event(event):
+                    matching_events.append(event)
                     matching_lines += 1
                     if matching_lines >= max_matching_lines:
                         limit_reached = True
@@ -128,7 +125,7 @@ class AsyncioPinnedRipgrepCommandRunner:
             raise
         return PinnedRipgrepCommandResult(
             returncode=process.returncode if process.returncode is not None else -1,
-            stdout="\n".join(output_events),
+            stdout="\n".join(matching_events),
             stderr=stderr,
             limit_reached=limit_reached,
         )
@@ -171,7 +168,7 @@ class PinnedRipgrepWorkspaceSearchBackend(WorkspaceSearchBackend):
             return _failure(query, SearchErrorCode.SEARCH_CANCELLED)
         try:
             scope = resolve_search_scope(self.workspace_root, query.path)
-            command = PinnedRipgrepCommandBuilder(self.workspace_root).command_for(query, scope, context.limits)
+            command = build_pinned_ripgrep_command(query, scope, context.limits)
             completed = await self.command_runner.run(
                 command,
                 cancellation=context.cancellation,
@@ -259,16 +256,15 @@ def _is_cancelled(cancellation: object) -> bool:
     return bool(getattr(cancellation, "is_cancelled", False))
 
 
+def _raise_if_interrupted(cancellation: object, deadline: float) -> None:
+    if _is_cancelled(cancellation):
+        raise asyncio.CancelledError
+    if monotonic() >= deadline:
+        raise TimeoutError
+
+
 def _is_match_event(event: str) -> bool:
     return '"type":"match"' in event.replace(" ", "")
-
-
-def _raise_cancelled() -> None:
-    raise asyncio.CancelledError
-
-
-def _raise_timeout() -> None:
-    raise TimeoutError
 
 
 def _diagnostic_error_code(stderr: str) -> SearchErrorCode | None:

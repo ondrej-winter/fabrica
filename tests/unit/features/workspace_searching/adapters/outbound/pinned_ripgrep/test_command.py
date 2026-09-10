@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep import command as pinned_ripgrep_command
-from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.command import PinnedRipgrepCommandBuilder
+from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.command import build_pinned_ripgrep_command
 from fabrica.features.workspace_searching.adapters.outbound.pinned_ripgrep.manifest import (
     PinnedRipgrepExecutable,
     PinnedRipgrepUnavailableError,
@@ -25,7 +25,7 @@ def test_linux_pinned_ripgrep_command_directly_invokes_the_verified_executable_w
     (tmp_path / "src").mkdir()
     scope = resolve_search_scope(tmp_path, "src")
 
-    command = PinnedRipgrepCommandBuilder(tmp_path).command_for(
+    command = build_pinned_ripgrep_command(
         SearchQuery(pattern="UserService", path="src", glob="**/*.py"), scope, SearchLimits(max_search_file_bytes=1234)
     )
 
@@ -40,6 +40,8 @@ def test_linux_pinned_ripgrep_command_directly_invokes_the_verified_executable_w
     assert "--glob=!.git/**" in backend
     assert "--glob=!node_modules/**" in backend
     assert "--glob=**/*.py" in backend
+    assert backend.index("--glob=**/*.py") < backend.index("--glob=!.git/**")
+    assert backend.index("--glob=**/*.py") < backend.index("--glob=!node_modules/**")
     assert "--no-ignore" not in backend
     assert "UserService" in backend
     assert "--max-count=1" not in backend
@@ -60,7 +62,7 @@ def test_linux_pinned_ripgrep_command_for_explicit_file_overrides_only_ordinary_
     ignored_file.write_text("value = 1\n", encoding="utf-8")
     scope = resolve_search_scope(tmp_path, "ignored.py")
 
-    command = PinnedRipgrepCommandBuilder(tmp_path).command_for(
+    command = build_pinned_ripgrep_command(
         SearchQuery(pattern="value", path="ignored.py", case_sensitive=True), scope, SearchLimits()
     )
 
@@ -85,7 +87,23 @@ def test_pinned_ripgrep_command_rejects_an_unsupported_platform(
     monkeypatch.setattr(pinned_ripgrep_command, "verified_pinned_ripgrep_executable", unavailable)
 
     with pytest.raises(PinnedRipgrepUnavailableError, match="unavailable"):
-        PinnedRipgrepCommandBuilder(tmp_path).command_for(SearchQuery(pattern="needle"), scope, SearchLimits())
+        build_pinned_ripgrep_command(SearchQuery(pattern="needle"), scope, SearchLimits())
+
+
+def test_pinned_ripgrep_command_fails_closed_for_an_unexpected_executable_platform_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source_file = tmp_path / "source.py"
+    source_file.write_text("needle\n", encoding="utf-8")
+    scope = resolve_search_scope(tmp_path, "source.py")
+    monkeypatch.setattr(
+        pinned_ripgrep_command,
+        "verified_pinned_ripgrep_executable",
+        lambda: PinnedRipgrepExecutable(Path("/package/unsupported/rg"), "15.2.0", "unsupported"),
+    )
+
+    with pytest.raises(PinnedRipgrepUnavailableError, match="unavailable"):
+        build_pinned_ripgrep_command(SearchQuery(pattern="needle"), scope, SearchLimits())
 
 
 def test_macos_pinned_ripgrep_command_directly_invokes_the_verified_executable_with_the_canonical_scope(
@@ -98,7 +116,7 @@ def test_macos_pinned_ripgrep_command_directly_invokes_the_verified_executable_w
     executable = PinnedRipgrepExecutable(Path("/package/macos_arm64/rg"), "15.2.0", "darwin-arm64")
     monkeypatch.setattr(pinned_ripgrep_command, "verified_pinned_ripgrep_executable", lambda: executable)
 
-    command = PinnedRipgrepCommandBuilder(tmp_path).command_for(SearchQuery(pattern="needle"), scope, SearchLimits())
+    command = build_pinned_ripgrep_command(SearchQuery(pattern="needle"), scope, SearchLimits())
 
     assert command[0] == str(executable.path)
     assert command[-1] == str(scope.canonical_path)

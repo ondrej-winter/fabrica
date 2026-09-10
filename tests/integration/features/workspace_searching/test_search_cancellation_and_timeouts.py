@@ -137,9 +137,9 @@ def test_scheduler_cancellation_interrupts_blocked_context_hydration(
     cancellation = MutableCancellation()
     source_loader = BlockingSourceLoader()
     monkeypatch.setattr(
-        adapter.PinnedRipgrepCommandBuilder,
-        "command_for",
-        lambda _self, _query, scope, _limits: ("verified-rg", str(scope.canonical_path)),
+        adapter,
+        "build_pinned_ripgrep_command",
+        lambda _query, scope, _limits: ("verified-rg", str(scope.canonical_path)),
     )
     backend = adapter.PinnedRipgrepWorkspaceSearchBackend(
         tmp_path,

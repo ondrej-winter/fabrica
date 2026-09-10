@@ -159,7 +159,7 @@ class CompletedButSlowWaitProcess(FakeProcess):
 def test_backend_returns_hydrated_matches_from_incremental_json_events(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    _allow_command_builder(monkeypatch)
+    _allow_command_factory(monkeypatch)
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "example.py").write_text("before\nclass UserService:\nafter\n", encoding="utf-8")
     runner = FakeRunner(
@@ -199,7 +199,7 @@ def test_backend_returns_hydrated_matches_from_incremental_json_events(
 def test_backend_maps_deterministic_ripgrep_diagnostics(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, stderr: str, expected: SearchErrorCode
 ) -> None:
-    _allow_command_builder(monkeypatch)
+    _allow_command_factory(monkeypatch)
     runner = FakeRunner(adapter.PinnedRipgrepCommandResult(returncode=2, stdout="", stderr=stderr))
     backend = adapter.PinnedRipgrepWorkspaceSearchBackend(tmp_path, command_runner=runner)
 
@@ -216,7 +216,7 @@ def test_backend_maps_deterministic_ripgrep_diagnostics(
 def test_backend_maps_process_failures_to_stable_outcomes(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, runner_error: Exception, expected: SearchErrorCode
 ) -> None:
-    _allow_command_builder(monkeypatch)
+    _allow_command_factory(monkeypatch)
     backend = adapter.PinnedRipgrepWorkspaceSearchBackend(tmp_path, command_runner=FakeRunner(runner_error))
 
     result = asyncio.run(backend.search_query(SearchQuery("needle"), _context()))
@@ -255,7 +255,7 @@ def test_backend_maps_an_unavailable_pinned_ripgrep_binary_to_a_stable_failure(
         message = "unavailable"
         raise adapter.PinnedRipgrepUnavailableError(message)
 
-    monkeypatch.setattr(adapter.PinnedRipgrepCommandBuilder, "command_for", unavailable_command)
+    monkeypatch.setattr(adapter, "build_pinned_ripgrep_command", unavailable_command)
     backend = adapter.PinnedRipgrepWorkspaceSearchBackend(tmp_path)
 
     result = asyncio.run(backend.search_query(SearchQuery("needle"), _context()))
@@ -268,7 +268,7 @@ def test_backend_maps_an_unavailable_pinned_ripgrep_binary_to_a_stable_failure(
 def test_backend_maps_malformed_backend_events_to_a_transient_io_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    _allow_command_builder(monkeypatch)
+    _allow_command_factory(monkeypatch)
     backend = adapter.PinnedRipgrepWorkspaceSearchBackend(
         tmp_path,
         command_runner=FakeRunner(adapter.PinnedRipgrepCommandResult(returncode=0, stdout="not json\n", stderr="")),
@@ -284,7 +284,7 @@ def test_backend_maps_malformed_backend_events_to_a_transient_io_failure(
 def test_backend_fails_closed_when_the_contained_backend_aborts_before_emitting_output(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    _allow_command_builder(monkeypatch)
+    _allow_command_factory(monkeypatch)
     backend = adapter.PinnedRipgrepWorkspaceSearchBackend(
         tmp_path,
         command_runner=FakeRunner(adapter.PinnedRipgrepCommandResult(returncode=-6, stdout="", stderr="")),
@@ -299,7 +299,7 @@ def test_backend_fails_closed_when_the_contained_backend_aborts_before_emitting_
 def test_backend_maps_unclassified_nonzero_backend_status_to_transient_io_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    _allow_command_builder(monkeypatch)
+    _allow_command_factory(monkeypatch)
     backend = adapter.PinnedRipgrepWorkspaceSearchBackend(
         tmp_path,
         command_runner=FakeRunner(
@@ -314,7 +314,7 @@ def test_backend_maps_unclassified_nonzero_backend_status_to_transient_io_failur
     assert result.error.metadata == {"transient": True}
 
 
-def test_async_runner_streams_events_and_collects_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_async_runner_retains_match_events_and_collects_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     process = FakeProcess((b'{"type":"match"}\n', b'{"type":"summary"}\n'), stderr=b"diagnostic")
     _install_process(monkeypatch, process)
 
@@ -328,9 +328,32 @@ def test_async_runner_streams_events_and_collects_stderr(monkeypatch: pytest.Mon
     )
 
     assert result.returncode == 0
-    assert result.stdout == '{"type":"match"}\n{"type":"summary"}'
+    assert result.stdout == '{"type":"match"}'
     assert result.stderr == "diagnostic"
     assert result.limit_reached is False
+
+
+def test_async_runner_retains_only_matching_events(monkeypatch: pytest.MonkeyPatch) -> None:
+    process = FakeProcess(
+        (
+            b'{"type":"begin"}\n',
+            b'{"type":"summary"}\n',
+            b'{"type":"match"}\n',
+            b'{"type":"end"}\n',
+        )
+    )
+    _install_process(monkeypatch, process)
+
+    result = asyncio.run(
+        adapter.AsyncioPinnedRipgrepCommandRunner().run(
+            ("verified-rg",),
+            cancellation=NeverCancelled(),
+            timeout_seconds=1,
+            max_matching_lines=2,
+        )
+    )
+
+    assert result.stdout == '{"type":"match"}'
 
 
 def test_async_runner_terminates_process_after_the_matching_line_cap(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -415,7 +438,7 @@ def test_async_runner_retries_after_a_short_stdout_poll_timeout(monkeypatch: pyt
         )
     )
 
-    assert result.stdout == '{"type":"summary"}'
+    assert result.stdout == ""
 
 
 def test_async_runner_uses_a_linux_process_group_for_cap_termination(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -524,11 +547,11 @@ def _install_process(monkeypatch: pytest.MonkeyPatch, process: FakeProcess) -> N
     monkeypatch.setattr(adapter.os, "killpg", lambda _pid, _signal: process.terminate())
 
 
-def _allow_command_builder(monkeypatch: pytest.MonkeyPatch) -> None:
+def _allow_command_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        adapter.PinnedRipgrepCommandBuilder,
-        "command_for",
-        lambda _self, _query, scope, _limits: ("verified-rg", "--json", str(scope.canonical_path)),
+        adapter,
+        "build_pinned_ripgrep_command",
+        lambda _query, scope, _limits: ("verified-rg", "--json", str(scope.canonical_path)),
     )
 
 
