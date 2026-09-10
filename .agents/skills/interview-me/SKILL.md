@@ -2,7 +2,7 @@
 name: interview-me
 description: Reduce uncertainty about a user's underlying intent through a formal XY-problem gate plus a hypothesis, confidence, evidence, and information-gain interview loop. Use when an ask is underspecified, solution-led, or has material unresolved trade-offs before idea refinement, specification, planning, or implementation.
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
   dependencies:
     tools: []
     skills:
@@ -98,12 +98,12 @@ Confidence means confidence that the intent statement is sufficient for the next
 downstream decision. It is not a claim of psychological certainty or a substitute
 for user confirmation.
 
-| Confidence | Meaning | Required action |
-| --- | --- | --- |
-| 0-39% | Primary user, problem, or outcome is unclear. | Test the core interpretation before discussing solutions. |
-| 40-69% | A direction is plausible, but material success, scope, or constraints are unresolved. | Ask the highest-information-gain question. |
-| 70-89% | Intent is mostly clear; boundaries, success, or ownership still need confirmation. | Resolve or explicitly record remaining material unknowns. |
-| 90-100% | The intent model is sufficient to restate for confirmation. | Present the intent artifact and request confirmation. |
+| Confidence | Meaning                                                                               | Required action                                           |
+| ---------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 0-39%      | Primary user, problem, or outcome is unclear.                                         | Test the core interpretation before discussing solutions. |
+| 40-69%     | A direction is plausible, but material success, scope, or constraints are unresolved. | Ask the highest-information-gain question.                |
+| 70-89%     | Intent is mostly clear; boundaries, success, or ownership still need confirmation.    | Resolve or explicitly record remaining material unknowns. |
+| 90-100%    | The intent model is sufficient to restate for confirmation.                           | Present the intent artifact and request confirmation.     |
 
 Do not increase confidence merely because more words were exchanged. Increase it
 only when evidence resolves, bounds, or explicitly accepts a high-impact unknown.
@@ -137,6 +137,14 @@ Ask exactly one question, followed by one falsifiable guess. Prefer the question
 whose possible answers would most change the next decision: route, scope,
 requirements, success criteria, constraint, or implementation approach.
 
+Each question must be self-contained for a user who may not remember the full
+conversation or source material. Before the question, provide a concise context
+recap that includes only the facts, current hypothesis, or unresolved distinction
+needed to understand and answer it. Clearly label hypotheses and inferences; do
+not restate the full interview, introduce new claims, or make the user reconstruct
+the agent's reasoning from earlier turns. State why the answer matters when that
+decision impact is not obvious.
+
 Prioritize unknowns in this order unless context shows another unknown has more
 decision value:
 
@@ -147,14 +155,28 @@ decision value:
 5. implementation detail that remains material after the preceding items
 
 ```text
-Q: <one focused question>
+CONTEXT: <the minimal confirmed facts and clearly labeled hypothesis or distinction relevant to this question>
+WHY THIS MATTERS: <the decision, route, scope, or trade-off this answer will resolve>
+Q: <one focused, answerable question>
 GUESS: <one predicted answer, why it is plausible, and permission to reject it>
 ```
 
-The guess must be falsifiable, evidence-based where possible, and non-manipulative.
-It is a test of the model, not an attempt to steer the user toward a preferred
-answer. Do not batch questions. Wait for the answer before selecting the next
-highest-value unknown.
+Keep `CONTEXT` and `WHY THIS MATTERS` brief enough that the question remains easy
+to scan. Omit `WHY THIS MATTERS` only when it would merely repeat the question.
+The guess must be falsifiable, evidence-based where possible, and
+non-manipulative. It is a test of the model, not an attempt to steer the user
+toward a preferred answer. Do not batch questions. Wait for the answer before
+selecting the next highest-value unknown.
+
+For example, do not ask `Q: What should the dashboard do?` after a long
+discussion. Instead, ask:
+
+```text
+CONTEXT: You requested a dashboard for support leads. It is confirmed that they review support work daily; it is still unknown whether their main goal is faster ticket triage or identifying recurring product issues.
+WHY THIS MATTERS: These goals require different data, workflows, and success measures.
+Q: Which of those two decisions should the dashboard help a support lead make first?
+GUESS: Faster triage is likely the first priority because the dashboard is intended for daily use, but please reject that if recurring-issue analysis is more valuable.
+```
 
 ### 3. Update from evidence
 
@@ -171,6 +193,8 @@ practice" by asking for the decision, threshold, failure mode, or trade-off they
 represent. When convention may be masking preference, ask:
 
 ```text
+CONTEXT: The request names a conventional solution, but the decision it should enable remains unconfirmed.
+WHY THIS MATTERS: Confirming the desired result keeps the conventional solution from becoming an untested requirement.
 Q: If you did not need to justify the conventional solution, what result would you actually choose?
 GUESS: The outcome matters more than preserving the named solution, because the request describes an artifact rather than a decision it enables.
 ```
@@ -260,7 +284,11 @@ Before handing off, verify that:
   high-impact unknowns, stated solution, underlying outcome, and XY-risk level
 - a high- or medium-risk stated solution was treated as a candidate until the
   underlying outcome and its relationship to that solution were confirmed
-- every question was singular and selected for expected decision value
+- every question was singular, selected for expected decision value, and preceded
+  by enough concise context for the user to understand it without recalling the
+  full interview or source material
+- every context recap separated confirmed evidence from hypotheses or inferences,
+  and did not introduce unsupported claims
 - every guess was falsifiable and did not present an inference as user evidence
 - confidence changed only in response to relevant evidence or contradiction
 - the final artifact includes outcome, user, success signals, constraints, in
