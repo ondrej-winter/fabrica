@@ -13,6 +13,7 @@
 - Revision: Accepted Version 1 scope on September 5, 2026: activation-only,
   global/workspace sources, unified frontmatter parsing, bounded transport, and
   no `@skill/...` resource routing.
+- Acceptance basis: The recorded acceptance, accepted revision, and accepting role in this Status section.
 - Supersedes: The unconfirmed skills-tool draft.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
@@ -116,6 +117,22 @@ permission and sandbox policy.
 - Model-callable skill scripts, automatic script execution, dynamic discovery,
   marketplace installation, and skill editing.
 - Compatibility support for heading-only `SKILL.md` files.
+
+## Requirements
+
+- R1: The system must provide the observable behavior, interface, and failure
+  semantics defined in **Desired Behavior** and the detailed contract sections
+  below.
+  Basis: The accepted requirements recorded in this canonical specification.
+- R2: Implementation and maintenance must remain within the explicit **Scope**
+  and must not add excluded capabilities without a material specification revision.
+  Basis: The accepted scope and exclusions in this specification.
+- R3: In the affected workflow, implementation must preserve the safety,
+  architecture, privacy, and execution boundaries defined in this specification.
+  Basis: The accepted constraints and execution boundaries in this specification.
+- R4: Behavior changes must be verified against the applicable scenarios in
+  **Testing Strategy** and **Commands and Validation**.
+  Basis: The accepted validation expectations in this specification.
 
 ## Desired Behavior
 
@@ -282,10 +299,7 @@ Example ambiguity result:
   "error": {
     "code": "AMBIGUOUS_SKILL",
     "message": "Skill \"review-pr\" is ambiguous.",
-    "candidates": [
-      "global:review-pr",
-      "workspace:review-pr"
-    ]
+    "candidates": ["global:review-pr", "workspace:review-pr"]
   }
 }
 ```
@@ -738,10 +752,7 @@ Missing skill example:
   "error": {
     "code": "SKILL_NOT_FOUND",
     "skill": "foo",
-    "available": [
-      "review-pr",
-      "release"
-    ]
+    "available": ["review-pr", "release"]
   }
 }
 ```
@@ -994,15 +1005,15 @@ XML-like arguments must remain ordinary argument data.
 
 ## Commands and Validation
 
-| Check | Command or procedure | Applicability |
-| --- | --- | --- |
-| Format | `uv run ruff format --check .` | Required for implementation changes |
-| Lint | `uv run ruff check .` | Required for implementation changes |
-| Type check | `uv run ty check src tests` | Required for implementation changes |
-| Tests | `uv run pytest` | Required for implementation changes |
-| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
-| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
-| Manual acceptance | Confirm this accepted specification remains accurate when implementation uncovers a material scope change. | Required for material changes |
+| Check                      | Command or procedure                                                                                       | Applicability                       |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Format                     | `uv run ruff format --check .`                                                                             | Required for implementation changes |
+| Lint                       | `uv run ruff check .`                                                                                      | Required for implementation changes |
+| Type check                 | `uv run ty check src tests`                                                                                | Required for implementation changes |
+| Tests                      | `uv run pytest`                                                                                            | Required for implementation changes |
+| Documentation              | Review this specification and its internal references for accuracy and consistency.                        | Required                            |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration.                                | Not applicable by default           |
+| Manual acceptance          | Confirm this accepted specification remains accurate when implementation uncovers a material scope change. | Required for material changes       |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 
@@ -1037,12 +1048,28 @@ model-callable runtime adapter.
 - Never automatically load all resource files during activation.
 - Never expose skill roots as mutable ordinary-task paths.
 
+## Constraints and Execution Boundaries
+
+The binding technical, architectural, safety, privacy, and operational constraints
+remain the detailed contracts in this specification, including its constraints or
+boundaries sections and the explicit **Execution Boundaries** section below. The
+project rules under `.clinerules/` are binding for implementation and validation.
+
+## Acceptance Checks
+
+| ID  | Requirement | Conditions and action                                                                | Expected observable result                                                          | Verification method                                                    |
+| --- | ----------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| AC1 | R1          | Execute the applicable normal and failure-path scenarios from the detailed contract. | Results match the specified success, error, and output semantics.                   | Focused acceptance scenarios and tests listed in **Testing Strategy**. |
+| AC2 | R2          | Review the change against **Scope** and explicit exclusions.                         | No excluded capability or unauthorized scope expansion is introduced.               | Specification and code review.                                         |
+| AC3 | R3          | Exercise applicable boundary, containment, and denial cases.                         | The system fails closed and preserves the specified safety and architecture guards. | Boundary-focused tests and review against the detailed constraints.    |
+| AC4 | R4          | Run the applicable validation commands and procedures.                               | Required validation evidence is produced without unauthorized live dependencies.    | **Commands and Validation** and **Testing Strategy**.                  |
+
 ## Success Criteria
 
 - The spec defines `skills` as an agent orchestration primitive for activating
   configured procedural instructions.
 - The public interface remains the Cline-compatible `{ "skill": string,
-  "args"?: string | null }` schema with strict input bounds.
+"args"?: string | null }` schema with strict input bounds.
 - The terminology consistently uses activate/load/use instead of execute for the
   skill primitive.
 - The registry model includes canonical IDs, source provenance, enabled state,
@@ -1063,11 +1090,11 @@ model-callable runtime adapter.
 
 ## Open Questions
 
-| Question | Impact | Blocking? | Owner | Resolution |
-| --- | --- | --- | --- | --- |
-| Should future `@skill/...` routing use resource manifests/tree digests? | Future resource-integrity design. | No | Maintainer | Deferred |
-| Should a future `run_commands` sandbox-mount contract expose activated roots read-only? | Future command-sandbox design. | No | Maintainer | Deferred |
-| How should plugin and managed providers express identity, trust, and revisions? | Future provider design. | No | Maintainer | Deferred |
+| Question                                                                                | Impact                            | Blocking? | Owner      | Resolution |
+| --------------------------------------------------------------------------------------- | --------------------------------- | --------- | ---------- | ---------- |
+| Should future `@skill/...` routing use resource manifests/tree digests?                 | Future resource-integrity design. | No        | Maintainer | Deferred   |
+| Should a future `run_commands` sandbox-mount contract expose activated roots read-only? | Future command-sandbox design.    | No        | Maintainer | Deferred   |
+| How should plugin and managed providers express identity, trust, and revisions?         | Future provider design.           | No        | Maintainer | Deferred   |
 
 ## Acceptance and Planning Gate
 
@@ -1084,3 +1111,8 @@ Follow the project architecture, typing, logging, secret-safety, and validation 
 - Specification: This file under `docs/specs/`.
 - Source and test ownership: The detailed architecture section in this specification remains authoritative.
 - Documentation ownership: `docs/specs/` and the relevant indexes.
+
+## Revision and Handoff Notes
+
+- September 10, 2026: Normalized this canonical specification to the local specification-template structure. This is a documentation-structure change only: it preserves the recorded accepted behavior, decisions, and acceptance evidence.
+- Next authorized step: Maintain or plan changes in conformance with this accepted specification; any material change requires an updated and re-confirmed specification.

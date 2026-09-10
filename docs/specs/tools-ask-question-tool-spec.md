@@ -7,6 +7,7 @@
 - Accepted by: Maintainer (interactive approval)
 - Accepted on: September 2, 2026
 - Revision: Version 1 interaction-contract decisions recorded on September 2, 2026.
+- Acceptance basis: The recorded acceptance, accepted revision, and accepting role in this Status section.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
@@ -107,6 +108,22 @@ or terminated.
   Skip/dismissed results, strict option-only answers, multi-selection, and answer
   attachments.
 
+## Requirements
+
+- R1: The system must provide the observable behavior, interface, and failure
+  semantics defined in **Desired Behavior** and the detailed contract sections
+  below.
+  Basis: The accepted requirements recorded in this canonical specification.
+- R2: Implementation and maintenance must remain within the explicit **Scope**
+  and must not add excluded capabilities without a material specification revision.
+  Basis: The accepted scope and exclusions in this specification.
+- R3: In the affected workflow, implementation must preserve the safety,
+  architecture, privacy, and execution boundaries defined in this specification.
+  Basis: The accepted constraints and execution boundaries in this specification.
+- R4: Behavior changes must be verified against the applicable scenarios in
+  **Testing Strategy** and **Commands and Validation**.
+  Basis: The accepted validation expectations in this specification.
+
 ## Desired Behavior
 
 `ask_question` must allow a model to:
@@ -186,11 +203,7 @@ Example with suggestions:
 ```json
 {
   "question": "Which database should this implementation target?",
-  "options": [
-    "PostgreSQL",
-    "SQLite",
-    "MySQL"
-  ]
+  "options": ["PostgreSQL", "SQLite", "MySQL"]
 }
 ```
 
@@ -207,10 +220,7 @@ Cline currently exposes this input shape:
 ```json
 {
   "question": "Which implementation should I use?",
-  "options": [
-    "Approach A",
-    "Approach B"
-  ]
+  "options": ["Approach A", "Approach B"]
 }
 ```
 
@@ -304,11 +314,7 @@ Good:
 Bad:
 
 ```json
-[
-  "Yes",
-  "No",
-  "Maybe"
-]
+["Yes", "No", "Maybe"]
 ```
 
 when the labels lose meaning outside the rendered UI. Option text becomes part of
@@ -393,10 +399,7 @@ Every question should have an interaction ID:
 {
   "question_id": "q_01J...",
   "question": "Which database should this use?",
-  "options": [
-    "PostgreSQL",
-    "SQLite"
-  ]
+  "options": ["PostgreSQL", "SQLite"]
 }
 ```
 
@@ -588,10 +591,7 @@ The frontend should receive structured data:
   "type": "question",
   "question_id": "q_01J...",
   "question": "Which database?",
-  "options": [
-    "PostgreSQL",
-    "SQLite"
-  ]
+  "options": ["PostgreSQL", "SQLite"]
 }
 ```
 
@@ -898,15 +898,15 @@ run is destroyed.
 
 ## Commands and Validation
 
-| Check | Command or procedure | Applicability |
-| --- | --- | --- |
-| Format | `uv run ruff format --check .` | Required for implementation changes |
-| Lint | `uv run ruff check .` | Required for implementation changes |
-| Type check | `uv run ty check src tests` | Required for implementation changes |
-| Tests | `uv run pytest` | Required for implementation changes |
-| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
-| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
-| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
+| Check                      | Command or procedure                                                                        | Applicability                       |
+| -------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Format                     | `uv run ruff format --check .`                                                              | Required for implementation changes |
+| Lint                       | `uv run ruff check .`                                                                       | Required for implementation changes |
+| Type check                 | `uv run ty check src tests`                                                                 | Required for implementation changes |
+| Tests                      | `uv run pytest`                                                                             | Required for implementation changes |
+| Documentation              | Review this specification and its internal references for accuracy and consistency.         | Required                            |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration.                 | Not applicable by default           |
+| Manual acceptance          | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts                 |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 
@@ -948,6 +948,22 @@ tests before adding concrete UI, CLI, or remote transports.
 - Never represent cancellation as an empty user answer.
 - Never duplicate the same answer unnecessarily in model context.
 
+## Constraints and Execution Boundaries
+
+The binding technical, architectural, safety, privacy, and operational constraints
+remain the detailed contracts in this specification, including its constraints or
+boundaries sections and the explicit **Execution Boundaries** section below. The
+project rules under `.clinerules/` are binding for implementation and validation.
+
+## Acceptance Checks
+
+| ID  | Requirement | Conditions and action                                                                | Expected observable result                                                          | Verification method                                                    |
+| --- | ----------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| AC1 | R1          | Execute the applicable normal and failure-path scenarios from the detailed contract. | Results match the specified success, error, and output semantics.                   | Focused acceptance scenarios and tests listed in **Testing Strategy**. |
+| AC2 | R2          | Review the change against **Scope** and explicit exclusions.                         | No excluded capability or unauthorized scope expansion is introduced.               | Specification and code review.                                         |
+| AC3 | R3          | Exercise applicable boundary, containment, and denial cases.                         | The system fails closed and preserves the specified safety and architecture guards. | Boundary-focused tests and review against the detailed constraints.    |
+| AC4 | R4          | Run the applicable validation commands and procedures.                               | Required validation evidence is produced without unauthorized live dependencies.    | **Commands and Validation** and **Testing Strategy**.                  |
+
 ## Success Criteria
 
 - The spec defines `ask_question` as a synchronous human-input orchestration
@@ -973,9 +989,9 @@ tests before adding concrete UI, CLI, or remote transports.
 
 ## Open Questions
 
-| Question | Impact | Blocking? | Owner | Resolution |
-| --- | --- | --- | --- | --- |
-| Future interaction extensions listed below do not block Version 1 implementation planning. | Future product scope. | No | Maintainer | Deferred |
+| Question                                                                                   | Impact                | Blocking? | Owner      | Resolution |
+| ------------------------------------------------------------------------------------------ | --------------------- | --------- | ---------- | ---------- |
+| Future interaction extensions listed below do not block Version 1 implementation planning. | Future product scope. | No        | Maintainer | Deferred   |
 
 - How long may a question remain pending: indefinitely, until session close, for a
   fixed duration such as 24 hours, or through configurable expiration?
@@ -1007,3 +1023,8 @@ Follow the project architecture, typing, logging, secret-safety, and validation 
 - Specification: This file under `docs/specs/`.
 - Source and test ownership: The detailed architecture section in this specification remains authoritative.
 - Documentation ownership: `docs/specs/` and the relevant documentation indexes.
+
+## Revision and Handoff Notes
+
+- September 10, 2026: Normalized this canonical specification to the local specification-template structure. This is a documentation-structure change only: it preserves the recorded accepted behavior, decisions, and acceptance evidence.
+- Next authorized step: Maintain or plan changes in conformance with this accepted specification; any material change requires an updated and re-confirmed specification.

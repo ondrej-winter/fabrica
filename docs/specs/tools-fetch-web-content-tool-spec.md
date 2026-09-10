@@ -8,6 +8,7 @@
 - Revision: Accepted after resolving Version 1 protocol, transport, destination
   classification, and HTML-normalization decisions; implementation status audited
   on September 1, 2026.
+- Acceptance basis: The recorded acceptance, accepted revision, and accepting role in this Status section.
 - Supersedes: Original draft added August 28, 2026.
 
 This document is the canonical source of truth for the implemented
@@ -105,6 +106,22 @@ agent reasons over returned untrusted content
   destination classification, and `markdownify` with standard-library
   `html.parser` for HTML normalization. Add `markdownify` as an explicit runtime
   dependency when implementing the tool.
+
+## Requirements
+
+- R1: The system must provide the observable behavior, interface, and failure
+  semantics defined in **Desired Behavior** and the detailed contract sections
+  below.
+  Basis: The accepted requirements recorded in this canonical specification.
+- R2: Implementation and maintenance must remain within the explicit **Scope**
+  and must not add excluded capabilities without a material specification revision.
+  Basis: The accepted scope and exclusions in this specification.
+- R3: In the affected workflow, implementation must preserve the safety,
+  architecture, privacy, and execution boundaries defined in this specification.
+  Basis: The accepted constraints and execution boundaries in this specification.
+- R4: Behavior changes must be verified against the applicable scenarios in
+  **Testing Strategy** and **Commands and Validation**.
+  Basis: The accepted validation expectations in this specification.
 
 ## Desired Behavior
 
@@ -1230,15 +1247,15 @@ must remain ordinary untrusted content in the result.
 
 ## Commands and Validation
 
-| Check | Command or procedure | Applicability |
-| --- | --- | --- |
-| Format | `uv run ruff format .` | Required for implementation changes. |
-| Lint | `uv run ruff check .` | Required for implementation changes. |
-| Type check | `uv run ty check src tests` | Required for implementation changes. |
-| Tests | `uv run pytest` | Required for implementation changes. |
-| Documentation | Review this specification for template alignment, consistency, and accurate lifecycle status. | Required for this documentation revision. |
-| Migration or compatibility | Not applicable; this project does not prioritize backward compatibility. | Not applicable. |
-| Manual acceptance | Confirm the accepted HTTPS-only, `httpx`, `ipaddress`, and `markdownify`/`html.parser` decisions remain represented accurately. | Recorded in the Status section. |
+| Check                      | Command or procedure                                                                                                            | Applicability                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Format                     | `uv run ruff format .`                                                                                                          | Required for implementation changes.      |
+| Lint                       | `uv run ruff check .`                                                                                                           | Required for implementation changes.      |
+| Type check                 | `uv run ty check src tests`                                                                                                     | Required for implementation changes.      |
+| Tests                      | `uv run pytest`                                                                                                                 | Required for implementation changes.      |
+| Documentation              | Review this specification for template alignment, consistency, and accurate lifecycle status.                                   | Required for this documentation revision. |
+| Migration or compatibility | Not applicable; this project does not prioritize backward compatibility.                                                        | Not applicable.                           |
+| Manual acceptance          | Confirm the accepted HTTPS-only, `httpx`, `ipaddress`, and `markdownify`/`html.parser` decisions remain represented accurately. | Recorded in the Status section.           |
 
 The implementation is covered by focused tests for input validation, URL policy,
 destination policy, redirect policy, content classification, extraction, output
@@ -1275,6 +1292,22 @@ limiting, timeout/cancellation distinction, and structured result mapping.
 - Let fetched content become agent instructions.
 - Silently truncate output.
 
+## Constraints and Execution Boundaries
+
+The binding technical, architectural, safety, privacy, and operational constraints
+remain the detailed contracts in this specification, including its constraints or
+boundaries sections and the explicit **Execution Boundaries** section below. The
+project rules under `.clinerules/` are binding for implementation and validation.
+
+## Acceptance Checks
+
+| ID  | Requirement | Conditions and action                                                                | Expected observable result                                                          | Verification method                                                    |
+| --- | ----------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| AC1 | R1          | Execute the applicable normal and failure-path scenarios from the detailed contract. | Results match the specified success, error, and output semantics.                   | Focused acceptance scenarios and tests listed in **Testing Strategy**. |
+| AC2 | R2          | Review the change against **Scope** and explicit exclusions.                         | No excluded capability or unauthorized scope expansion is introduced.               | Specification and code review.                                         |
+| AC3 | R3          | Exercise applicable boundary, containment, and denial cases.                         | The system fails closed and preserves the specified safety and architecture guards. | Boundary-focused tests and review against the detailed constraints.    |
+| AC4 | R4          | Run the applicable validation commands and procedures.                               | Required validation evidence is produced without unauthorized live dependencies.    | **Commands and Validation** and **Testing Strategy**.                  |
+
 ## Success Criteria
 
 - The spec defines `fetch_web_content` as a deterministic, read-only,
@@ -1306,18 +1339,16 @@ limiting, timeout/cancellation distinction, and structured result mapping.
 
 ## Resolved decisions
 
-| Decision | Impact | Owner | Resolution |
-| --- | --- | --- | --- |
-| Protocol policy | Public security posture and redirect behavior. | Product/runtime owner | Version 1 is HTTPS-only. Reject initial HTTP URLs and redirects to HTTP. |
-| HTTP stack | Transport implementation and dependency scope. | Product/runtime owner | Reuse the existing `httpx` dependency. Validate DNS results before every initial and redirect request; defer connection-level address pinning. |
-| Destination classification | SSRF policy implementation. | Product/runtime owner | Use standard-library `ipaddress` with an allow-only-globally-routable policy. |
-| HTML normalization | Documentation-content fidelity and dependencies. | Product/runtime owner | Use `markdownify` with standard-library `html.parser`; require fixtures for headings, code blocks, links, and tables; defer readability extraction, `lxml`, and custom conversion. |
+| Decision                   | Impact                                           | Owner                 | Resolution                                                                                                                                                                         |
+| -------------------------- | ------------------------------------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Protocol policy            | Public security posture and redirect behavior.   | Product/runtime owner | Version 1 is HTTPS-only. Reject initial HTTP URLs and redirects to HTTP.                                                                                                           |
+| HTTP stack                 | Transport implementation and dependency scope.   | Product/runtime owner | Reuse the existing `httpx` dependency. Validate DNS results before every initial and redirect request; defer connection-level address pinning.                                     |
+| Destination classification | SSRF policy implementation.                      | Product/runtime owner | Use standard-library `ipaddress` with an allow-only-globally-routable policy.                                                                                                      |
+| HTML normalization         | Documentation-content fidelity and dependencies. | Product/runtime owner | Use `markdownify` with standard-library `html.parser`; require fixtures for headings, code blocks, links, and tables; defer readability extraction, `lxml`, and custom conversion. |
 
 ## Open Questions
 
-| Question | Impact | Blocking? | Owner | Resolution |
-| --- | --- | --- | --- | --- |
-| No additional unresolved question is recorded by this migration. | None known. | No | Maintainer | Not applicable |
+None.
 
 ## Acceptance and Planning Gate
 
@@ -1332,3 +1363,8 @@ Follow the project architecture, typing, logging, secret-safety, and validation 
 - Always: Preserve the explicit safety and ownership constraints in this specification.
 - Ask first: Expand scope, introduce dependencies, or change public contracts.
 - Never: Bypass documented security, privacy, or architecture boundaries.
+
+## Revision and Handoff Notes
+
+- September 10, 2026: Normalized this canonical specification to the local specification-template structure. This is a documentation-structure change only: it preserves the recorded accepted behavior, decisions, and acceptance evidence.
+- Next authorized step: Maintain or plan changes in conformance with this accepted specification; any material change requires an updated and re-confirmed specification.

@@ -7,6 +7,7 @@
 - Accepted by: Maintainer
 - Accepted on: September 9, 2026
 - Revision: Accepted production-runtime dependency clarification on September 9, 2026.
+- Acceptance basis: The recorded acceptance, accepted revision, and accepting role in this Status section.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the coding-agent session product
@@ -81,6 +82,22 @@ replacement for the provider-neutral runtime and tool contracts.
 - Autonomous Git commit, push, branch, rebase, merge, or release actions.
 - Enabling public web access or Agent Skill script execution by default.
 - Replacing tool-specific contracts with a broad, implicit "agent permission."
+
+## Requirements
+
+- R1: The system must provide the observable behavior, interface, and failure
+  semantics defined in **Desired Behavior** and the detailed contract sections
+  below.
+  Basis: The accepted requirements recorded in this canonical specification.
+- R2: Implementation and maintenance must remain within the explicit **Scope**
+  and must not add excluded capabilities without a material specification revision.
+  Basis: The accepted scope and exclusions in this specification.
+- R3: In the affected workflow, implementation must preserve the safety,
+  architecture, privacy, and execution boundaries defined in this specification.
+  Basis: The accepted constraints and execution boundaries in this specification.
+- R4: Behavior changes must be verified against the applicable scenarios in
+  **Testing Strategy** and **Commands and Validation**.
+  Basis: The accepted validation expectations in this specification.
 
 ## Desired Behavior
 
@@ -250,7 +267,7 @@ Required deterministic offline coverage includes:
 7. No default test reads Codex credentials or calls a live backend.
 8. Normal CLI composition uses its production runtime factory when no test
    override is supplied; it does not raise `coding-agent session runtime is not
-   configured`.
+configured`.
 9. Offline Codex tool-aware fixtures verify normalized transcript continuity and
    tool-call/result ID preservation before session wiring is considered complete.
 
@@ -261,14 +278,30 @@ outside the default test suite and CI.
 
 ## Commands and Validation
 
-| Check | Command or procedure | Applicability |
-| --- | --- | --- |
-| Documentation | Review links, command status, and tool-policy statements for consistency with primitive specs. | Required now |
-| Format | `uv run ruff format --check .` | Required when Python changes are implemented |
-| Lint | `uv run ruff check .` | Required when Python changes are implemented |
-| Type check | `uv run ty check src tests` | Required when Python changes are implemented |
-| Tests | `uv run pytest` | Required when Python changes are implemented |
-| Live smoke test | Explicit opt-in only, in a disposable workspace after `codex login`. | Not part of default CI |
+| Check           | Command or procedure                                                                           | Applicability                                |
+| --------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Documentation   | Review links, command status, and tool-policy statements for consistency with primitive specs. | Required now                                 |
+| Format          | `uv run ruff format --check .`                                                                 | Required when Python changes are implemented |
+| Lint            | `uv run ruff check .`                                                                          | Required when Python changes are implemented |
+| Type check      | `uv run ty check src tests`                                                                    | Required when Python changes are implemented |
+| Tests           | `uv run pytest`                                                                                | Required when Python changes are implemented |
+| Live smoke test | Explicit opt-in only, in a disposable workspace after `codex login`.                           | Not part of default CI                       |
+
+## Constraints and Execution Boundaries
+
+The binding technical, architectural, safety, privacy, and operational constraints
+remain the detailed contracts in this specification, including its constraints or
+boundaries sections and the explicit **Execution Boundaries** section below. The
+project rules under `.clinerules/` are binding for implementation and validation.
+
+## Acceptance Checks
+
+| ID  | Requirement | Conditions and action                                                                | Expected observable result                                                          | Verification method                                                    |
+| --- | ----------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| AC1 | R1          | Execute the applicable normal and failure-path scenarios from the detailed contract. | Results match the specified success, error, and output semantics.                   | Focused acceptance scenarios and tests listed in **Testing Strategy**. |
+| AC2 | R2          | Review the change against **Scope** and explicit exclusions.                         | No excluded capability or unauthorized scope expansion is introduced.               | Specification and code review.                                         |
+| AC3 | R3          | Exercise applicable boundary, containment, and denial cases.                         | The system fails closed and preserves the specified safety and architecture guards. | Boundary-focused tests and review against the detailed constraints.    |
+| AC4 | R4          | Run the applicable validation commands and procedures.                               | Required validation evidence is produced without unauthorized live dependencies.    | **Commands and Validation** and **Testing Strategy**.                  |
 
 ## Success Criteria
 
@@ -289,10 +322,10 @@ outside the default test suite and CI.
 
 ## Open Questions
 
-| Question | Impact | Blocking? | Owner | Resolution |
-| --- | --- | --- | --- | --- |
-| Should a non-interactive `--read-only` session be included in Version 1? | May support CI-like investigation without terminal interaction. | No | Maintainer | Deferred; interactive terminal session is the accepted first surface. |
-| How does the production session retain tool-turn continuity? | Required Codex adapter and runtime composition boundary. | No | Maintainer | Resolved: use the client-managed normalized transcript in ADR 0011; opaque provider identifiers are adapter-private only. |
+| Question                                                                 | Impact                                                          | Blocking? | Owner      | Resolution                                                                                                                |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------- | --------- | ---------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Should a non-interactive `--read-only` session be included in Version 1? | May support CI-like investigation without terminal interaction. | No        | Maintainer | Deferred; interactive terminal session is the accepted first surface.                                                     |
+| How does the production session retain tool-turn continuity?             | Required Codex adapter and runtime composition boundary.        | No        | Maintainer | Resolved: use the client-managed normalized transcript in ADR 0011; opaque provider identifiers are adapter-private only. |
 
 ## Acceptance and Planning Gate
 
@@ -310,3 +343,8 @@ suite and keep live Codex validation explicitly opt-in.
 - Never: Treat terminal interaction as blanket authorization, bypass patch
   approval through commands, expose secrets, or make live model access part of
   default tests or CI.
+
+## Revision and Handoff Notes
+
+- September 10, 2026: Normalized this canonical specification to the local specification-template structure. This is a documentation-structure change only: it preserves the recorded accepted behavior, decisions, and acceptance evidence.
+- Next authorized step: Maintain or plan changes in conformance with this accepted specification; any material change requires an updated and re-confirmed specification.

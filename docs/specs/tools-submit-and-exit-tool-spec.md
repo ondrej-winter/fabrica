@@ -10,6 +10,7 @@
   verification, interaction, and blocked-result decisions; the same revision also
   specifies the atomic completion commit boundary, conflict-safe idempotency,
   mandatory terminal batching, and bounded required-completion reminders.
+- Acceptance basis: The recorded acceptance, accepted revision, and accepting role in this Status section.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
@@ -112,6 +113,22 @@ Unlike `ask_question`, `submit_and_exit` is terminal. It transitions a run from
 ### Out of Scope
 
 The detailed exclusions already recorded below remain authoritative.
+
+## Requirements
+
+- R1: The system must provide the observable behavior, interface, and failure
+  semantics defined in **Desired Behavior** and the detailed contract sections
+  below.
+  Basis: The accepted requirements recorded in this canonical specification.
+- R2: Implementation and maintenance must remain within the explicit **Scope**
+  and must not add excluded capabilities without a material specification revision.
+  Basis: The accepted scope and exclusions in this specification.
+- R3: In the affected workflow, implementation must preserve the safety,
+  architecture, privacy, and execution boundaries defined in this specification.
+  Basis: The accepted constraints and execution boundaries in this specification.
+- R4: Behavior changes must be verified against the applicable scenarios in
+  **Testing Strategy** and **Commands and Validation**.
+  Basis: The accepted validation expectations in this specification.
 
 ## Desired Behavior
 
@@ -968,15 +985,15 @@ Required future acceptance tests include the following scenarios.
 
 ## Commands and Validation
 
-| Check | Command or procedure | Applicability |
-| --- | --- | --- |
-| Format | `uv run ruff format --check .` | Required for implementation changes |
-| Lint | `uv run ruff check .` | Required for implementation changes |
-| Type check | `uv run ty check src tests` | Required for implementation changes |
-| Tests | `uv run pytest` | Required for implementation changes |
-| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
-| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
-| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
+| Check                      | Command or procedure                                                                        | Applicability                       |
+| -------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Format                     | `uv run ruff format --check .`                                                              | Required for implementation changes |
+| Lint                       | `uv run ruff check .`                                                                       | Required for implementation changes |
+| Type check                 | `uv run ty check src tests`                                                                 | Required for implementation changes |
+| Tests                      | `uv run pytest`                                                                             | Required for implementation changes |
+| Documentation              | Review this specification and its internal references for accuracy and consistency.         | Required                            |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration.                 | Not applicable by default           |
+| Manual acceptance          | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts                 |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 
@@ -1013,6 +1030,22 @@ adapters.
 - Never create more than one accepted completion record for a run.
 - Never show executor acknowledgement prose as duplicate final output.
 
+## Constraints and Execution Boundaries
+
+The binding technical, architectural, safety, privacy, and operational constraints
+remain the detailed contracts in this specification, including its constraints or
+boundaries sections and the explicit **Execution Boundaries** section below. The
+project rules under `.clinerules/` are binding for implementation and validation.
+
+## Acceptance Checks
+
+| ID  | Requirement | Conditions and action                                                                | Expected observable result                                                          | Verification method                                                    |
+| --- | ----------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| AC1 | R1          | Execute the applicable normal and failure-path scenarios from the detailed contract. | Results match the specified success, error, and output semantics.                   | Focused acceptance scenarios and tests listed in **Testing Strategy**. |
+| AC2 | R2          | Review the change against **Scope** and explicit exclusions.                         | No excluded capability or unauthorized scope expansion is introduced.               | Specification and code review.                                         |
+| AC3 | R3          | Exercise applicable boundary, containment, and denial cases.                         | The system fails closed and preserves the specified safety and architecture guards. | Boundary-focused tests and review against the detailed constraints.    |
+| AC4 | R4          | Run the applicable validation commands and procedures.                               | Required validation evidence is produced without unauthorized live dependencies.    | **Commands and Validation** and **Testing Strategy**.                  |
+
 ## Success Criteria
 
 - The spec defines `submit_and_exit` as the terminal run-completion orchestration
@@ -1038,18 +1071,22 @@ adapters.
 
 ## Resolved Version 1 Decisions
 
-| Decision | Resolution |
-| --- | --- |
-| Verification evidence | `verification="verified"` remains a model declaration. Hosts may apply optional `CompletionGuard` policy checks; Version 1 neither requires evidence references nor mandates runtime validation of tool history. |
-| Outcome enum | Exactly `completed`, `partial`, and `blocked`; Version 1 does not add `failed`. |
-| Verification enum | Exactly `verified`, `not_verified`, and `not_applicable`; Version 1 does not add `failed` or `not_run`. |
-| Completed but not verified | Valid. The summary must disclose material failed, unavailable, or incomplete verification; hosts may enforce stricter policy through a completion guard. |
-| Terminal batching | `submit_and_exit` must be the sole tool call in its model turn. A mixed batch is rejected in full before any call executes. |
-| Interactive task runs | Hosts may expose both `ask_question` and `submit_and_exit`. `ask_question` pauses for material user input; `submit_and_exit` remains the terminal action after the run resumes. Headless hosts may omit `ask_question`. |
-| Final content | `summary` is the sole model-provided final text and the canonical user-facing response. |
-| Changed files | No Version 1 completion-input field. A host may separately surface trustworthy run-scoped mutation provenance when it has it. |
-| Verification commands | No Version 1 completion-input field. Hosts may retain run-scoped tool history for diagnostics or completion guards. |
-| Blocked results | Every legitimate agent-reported blocker completes through `submit_and_exit(outcome="blocked")`. Provider, transport, persistence, invariant, and cancellation failures use runtime terminal states such as `ERROR` or `CANCELLED`. |
+| Decision                   | Resolution                                                                                                                                                                                                                         |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Verification evidence      | `verification="verified"` remains a model declaration. Hosts may apply optional `CompletionGuard` policy checks; Version 1 neither requires evidence references nor mandates runtime validation of tool history.                   |
+| Outcome enum               | Exactly `completed`, `partial`, and `blocked`; Version 1 does not add `failed`.                                                                                                                                                    |
+| Verification enum          | Exactly `verified`, `not_verified`, and `not_applicable`; Version 1 does not add `failed` or `not_run`.                                                                                                                            |
+| Completed but not verified | Valid. The summary must disclose material failed, unavailable, or incomplete verification; hosts may enforce stricter policy through a completion guard.                                                                           |
+| Terminal batching          | `submit_and_exit` must be the sole tool call in its model turn. A mixed batch is rejected in full before any call executes.                                                                                                        |
+| Interactive task runs      | Hosts may expose both `ask_question` and `submit_and_exit`. `ask_question` pauses for material user input; `submit_and_exit` remains the terminal action after the run resumes. Headless hosts may omit `ask_question`.            |
+| Final content              | `summary` is the sole model-provided final text and the canonical user-facing response.                                                                                                                                            |
+| Changed files              | No Version 1 completion-input field. A host may separately surface trustworthy run-scoped mutation provenance when it has it.                                                                                                      |
+| Verification commands      | No Version 1 completion-input field. Hosts may retain run-scoped tool history for diagnostics or completion guards.                                                                                                                |
+| Blocked results            | Every legitimate agent-reported blocker completes through `submit_and_exit(outcome="blocked")`. Provider, transport, persistence, invariant, and cancellation failures use runtime terminal states such as `ERROR` or `CANCELLED`. |
+
+## Open Questions
+
+None.
 
 ## Acceptance and Planning Gate
 
@@ -1066,3 +1103,8 @@ Follow the project architecture, typing, logging, secret-safety, and validation 
 - Specification: This file under `docs/specs/`.
 - Source and test ownership: The detailed architecture section in this specification remains authoritative.
 - Documentation ownership: `docs/specs/` and the relevant documentation indexes.
+
+## Revision and Handoff Notes
+
+- September 10, 2026: Normalized this canonical specification to the local specification-template structure. This is a documentation-structure change only: it preserves the recorded accepted behavior, decisions, and acceptance evidence.
+- Next authorized step: Maintain or plan changes in conformance with this accepted specification; any material change requires an updated and re-confirmed specification.

@@ -7,6 +7,7 @@
 - Accepted by: Product interview
 - Accepted on: September 2, 2026
 - Revision: Snapshot-safety adapter conformance synchronized on September 4, 2026.
+- Acceptance basis: The recorded acceptance, accepted revision, and accepting role in this Status section.
 - Supersedes: Not applicable.
 
 This document is the canonical source of truth for the requirements it defines. Derived plans and implementation must preserve its objective, constraints, execution boundaries, and success criteria; material changes require an updated and re-confirmed specification.
@@ -896,15 +897,15 @@ ambient model tools.
 
 ## Commands and Validation
 
-| Check | Command or procedure | Applicability |
-| --- | --- | --- |
-| Format | `uv run ruff format --check .` | Required for implementation changes |
-| Lint | `uv run ruff check .` | Required for implementation changes |
-| Type check | `uv run ty check src tests` | Required for implementation changes |
-| Tests | `uv run pytest` | Required for implementation changes |
-| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
-| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration. | Not applicable by default |
-| Manual acceptance | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts |
+| Check                      | Command or procedure                                                                        | Applicability                       |
+| -------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Format                     | `uv run ruff format --check .`                                                              | Required for implementation changes |
+| Lint                       | `uv run ruff check .`                                                                       | Required for implementation changes |
+| Type check                 | `uv run ty check src tests`                                                                 | Required for implementation changes |
+| Tests                      | `uv run pytest`                                                                             | Required for implementation changes |
+| Documentation              | Review this specification and its internal references for accuracy and consistency.         | Required                            |
+| Migration or compatibility | Not applicable unless this specification explicitly introduces a migration.                 | Not applicable by default           |
+| Manual acceptance          | Obtain documented human acceptance before implementation planning when the status is Draft. | Required for drafts                 |
 
 Documentation-only changes should be reviewed for clarity and consistency.
 Implementation changes should use the project quality gate:
@@ -919,6 +920,22 @@ Implementation changes should use the project quality gate:
 Manual verification for implementation changes may use a temporary local git
 repository with staged changes, unstaged tracked changes, branches, and sample
 commits.
+
+## Constraints and Execution Boundaries
+
+The binding technical, architectural, safety, privacy, and operational constraints
+remain the detailed contracts in this specification, including its constraints or
+boundaries sections and the explicit **Execution Boundaries** section below. The
+project rules under `.clinerules/` are binding for implementation and validation.
+
+## Acceptance Checks
+
+| ID  | Requirement | Conditions and action                                                                | Expected observable result                                                          | Verification method                                                    |
+| --- | ----------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| AC1 | R1          | Execute the applicable normal and failure-path scenarios from the detailed contract. | Results match the specified success, error, and output semantics.                   | Focused acceptance scenarios and tests listed in **Testing Strategy**. |
+| AC2 | R2          | Review the change against **Scope** and explicit exclusions.                         | No excluded capability or unauthorized scope expansion is introduced.               | Specification and code review.                                         |
+| AC3 | R3          | Exercise applicable boundary, containment, and denial cases.                         | The system fails closed and preserves the specified safety and architecture guards. | Boundary-focused tests and review against the detailed constraints.    |
+| AC4 | R4          | Run the applicable validation commands and procedures.                               | Required validation evidence is produced without unauthorized live dependencies.    | **Commands and Validation** and **Testing Strategy**.                  |
 
 ## Success Criteria
 
@@ -950,9 +967,7 @@ The detailed exclusions already recorded below remain authoritative.
 
 ## Open Questions
 
-| Question | Impact | Blocking? | Owner | Resolution |
-| --- | --- | --- | --- | --- |
-| No additional unresolved question is recorded by this migration. | None known. | No | Maintainer | Not applicable |
+None.
 
 ## Acceptance and Planning Gate
 
@@ -976,6 +991,22 @@ The detailed workflow, architecture, and safety context in this specification re
 
 - The existing detailed requirements remain valid unless explicitly superseded by an accepted revision.
 
+## Requirements
+
+- R1: The system must provide the observable behavior, interface, and failure
+  semantics defined in **Desired Behavior** and the detailed contract sections
+  below.
+  Basis: The accepted requirements recorded in this canonical specification.
+- R2: Implementation and maintenance must remain within the explicit **Scope**
+  and must not add excluded capabilities without a material specification revision.
+  Basis: The accepted scope and exclusions in this specification.
+- R3: In the affected workflow, implementation must preserve the safety,
+  architecture, privacy, and execution boundaries defined in this specification.
+  Basis: The accepted constraints and execution boundaries in this specification.
+- R4: Behavior changes must be verified against the applicable scenarios in
+  **Testing Strategy** and **Commands and Validation**.
+  Basis: The accepted validation expectations in this specification.
+
 ## Desired Behavior
 
 The detailed behavioral contract in this specification defines the required observable outcomes and failure behavior.
@@ -985,3 +1016,8 @@ The detailed behavioral contract in this specification defines the required obse
 - Specification: This file under `docs/specs/`.
 - Source and test ownership: The detailed architecture section in this specification remains authoritative.
 - Documentation ownership: `docs/specs/` and the relevant documentation indexes.
+
+## Revision and Handoff Notes
+
+- September 10, 2026: Normalized this canonical specification to the local specification-template structure. This is a documentation-structure change only: it preserves the recorded accepted behavior, decisions, and acceptance evidence.
+- Next authorized step: Maintain or plan changes in conformance with this accepted specification; any material change requires an updated and re-confirmed specification.

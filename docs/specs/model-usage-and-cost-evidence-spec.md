@@ -8,8 +8,8 @@
   implemented in conformance with this accepted Version 1 contract.
 - Accepted by: Maintainer.
 - Accepted on: September 4, 2026.
-- Revision: Accepted Version 1 evidence-boundary clarification on September 4,
-  2026.
+- Revision: Accepted Version 1 evidence-boundary clarification on September 4, 2026.
+- Acceptance basis: The recorded acceptance, accepted revision, and accepting role in this Status section.
 - Supersedes: Draft — unconfirmed model-usage-and-cost-evidence specification.
 
 This document is the canonical source of truth for the requirements it defines.
@@ -82,6 +82,22 @@ source attribution, confidence, and explicit non-monetary pricing state.
 - Billing-page scraping, raw provider-payload persistence, or account-private
   billing evidence.
 - Live Codex probes in default local tests, CI, or quality gates.
+
+## Requirements
+
+- R1: The system must provide the observable behavior, interface, and failure
+  semantics defined in **Desired Behavior** and the detailed contract sections
+  below.
+  Basis: The accepted requirements recorded in this canonical specification.
+- R2: Implementation and maintenance must remain within the explicit **Scope**
+  and must not add excluded capabilities without a material specification revision.
+  Basis: The accepted scope and exclusions in this specification.
+- R3: In the affected workflow, implementation must preserve the safety,
+  architecture, privacy, and execution boundaries defined in this specification.
+  Basis: The accepted constraints and execution boundaries in this specification.
+- R4: Behavior changes must be verified against the applicable scenarios in
+  **Testing Strategy** and **Commands and Validation**.
+  Basis: The accepted validation expectations in this specification.
 
 ## Desired Behavior
 
@@ -235,14 +251,14 @@ specification establishes a distinct use-case family.
 
 ## Commands and Validation
 
-| Check | Command or procedure | Applicability |
-| --- | --- | --- |
-| Format | `uv run ruff format --check .` | Required for implementation changes |
-| Lint | `uv run ruff check .` | Required for implementation changes |
-| Type check | `uv run ty check src tests` | Required for implementation changes |
-| Tests | `uv run pytest` | Required for implementation changes |
-| Documentation | Review this specification and its internal references for accuracy and consistency. | Required |
-| Manual acceptance | Recorded in this specification's Status section. | Completed |
+| Check             | Command or procedure                                                                | Applicability                       |
+| ----------------- | ----------------------------------------------------------------------------------- | ----------------------------------- |
+| Format            | `uv run ruff format --check .`                                                      | Required for implementation changes |
+| Lint              | `uv run ruff check .`                                                               | Required for implementation changes |
+| Type check        | `uv run ty check src tests`                                                         | Required for implementation changes |
+| Tests             | `uv run pytest`                                                                     | Required for implementation changes |
+| Documentation     | Review this specification and its internal references for accuracy and consistency. | Required                            |
+| Manual acceptance | Recorded in this specification's Status section.                                    | Completed                           |
 
 Focused implementation checks should include:
 
@@ -300,6 +316,22 @@ and excluded from default local and CI validation.
 - Generic quota unit/scope normalization and cross-provider quota comparison.
 - A production second-provider adapter or reusable provider-adapter contract.
 
+## Constraints and Execution Boundaries
+
+The binding technical, architectural, safety, privacy, and operational constraints
+remain the detailed contracts in this specification, including its constraints or
+boundaries sections and the explicit **Execution Boundaries** section below. The
+project rules under `.clinerules/` are binding for implementation and validation.
+
+## Acceptance Checks
+
+| ID  | Requirement | Conditions and action                                                                | Expected observable result                                                          | Verification method                                                    |
+| --- | ----------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| AC1 | R1          | Execute the applicable normal and failure-path scenarios from the detailed contract. | Results match the specified success, error, and output semantics.                   | Focused acceptance scenarios and tests listed in **Testing Strategy**. |
+| AC2 | R2          | Review the change against **Scope** and explicit exclusions.                         | No excluded capability or unauthorized scope expansion is introduced.               | Specification and code review.                                         |
+| AC3 | R3          | Exercise applicable boundary, containment, and denial cases.                         | The system fails closed and preserves the specified safety and architecture guards. | Boundary-focused tests and review against the detailed constraints.    |
+| AC4 | R4          | Run the applicable validation commands and procedures.                               | Required validation evidence is produced without unauthorized live dependencies.    | **Commands and Validation** and **Testing Strategy**.                  |
+
 ## Success Criteria
 
 - The contract separates provider-neutral usage and pricing-state evidence from
@@ -320,12 +352,15 @@ and excluded from default local and CI validation.
 
 ## Open Questions
 
-| Question | Impact | Blocking? | Owner | Resolution |
-| --- | --- | --- | --- | --- |
-| No open Version 1 questions remain. | None known. | No | Maintainer | Resolved through Version 1 acceptance on September 4, 2026. |
+None.
 
 ## Acceptance and Planning Gate
 
 This accepted Version 1 specification may be handed to implementation planning.
 Any plan must preserve the non-monetary pricing boundary and treat the listed
 Version 1 conformance work as required before claiming full conformance.
+
+## Revision and Handoff Notes
+
+- September 10, 2026: Normalized this canonical specification to the local specification-template structure. This is a documentation-structure change only: it preserves the recorded accepted behavior, decisions, and acceptance evidence.
+- Next authorized step: Maintain or plan changes in conformance with this accepted specification; any material change requires an updated and re-confirmed specification.

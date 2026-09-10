@@ -10,9 +10,10 @@ ownership, validation expectations, and preserved historical decisions.
 
 Every `*-spec.md` is a canonical requirements artifact and follows the local
 `spec-driven-development` template. Each specification must record its status,
-acceptance evidence, revision, assumptions, desired behavior, explicit scope,
-validation, structure, constraints, execution boundaries, success criteria, and
-open-question ownership.
+acceptance evidence, revision, objective and context, explicit scope, assessable
+requirements, constraints and execution boundaries, acceptance checks, held
+assumptions, open questions, and revision/handoff notes. Detailed legacy sections
+remain authoritative for the contract they elaborate.
 
 - **Accepted** specifications may be handed to planning. A derived plan belongs
   under `docs/plans/` by default and must not redefine the specification.
