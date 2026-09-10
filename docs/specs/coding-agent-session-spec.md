@@ -41,9 +41,9 @@ replacement for the provider-neutral runtime and tool contracts.
 - The public `fabrica run` command currently performs one direct runtime prompt
   with optional selected-skill context. It does not expose a workspace coding tool
   loop, terminal interaction transport, or terminal patch-approval host.
-- The `fabrica agent` CLI command and its terminal/session components are present,
-  but the normal path currently fails closed because it has no production
-  tool-aware Codex runtime composition.
+- The `fabrica agent` CLI command composes the production tool-aware Codex runtime,
+  terminal interaction and approval adapters, a filtered command environment, and
+  workspace-bound tools after workspace validation.
 - ADR 0010 records the decision to ship this composition as a terminal-hosted,
   workspace-scoped product workflow.
 - ADR 0011 records the client-managed normalized transcript boundary required for
@@ -65,8 +65,7 @@ replacement for the provider-neutral runtime and tool contracts.
 
 ### In Scope
 
-- A planned first-class `fabrica agent` command; the concrete name is accepted as
-  `agent` for Version 1.
+- A first-class `fabrica agent` command for Version 1.
 - Explicit workspace selection, tool exposure, terminal interaction, approval
   behavior, safe defaults, session output, and validation requirements.
 - Composition of existing primitives into one tool-aware Codex-backed session.
@@ -101,7 +100,7 @@ replacement for the provider-neutral runtime and tool contracts.
 
 ## Desired Behavior
 
-The planned command shape is:
+The command shape is:
 
 ```bash
 uv run fabrica agent --workspace /absolute/path/to/repository --prompt "Fix the failing parser test"
@@ -322,17 +321,21 @@ project rules under `.clinerules/` are binding for implementation and validation
 
 ## Open Questions
 
-| Question                                                                 | Impact                                                          | Blocking? | Owner      | Resolution                                                                                                                |
-| ------------------------------------------------------------------------ | --------------------------------------------------------------- | --------- | ---------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Should a non-interactive `--read-only` session be included in Version 1? | May support CI-like investigation without terminal interaction. | No        | Maintainer | Deferred; interactive terminal session is the accepted first surface.                                                     |
-| How does the production session retain tool-turn continuity?             | Required Codex adapter and runtime composition boundary.        | No        | Maintainer | Resolved: use the client-managed normalized transcript in ADR 0011; opaque provider identifiers are adapter-private only. |
+| Question                                                                 | Impact                                                          | Blocking? | Owner      | Resolution                                                            |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------- | --------- | ---------- | --------------------------------------------------------------------- |
+| Should a non-interactive `--read-only` session be included in Version 1? | May support CI-like investigation without terminal interaction. | No        | Maintainer | Deferred; interactive terminal session is the accepted first surface. |
 
 ## Acceptance and Planning Gate
 
-This accepted specification is implemented. The Version 1 command-permission,
-patch-preview, default-Codex-configuration, and transcript continuity decisions
-are recorded above. Ongoing work must preserve the offline deterministic test
-suite and keep live Codex validation explicitly opt-in.
+This accepted specification is implemented and verified by deterministic offline
+CLI, composition, primitive-boundary, and inspect/edit/validate integration
+coverage. The Version 1 command-permission mapping is `DENY` for shell,
+interactive/background, and Git forms, then `REQUIRE_APPROVAL` for every eligible
+argv command; no Version 1 command receives blanket `ALLOW`. Patch approval uses
+the existing bounded preview, affected paths, derived effects, and exact plan
+digest; unified-diff rendering remains intentionally deferred. Ongoing work must
+preserve the offline deterministic suite and keep live Codex validation explicitly
+opt-in.
 
 ## Execution Boundaries
 
@@ -347,4 +350,8 @@ suite and keep live Codex validation explicitly opt-in.
 ## Revision and Handoff Notes
 
 - September 10, 2026: Normalized this canonical specification to the local specification-template structure. This is a documentation-structure change only: it preserves the recorded accepted behavior, decisions, and acceptance evidence.
+- September 10, 2026: Recorded the implemented production tool-aware runtime,
+  Version 1 per-command admission mapping, digest-bound no-unified-diff patch
+  approval, deterministic offline session coverage, and explicitly opt-in live
+  smoke validation.
 - Next authorized step: Maintain or plan changes in conformance with this accepted specification; any material change requires an updated and re-confirmed specification.

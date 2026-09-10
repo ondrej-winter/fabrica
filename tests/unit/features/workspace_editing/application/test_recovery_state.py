@@ -1,5 +1,6 @@
 """Tests for apply-patch journal and recovery state contracts."""
 
+import pickle
 from dataclasses import FrozenInstanceError
 from typing import cast
 
@@ -78,6 +79,22 @@ def test_journal_records_are_immutable_and_copy_metadata() -> None:
     frozen_field = "state"
     with pytest.raises(FrozenInstanceError):
         setattr(record, frozen_field, PatchJournalState.COMMITTED)
+
+
+def test_helper_process_journal_round_trips_immutable_metadata_through_pickle() -> None:
+    """Keep supervised helper-process journal inputs serializable under spawn."""
+    record = PatchJournalRecord(
+        journal_digest=SHA256_A,
+        plan_digest=SHA256_B,
+        state=PatchJournalState.PREPARING,
+        metadata={"workspace": "primary"},
+    )
+
+    restored = pickle.loads(pickle.dumps(record))  # noqa: S301
+
+    assert restored == record
+    with pytest.raises(TypeError):
+        cast("dict[str, object]", restored.metadata)["workspace"] = "changed"
 
 
 def test_recovery_decision_invariants_match_mutation_guarantees() -> None:

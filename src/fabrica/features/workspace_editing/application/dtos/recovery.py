@@ -91,6 +91,31 @@ class PatchJournalRecord:
         object.__setattr__(self, "rollback_entries", tuple(self.rollback_entries))
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
+    def __reduce__(
+        self,
+    ) -> tuple[
+        object,
+        tuple[
+            str,
+            str,
+            PatchJournalState,
+            tuple[PatchDirectoryOutcome, ...],
+            tuple[PatchPathOutcome, ...],
+            tuple[PatchRollbackEntry, ...],
+            dict[str, SafePatchMetadataValue],
+        ],
+    ]:
+        """Serialize immutable metadata safely for supervised helper processes."""
+        return type(self), (
+            self.journal_digest,
+            self.plan_digest,
+            self.state,
+            self.created_directories,
+            self.path_outcomes,
+            self.rollback_entries,
+            dict(self.metadata),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class PatchRollbackEntry:

@@ -28,7 +28,7 @@ live validation rules belong in
 `docs/specs/codex-transport-spec.md`. Provider-neutral usage and pricing evidence
 belongs in `docs/specs/model-usage-and-cost-evidence-spec.md`.
 
-- The accepted, planned terminal-hosted product composition of the runtime and
+- The accepted, implemented terminal-hosted product composition of the runtime and
   workspace tools belongs in `docs/specs/coding-agent-session-spec.md`; it does
   not promote all runtime composition APIs to default CLI capabilities.
 

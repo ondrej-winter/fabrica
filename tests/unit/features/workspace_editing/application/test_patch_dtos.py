@@ -1,5 +1,6 @@
 """Tests for apply-patch application DTO contracts."""
 
+import pickle
 from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime
 from typing import cast
@@ -127,6 +128,34 @@ def test_patch_dtos_are_immutable_and_copy_container_inputs() -> None:
     )
     with pytest.raises(FrozenInstanceError):
         result.status = PatchResultStatus.REJECTED  # ty: ignore[invalid-assignment]
+
+
+def test_helper_process_dtos_round_trip_immutable_metadata_through_pickle() -> None:
+    """Keep helper-process plan inputs and results serializable under spawn."""
+    evidence = PatchPathEvidence(
+        path="src/example.py",
+        exists=True,
+        content_digest=SHA256_A,
+        metadata={"mode": "100644"},
+    )
+    error = PatchError(
+        code="IO_ERROR",
+        phase=PatchErrorPhase.COMMIT,
+        retryable=False,
+        mutation_guarantee=PatchMutationGuarantee.PARTIAL_OR_UNCERTAIN_MUTATION,
+        runtime_mapping=PatchRuntimeMapping.FATAL,
+        metadata={"path": "src/example.py"},
+    )
+
+    restored_evidence = pickle.loads(pickle.dumps(evidence))  # noqa: S301
+    restored_error = pickle.loads(pickle.dumps(error))  # noqa: S301
+
+    assert restored_evidence == evidence
+    assert restored_error == error
+    with pytest.raises(TypeError):
+        cast("dict[str, object]", restored_evidence.metadata)["mode"] = "changed"
+    with pytest.raises(TypeError):
+        cast("dict[str, object]", restored_error.metadata)["path"] = "changed"
 
 
 def test_patch_limits_and_paths_reject_invalid_inputs() -> None:

@@ -261,6 +261,10 @@ class PatchPathEvidence:
             _validate_digest(self.identity_digest, field_name="identity_digest")
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
+    def __reduce__(self) -> tuple[object, tuple[str, bool, str | None, str | None, dict[str, SafePatchMetadataValue]]]:
+        """Serialize immutable metadata safely for supervised helper processes."""
+        return type(self), (self.path, self.exists, self.content_digest, self.identity_digest, dict(self.metadata))
+
 
 @dataclass(frozen=True, slots=True)
 class PatchDirectoryOutcome:
@@ -396,6 +400,31 @@ class PatchError:
             msg = "patch error message exceeds the safe error bound"
             raise ValueError(msg)
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+    def __reduce__(
+        self,
+    ) -> tuple[
+        object,
+        tuple[
+            str,
+            PatchErrorPhase,
+            bool,
+            PatchMutationGuarantee,
+            PatchRuntimeMapping,
+            str | None,
+            dict[str, SafePatchMetadataValue],
+        ],
+    ]:
+        """Serialize immutable metadata safely for supervised helper-process results."""
+        return type(self), (
+            self.code,
+            self.phase,
+            self.retryable,
+            self.mutation_guarantee,
+            self.runtime_mapping,
+            self.message,
+            dict(self.metadata),
+        )
 
 
 @dataclass(frozen=True, slots=True)

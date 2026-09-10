@@ -382,6 +382,93 @@ authenticate the Codex CLI first with `codex login`. Help and import paths are
 offline and do not read credentials, read skill roots, call backends, prompt for
 approval, or execute scripts.
 
+## Workspace coding-agent session
+
+`fabrica agent` runs an interactive, tool-aware coding session inside one
+explicitly selected local workspace:
+
+```bash
+uv run fabrica agent \
+  --workspace /absolute/path/to/repository \
+  --prompt "Inspect the failing parser test and propose a safe fix"
+```
+
+Both `--workspace` and `--prompt` are required. The CLI resolves the workspace
+before creating the runtime; it rejects missing paths, files, and non-directory
+workspaces before model I/O. Workspace tool paths remain relative to that
+canonical root.
+
+Use explicit skill context only when it is relevant to the requested work:
+
+```bash
+uv run fabrica agent \
+  --workspace /absolute/path/to/repository \
+  --prompt "Use the selected testing guidance to investigate this failure" \
+  --skill python-testing \
+  --resource python-testing:references/pytest.md \
+  --skill-root /absolute/path/to/skills
+```
+
+`--skill`, `--resource SKILL_ID:RESOURCE_ID`, and `--skill-root` may each be
+repeated. Supplying a skill root does not grant trust to every discovered skill,
+resource, or script; only the explicitly selected context is requested.
+
+### Tools and approvals
+
+With a successful workspace-mutation startup gate, Version 1 exposes exactly:
+
+```text
+read_files
+search_codebase
+run_commands
+apply_patch
+ask_question
+```
+
+`read_files` and `search_codebase` are bounded inspection tools.
+`ask_question` collects missing information or design choices; it is not an
+approval mechanism. `fetch_web_content`, Agent Skill scripts, Git workflow
+tools, commits, pushes, and generic shell escape hatches are not exposed by this
+command.
+
+Every permitted command requires separate terminal approval. Shell mode,
+interactive or background forms, and Git commands are denied before approval.
+The host approves the resolved command, not an open-ended task or a reusable
+authorization grant.
+
+Every patch is planned before visible filesystem effects. The terminal renders a
+bounded preview, affected workspace-relative paths, derived effects, and an
+immutable plan digest. Approval is bound to that exact digest; denial, EOF,
+Ctrl-C, or a changed plan does not authorize mutation. Version 1 does not render
+a unified diff for approval.
+
+If workspace recovery or capability verification cannot prove mutation safety,
+the session remains usable with its read-only tools and omits `apply_patch`. The
+final output states that mutation was unavailable and reports the structured gate
+reason. It does not claim that an edit was applied without committed patch
+evidence.
+
+The command prints final session and mutation-disposition evidence. Completed
+and completed-read-only sessions exit with `0`; cancellation exits with `130`;
+and failures exit with `3`.
+
+### Live smoke test
+
+Default tests are deterministic and offline: they do not read Codex credentials
+or contact a live backend. The coding-agent live smoke test is deliberately
+separate and uses a disposable workspace with a read-only `read_files` request.
+After authenticating the Codex CLI, run it explicitly:
+
+```bash
+codex login
+make test-live-agent-session
+```
+
+The target sets `FABRICA_RUN_LIVE_CODEX_TESTS=1` and runs only the `live_codex`
+marked coding-agent-session test. Keep any resulting diagnostics redacted; never
+copy Codex credentials, authorization data, or private workspace contents into
+logs, issue notes, or documentation.
+
 Selected Agent Skills markdown and non-script resources can be added explicitly:
 
 ```bash
@@ -641,13 +728,13 @@ persisted, printed, or logged by the runtime path. Runtime failures return
 normalized statuses and bounded, redacted observations.
 
 Still-deferred runtime work remains explicit: streaming support, OAuth refresh or
-credential mutation, production sandboxing, and UI entry points. The accepted
-first-class terminal coding-agent workflow is specified in
-[`docs/specs/coding-agent-session-spec.md`](docs/specs/coding-agent-session-spec.md),
-but `fabrica agent` is not implemented yet. Tool loops, PydanticAI-shaped
-composition proofs, and model-driven selected Agent Skills composition are
-documented below as explicit, bounded Python API paths rather than ambient runtime
-powers.
+credential mutation, broader production sandboxing, and additional UI entry
+points. The accepted first-class terminal coding-agent workflow is implemented as
+`fabrica agent` and specified in
+[`docs/specs/coding-agent-session-spec.md`](docs/specs/coding-agent-session-spec.md).
+Other tool loops, PydanticAI-shaped composition proofs, and model-driven selected
+Agent Skills composition remain explicit, bounded Python API paths rather than
+ambient runtime powers.
 
 ## Offline PydanticAI runtime compatibility proof
 
