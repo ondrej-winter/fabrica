@@ -84,7 +84,7 @@ class CommitMessageWorkflowOptions:
     git_commit_timeout_seconds: float = DEFAULT_GIT_COMMIT_TIMEOUT_SECONDS
     git_hash_lookup_timeout_seconds: float = DEFAULT_GIT_HASH_LOOKUP_TIMEOUT_SECONDS
     git_working_directory: Path | None = None
-    max_parallel_analysis: int = 4
+    max_parallel_analysis: int = 16
     verbose_diagnostics: bool = False
 
 
