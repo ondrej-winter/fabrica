@@ -54,7 +54,7 @@ immutable containers for repeated arguments.
 
 ## Alternatives considered
 
-| Option | Reason rejected |
-| ------ | --------------- |
+| Option                                                                       | Reason rejected                                                                                                                                                           |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Move command contribution contracts to an application-layer port immediately | The contracts are intentionally argparse-oriented and currently serve only CLI adapter composition. Moving them now would add abstraction without removing real coupling. |
-| Forbid feature adapters from importing all product CLI modules | This would require duplicating parser contribution mechanics or pushing argparse concepts into each feature, weakening the shared shell invariants. |
+| Forbid feature adapters from importing all product CLI modules               | This would require duplicating parser contribution mechanics or pushing argparse concepts into each feature, weakening the shared shell invariants.                       |

@@ -50,9 +50,9 @@ Silicon.
 
 ## Alternatives considered
 
-| Option | Reason rejected or deferred |
-| --- | --- |
-| Retain Linux Bubblewrap | It introduces a runtime dependency and namespace-capability requirement inconsistent with the package-only macOS path. |
-| Require Docker for Linux search | Docker is an external runtime with comparable operational friction and does not strengthen ordinary host execution. |
-| Descriptor-rooted Fabrica helper | Potentially restores stronger containment, but requires a dedicated security-reviewed native design and artifact pipeline. |
-| Discover or use host-installed ripgrep | Makes semantics, versioning, and trust vary by host. |
+| Option                                 | Reason rejected or deferred                                                                                                |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Retain Linux Bubblewrap                | It introduces a runtime dependency and namespace-capability requirement inconsistent with the package-only macOS path.     |
+| Require Docker for Linux search        | Docker is an external runtime with comparable operational friction and does not strengthen ordinary host execution.        |
+| Descriptor-rooted Fabrica helper       | Potentially restores stronger containment, but requires a dedicated security-reviewed native design and artifact pipeline. |
+| Discover or use host-installed ripgrep | Makes semantics, versioning, and trust vary by host.                                                                       |

@@ -91,20 +91,20 @@ tool output contracts remain authoritative.
 - [x] **CAS-04** Compose the workspace-scoped coding-agent runtime.
 - [x] **CAS-05** Add feature-owned `agent` CLI parsing, rendering, and exit codes.
   - [x] **CAS-05-AC-01** The feature-local registrar accepts `agent` with canonical
-    workspace and explicit skill/resource context.
+        workspace and explicit skill/resource context.
   - [x] **CAS-05-AC-02** Invalid workspace values are rejected before the injected
-    feature handler runs.
+        feature handler runs.
   - [x] **CAS-05-AC-03** The feature-local runner renders stable session evidence
-    and maps completed, cancelled, and failed results to stable exit codes.
+        and maps completed, cancelled, and failed results to stable exit codes.
   - [x] **CAS-05-V-01** Focused registration and runner tests pass with injected
-    streams and faked runtime dependencies.
+        streams and faked runtime dependencies.
 - [x] **CAS-06** Register bootstrap handlers and production composition.
   - [x] **CAS-06-AC-01** The public bootstrap CLI reaches `fabrica agent` with an
-    injected typed session-runtime override and injectable streams.
+        injected typed session-runtime override and injectable streams.
   - [x] **CAS-06-AC-02** The default terminal composition creates a Codex-backed
-    tool-aware runtime with only the Version 1 workspace and interaction tools.
+        tool-aware runtime with only the Version 1 workspace and interaction tools.
   - [x] **CAS-06-V-01** Focused bootstrap CLI and composition tests plus
-    import-linter contracts pass.
+        import-linter contracts pass.
 - [x] **CAS-07** Add deterministic offline tests and optional live-smoke scaffold.
 - [x] **CAS-08** Update user-facing documentation and specification status.
 - [x] **CAS-09** Run and record final validation.
@@ -244,8 +244,8 @@ tests/unit/features/agent_runtime/... or tests/unit/features/user_interaction/..
 ### Checkpoint A — Core host boundaries
 
 - [x] **CAS-CP-A** Confirm CAS-01 through CAS-03 expose no extra tools, preserve
-  cancellation/approval boundaries, and pass focused tests before production
-  workspace composition begins.
+      cancellation/approval boundaries, and pass focused tests before production
+      workspace composition begins.
 
 ### CAS-04 — Compose the workspace-scoped coding session
 
@@ -327,22 +327,22 @@ src/fabrica/features/coding_agent_session/adapters/inbound/cli/__init__.py
 **Acceptance criteria**
 
 - [x] **CAS-05-AC-01** The feature-local registrar accepts `agent`, requires
-  `--workspace` and `--prompt`, canonicalizes the workspace, and decodes explicit
-  `--skill`, `--resource`, and `--skill-root` context. Public `fabrica agent`
-  reachability is owned by CAS-06.
+      `--workspace` and `--prompt`, canonicalizes the workspace, and decodes explicit
+      `--skill`, `--resource`, and `--skill-root` context. Public `fabrica agent`
+      reachability is owned by CAS-06.
 - [x] **CAS-05-AC-02** Missing, non-existent, non-directory, or unresolvable
-  workspaces fail before the injected feature handler can construct or invoke a
-  model runtime.
+      workspaces fail before the injected feature handler can construct or invoke a
+      model runtime.
 - [x] **CAS-05-AC-03** CLI streams are injectable; the feature-local runner renders
-  session evidence and maps completed, cancelled, and failed results to stable
-  exit codes without requiring an actual terminal.
+      session evidence and maps completed, cancelled, and failed results to stable
+      exit codes without requiring an actual terminal.
 
 **Verification**
 
 - [x] **CAS-05-V-01** Run `uv run pytest --no-cov
-  tests/unit/features/coding_agent_session/adapters/inbound/cli`; expected result:
-  registration, decode, workspace-failure, output, and exit-code tests pass with
-  injected streams and fake runtime dependencies.
+tests/unit/features/coding_agent_session/adapters/inbound/cli`; expected result:
+      registration, decode, workspace-failure, output, and exit-code tests pass with
+      injected streams and fake runtime dependencies.
 
 **Evidence and status**
 
@@ -378,21 +378,21 @@ tests/integration/bootstrap/cli/test_entrypoint.py
 **Acceptance criteria**
 
 - [x] **CAS-06-AC-01** `fabrica agent` is reachable through the public CLI entry
-  point with a narrow `CodingAgentSessionRuntime` dependency override for
-  deterministic tests.
+      point with a narrow `CodingAgentSessionRuntime` dependency override for
+      deterministic tests.
 - [x] **CAS-06-AC-02** The default command uses
-  `create_terminal_workspace_coding_agent_session_runtime()`, which supplies the
-  Codex tool-aware model rather than the direct one-shot runtime alone.
+      `create_terminal_workspace_coding_agent_session_runtime()`, which supplies the
+      Codex tool-aware model rather than the direct one-shot runtime alone.
 - [x] **CAS-06-AC-03** Bootstrap owns cross-slice wiring and exposes only
-  `read_files`, `search_codebase`, `run_commands`, `apply_patch` when the mutation
-  gate enables it, and interactive `ask_question`; prohibited default tools remain
-  unwired.
+      `read_files`, `search_codebase`, `run_commands`, `apply_patch` when the mutation
+      gate enables it, and interactive `ask_question`; prohibited default tools remain
+      unwired.
 
 **Verification**
 
 - [x] **CAS-06-V-01** Ran `uv run pytest --no-cov
-  tests/unit/bootstrap/cli/test_coding_agent_session.py
-  tests/unit/bootstrap/composition/test_coding_agent_session.py` (7 passed).
+tests/unit/bootstrap/cli/test_coding_agent_session.py
+tests/unit/bootstrap/composition/test_coding_agent_session.py` (7 passed).
 - [x] **CAS-06-V-02** Ran `uv run lint-imports` (11 contracts kept, 0 broken).
 
 **Evidence and status**
@@ -409,8 +409,8 @@ tests/integration/bootstrap/cli/test_entrypoint.py
 ### Checkpoint B — First complete vertical slice
 
 - [x] **CAS-CP-B** Confirm the registered CLI can create a fully offline
-  workspace-scoped session, expose the intended tools, and report mutation-gate
-  fallback correctly before expanding edge-case coverage.
+      workspace-scoped session, expose the intended tools, and report mutation-gate
+      fallback correctly before expanding edge-case coverage.
 
 **Evidence and status**
 
@@ -439,16 +439,16 @@ tests/integration/features/coding_agent_session/test_live_coding_agent_session.p
 **Required coverage**
 
 1. [x] CLI rejects missing, non-existent, file, and invalid workspaces before
-   model I/O.
+       model I/O.
 2. [x] A successful composition exposes exactly the five Version 1 tools.
 3. [x] Mutation-gate failure omits `apply_patch` while retaining read-only tools
-   and produces accurate final evidence.
+       and produces accurate final evidence.
 4. [x] A scripted offline model performs inspect → approved digest-bound patch →
-   approved validation command.
+       approved validation command.
 5. [x] Patch denial, EOF, Ctrl-C, and changed-plan approval attempts do not
-   mutate workspace files.
+       mutate workspace files.
 6. [x] Command policy rejects disallowed or interactive execution; command
-   denial, timeout, and cancellation preserve the existing primitive behavior.
+       denial, timeout, and cancellation preserve the existing primitive behavior.
 7. [x] Pending questions are released or cancelled on terminal cancellation.
 8. [x] Default tests do not read Codex credentials or call a live backend.
 
@@ -464,12 +464,12 @@ guard, and document a dedicated non-default invocation by extending
 **Verification**
 
 - [x] **CAS-07-V-01** Ran `uv run pytest --no-cov
-  tests/unit/features/workspace_editing/application/test_patch_dtos.py
-  tests/unit/features/workspace_editing/application/test_recovery_state.py
-  tests/integration/features/coding_agent_session/test_coding_agent_session_composition.py
-  tests/integration/features/coding_agent_session/test_live_coding_agent_session.py` (30 passed, 1 skipped).
+tests/unit/features/workspace_editing/application/test_patch_dtos.py
+tests/unit/features/workspace_editing/application/test_recovery_state.py
+tests/integration/features/coding_agent_session/test_coding_agent_session_composition.py
+tests/integration/features/coding_agent_session/test_live_coding_agent_session.py` (30 passed, 1 skipped).
 - [x] **CAS-07-V-02** Ran focused Ruff and Ty checks plus `uv run lint-imports`;
-  all passed, with 11 import contracts kept.
+      all passed, with 11 import contracts kept.
 
 **Evidence and status**
 
@@ -533,11 +533,11 @@ docs/specs/coding-agent-session-spec.md
 **Verification**
 
 - [x] **CAS-08-V-01** Reviewed README and canonical-spec command, tool-policy,
-  approval, fallback, exit-status, and live-smoke statements against CLI
-  registration, terminal composition, and deterministic coverage.
+      approval, fallback, exit-status, and live-smoke statements against CLI
+      registration, terminal composition, and deterministic coverage.
 - [x] **CAS-08-V-02** Ran `uv run fabrica agent --help` and confirmed its required
-  `--workspace` / `--prompt` options plus repeatable `--skill`, `--resource`, and
-  `--skill-root` options; confirmed `make help` lists `test-live-agent-session`.
+      `--workspace` / `--prompt` options plus repeatable `--skill`, `--resource`, and
+      `--skill-root` options; confirmed `make help` lists `test-live-agent-session`.
 
 **Evidence and status**
 
@@ -576,16 +576,16 @@ quality gate.
 **Verification evidence**
 
 - [x] **CAS-09-V-01** `uv run ruff format --check .` passed: 804 files already
-  formatted.
+      formatted.
 - [x] **CAS-09-V-02** `uv run ruff check .` and `uv run ty check src tests`
-  passed without findings.
+      passed without findings.
 - [x] **CAS-09-V-03** `uv run lint-imports` passed: 11 contracts kept and none
-  broken.
+      broken.
 - [x] **CAS-09-V-04** `uv run pytest` passed: 2,294 passed, 4 skipped, and
-  97.53% total coverage.
+      97.53% total coverage.
 - [x] **CAS-09-V-05** `make quality` passed after the individual checks; its
-  configured Ruff, Ty, import-linter, and default offline pytest steps completed
-  without modifying source files.
+      configured Ruff, Ty, import-linter, and default offline pytest steps completed
+      without modifying source files.
 - [x] **CAS-09-V-06** `git diff --check` passed after validation.
 
 **Opt-in validation not run**
@@ -609,8 +609,8 @@ quality gate.
 ### Final Checkpoint
 
 - [x] **CAS-CP-FINAL** All tasks, acceptance criteria, and required validation are
-  complete; `fabrica agent` is documented, workspace-scoped, tool-aware,
-  approval-bound, fail-closed for mutation, and fully covered by offline tests.
+      complete; `fabrica agent` is documented, workspace-scoped, tool-aware,
+      approval-bound, fail-closed for mutation, and fully covered by offline tests.
 
 ## Risks and Guardrails
 

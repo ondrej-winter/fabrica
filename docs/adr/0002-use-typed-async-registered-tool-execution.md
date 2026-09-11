@@ -57,8 +57,8 @@ preview, excerpt, or evidence detail is truncated.
 
 ## Alternatives considered
 
-| Option | Reason rejected |
-| ------ | --------------- |
-| Keep synchronous `Callable[..., str]` handlers and encode status in text | Text cannot reliably drive runtime loop control, duplicate delivery, or fatal mutation handling. |
-| Add `apply_patch`-specific runtime hooks only | This would make a generic tool-loop concern depend on one feature. |
-| Replay incomplete mutation calls after restart from the runtime ledger | Filesystem mutation recovery must be journal- and evidence-driven in `workspace_editing`. Runtime replay could duplicate or corrupt edits. |
+| Option                                                                   | Reason rejected                                                                                                                            |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Keep synchronous `Callable[..., str]` handlers and encode status in text | Text cannot reliably drive runtime loop control, duplicate delivery, or fatal mutation handling.                                           |
+| Add `apply_patch`-specific runtime hooks only                            | This would make a generic tool-loop concern depend on one feature.                                                                         |
+| Replay incomplete mutation calls after restart from the runtime ledger   | Filesystem mutation recovery must be journal- and evidence-driven in `workspace_editing`. Runtime replay could duplicate or corrupt edits. |

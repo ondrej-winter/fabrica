@@ -46,9 +46,9 @@ Skill script execution remain absent from the default coding-session tool set.
 
 ## Alternatives considered
 
-| Option | Reason rejected |
-| --- | --- |
-| Keep coding-agent composition custom-host-only | It leaves the project without a usable local coding-agent product workflow and repeats host integration work for every developer. |
-| Extend `fabrica run` implicitly with workspace tools | It would change a direct prompt command into a stateful mutating workflow without a clear public contract or safety boundary. |
+| Option                                                 | Reason rejected                                                                                                                              |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Keep coding-agent composition custom-host-only         | It leaves the project without a usable local coding-agent product workflow and repeats host integration work for every developer.            |
+| Extend `fabrica run` implicitly with workspace tools   | It would change a direct prompt command into a stateful mutating workflow without a clear public contract or safety boundary.                |
 | Expose all tools and rely on one session-wide approval | Workspace selection and a single approval do not safely authorize later commands, changed patches, Git mutation, scripts, or network access. |
-| Build a VS Code or web host first | A terminal host provides the smallest inspectable interactive surface while retaining future host-adapter options. |
+| Build a VS Code or web host first                      | A terminal host provides the smallest inspectable interactive surface while retaining future host-adapter options.                           |

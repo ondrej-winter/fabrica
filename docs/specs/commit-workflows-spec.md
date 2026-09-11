@@ -95,12 +95,14 @@ Commit-message generation is evidence-first and staged-only.
 The generation flow has three phases:
 
 1. **Staged file discovery**
+
    - List currently staged files through the developer-workflow staged-git port.
    - Fail before model invocation when there are no staged files.
    - Preserve staged file path and status metadata needed for evidence analysis.
    - Do not read unstaged changes or mutate repository state.
 
 2. **Per-file evidence analysis**
+
    - Load only one staged file diff at a time through `load_file_diff(path)`.
    - Run one evidence analysis model call or session for each staged file.
    - Implementations may analyze multiple staged files concurrently through a

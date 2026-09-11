@@ -64,9 +64,9 @@ terminal-state and termination guarantees.
 
 ## Alternatives considered
 
-| Option | Reason rejected |
-| --- | --- |
-| Use `os.rename` or `os.replace` after an existence check | A concurrent destination creator can be overwritten; the required no-replace guarantee is absent. |
-| Enable by platform or filesystem name | Names do not prove the selected primitive or helper ownership works for the actual workspace. |
-| Run visible mutation in the host process | A host cancellation or deadline cannot prove bounded cleanup for blocking POSIX operations. |
+| Option                                                      | Reason rejected                                                                                           |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Use `os.rename` or `os.replace` after an existence check    | A concurrent destination creator can be overwritten; the required no-replace guarantee is absent.         |
+| Enable by platform or filesystem name                       | Names do not prove the selected primitive or helper ownership works for the actual workspace.             |
+| Run visible mutation in the host process                    | A host cancellation or deadline cannot prove bounded cleanup for blocking POSIX operations.               |
 | Delay all design work until a cross-platform backend exists | It would delay the primary Apple Silicon macOS target and leave unsupported Linux combinations ambiguous. |

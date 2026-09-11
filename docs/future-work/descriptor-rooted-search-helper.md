@@ -42,7 +42,7 @@ containment only on both supported platforms.
 - Preserve the canonical `search_codebase` request/result contract and stable
   error taxonomy without host binary discovery or a fallback regex engine.
 - Provide Linux `x86_64` and Apple Silicon builds, artifact integrity verification, and
-platform-appropriate signing/release controls for Fabrica distribution.
+  platform-appropriate signing/release controls for Fabrica distribution.
 - Add deterministic unit, integration, and distribution conformance coverage for
   descriptor traversal, ignore/glob behavior, cancellation, output limits, and
   malformed/unavailable artifacts.

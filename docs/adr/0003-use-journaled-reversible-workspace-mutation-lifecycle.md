@@ -69,9 +69,9 @@ This is intentionally not cross-file atomicity.
 
 ## Alternatives considered
 
-| Option | Reason rejected |
-| ------ | --------------- |
-| Treat derived directories as part of the file commit point | Directories are visible before file renames/deletes, so this would hide real mutation from cancellation and recovery semantics. |
-| Reject Add and Move operations with missing destination parents | This would contradict the v1 product contract and make common patch operations unnecessarily brittle. |
-| Claim cross-file atomicity through staging | POSIX multi-file commits still need best-effort scheduling, rollback, and final-state evidence. |
-| Leave retained directories as harmless warnings | Retained directories are visible workspace mutations and must affect mutation guarantees and runtime disposition. |
+| Option                                                          | Reason rejected                                                                                                                 |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Treat derived directories as part of the file commit point      | Directories are visible before file renames/deletes, so this would hide real mutation from cancellation and recovery semantics. |
+| Reject Add and Move operations with missing destination parents | This would contradict the v1 product contract and make common patch operations unnecessarily brittle.                           |
+| Claim cross-file atomicity through staging                      | POSIX multi-file commits still need best-effort scheduling, rollback, and final-state evidence.                                 |
+| Leave retained directories as harmless warnings                 | Retained directories are visible workspace mutations and must affect mutation guarantees and runtime disposition.               |

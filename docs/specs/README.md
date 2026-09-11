@@ -37,6 +37,10 @@ replacing those technical details.
 - `coding-agent-session-spec.md` defines the accepted, implemented terminal-hosted
   `fabrica agent` product composition, including workspace scope, default tool
   exposure, explicit patch approval, terminal interaction, and validation.
+- `mature-agent-mvp-spec.md` is a draft, unconfirmed MVP proposal for durable
+  terminal-session records, normal resume or mismatch replan, deterministic
+  evaluation, complete sensitive local audit evidence, and documented policy-only
+  execution isolation. It adds no authority until formally accepted.
 - `codex-transport-spec.md` defines the subscription-backed Codex transport support
   path, private-backend constraints, credential safety, and opt-in live
   validation rules.

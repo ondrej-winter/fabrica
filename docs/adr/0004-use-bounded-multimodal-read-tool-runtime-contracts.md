@@ -55,9 +55,9 @@ bounded cleanup period.
 
 ## Alternatives considered
 
-| Option | Reason rejected |
-| ------ | --------------- |
-| Add `read_files`-specific nested argument and image-return compatibility shims | It would make generic runtime responsibilities feature-specific and leave later tools without a stable contract. |
-| Keep text-only generic tool outcomes and handle images in a provider-facing side channel | It would fragment tool outcome semantics and make ordered text/image results difficult to test provider-neutrally. |
-| Reject every symlink or use resolve-then-open containment | Rejecting all internal symlinks unnecessarily reduces useful workspace access; resolve-then-open permits replacement races. |
-| Use worker threads for blocking filesystem reads | Threads can prevent queued work and cooperate during streaming, but cannot guarantee termination or handle cleanup when a syscall blocks indefinitely. |
+| Option                                                                                   | Reason rejected                                                                                                                                        |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Add `read_files`-specific nested argument and image-return compatibility shims           | It would make generic runtime responsibilities feature-specific and leave later tools without a stable contract.                                       |
+| Keep text-only generic tool outcomes and handle images in a provider-facing side channel | It would fragment tool outcome semantics and make ordered text/image results difficult to test provider-neutrally.                                     |
+| Reject every symlink or use resolve-then-open containment                                | Rejecting all internal symlinks unnecessarily reduces useful workspace access; resolve-then-open permits replacement races.                            |
+| Use worker threads for blocking filesystem reads                                         | Threads can prevent queued work and cooperate during streaming, but cannot guarantee termination or handle cleanup when a syscall blocks indefinitely. |

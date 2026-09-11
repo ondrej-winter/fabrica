@@ -43,8 +43,8 @@ the provider-neutral `agent_runtime` application boundary.
 
 ## Alternatives considered
 
-| Option | Reason rejected |
-| --- | --- |
+| Option                                                          | Reason rejected                                                                                                                            |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | Require opaque Codex response or conversation IDs between turns | It leaks volatile provider state into runtime continuity, weakens deterministic fixture coverage, and makes backend drift more disruptive. |
-| Reuse the one-shot `fabrica run` Codex adapter | It implements final completion, not the tool-aware turn contract, so it cannot safely expose coding tools. |
-| Make PydanticAI the mandatory production tool-turn bridge | It adds an unnecessary framework dependency and leaves private Codex wire behavior outside the owning transport slice. |
+| Reuse the one-shot `fabrica run` Codex adapter                  | It implements final completion, not the tool-aware turn contract, so it cannot safely expose coding tools.                                 |
+| Make PydanticAI the mandatory production tool-turn bridge       | It adds an unnecessary framework dependency and leaves private Codex wire behavior outside the owning transport slice.                     |

@@ -43,6 +43,9 @@ jobs:
       - name: Check formatting
         run: uv run ruff format --check .
 
+      - name: Check Markdown formatting
+        run: uv run pre-commit run prettier --all-files
+
       - name: Lint
         run: uv run ruff check .
 
