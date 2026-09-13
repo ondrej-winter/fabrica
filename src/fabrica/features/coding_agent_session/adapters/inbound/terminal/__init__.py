@@ -5,5 +5,13 @@ from fabrica.features.coding_agent_session.adapters.inbound.terminal.command_app
 )
 from fabrica.features.coding_agent_session.adapters.inbound.terminal.patch_approval import TerminalPatchApproval
 from fabrica.features.coding_agent_session.adapters.inbound.terminal.question_transport import TerminalQuestionTransport
+from fabrica.features.coding_agent_session.adapters.inbound.terminal.stale_context_replan import (
+    TerminalStaleContextReplanAcknowledgement,
+)
 
-__all__ = ["TerminalCommandApprovalResolver", "TerminalPatchApproval", "TerminalQuestionTransport"]
+__all__ = [
+    "TerminalCommandApprovalResolver",
+    "TerminalPatchApproval",
+    "TerminalQuestionTransport",
+    "TerminalStaleContextReplanAcknowledgement",
+]

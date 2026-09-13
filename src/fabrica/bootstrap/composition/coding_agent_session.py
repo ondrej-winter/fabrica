@@ -2,7 +2,7 @@
 
 import json
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, TextIO
@@ -13,7 +13,11 @@ from fabrica.bootstrap.composition.skill_context import (
     SkillContextAugmentationOptions,
     create_skill_context_augmented_local_agent_command,
 )
-from fabrica.bootstrap.composition.user_interaction import active_interactive_run, create_interactive_tool_loop_runtime
+from fabrica.bootstrap.composition.user_interaction import (
+    InteractiveToolLoopObservationOptions,
+    active_interactive_run,
+    create_interactive_tool_loop_runtime,
+)
 from fabrica.bootstrap.composition.workspace_command_execution import (
     RunCommandsToolOptions,
     create_run_commands_registered_tool_adapter,
@@ -25,19 +29,33 @@ from fabrica.bootstrap.composition.workspace_editing import (
 from fabrica.bootstrap.composition.workspace_reading import create_read_files_registered_tool_adapter
 from fabrica.bootstrap.composition.workspace_searching import create_search_codebase_registered_tool_adapter
 from fabrica.features.agent_runtime.application.dtos import (
+    LocalAgentContextBlock,
     LocalAgentRunCommand,
     RuntimeObservation,
+    ToolCallRequest,
+    ToolCallResult,
+    ToolCallResultStatus,
     ToolCancellationSignal,
     ToolDefinition,
+    ToolLoopLimits,
     ToolLoopRunResult,
     ToolLoopRunStatus,
 )
-from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModel
+from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModel, ToolExecutor
 from fabrica.features.agent_session.adapters.outbound.posix_filesystem import (
     PosixSessionRecordStore,
     PosixWorkspaceFingerprintBuilder,
 )
-from fabrica.features.agent_session.application import RecordSessionLifecycle, SessionRecordingError
+from fabrica.features.agent_session.application import (
+    AcknowledgeStaleContextPlan,
+    PrepareSessionResume,
+    RecordSessionLifecycle,
+    ReplanSafetyGate,
+    ResumeDisposition,
+    SessionRecordingError,
+    SessionResumePreparation,
+)
+from fabrica.features.agent_session.application.dtos import ResumeContext
 from fabrica.features.coding_agent_session.adapters.inbound.terminal import (
     TerminalCommandApprovalResolver,
     TerminalPatchApproval,
@@ -63,6 +81,8 @@ from fabrica.features.workspace_reading.application.dtos import ReadFilesLimits
 from fabrica.features.workspace_searching.application.dtos import SearchLimits
 
 _APPLY_PATCH_TOOL_NAME = "apply_patch"
+_RUN_COMMANDS_TOOL_NAME = "run_commands"
+_FRESH_INSPECTION_TOOL_NAMES = frozenset({"read_files", "search_codebase"})
 _COMMITTED_MUTATION_GUARANTEE = "committed"
 _NO_MUTATION_GUARANTEE = "no_mutation"
 
@@ -81,6 +101,9 @@ class CodingAgentSessionOptions:
     read_files_limits: ReadFilesLimits | None = None
     search_limits: SearchLimits | None = None
     selected_context_options: SkillContextAugmentationOptions | None = None
+    replan_safety_gate: ReplanSafetyGate | None = None
+    session_id: str | None = None
+    resume_context: ResumeContext | None = None
 
     def __post_init__(self) -> None:
         workspace_root = Path(self.workspace_root)
@@ -88,6 +111,9 @@ class CodingAgentSessionOptions:
             msg = "workspace_root must be canonical and absolute"
             raise ValueError(msg)
         object.__setattr__(self, "workspace_root", workspace_root)
+        if self.resume_context is not None and self.session_id != self.resume_context.checkpoint.session_id:
+            msg = "resume context must use its checkpoint session ID"
+            raise ValueError(msg)
 
 
 class _InteractiveSessionRuntime(Protocol):
@@ -107,6 +133,44 @@ class _InteractiveSessionRuntime(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class ReplanGatedToolExecutor:
+    """Block stale-context side effects until host-owned replan prerequisites hold."""
+
+    delegate: ToolExecutor
+    gate: ReplanSafetyGate
+
+    async def execute_tool(
+        self,
+        request: ToolCallRequest,
+        limits: ToolLoopLimits,
+        cancellation: ToolCancellationSignal,
+        opaque_context: Mapping[str, object] | None = None,
+    ) -> ToolCallResult:
+        """Delegate inspection but reject commands and patches before replan acknowledgement."""
+        if (
+            request.tool_name in {_RUN_COMMANDS_TOOL_NAME, _APPLY_PATCH_TOOL_NAME}
+            and not self.gate.side_effects_permitted
+        ):
+            return ToolCallResult(
+                call_id=request.call_id,
+                tool_name=request.tool_name,
+                status=ToolCallResultStatus.REJECTED,
+                arguments=request.arguments,
+                error_message=self.gate.side_effect_block_reason(),
+                observations=(
+                    RuntimeObservation(
+                        message="stale-context replan blocked a side-effecting tool",
+                        metadata={"tool_name": request.tool_name, "category": "stale_context_replan"},
+                    ),
+                ),
+            )
+        result = await self.delegate.execute_tool(request, limits, cancellation, opaque_context)
+        if request.tool_name in _FRESH_INSPECTION_TOOL_NAMES and result.status is ToolCallResultStatus.SUCCESS:
+            self.gate.record_fresh_inspection()
+        return result
+
+
+@dataclass(frozen=True, slots=True)
 class WorkspaceCodingAgentSessionRuntime:
     """Run sessions through tools composed for one canonical workspace root."""
 
@@ -115,6 +179,7 @@ class WorkspaceCodingAgentSessionRuntime:
     mutation_gate: MutationGateEvidence
     selected_context_options: SkillContextAugmentationOptions | None = None
     lifecycle_recorder: RecordSessionLifecycle | None = None
+    resume_context: ResumeContext | None = None
 
     @property
     def available_tools(self) -> tuple[ToolDefinition, ...]:
@@ -131,7 +196,7 @@ class WorkspaceCodingAgentSessionRuntime:
         if command.workspace_root != self.workspace_root:
             msg = "session command workspace_root must match the composed workspace root"
             raise ValueError(msg)
-        runtime_command = LocalAgentRunCommand(prompt=command.prompt)
+        runtime_command = _resume_aware_runtime_command(command.prompt, self.resume_context)
         runtime_command = _augment_selected_context(runtime_command, command, self.selected_context_options)
         if self.lifecycle_recorder is not None:
             try:
@@ -156,6 +221,22 @@ class WorkspaceCodingAgentSessionRuntime:
             mutation_gate=self.mutation_gate,
             mutation_disposition=_mutation_disposition(tool_loop_result),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class WorkspaceSessionResumeRuntimePreparation:
+    """Safe resume classification and runtime for one existing workspace session."""
+
+    preparation: SessionResumePreparation
+    runtime: WorkspaceCodingAgentSessionRuntime | None = None
+
+    def __post_init__(self) -> None:
+        if self.preparation.disposition is ResumeDisposition.UNAVAILABLE and self.runtime is not None:
+            msg = "unavailable session evidence cannot produce a runtime"
+            raise ValueError(msg)
+        if self.preparation.disposition is not ResumeDisposition.UNAVAILABLE and self.runtime is None:
+            msg = "available or stale session evidence requires a runtime"
+            raise ValueError(msg)
 
 
 async def create_workspace_coding_agent_session_runtime(
@@ -187,8 +268,9 @@ async def create_workspace_coding_agent_session_runtime(
         read_only_tools=(read_files, search_codebase, run_commands),
     )
     model = options.model_factory()
+    session_id = options.session_id or f"session_{uuid4().hex}"
     lifecycle_recorder = RecordSessionLifecycle(
-        session_id=f"session_{uuid4().hex}",
+        session_id=session_id,
         store=PosixSessionRecordStore(options.workspace_root),
         fingerprint_builder=PosixWorkspaceFingerprintBuilder(options.workspace_root),
     )
@@ -196,8 +278,11 @@ async def create_workspace_coding_agent_session_runtime(
         model=model,
         transport=options.interaction_transport,
         tools=editing_composition.tools,
-        model_response_observer=lifecycle_recorder.record_model_response,
-        tool_result_observer=lifecycle_recorder.record_tool_result,
+        observation_options=InteractiveToolLoopObservationOptions(
+            model_response_observer=lifecycle_recorder.record_model_response,
+            tool_result_observer=lifecycle_recorder.record_tool_result,
+            tool_executor_decorator=_replan_executor_decorator(options.replan_safety_gate),
+        ),
     )
     return WorkspaceCodingAgentSessionRuntime(
         workspace_root=options.workspace_root,
@@ -205,6 +290,45 @@ async def create_workspace_coding_agent_session_runtime(
         mutation_gate=_mutation_gate_evidence(editing_composition.mutation_gate),
         selected_context_options=options.selected_context_options,
         lifecycle_recorder=lifecycle_recorder,
+        resume_context=options.resume_context,
+    )
+
+
+async def prepare_workspace_coding_agent_session_resume_runtime(
+    *,
+    options: CodingAgentSessionOptions,
+    session_id: str,
+) -> WorkspaceSessionResumeRuntimePreparation:
+    """Prepare an existing session for a fresh normal or stale-context runtime turn."""
+    store = PosixSessionRecordStore(options.workspace_root)
+    preparation = PrepareSessionResume(
+        store=store,
+        fingerprint_builder=PosixWorkspaceFingerprintBuilder(options.workspace_root),
+    ).execute(session_id)
+    if preparation.disposition is ResumeDisposition.UNAVAILABLE:
+        return WorkspaceSessionResumeRuntimePreparation(preparation=preparation)
+    resumed_options = CodingAgentSessionOptions(
+        workspace_root=options.workspace_root,
+        model_factory=options.model_factory,
+        interaction_transport=options.interaction_transport,
+        command_options=options.command_options,
+        mutation_options=options.mutation_options,
+        read_files_external_authorized=options.read_files_external_authorized,
+        read_files_image_input_supported=options.read_files_image_input_supported,
+        read_files_limits=options.read_files_limits,
+        search_limits=options.search_limits,
+        selected_context_options=options.selected_context_options,
+        session_id=session_id,
+        resume_context=preparation.resume_context,
+        replan_safety_gate=(
+            ReplanSafetyGate(AcknowledgeStaleContextPlan(store=store, session_id=session_id))
+            if preparation.disposition is ResumeDisposition.STALE_CONTEXT
+            else None
+        ),
+    )
+    return WorkspaceSessionResumeRuntimePreparation(
+        preparation=preparation,
+        runtime=await create_workspace_coding_agent_session_runtime(options=resumed_options),
     )
 
 
@@ -235,16 +359,72 @@ async def create_terminal_workspace_coding_agent_session_runtime(
         sandbox_preflight=HostCommandSandboxPreflight(_allow_terminal_sandbox),
     )
     return await create_workspace_coding_agent_session_runtime(
-        options=CodingAgentSessionOptions(
+        options=_terminal_session_options(
             workspace_root=workspace_root,
-            model_factory=create_codex_tool_aware_model,
             interaction_transport=interaction_transport,
             command_options=command_options,
-            mutation_options=ProductionWorkspaceEditingOptions(approval_callback=patch_approval.decide),
-            read_files_external_authorized=False,
-            read_files_image_input_supported=False,
-            selected_context_options=SkillContextAugmentationOptions(skill_roots=skill_roots),
+            patch_approval=patch_approval,
+            skill_roots=skill_roots,
         )
+    )
+
+
+async def prepare_terminal_workspace_coding_agent_session_resume_runtime(
+    *,
+    workspace_root: Path,
+    session_id: str,
+    stdin: TextIO,
+    stdout: TextIO,
+    skill_roots: tuple[Path, ...] = (),
+) -> WorkspaceSessionResumeRuntimePreparation:
+    """Prepare an existing terminal session without executing stale or unavailable evidence."""
+    command_approval = TerminalCommandApprovalResolver(stdin=stdin, stdout=stdout)
+    patch_approval = TerminalPatchApproval(stdin=stdin, stdout=stdout)
+    interaction_transport = TerminalQuestionTransport(
+        stdin=stdin,
+        stdout=stdout,
+        submit_answer=lambda submission: active_interactive_run().submit_answer(submission),
+        cancel_question=lambda question_id: active_interactive_run().cancel_question(question_id.value),
+    )
+    command_options = RunCommandsToolOptions(
+        shell_executable="/bin/sh",
+        environment_builder=FilteredCommandEnvironmentBuilder(
+            inherited_environment={"PATH": os.environ.get("PATH", "")},
+            allowed_override_keys=frozenset(),
+        ),
+        permission_evaluator=HostCommandPermissionEvaluator(_terminal_command_permission),
+        approval_resolver=command_approval,
+        sandbox_preflight=HostCommandSandboxPreflight(_allow_terminal_sandbox),
+    )
+    return await prepare_workspace_coding_agent_session_resume_runtime(
+        options=_terminal_session_options(
+            workspace_root=workspace_root,
+            interaction_transport=interaction_transport,
+            command_options=command_options,
+            patch_approval=patch_approval,
+            skill_roots=skill_roots,
+        ),
+        session_id=session_id,
+    )
+
+
+def _terminal_session_options(
+    *,
+    workspace_root: Path,
+    interaction_transport: InteractionTransport,
+    command_options: RunCommandsToolOptions,
+    patch_approval: TerminalPatchApproval,
+    skill_roots: tuple[Path, ...],
+) -> CodingAgentSessionOptions:
+    return CodingAgentSessionOptions(
+        workspace_root=workspace_root,
+        model_factory=create_codex_tool_aware_model,
+        interaction_transport=interaction_transport,
+        command_options=command_options,
+        mutation_options=ProductionWorkspaceEditingOptions(approval_callback=patch_approval.decide),
+        read_files_external_authorized=False,
+        read_files_image_input_supported=False,
+        selected_context_options=SkillContextAugmentationOptions(skill_roots=skill_roots),
     )
 
 
@@ -266,6 +446,12 @@ def _has_interactive_or_background_form(argv: tuple[str, ...]) -> bool:
     return any(argument in {"&", "-i", "--interactive"} for argument in argv)
 
 
+def _replan_executor_decorator(gate: ReplanSafetyGate | None) -> Callable[[ToolExecutor], ToolExecutor] | None:
+    if gate is None:
+        return None
+    return lambda executor: ReplanGatedToolExecutor(executor, gate)
+
+
 def _augment_selected_context(
     command: LocalAgentRunCommand,
     session_command: CodingAgentSessionCommand,
@@ -283,6 +469,29 @@ def _augment_selected_context(
             skill_bounds=base_options.skill_bounds,
             resource_bounds=base_options.resource_bounds,
             verbose_diagnostics=base_options.verbose_diagnostics,
+        ),
+    )
+
+
+def _resume_aware_runtime_command(prompt: str, resume_context: ResumeContext | None) -> LocalAgentRunCommand:
+    """Create a fresh turn command with bounded completed evidence when normal resume is safe."""
+    if resume_context is None:
+        return LocalAgentRunCommand(prompt=prompt)
+    checkpoint = resume_context.checkpoint
+    evidence_lines = [
+        resume_context.continuation_instruction,
+        f"Completed checkpoint: {checkpoint.completed_summary}",
+        f"Checkpoint state: {checkpoint.state.value}",
+        f"Completed events after checkpoint: {len(resume_context.later_events)}",
+    ]
+    return LocalAgentRunCommand(
+        prompt=prompt,
+        context=(
+            LocalAgentContextBlock(
+                text="\n".join(evidence_lines),
+                label="Safe durable session resume context",
+                metadata={"session_id": checkpoint.session_id, "checkpoint_sequence": checkpoint.sequence},
+            ),
         ),
     )
 

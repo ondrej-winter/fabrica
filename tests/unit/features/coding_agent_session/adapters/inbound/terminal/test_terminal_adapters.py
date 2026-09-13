@@ -2,13 +2,17 @@
 
 import asyncio
 from io import StringIO
+from pathlib import Path
 
 import pytest
 
+from fabrica.features.agent_session.application import AcknowledgeStaleContextPlan, ReplanSafetyGate, ReplanSafetyState
+from fabrica.features.agent_session.application.dtos import SessionCheckpoint, SessionEvent
 from fabrica.features.coding_agent_session.adapters.inbound.terminal import (
     TerminalCommandApprovalResolver,
     TerminalPatchApproval,
     TerminalQuestionTransport,
+    TerminalStaleContextReplanAcknowledgement,
 )
 from fabrica.features.user_interaction.application.dtos import (
     AnswerSubmission,
@@ -133,6 +137,43 @@ def test_patch_approval_denies_non_approval_eof_and_interruption(stdin: StringIO
     assert decision.plan_digest == plan.plan_digest
 
 
+def test_stale_context_replan_acknowledgement_is_distinct_from_command_and_patch_approval() -> None:
+    store = _SessionStore()
+    gate = ReplanSafetyGate(AcknowledgeStaleContextPlan(store, "session"))
+    gate.record_fresh_inspection()
+    stdout = StringIO()
+
+    acknowledged = TerminalStaleContextReplanAcknowledgement(StringIO("yes\n"), stdout, gate).acknowledge(
+        summary="Inspect src before proposing changes.",
+        plan_digest="sha256:" + "b" * 64,
+    )
+
+    assert acknowledged is True
+    assert gate.state is ReplanSafetyState.SIDE_EFFECTS_PERMITTED
+    assert "Stale-context replan acknowledgement required:" in stdout.getvalue()
+    assert "Acknowledge this refreshed plan? [y/N] " in stdout.getvalue()
+    assert [(event.kind, dict(event.payload)) for event in store.events] == [
+        (
+            "stale_context_plan_acknowledged",
+            {"plan_digest": "sha256:" + "b" * 64, "acknowledged": True},
+        )
+    ]
+
+
+@pytest.mark.parametrize("stdin", [StringIO("no\n"), StringIO(""), InterruptingInput()])
+def test_stale_context_replan_acknowledgement_denies_without_opening_the_gate(stdin: StringIO) -> None:
+    gate = ReplanSafetyGate(AcknowledgeStaleContextPlan(_SessionStore(), "session"))
+    gate.record_fresh_inspection()
+
+    acknowledged = TerminalStaleContextReplanAcknowledgement(stdin, StringIO(), gate).acknowledge(
+        summary="Inspect src before proposing changes.",
+        plan_digest="sha256:" + "b" * 64,
+    )
+
+    assert acknowledged is False
+    assert gate.state is ReplanSafetyState.PLAN_ACKNOWLEDGEMENT_REQUIRED
+
+
 def _command() -> PlannedCommand:
     return PlannedCommand(
         index=0,
@@ -158,3 +199,32 @@ def _patch_plan() -> PatchPlan:
         ),
         approval_preview=PatchApprovalPreview("add src/new.py"),
     )
+
+
+class _SessionStore:
+    def __init__(self) -> None:
+        self.events: list[SessionEvent] = []
+
+    def append_event(self, event: SessionEvent) -> None:
+        self.events.append(event)
+
+    def load_events(self, session_id: str) -> tuple[SessionEvent, ...]:
+        del session_id
+        return tuple(self.events)
+
+    def save_checkpoint(self, checkpoint: SessionCheckpoint) -> None:
+        del checkpoint
+
+    def load_checkpoint(self, session_id: str) -> SessionCheckpoint | None:
+        del session_id
+        return None
+
+    def list_session_ids(self) -> tuple[str, ...]:
+        return ()
+
+    def delete_session(self, session_id: str) -> None:
+        del session_id
+
+    def export_session(self, session_id: str, destination: Path) -> Path:
+        del session_id
+        return destination

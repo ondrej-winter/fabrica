@@ -34,6 +34,7 @@ class RecordSessionLifecycle:
         """Persist the warning and initial running checkpoint before model activity."""
         if self._started:
             return
+        self._sequence = _next_sequence(self.store.load_events(self.session_id))
         self._append("sensitivity_warning", {"message": _SENSITIVITY_WARNING})
         self._append("state_changed", {"state": SessionState.RUNNING.value})
         self._save_checkpoint(SessionState.RUNNING, "Session started.")
@@ -90,3 +91,8 @@ class RecordSessionLifecycle:
         if not self._started:
             msg = "session recording must start before runtime activity"
             raise SessionRecordingError(msg)
+
+
+def _next_sequence(events: tuple[SessionEvent, ...]) -> int:
+    """Return the next append-only sequence for recovered durable evidence."""
+    return events[-1].sequence + 1 if events else 0

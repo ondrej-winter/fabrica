@@ -12,8 +12,11 @@ from fabrica.bootstrap.composition.codex_runtime import (
 from fabrica.bootstrap.composition.coding_agent_session import (
     CodingAgentSessionOptions,
     WorkspaceCodingAgentSessionRuntime,
+    WorkspaceSessionResumeRuntimePreparation,
     create_terminal_workspace_coding_agent_session_runtime,
     create_workspace_coding_agent_session_runtime,
+    prepare_terminal_workspace_coding_agent_session_resume_runtime,
+    prepare_workspace_coding_agent_session_resume_runtime,
 )
 from fabrica.bootstrap.composition.completion_runtime import CompletionToolLoopRun, CompletionToolLoopRuntime
 from fabrica.bootstrap.composition.developer_workflow import (
@@ -103,6 +106,7 @@ __all__ = [
     "StagedGitToolOptions",
     "ToolLoopRuntime",
     "WorkspaceCodingAgentSessionRuntime",
+    "WorkspaceSessionResumeRuntimePreparation",
     "create_apply_patch_registered_tool_adapter",
     "create_codex_commit_message_workflow",
     "create_codex_confirmed_commit_workflow",
@@ -135,4 +139,6 @@ __all__ = [
     "create_terminal_workspace_coding_agent_session_runtime",
     "create_tool_loop_runtime",
     "create_workspace_coding_agent_session_runtime",
+    "prepare_terminal_workspace_coding_agent_session_resume_runtime",
+    "prepare_workspace_coding_agent_session_resume_runtime",
 ]

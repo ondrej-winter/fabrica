@@ -43,6 +43,16 @@ from fabrica.features.user_interaction.application.use_cases import InMemoryInte
 _ACTIVE_INTERACTIVE_RUN: ContextVar[InteractiveToolLoopRun | None] = ContextVar("active_interactive_run", default=None)
 type ModelResponseObserver = Callable[[ToolAwareModelResponse], None]
 type ToolResultObserver = Callable[[ToolCallResult], None]
+type ToolExecutorDecorator = Callable[[ToolExecutor], ToolExecutor]
+
+
+@dataclass(frozen=True, slots=True)
+class InteractiveToolLoopObservationOptions:
+    """Optional observers and executor decoration for one composed interactive runtime."""
+
+    model_response_observer: ModelResponseObserver | None = None
+    tool_result_observer: ToolResultObserver | None = None
+    tool_executor_decorator: ToolExecutorDecorator | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,8 +128,7 @@ def create_interactive_tool_loop_runtime(
     model: ToolAwareAgentModel,
     transport: InteractionTransport,
     tools: tuple[RegisteredTool | AsyncRegisteredTool, ...] = (),
-    model_response_observer: ModelResponseObserver | None = None,
-    tool_result_observer: ToolResultObserver | None = None,
+    observation_options: InteractiveToolLoopObservationOptions | None = None,
 ) -> InteractiveToolLoopRuntime:
     """Create an interactive runtime from explicit tools, model, and host transport.
 
@@ -129,7 +138,10 @@ def create_interactive_tool_loop_runtime(
     """
     manager = InMemoryInteractionManager(transport)
     registered_executor = RegisteredToolExecutor((*tools, create_ask_question_registered_tool(manager)))
-    executor = _ObservedToolExecutor(registered_executor, tool_result_observer)
+    options = observation_options or InteractiveToolLoopObservationOptions()
+    executor: ToolExecutor = _ObservedToolExecutor(registered_executor, options.tool_result_observer)
+    if options.tool_executor_decorator is not None:
+        executor = options.tool_executor_decorator(executor)
 
     async def release_interaction_owner(opaque_context: Mapping[str, object]) -> None:
         owner = opaque_context.get(INTERACTION_OWNER_CONTEXT_KEY)
@@ -139,7 +151,7 @@ def create_interactive_tool_loop_runtime(
     return InteractiveToolLoopRuntime(
         _runtime=ToolLoopRuntime(
             runner=RunToolLoop(
-                model=_ObservedToolAwareAgentModel(model, model_response_observer),
+                model=_ObservedToolAwareAgentModel(model, options.model_response_observer),
                 tool_executor=executor,
                 terminal_hooks=(release_interaction_owner,),
             ),

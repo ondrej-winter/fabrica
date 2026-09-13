@@ -3,6 +3,7 @@
 from fabrica.features.coding_agent_session.adapters.inbound.cli.command_models import (
     CliCodingAgentSessionCommand,
     CliSelectedResource,
+    CliSessionRecordCommand,
     CodingAgentSessionCliCompositionOptions,
 )
 from fabrica.features.coding_agent_session.adapters.inbound.cli.contracts import CodingAgentSessionCliStreams
@@ -12,14 +13,17 @@ from fabrica.features.coding_agent_session.adapters.inbound.cli.registration imp
     register_coding_agent_session_cli_commands,
 )
 from fabrica.features.coding_agent_session.adapters.inbound.cli.runner import run_coding_agent_session_cli_command
+from fabrica.features.coding_agent_session.adapters.inbound.cli.session_records import run_session_record_cli_command
 
 __all__ = [
     "CODING_AGENT_SESSION_CLI_COMMAND_NAMES",
     "CliCodingAgentSessionCommand",
     "CliSelectedResource",
+    "CliSessionRecordCommand",
     "CodingAgentSessionCliCompositionOptions",
     "CodingAgentSessionCliHandler",
     "CodingAgentSessionCliStreams",
     "register_coding_agent_session_cli_commands",
     "run_coding_agent_session_cli_command",
+    "run_session_record_cli_command",
 ]

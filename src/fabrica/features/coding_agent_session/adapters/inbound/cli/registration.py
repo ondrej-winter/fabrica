@@ -10,19 +10,21 @@ from fabrica.features.agent_runtime.application.dtos import SelectedSkill, Selec
 from fabrica.features.coding_agent_session.adapters.inbound.cli.command_models import (
     CliCodingAgentSessionCommand,
     CliSelectedResource,
+    CliSessionRecordCommand,
     CodingAgentSessionCliCompositionOptions,
 )
 
 CODING_AGENT_SESSION_COMMAND_NAME = "agent"
 CODING_AGENT_SESSION_CLI_COMMAND_NAMES = (CODING_AGENT_SESSION_COMMAND_NAME,)
+type CodingAgentSessionCliCommand = CliCodingAgentSessionCommand | CliSessionRecordCommand
 type CodingAgentSessionCliHandler = Callable[
-    [CliCodingAgentSessionCommand, CodingAgentSessionCliCompositionOptions, CommandContext], int
+    [CodingAgentSessionCliCommand, CodingAgentSessionCliCompositionOptions, CommandContext], int
 ]
 
 
 @dataclass(frozen=True, slots=True)
 class _ParsedCodingAgentSessionCommand:
-    command: CliCodingAgentSessionCommand
+    command: CodingAgentSessionCliCommand
     composition_options: CodingAgentSessionCliCompositionOptions
 
 
@@ -31,20 +33,64 @@ def register_coding_agent_session_cli_commands(
     *,
     agent_command: CodingAgentSessionCliHandler,
 ) -> None:
-    """Register the workspace-scoped interactive coding-agent command."""
+    """Register nested start and durable-session workflows under ``agent``."""
     commands.register(
         Command(
             name=CODING_AGENT_SESSION_COMMAND_NAME,
-            summary="run an interactive workspace-scoped coding agent",
+            summary="start and manage workspace-scoped coding-agent sessions",
             configure=_configure_agent_parser,
             decode=_command_from_namespace,
             run=_handler(agent_command),
-            description="Run a tool-aware coding-agent session inside one explicitly selected workspace.",
+            description="Start or manage durable tool-aware coding-agent sessions in one selected workspace.",
         ),
     )
 
 
 def _configure_agent_parser(parser: argparse.ArgumentParser) -> None:
+    subparsers = parser.add_subparsers(dest="agent_operation", required=True)
+    start_parser = subparsers.add_parser("start", help="start a new interactive coding-agent session")
+    _configure_start_parser(start_parser)
+    sessions_parser = subparsers.add_parser(
+        "sessions",
+        help="inspect and manage sensitive durable session records",
+        description=(
+            "Session records under .fabrica/ are sensitive local artifacts. Add .fabrica/ to .gitignore; "
+            "optional .fabricaignore exclusions can reduce normal resume sensitivity."
+        ),
+    )
+    session_subparsers = sessions_parser.add_subparsers(dest="session_operation", required=True)
+    list_parser = session_subparsers.add_parser("list", help="list durable session IDs")
+    _add_workspace_argument(list_parser)
+    inspect_parser = session_subparsers.add_parser("inspect", help="inspect one durable session")
+    _add_workspace_argument(inspect_parser)
+    _add_session_id_argument(inspect_parser)
+    delete_parser = session_subparsers.add_parser("delete", help="delete one durable session")
+    _add_workspace_argument(delete_parser)
+    _add_session_id_argument(delete_parser)
+    export_parser = session_subparsers.add_parser("export", help="export one durable session bundle")
+    _add_workspace_argument(export_parser)
+    _add_session_id_argument(export_parser)
+    export_parser.add_argument(
+        "--destination", required=True, type=Path, help="New destination directory for the export."
+    )
+    resume_parser = session_subparsers.add_parser("resume", help="safely resume one durable session")
+    _add_workspace_argument(resume_parser)
+    _add_session_id_argument(resume_parser)
+    resume_parser.add_argument(
+        "--prompt", required=True, type=_parse_prompt, help="Task for the fresh continuation turn."
+    )
+    resume_parser.add_argument("--skill-root", dest="skill_roots", action="append", default=[], type=Path)
+
+
+def _configure_start_parser(parser: argparse.ArgumentParser) -> None:
+    _add_workspace_argument(parser)
+    parser.add_argument("--prompt", required=True, type=_parse_prompt, help="Task for the coding-agent session.")
+    parser.add_argument("--skill", dest="skill_ids", action="append", default=[], type=_parse_skill_id)
+    parser.add_argument("--resource", dest="resources", action="append", default=[], type=_parse_resource_selection)
+    parser.add_argument("--skill-root", dest="skill_roots", action="append", default=[], type=Path)
+
+
+def _add_workspace_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--workspace",
         dest="workspace_root",
@@ -52,32 +98,10 @@ def _configure_agent_parser(parser: argparse.ArgumentParser) -> None:
         type=_parse_workspace,
         help="Existing workspace directory.",
     )
-    parser.add_argument("--prompt", required=True, type=_parse_prompt, help="Task for the coding-agent session.")
-    parser.add_argument(
-        "--skill",
-        dest="skill_ids",
-        action="append",
-        default=[],
-        type=_parse_skill_id,
-        help="Explicit selected Agent Skill ID. May be repeated.",
-    )
-    parser.add_argument(
-        "--resource",
-        dest="resources",
-        action="append",
-        default=[],
-        type=_parse_resource_selection,
-        metavar="SKILL_ID:RESOURCE_ID",
-        help="Explicit selected Agent Skill resource. May be repeated.",
-    )
-    parser.add_argument(
-        "--skill-root",
-        dest="skill_roots",
-        action="append",
-        default=[],
-        type=Path,
-        help="Skill root override for explicit skill/resource selection. May be repeated.",
-    )
+
+
+def _add_session_id_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("session_id", help="Durable session identifier.")
 
 
 def _parse_workspace(value: str) -> Path:
@@ -120,17 +144,28 @@ def _parse_resource_selection(value: str) -> CliSelectedResource:
 
 def _command_from_namespace(namespace: argparse.Namespace) -> _ParsedCodingAgentSessionCommand:
     try:
-        command = CliCodingAgentSessionCommand(
-            workspace_root=namespace.workspace_root,
-            prompt=namespace.prompt,
-            skill_ids=tuple(namespace.skill_ids),
-            resources=tuple(namespace.resources),
-        )
+        if namespace.agent_operation == "start":
+            command: CodingAgentSessionCliCommand = CliCodingAgentSessionCommand(
+                workspace_root=namespace.workspace_root,
+                prompt=namespace.prompt,
+                skill_ids=tuple(namespace.skill_ids),
+                resources=tuple(namespace.resources),
+            )
+        else:
+            command = CliSessionRecordCommand(
+                workspace_root=namespace.workspace_root,
+                operation=namespace.session_operation,
+                session_id=getattr(namespace, "session_id", None),
+                prompt=getattr(namespace, "prompt", None),
+                export_destination=getattr(namespace, "destination", None),
+            )
     except ValueError as err:
         raise UsageError(str(err)) from err
     return _ParsedCodingAgentSessionCommand(
         command=command,
-        composition_options=CodingAgentSessionCliCompositionOptions(skill_roots=tuple(namespace.skill_roots)),
+        composition_options=CodingAgentSessionCliCompositionOptions(
+            skill_roots=tuple(getattr(namespace, "skill_roots", ())),
+        ),
     )
 
 

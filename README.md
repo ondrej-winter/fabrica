@@ -28,6 +28,40 @@ also writes a self-contained results report to `.reports/pytest/report.html` and
 coverage HTML report to `.reports/coverage/index.html`. These local artifacts are
 ignored by Git.
 
+## Durable coding-agent sessions
+
+Start a new workspace-scoped coding-agent session explicitly:
+
+```bash
+uv run fabrica agent start --workspace /path/to/workspace --prompt "Inspect the test failures"
+```
+
+Durable session records are stored under the workspace’s `.fabrica/` directory.
+They are **sensitive local artifacts** and can contain repository content or
+secrets. Add this entry to the workspace `.gitignore`; Fabrica warns when it
+detects a Git workspace without that entry, but it never modifies `.gitignore`:
+
+```gitignore
+.fabrica/
+```
+
+Manage records with:
+
+```bash
+uv run fabrica agent sessions list --workspace /path/to/workspace
+uv run fabrica agent sessions inspect SESSION_ID --workspace /path/to/workspace
+uv run fabrica agent sessions export SESSION_ID --workspace /path/to/workspace --destination /path/to/export
+uv run fabrica agent sessions delete SESSION_ID --workspace /path/to/workspace
+uv run fabrica agent sessions resume SESSION_ID --workspace /path/to/workspace --prompt "Continue safely"
+```
+
+Resume creates a fresh turn from completed durable evidence only. A matching
+workspace fingerprint permits normal resume; changed or unavailable fingerprints
+fail closed and require stale-context replanning rather than replaying historical
+actions or approvals. Optional `.fabricaignore` exclusions can reduce the
+sensitivity of fingerprint comparison, so exclude only paths you accept as
+irrelevant to safe resume.
+
 ## Interactive `ask_question` tool composition
 
 Hosts can opt in to the live `ask_question` tool with

@@ -39,6 +39,16 @@ def write_patch_preview(stream: TextIO, plan: PatchPlan) -> None:
     write_line(stream, f"Plan digest: {plan.plan_digest}")
 
 
+def write_stale_context_replan(stream: TextIO, *, summary: str, plan_digest: str) -> None:
+    """Render a distinct refreshed-plan acknowledgement view without action authority."""
+    write_line(stream, "Stale-context replan acknowledgement required:")
+    write_line(stream, "Refreshed plan:")
+    stream.write(bound_multiline_text(summary))
+    if not summary.endswith("\n"):
+        stream.write("\n")
+    write_line(stream, f"Plan digest: {plan_digest}")
+
+
 def _command_text(command: PlannedCommand) -> str:
     request = command.request
     if request.mode is CommandExecutionMode.ARGV:
