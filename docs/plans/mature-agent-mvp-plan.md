@@ -68,9 +68,9 @@ adapters do not orchestrate side effects directly.
 
 ## Progress Tracking
 
-- [ ] **MAM-01** Establish storage, resume, and evaluation contracts.
-- [ ] **MAM-02** Implement versioned workspace-local event and checkpoint storage.
-- [ ] **MAM-03** Implement fingerprinting and `.fabricaignore` handling.
+- [x] **MAM-01** Establish storage and resume contracts. Evidence: September 13, 2026 — `agent_session` owns immutable normalized event, completed-checkpoint, resume-context, and stale-context acknowledgement DTOs; legal lifecycle transitions and focused unit tests pass.
+- [x] **MAM-02** Implement versioned workspace-local event and checkpoint storage. Evidence: September 13, 2026 — POSIX `.fabrica/sessions/<session-id>/` JSONL/checkpoint adapter covers append durability, tail recovery, corruption rejection, export, and isolated deletion in temporary-workspace tests.
+- [x] **MAM-03** Implement fingerprinting and `.fabricaignore` handling. Evidence: September 13, 2026 — deterministic SHA-256 manifest adapter excludes `.fabrica/` and `.git/`, supports ordered exclusions, and fails closed for invalid patterns and symlinks.
 - [ ] **MAM-04** Establish event-observation composition and integrate durable lifecycle capture.
 - [ ] **MAM-05** Implement safe-boundary normal resume and stale-context replan.
 - [ ] **MAM-06** Add terminal session-history, inspect, export, delete, and resume workflows.
@@ -82,7 +82,7 @@ adapters do not orchestrate side effects directly.
 
 ### MAM-01 — Establish storage, resume, and evaluation contracts
 
-- [ ] **MAM-01** Define `agent_session` feature-owned domain/application DTOs,
+- [x] **MAM-01** Define `agent_session` feature-owned domain/application DTOs,
       ports, session-state transition rules, and test fakes for requirements R1, R4,
       R5, R6, and R7.
 
@@ -115,7 +115,7 @@ tests/unit/features/agent_session/
 
 ### MAM-02 — Implement versioned workspace-local event and checkpoint storage
 
-- [ ] **MAM-02** Implement append-only event recording, durable checkpoints,
+- [x] **MAM-02** Implement append-only event recording, durable checkpoints,
       schema-version dispatch, single-session deletion, inspection, and export behind
       an outbound port.
 
@@ -139,7 +139,7 @@ tests/unit/features/agent_session/
 
 ### MAM-03 — Implement fingerprinting and `.fabricaignore` handling
 
-- [ ] **MAM-03** Implement deterministic workspace fingerprint creation and
+- [x] **MAM-03** Implement deterministic workspace fingerprint creation and
       comparison with mandatory `.fabrica/`/`.git/` exclusions and optional
       Gitignore-style `.fabricaignore` patterns.
 
