@@ -2,23 +2,22 @@
 
 ## Status
 
-- State: Draft — unconfirmed.
+- State: Accepted.
 - Implementation status: Not implemented. This specification extracts a narrow MVP
   from `docs/ideas/mature-agent-product-roadmap.md`; it does not modify accepted
   Version 1 runtime or coding-agent-session contracts.
-- Accepted by: Not yet accepted.
-- Accepted on: Not applicable.
-- Revision: Revised from confirmed product-policy interview decisions on September
-  11, 2026.
-- Acceptance basis: The MVP boundaries below reflect confirmed user decisions, but
-  a maintainer has not formally accepted this canonical specification for
-  implementation.
+- Accepted by: Maintainer.
+- Accepted on: September 12, 2026.
+- Revision: Accepted after product-policy interview confirmation on September 12, 2026.
+- Acceptance basis: The maintainer explicitly confirmed the consolidated MVP
+  intent and audit resolution as the basis for the persistent-storage ADR and
+  derived implementation plan.
 - Supersedes: The initial draft revision dated September 11, 2026.
 
-This is the proposed canonical source of truth for the mature-agent MVP. It must
-remain a draft until a maintainer formally accepts it. The user-confirmed capture
-policy intentionally differs from the roadmap's original redaction proposal:
-session records are complete, unredacted, and sensitive local artifacts.
+This is the canonical source of truth for the accepted mature-agent MVP. The
+accepted structured-session capture policy intentionally differs from the
+roadmap's original redaction proposal: records are unredacted within the explicit
+capture boundary below and are sensitive local artifacts.
 
 ## Objective
 
@@ -84,27 +83,38 @@ containment.
 
 - R1: Fabrica must persist a complete append-only event stream and durable
   checkpoints for each terminal coding-agent session under the selected
-  workspace's `.fabrica/` directory. Records must retain model prompts and
-  responses, tool calls and results, command and patch text, approvals, user
-  questions and answers, errors, final outcomes, and session state transitions.
-  The MVP must not automatically redact, truncate, size-limit, expire, or upload
-  this content.
-  Basis: Confirmed product-policy decision on September 11, 2026.
+  workspace's `.fabrica/` directory. Complete means the unredacted structured,
+  model-visible session evidence: prompts, normalized model responses, tool calls
+  and results, command and patch text, approvals, user questions and structured
+  answers, errors, final outcomes, session metadata, and state transitions.
+  Fabrica must never persist process environments, credentials, authentication
+  headers, raw provider request or response wire payloads, or terminal keystrokes
+  outside structured submitted answers. The MVP must not automatically redact,
+  truncate, size-limit, expire, or upload captured evidence.
+  Basis: Confirmed product-policy decision on September 12, 2026.
 - R2: `.fabrica/` and all session exports must be documented and presented as
   highly sensitive local data that can contain secrets and repository content.
-  Fabrica must retain session records until explicit user deletion and provide
-  terminal workflows to list, inspect, export, and delete them. Fabrica must warn
-  visibly when `.fabrica/` is not Git-ignored, document the required ignore entry,
-  and never edit `.gitignore` automatically.
-  Basis: Confirmed product-policy decision on September 11, 2026.
+  Before the first persisted capture in a workspace, Fabrica must issue a visible
+  sensitivity warning. Fabrica must retain session records indefinitely until
+  explicit user deletion, provide terminal workflows to list, inspect, export, and
+  delete them, and ensure deletion of a session removes only that session's
+  records and checkpoints. Exports are user-managed copies outside Fabrica's
+  lifecycle. Fabrica must warn visibly when `.fabrica/` is not Git-ignored,
+  document the required ignore entry, and never edit `.gitignore` automatically.
+  Basis: Confirmed product-policy decision on September 12, 2026.
 - R3: Each resumable checkpoint must include a workspace fingerprint. The
   fingerprint must exclude `.fabrica/`, `.git/`, and paths matched by an optional
   Gitignore-style `.fabricaignore`; by default, no other paths are excluded.
-  Basis: Confirmed product-policy decision on September 11, 2026.
+  Users may exclude any workspace paths. Fabrica must validate ignore-pattern
+  syntax, but must not infer whether an excluded path is semantically relevant;
+  its help and documentation must warn that excluding relevant paths can make
+  normal resume less context-sensitive.
+  Basis: Confirmed product-policy decision on September 12, 2026.
 - R4: On an explicit resume request, Fabrica must compare the current fingerprint
-  with the checkpoint fingerprint. A match must take the normal resume path. A
-  difference must transition the session to `stale_context` and require replan.
-  Basis: Confirmed product-policy decision on September 11, 2026.
+  with the checkpoint fingerprint. A match must take the normal resume path by
+  reconstructing completed durable context into a fresh model turn. A difference
+  must transition the session to `stale_context` and require replan.
+  Basis: Confirmed product-policy decision on September 12, 2026.
 - R5: In `stale_context`, Fabrica must preserve history but programmatically block
   side-effecting tool calls until a successful fresh workspace inspection has
   occurred, an updated user-visible plan/intent summary has been displayed, and
@@ -114,15 +124,20 @@ containment.
   Basis: Confirmed product-policy decision on September 11, 2026.
 - R6: Stored events, checkpoints, refreshed-plan acknowledgement, and historical
   approvals must never silently replay a side effect or authorize a new action.
+  An interruption checkpoint must preserve completed evidence only: resume must
+  not revive a pending user question, approval, command, or patch. Commands and
+  patches remain governed by their existing recovery contracts, while any resumed
+  side effect requires a fresh model proposal and its normal separate approval.
   Existing accepted command and patch approval contracts remain authoritative.
   Basis: Confirmed product-policy decision and accepted Version 1 contracts.
 - R7: The MVP must introduce a versioned deterministic offline evaluation corpus
-  covering inspection, scoped edits, validation, approval denials, cancellation,
-  resume with matching and mismatched fingerprints, replan acknowledgement,
-  malicious-repository or prompt-injection cases, and recovery. It must report
+  with rule-based transcript, tool, and state assertions. Its initial fixtures
+  must cover inspect-only success, an approved scoped edit plus validation,
+  denied-approval recovery, interruption and safe-boundary resume,
+  fingerprint-mismatch replan, and secret-capture exclusions. It must report
   results but must not initially block changes or releases. A future maintainer
   may separately decide to make it a release gate.
-  Basis: Confirmed product-policy decision on September 11, 2026.
+  Basis: Confirmed product-policy decision on September 12, 2026.
 - R8: Optional live-model evaluation must use disposable workspaces and remain
   separate from the deterministic, offline, credential-free default quality gate.
   Basis: Existing accepted Version 1 validation contract.
@@ -200,14 +215,15 @@ containment.
 
 ## Resolved Product-Policy Decisions
 
-| Decision                             | Confirmed outcome                                                                                                                                                       | Basis                                                  |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Durable record content and retention | Capture all session content, including sensitive content and secrets, without automatic redaction, bounds, expiry, or upload; retain until user deletion.               | User-confirmed interview decision, September 11, 2026. |
-| Storage and lifecycle                | Store records in workspace-local `.fabrica/`; support list, inspect, export, and delete; warn but never edit `.gitignore`.                                              | User-confirmed interview decision, September 11, 2026. |
-| Resume validation                    | Compare checkpoint and current workspace fingerprints; exclude `.fabrica/`, `.git/`, and optional `.fabricaignore` patterns only.                                       | User-confirmed interview decision, September 11, 2026. |
-| Mismatch handling                    | Enter `stale_context` replan; require fresh inspection, displayed refreshed plan, and user acknowledgement before proposing a side effect for separate normal approval. | User-confirmed interview decision, September 11, 2026. |
-| Evaluation promotion                 | Start deterministic evaluation as reporting-only; require a separate future maintainer decision to make it gating.                                                      | User-confirmed interview decision, September 11, 2026. |
-| Execution isolation                  | Make a policy-only statement; do not make a sandbox-containment guarantee.                                                                                              | User-confirmed interview decision, September 11, 2026. |
+| Decision                             | Confirmed outcome                                                                                                                                                                                                                    | Basis                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| Durable record content and retention | Capture unredacted structured, model-visible session evidence; never capture process environments, credentials, auth headers, raw provider payloads, or non-structured terminal keystrokes. Retain indefinitely until user deletion. | User-confirmed interview decision, September 12, 2026. |
+| Storage and lifecycle                | Store records in workspace-local `.fabrica/`; warn before first capture; support list, inspect, export, and single-session deletion; keep exports outside Fabrica's lifecycle; never edit `.gitignore`.                              | User-confirmed interview decision, September 12, 2026. |
+| Resume validation                    | Compare checkpoint and current workspace fingerprints; exclude `.fabrica/`, `.git/`, and optional user-selected `.fabricaignore` patterns. Warn that exclusions can make normal resume less context-sensitive.                       | User-confirmed interview decision, September 12, 2026. |
+| Mismatch handling                    | Enter `stale_context` replan; require fresh inspection, displayed refreshed plan, and user acknowledgement before proposing a side effect for separate normal approval.                                                              | User-confirmed interview decision, September 11, 2026. |
+| Safe-boundary resume                 | Resume from completed durable context in a fresh model turn; never revive pending questions, approvals, commands, or patches; require fresh approval for each new side effect.                                                       | User-confirmed interview decision, September 12, 2026. |
+| Evaluation promotion                 | Use a small deterministic corpus with rule-based transcript, tool, and state assertions; start as reporting-only and require a separate future decision to make it gating.                                                           | User-confirmed interview decision, September 12, 2026. |
+| Execution isolation                  | Make a policy-only statement; do not make a sandbox-containment guarantee.                                                                                                                                                           | User-confirmed interview decision, September 11, 2026. |
 
 ## Open Questions
 
@@ -215,30 +231,28 @@ No product-policy decision blocks a derived implementation plan. The following
 implementation design choices must preserve the requirements above and require
 maintainer review during planning:
 
-| Question                                                                                        | Impact                                                                         | Owner      | Resolution                           |
-| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------- | ------------------------------------ |
-| What durable-record encoding, schema versioning, and migration policy should `.fabrica/` use?   | Determines implementation compatibility and recovery behavior.                 | Maintainer | Deferred to implementation planning. |
-| What deterministic fingerprint algorithm and path-normalization rules should implement R3?      | Determines reproducibility, performance, and precise matching semantics.       | Maintainer | Deferred to implementation planning. |
-| What terminal command names and export-bundle representation best fit existing CLI conventions? | Determines the user-facing interface without changing the required lifecycle.  | Maintainer | Deferred to implementation planning. |
-| Which initial corpus fixtures and reporting fields best demonstrate R7?                         | Determines initial evaluation coverage while preserving reporting-only status. | Maintainer | Deferred to implementation planning. |
+| Question                                                                                        | Impact                                                                        | Owner      | Resolution                           |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------- | ------------------------------------ |
+| What durable-record encoding, schema versioning, and migration policy should `.fabrica/` use?   | Determines implementation compatibility and recovery behavior.                | Maintainer | Deferred to implementation planning. |
+| What deterministic fingerprint algorithm and path-normalization rules should implement R3?      | Determines reproducibility, performance, and precise matching semantics.      | Maintainer | Deferred to implementation planning. |
+| What terminal command names and export-bundle representation best fit existing CLI conventions? | Determines the user-facing interface without changing the required lifecycle. | Maintainer | Deferred to implementation planning. |
+| Which stable report fields best demonstrate R7?                                                 | Determines useful evaluation evidence while preserving reporting-only status. | Maintainer | Deferred to implementation planning. |
 
 ## Acceptance and Planning Gate
 
-This draft has resolved its product-policy decisions through a confirmed interview,
-but it is not formally accepted. A maintainer must accept this specification before
-implementation planning begins. Persistent session-event storage is an
-architectural decision and requires an ADR before implementation. Any future change
-to the policy-only isolation claim, session-data sensitivity boundary, or accepted
-Version 1 tool, approval, workspace, and offline-validation contracts requires a
-material specification revision and, where applicable, an ADR.
+The maintainer accepted this specification on September 12, 2026 after confirming
+the consolidated product-policy interview outcomes. Persistent session-event
+storage is an architectural decision recorded by ADR 0012. The derived
+implementation plan may resolve the listed implementation design choices without
+changing these requirements. Any future change to the policy-only isolation claim,
+session-data sensitivity boundary, or accepted Version 1 tool, approval, workspace,
+and offline-validation contracts requires a material specification revision and,
+where applicable, an ADR.
 
 ## Revision and Handoff Notes
 
-- September 11, 2026: Revised the initial roadmap extraction with confirmed
-  product-policy decisions for full local capture, `.fabricaignore` fingerprint
-  exclusions, normal resume, mandatory mismatch replan, reporting-only evaluation,
-  and policy-only execution isolation.
-- The roadmap remains an idea record. This draft adds no runtime authority and
-  does not authorize implementation.
-- Next authorized step: formal maintainer acceptance, then an ADR for persistent
-  session storage and a derived implementation plan.
+- September 12, 2026: Accepted after confirmation of the local-data lifecycle,
+  safe-boundary resume, structured evidence boundary, unrestricted user-selected
+  fingerprint exclusions, and initial deterministic evaluation corpus.
+- The roadmap remains an idea record. This accepted MVP adds no runtime authority.
+- Next authorized step: execute the derived implementation plan under ADR 0012.

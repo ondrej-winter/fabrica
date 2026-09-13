@@ -38,10 +38,10 @@ This directory contains durable project documentation and current reference note
 - `specs/coding-agent-session-spec.md` defines the accepted, implemented
   terminal-hosted workspace coding-agent session and its tool/approval composition
   contract.
-- `specs/mature-agent-mvp-spec.md` is the draft, unconfirmed MVP proposal for
-  durable terminal sessions with normal resume or mismatch replan, deterministic
-  evaluations, complete sensitive local audit evidence, and a documented
-  policy-only execution-isolation posture.
+- `specs/mature-agent-mvp-spec.md` defines the accepted MVP for durable sensitive
+  local terminal-session evidence, safe-boundary normal resume or mismatch replan,
+  deterministic reporting-only evaluation, and a documented policy-only
+  execution-isolation posture.
 - `specs/codex-transport-spec.md` defines the subscription-backed Codex transport
   support path and preserves private-backend errata.
 - `specs/model-usage-and-cost-evidence-spec.md` defines the generic usage and pricing
