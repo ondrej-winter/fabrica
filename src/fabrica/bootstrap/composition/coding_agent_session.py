@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, TextIO
+from uuid import uuid4
 
 from fabrica.bootstrap.composition.codex_runtime import create_codex_tool_aware_model
 from fabrica.bootstrap.composition.skill_context import (
@@ -25,11 +26,18 @@ from fabrica.bootstrap.composition.workspace_reading import create_read_files_re
 from fabrica.bootstrap.composition.workspace_searching import create_search_codebase_registered_tool_adapter
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
+    RuntimeObservation,
     ToolCancellationSignal,
     ToolDefinition,
     ToolLoopRunResult,
+    ToolLoopRunStatus,
 )
 from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModel
+from fabrica.features.agent_session.adapters.outbound.posix_filesystem import (
+    PosixSessionRecordStore,
+    PosixWorkspaceFingerprintBuilder,
+)
+from fabrica.features.agent_session.application import RecordSessionLifecycle, SessionRecordingError
 from fabrica.features.coding_agent_session.adapters.inbound.terminal import (
     TerminalCommandApprovalResolver,
     TerminalPatchApproval,
@@ -106,6 +114,7 @@ class WorkspaceCodingAgentSessionRuntime:
     runtime: _InteractiveSessionRuntime
     mutation_gate: MutationGateEvidence
     selected_context_options: SkillContextAugmentationOptions | None = None
+    lifecycle_recorder: RecordSessionLifecycle | None = None
 
     @property
     def available_tools(self) -> tuple[ToolDefinition, ...]:
@@ -124,7 +133,24 @@ class WorkspaceCodingAgentSessionRuntime:
             raise ValueError(msg)
         runtime_command = LocalAgentRunCommand(prompt=command.prompt)
         runtime_command = _augment_selected_context(runtime_command, command, self.selected_context_options)
+        if self.lifecycle_recorder is not None:
+            try:
+                self.lifecycle_recorder.start()
+            except SessionRecordingError:
+                return _recording_failure_result(self.mutation_gate)
         tool_loop_result = await self.runtime.run(runtime_command, cancellation=cancellation)
+        if self.lifecycle_recorder is not None:
+            try:
+                self.lifecycle_recorder.finish(tool_loop_result)
+            except SessionRecordingError:
+                tool_loop_result = ToolLoopRunResult(
+                    status=ToolLoopRunStatus.MODEL_ERROR,
+                    tool_results=tool_loop_result.tool_results,
+                    observations=(
+                        *tool_loop_result.observations,
+                        RuntimeObservation(message="durable session recording failed"),
+                    ),
+                )
         return CodingAgentSessionRuntimeResult(
             tool_loop_result=tool_loop_result,
             mutation_gate=self.mutation_gate,
@@ -161,16 +187,24 @@ async def create_workspace_coding_agent_session_runtime(
         read_only_tools=(read_files, search_codebase, run_commands),
     )
     model = options.model_factory()
+    lifecycle_recorder = RecordSessionLifecycle(
+        session_id=f"session_{uuid4().hex}",
+        store=PosixSessionRecordStore(options.workspace_root),
+        fingerprint_builder=PosixWorkspaceFingerprintBuilder(options.workspace_root),
+    )
     runtime = create_interactive_tool_loop_runtime(
         model=model,
         transport=options.interaction_transport,
         tools=editing_composition.tools,
+        model_response_observer=lifecycle_recorder.record_model_response,
+        tool_result_observer=lifecycle_recorder.record_tool_result,
     )
     return WorkspaceCodingAgentSessionRuntime(
         workspace_root=options.workspace_root,
         runtime=runtime,
         mutation_gate=_mutation_gate_evidence(editing_composition.mutation_gate),
         selected_context_options=options.selected_context_options,
+        lifecycle_recorder=lifecycle_recorder,
     )
 
 
@@ -265,6 +299,17 @@ def _mutation_gate_evidence(gate: WorkspaceMutationStartupGate) -> MutationGateE
         mutation_enabled=False,
         reason=reason,
         recovered_journal_digests=gate.recovered_journal_digests,
+    )
+
+
+def _recording_failure_result(mutation_gate: MutationGateEvidence) -> CodingAgentSessionRuntimeResult:
+    return CodingAgentSessionRuntimeResult(
+        tool_loop_result=ToolLoopRunResult(
+            status=ToolLoopRunStatus.MODEL_ERROR,
+            observations=(RuntimeObservation(message="durable session recording failed"),),
+        ),
+        mutation_gate=mutation_gate,
+        mutation_disposition=MutationDisposition(MutationDispositionStatus.NOT_ATTEMPTED),
     )
 
 

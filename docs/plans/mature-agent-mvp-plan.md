@@ -71,7 +71,7 @@ adapters do not orchestrate side effects directly.
 - [x] **MAM-01** Establish storage and resume contracts. Evidence: September 13, 2026 — `agent_session` owns immutable normalized event, completed-checkpoint, resume-context, and stale-context acknowledgement DTOs; legal lifecycle transitions and focused unit tests pass.
 - [x] **MAM-02** Implement versioned workspace-local event and checkpoint storage. Evidence: September 13, 2026 — POSIX `.fabrica/sessions/<session-id>/` JSONL/checkpoint adapter covers append durability, tail recovery, corruption rejection, export, and isolated deletion in temporary-workspace tests.
 - [x] **MAM-03** Implement fingerprinting and `.fabricaignore` handling. Evidence: September 13, 2026 — deterministic SHA-256 manifest adapter excludes `.fabrica/` and `.git/`, supports ordered exclusions, and fails closed for invalid patterns and symlinks.
-- [ ] **MAM-04** Establish event-observation composition and integrate durable lifecycle capture.
+- [x] **MAM-04** Establish event-observation composition and integrate durable lifecycle capture. Evidence: September 13, 2026 — bootstrap-composed normalized model/tool observation decorators persist sensitivity warning, correlated monotonic events, running/completed checkpoints, and terminal dispositions in workspace-local records; recorder failures fail closed without changing tool authority. Focused tests and full offline quality gate pass (2,303 passed, 4 skipped).
 - [ ] **MAM-05** Implement safe-boundary normal resume and stale-context replan.
 - [ ] **MAM-06** Add terminal session-history, inspect, export, delete, and resume workflows.
 - [ ] **MAM-07** Add deterministic reporting-only evaluation corpus.
@@ -164,7 +164,7 @@ tests/unit/features/agent_session/
 
 ### MAM-04 — Establish event-observation composition and durable lifecycle capture
 
-- [ ] **MAM-04** Implement the bootstrap-composed synchronous observation recorder
+- [x] **MAM-04** Implement the bootstrap-composed synchronous observation recorder
       around terminal coding-session model turns, tools, approvals, questions, errors,
       final dispositions, and lifecycle transitions.
 

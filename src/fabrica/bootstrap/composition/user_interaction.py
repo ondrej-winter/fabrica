@@ -1,6 +1,6 @@
 """Opt-in composition for live human interaction in a tool-loop run."""
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
 from secrets import token_urlsafe
@@ -13,11 +13,20 @@ from fabrica.features.agent_runtime.adapters.outbound.registered_tool import (
 )
 from fabrica.features.agent_runtime.application.dtos import (
     LocalAgentRunCommand,
+    ToolAwareModelResponse,
+    ToolCallRequest,
+    ToolCallResult,
     ToolCancellationSignal,
     ToolDefinition,
+    ToolLoopLimits,
     ToolLoopRunResult,
 )
-from fabrica.features.agent_runtime.application.ports import ToolAwareAgentModel
+from fabrica.features.agent_runtime.application.ports import (
+    ToolAwareAgentModel,
+    ToolAwareAgentModelError,
+    ToolExecutionError,
+    ToolExecutor,
+)
 from fabrica.features.agent_runtime.application.use_cases import RunToolLoop
 from fabrica.features.user_interaction.adapters.inbound.registered_tool import (
     INTERACTION_OWNER_CONTEXT_KEY,
@@ -32,6 +41,8 @@ from fabrica.features.user_interaction.application.ports import InteractionManag
 from fabrica.features.user_interaction.application.use_cases import InMemoryInteractionManager
 
 _ACTIVE_INTERACTIVE_RUN: ContextVar[InteractiveToolLoopRun | None] = ContextVar("active_interactive_run", default=None)
+type ModelResponseObserver = Callable[[ToolAwareModelResponse], None]
+type ToolResultObserver = Callable[[ToolCallResult], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +118,8 @@ def create_interactive_tool_loop_runtime(
     model: ToolAwareAgentModel,
     transport: InteractionTransport,
     tools: tuple[RegisteredTool | AsyncRegisteredTool, ...] = (),
+    model_response_observer: ModelResponseObserver | None = None,
+    tool_result_observer: ToolResultObserver | None = None,
 ) -> InteractiveToolLoopRuntime:
     """Create an interactive runtime from explicit tools, model, and host transport.
 
@@ -115,7 +128,8 @@ def create_interactive_tool_loop_runtime(
     ``ask_question`` registration, fail during construction.
     """
     manager = InMemoryInteractionManager(transport)
-    executor = RegisteredToolExecutor((*tools, create_ask_question_registered_tool(manager)))
+    registered_executor = RegisteredToolExecutor((*tools, create_ask_question_registered_tool(manager)))
+    executor = _ObservedToolExecutor(registered_executor, tool_result_observer)
 
     async def release_interaction_owner(opaque_context: Mapping[str, object]) -> None:
         owner = opaque_context.get(INTERACTION_OWNER_CONTEXT_KEY)
@@ -124,8 +138,12 @@ def create_interactive_tool_loop_runtime(
 
     return InteractiveToolLoopRuntime(
         _runtime=ToolLoopRuntime(
-            runner=RunToolLoop(model=model, tool_executor=executor, terminal_hooks=(release_interaction_owner,)),
-            available_tools=executor.tool_definitions,
+            runner=RunToolLoop(
+                model=_ObservedToolAwareAgentModel(model, model_response_observer),
+                tool_executor=executor,
+                terminal_hooks=(release_interaction_owner,),
+            ),
+            available_tools=registered_executor.tool_definitions,
         ),
         _interaction_manager=manager,
     )
@@ -138,3 +156,54 @@ def active_interactive_run() -> InteractiveToolLoopRun:
         msg = "no interactive run is active"
         raise RuntimeError(msg)
     return run
+
+
+@dataclass(frozen=True, slots=True)
+class _ObservedToolAwareAgentModel:
+    """Record completed normalized model turns before returning them to the loop."""
+
+    delegate: ToolAwareAgentModel
+    observer: ModelResponseObserver | None
+
+    async def run_turn(
+        self,
+        command: LocalAgentRunCommand,
+        available_tools: tuple[ToolDefinition, ...],
+        tool_results: tuple[ToolCallResult, ...] = (),
+        cancellation: ToolCancellationSignal | None = None,
+    ) -> ToolAwareModelResponse:
+        """Delegate one turn and synchronously publish its normalized completion."""
+        response = await self.delegate.run_turn(command, available_tools, tool_results, cancellation)
+        if self.observer is not None:
+            try:
+                self.observer(response)
+            except RuntimeError as err:
+                msg = "durable session model recording failed"
+                raise ToolAwareAgentModelError(msg, category="durable_session_recording") from err
+        return response
+
+
+@dataclass(frozen=True, slots=True)
+class _ObservedToolExecutor:
+    """Record completed normalized tool outcomes before returning them to the loop."""
+
+    delegate: ToolExecutor
+    observer: ToolResultObserver | None
+
+    async def execute_tool(
+        self,
+        request: ToolCallRequest,
+        limits: ToolLoopLimits,
+        cancellation: ToolCancellationSignal,
+        opaque_context: Mapping[str, object] | None = None,
+    ) -> ToolCallResult:
+        """Delegate one tool and convert observation persistence failure to an adapter failure."""
+        result = await self.delegate.execute_tool(request, limits, cancellation, opaque_context)
+        if self.observer is None:
+            return result
+        try:
+            self.observer(result)
+        except RuntimeError as err:
+            msg = "durable session tool recording failed"
+            raise ToolExecutionError(msg, category="durable_session_recording") from err
+        return result

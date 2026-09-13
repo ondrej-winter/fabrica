@@ -1,6 +1,7 @@
 """Offline integration coverage for the workspace-scoped coding-agent session."""
 
 import asyncio
+import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -170,6 +171,25 @@ def test_session_composition_inspects_applies_digest_bound_patch_and_validates_w
     assert source_file.read_text(encoding="utf-8") == "original\n"
     assert (tmp_path / "validated.txt").read_text(encoding="utf-8") == "validated\n"
     assert len(model.calls) == EXPECTED_MODEL_TURN_COUNT
+    event_paths = tuple((tmp_path / ".fabrica" / "sessions").glob("*/events.jsonl"))
+    assert len(event_paths) == 1
+    journal = event_paths[0].read_text(encoding="utf-8")
+    events = tuple(json.loads(line) for line in journal.splitlines())
+    assert [event["kind"] for event in events] == [
+        "sensitivity_warning",
+        "state_changed",
+        "model_turn_completed",
+        "tool_call_completed",
+        "model_turn_completed",
+        "tool_call_completed",
+        "model_turn_completed",
+        "tool_call_completed",
+        "model_turn_completed",
+        "run_completed",
+        "state_changed",
+    ]
+    assert "Update the note." not in journal
+    assert VALIDATION_COMMAND not in journal
 
 
 def _options(
