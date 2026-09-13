@@ -11,13 +11,19 @@ from fabrica.bootstrap.composition.coding_agent_session import (
     WorkspaceSessionResumeRuntimePreparation,
 )
 from fabrica.features.agent_runtime.application.dtos import (
+    LocalAgentRunCommand,
     ToolCancellationSignal,
     ToolDefinition,
     ToolLoopRunResult,
     ToolLoopRunStatus,
 )
 from fabrica.features.agent_session.adapters.outbound.posix_filesystem import PosixSessionRecordStore
-from fabrica.features.agent_session.application import ResumeDisposition, SessionResumePreparation
+from fabrica.features.agent_session.application import (
+    AcknowledgeStaleContextPlan,
+    ReplanSafetyGate,
+    ResumeDisposition,
+    SessionResumePreparation,
+)
 from fabrica.features.agent_session.application.dtos import SessionEvent
 from fabrica.features.coding_agent_session.adapters.inbound.cli.output import EXIT_CODE_BY_SESSION_STATUS
 from fabrica.features.coding_agent_session.application.dtos import (
@@ -168,8 +174,14 @@ def test_public_cli_does_not_warn_without_a_git_repository_or_with_an_ignore_ent
     assert ignored_stderr.getvalue() == ""
 
 
-def test_public_cli_fails_closed_for_stale_resume_without_running_a_session(monkeypatch, tmp_path: Path) -> None:
-    runtime = FakeSessionRuntime()
+def test_public_cli_runs_inspected_and_acknowledged_stale_replan_before_a_fresh_execution_turn(
+    monkeypatch, tmp_path: Path
+) -> None:
+    store = PosixSessionRecordStore(tmp_path)
+    gate = ReplanSafetyGate(AcknowledgeStaleContextPlan(store, "session-one"))
+    interactive_runtime = _FakeInteractiveRuntime(
+        gate=gate, planning_summary="Inspect src, then update the failing test."
+    )
 
     async def prepare_resume(**_kwargs: object):
         return WorkspaceSessionResumeRuntimePreparation(
@@ -179,8 +191,68 @@ def test_public_cli_fails_closed_for_stale_resume_without_running_a_session(monk
             ),
             runtime=WorkspaceCodingAgentSessionRuntime(
                 workspace_root=tmp_path,
-                runtime=_FakeInteractiveRuntime(),
+                runtime=interactive_runtime,
                 mutation_gate=MutationGateEvidence(mutation_enabled=True),
+                replan_safety_gate=gate,
+            ),
+        )
+
+    monkeypatch.setattr(
+        coding_agent_session_bootstrap, "prepare_terminal_workspace_coding_agent_session_resume_runtime", prepare_resume
+    )
+    stdout = StringIO()
+    stderr = StringIO()
+
+    exit_code = run_cli(
+        (
+            "agent",
+            "sessions",
+            "resume",
+            "session-one",
+            "--workspace",
+            str(tmp_path),
+            "--prompt",
+            "Continue safely",
+        ),
+        stdin=StringIO("yes\n"),
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0
+    assert (
+        "session requires stale-context replan; inspect the current workspace before proposing work"
+        in stderr.getvalue()
+    )
+    assert "Stale-context replan acknowledgement required:" in stdout.getvalue()
+    assert "Plan digest: sha256:" in stdout.getvalue()
+    assert isinstance(interactive_runtime.calls[0], LocalAgentRunCommand)
+    assert interactive_runtime.calls[0].prompt.startswith("The durable session context is stale.")
+    assert isinstance(interactive_runtime.calls[1], LocalAgentRunCommand)
+    assert interactive_runtime.calls[1].prompt == "Continue safely"
+    acknowledgement = store.load_events("session-one")
+    assert acknowledgement[-1].kind == "stale_context_plan_acknowledged"
+    assert acknowledgement[-1].payload["acknowledged"] is True
+
+
+def test_public_cli_blocks_stale_replan_execution_when_acknowledgement_is_denied(monkeypatch, tmp_path: Path) -> None:
+    store = PosixSessionRecordStore(tmp_path)
+    gate = ReplanSafetyGate(AcknowledgeStaleContextPlan(store, "session-one"))
+    interactive_runtime = _FakeInteractiveRuntime(
+        gate=gate, planning_summary="Inspect src, then update the failing test."
+    )
+
+    async def prepare_resume(**_kwargs: object):
+        return WorkspaceSessionResumeRuntimePreparation(
+            preparation=SessionResumePreparation(
+                ResumeDisposition.STALE_CONTEXT,
+                stale_context_reason="workspace fingerprint changed",
+            ),
+            runtime=WorkspaceCodingAgentSessionRuntime(
+                workspace_root=tmp_path,
+                runtime=interactive_runtime,
+                mutation_gate=MutationGateEvidence(mutation_enabled=True),
+                replan_safety_gate=gate,
             ),
         )
 
@@ -200,18 +272,22 @@ def test_public_cli_fails_closed_for_stale_resume_without_running_a_session(monk
             "--prompt",
             "Continue safely",
         ),
-        overrides=CliDependencyOverrides(coding_agent_session_runtime=runtime),
-        stdin=StringIO(),
+        stdin=StringIO("no\n"),
         stdout=StringIO(),
         stderr=stderr,
     )
 
     assert exit_code == EXIT_CODE_BY_SESSION_STATUS[SessionStatus.FAILED]
-    assert stderr.getvalue() == "session requires stale-context replan: workspace fingerprint changed\n"
-    assert runtime.calls == []
+    assert stderr.getvalue().endswith("stale-context replan acknowledgement was not granted\n")
+    assert len(interactive_runtime.calls) == 1
 
 
 class _FakeInteractiveRuntime:
+    def __init__(self, *, gate: ReplanSafetyGate, planning_summary: str) -> None:
+        self.gate = gate
+        self.planning_summary = planning_summary
+        self.calls: list[object] = []
+
     @property
     def available_tools(self) -> tuple[ToolDefinition, ...]:
         return ()
@@ -222,5 +298,9 @@ class _FakeInteractiveRuntime:
         *,
         cancellation: ToolCancellationSignal | None = None,
     ) -> ToolLoopRunResult:
-        del command, cancellation
-        return ToolLoopRunResult(status=ToolLoopRunStatus.SUCCESS)
+        del cancellation
+        self.calls.append(command)
+        if len(self.calls) == 1:
+            self.gate.record_fresh_inspection()
+            return ToolLoopRunResult(status=ToolLoopRunStatus.SUCCESS, output_text=self.planning_summary)
+        return ToolLoopRunResult(status=ToolLoopRunStatus.SUCCESS, output_text="Session complete.")

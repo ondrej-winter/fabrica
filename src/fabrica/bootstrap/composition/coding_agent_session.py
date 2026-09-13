@@ -180,6 +180,7 @@ class WorkspaceCodingAgentSessionRuntime:
     selected_context_options: SkillContextAugmentationOptions | None = None
     lifecycle_recorder: RecordSessionLifecycle | None = None
     resume_context: ResumeContext | None = None
+    replan_safety_gate: ReplanSafetyGate | None = None
 
     @property
     def available_tools(self) -> tuple[ToolDefinition, ...]:
@@ -291,6 +292,7 @@ async def create_workspace_coding_agent_session_runtime(
         selected_context_options=options.selected_context_options,
         lifecycle_recorder=lifecycle_recorder,
         resume_context=options.resume_context,
+        replan_safety_gate=options.replan_safety_gate,
     )
 
 

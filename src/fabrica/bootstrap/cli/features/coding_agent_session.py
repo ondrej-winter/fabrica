@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO
 
@@ -11,7 +12,7 @@ from fabrica.bootstrap.composition.coding_agent_session import (
     prepare_terminal_workspace_coding_agent_session_resume_runtime,
 )
 from fabrica.features.agent_session.adapters.outbound.posix_filesystem import PosixSessionRecordStore
-from fabrica.features.agent_session.application import ResumeDisposition
+from fabrica.features.agent_session.application import ReplanSafetyState, ResumeDisposition
 from fabrica.features.coding_agent_session.adapters.inbound.cli.command_models import (
     CliCodingAgentSessionCommand,
     CliSessionRecordCommand,
@@ -19,9 +20,12 @@ from fabrica.features.coding_agent_session.adapters.inbound.cli.command_models i
 from fabrica.features.coding_agent_session.adapters.inbound.cli.contracts import CodingAgentSessionCliStreams
 from fabrica.features.coding_agent_session.adapters.inbound.cli.runner import run_coding_agent_session_cli_command
 from fabrica.features.coding_agent_session.adapters.inbound.cli.session_records import run_session_record_cli_command
+from fabrica.features.coding_agent_session.adapters.inbound.terminal import TerminalStaleContextReplanAcknowledgement
+from fabrica.features.coding_agent_session.application.dtos import CodingAgentSessionCommand
 
 if TYPE_CHECKING:
     from fabrica.adapters.inbound.cli import CommandContext
+    from fabrica.bootstrap.composition.coding_agent_session import WorkspaceCodingAgentSessionRuntime
     from fabrica.features.coding_agent_session.adapters.inbound.cli.command_models import (
         CodingAgentSessionCliCompositionOptions,
     )
@@ -108,8 +112,10 @@ def _run_resume(
         streams.stderr.write(f"session resume unavailable: {prepared.preparation.stale_context_reason}\n")
         return 3
     if prepared.preparation.disposition is ResumeDisposition.STALE_CONTEXT:
-        streams.stderr.write(f"session requires stale-context replan: {prepared.preparation.stale_context_reason}\n")
-        return 3
+        if prepared.runtime is None:
+            msg = "stale-context resume preparation did not produce a runtime"
+            raise RuntimeError(msg)
+        return _run_stale_context_replan(command, streams=streams, context=context, runtime=prepared.runtime)
     if prepared.runtime is None:
         msg = "normal resume preparation did not produce a runtime"
         raise RuntimeError(msg)
@@ -117,6 +123,59 @@ def _run_resume(
         CliCodingAgentSessionCommand(workspace_root=command.workspace_root, prompt=prompt),
         streams=streams,
         runtime=prepared.runtime,
+    )
+
+
+def _run_stale_context_replan(
+    command: CliSessionRecordCommand,
+    *,
+    streams: CodingAgentSessionCliStreams,
+    context: CommandContext,
+    runtime: WorkspaceCodingAgentSessionRuntime,
+) -> int:
+    """Run an inspection-only replan turn before a separately acknowledged execution turn."""
+    session_id = command.session_id
+    prompt = command.prompt
+    if session_id is None or prompt is None:
+        msg = "stale-context replan command was not fully validated"
+        raise ValueError(msg)
+    gate = runtime.replan_safety_gate
+    if gate is None:
+        msg = "stale-context runtime omitted its replan safety gate"
+        raise RuntimeError(msg)
+    streams.stderr.write("session requires stale-context replan; inspect the current workspace before proposing work\n")
+    planning_result = asyncio.run(
+        runtime.run(
+            CodingAgentSessionCommand(
+                workspace_root=command.workspace_root,
+                prompt=(
+                    "The durable session context is stale. Inspect the current workspace using read_files or "
+                    "search_codebase, then provide a concise refreshed plan. Do not attempt commands or patches "
+                    "in this planning turn. Original request: "
+                    f"{prompt}"
+                ),
+            )
+        )
+    )
+    if gate.state is ReplanSafetyState.INSPECTION_REQUIRED:
+        streams.stderr.write("stale-context replan blocked: fresh workspace inspection was not completed\n")
+        return 3
+    summary = planning_result.tool_loop_result.output_text
+    if summary is None or not summary.strip():
+        streams.stderr.write("stale-context replan blocked: refreshed plan was not produced\n")
+        return 3
+    plan_digest = f"sha256:{hashlib.sha256(summary.encode()).hexdigest()}"
+    acknowledged = TerminalStaleContextReplanAcknowledgement(context.stdin, context.stdout, gate).acknowledge(
+        summary=summary,
+        plan_digest=plan_digest,
+    )
+    if not acknowledged:
+        streams.stderr.write("stale-context replan acknowledgement was not granted\n")
+        return 3
+    return run_coding_agent_session_cli_command(
+        CliCodingAgentSessionCommand(workspace_root=command.workspace_root, prompt=prompt),
+        streams=streams,
+        runtime=runtime,
     )
 
 

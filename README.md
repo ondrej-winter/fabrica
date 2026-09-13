@@ -58,7 +58,11 @@ uv run fabrica agent sessions resume SESSION_ID --workspace /path/to/workspace -
 Resume creates a fresh turn from completed durable evidence only. A matching
 workspace fingerprint permits normal resume; changed or unavailable fingerprints
 fail closed and require stale-context replanning rather than replaying historical
-actions or approvals. Optional `.fabricaignore` exclusions can reduce the
+actions or approvals. A stale-context replan first requires fresh `read_files` or
+`search_codebase` inspection, displays a digest-bound refreshed plan for a
+separate terminal acknowledgement, and then starts a new execution turn. That
+acknowledgement is not command or patch approval; each later side effect still
+requires its ordinary approval. Optional `.fabricaignore` exclusions can reduce the
 sensitivity of fingerprint comparison, so exclude only paths you accept as
 irrelevant to safe resume.
 
