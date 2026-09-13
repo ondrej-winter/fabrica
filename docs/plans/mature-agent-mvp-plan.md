@@ -189,7 +189,7 @@ tests/unit/features/agent_session/
 
 ### MAM-05 — Implement safe-boundary normal resume and stale-context replan
 
-- [ ] **MAM-05** Add resume orchestration that compares fingerprints, reconstructs
+- [x] **MAM-05** Add resume orchestration that compares fingerprints, reconstructs
       completed evidence into a fresh model turn for a match, and enters
       `stale_context` for a mismatch.
 
@@ -215,7 +215,7 @@ tests/unit/features/agent_session/
 
 ### MAM-06 — Add terminal session-record workflows
 
-- [ ] **MAM-06** Add CLI workflows to start persisted sessions and list, inspect,
+- [x] **MAM-06** Add CLI workflows to start persisted sessions and list, inspect,
       export, delete, and resume them; document `.fabricaignore` trade-offs in help.
 
 **Dependencies:** MAM-02, MAM-05.
@@ -240,7 +240,7 @@ tests/unit/features/agent_session/
 
 ### MAM-07 — Add deterministic reporting-only evaluation corpus
 
-- [ ] **MAM-07** Build versioned fixtures and rule-based transcript/tool/state
+- [x] **MAM-07** Build versioned fixtures and rule-based transcript/tool/state
       assertions for R7's six confirmed scenarios, then emit a deterministic report.
 
 **Dependencies:** MAM-04, MAM-05.
@@ -263,7 +263,7 @@ tests/unit/features/agent_session/
 
 ### MAM-08 — Document the sensitive-data and policy-only isolation posture
 
-- [ ] **MAM-08** Update project documentation with `.fabrica/` lifecycle and
+- [x] **MAM-08** Update project documentation with `.fabrica/` lifecycle and
       capture boundaries, resume/replan behavior, `.fabricaignore` warning, evaluation
       status, and the R9 threat model/policy-only isolation statement.
 
@@ -284,7 +284,7 @@ tests/unit/features/agent_session/
 
 ### MAM-09 — Complete full validation and handoff
 
-- [ ] **MAM-09** Run the configured project quality gate and record evidence.
+- [x] **MAM-09** Run the configured project quality gate and record evidence.
 
 **Dependencies:** MAM-01 through MAM-08.
 

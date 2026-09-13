@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from fabrica.bootstrap.cli.contracts import CliDependencyOverrides
+from fabrica.bootstrap.cli.features.agent_evaluation import run_agent_evaluation_command
 from fabrica.bootstrap.cli.features.agent_runtime import (
     run_agent_runtime_command,
     run_script_execute_command,
@@ -12,6 +13,8 @@ from fabrica.bootstrap.cli.features.agent_runtime import (
 )
 from fabrica.bootstrap.cli.features.coding_agent_session import run_coding_agent_session_command
 from fabrica.bootstrap.cli.features.developer_workflow import run_commit_message_command, run_confirmed_commit_command
+from fabrica.features.agent_evaluation.adapters.inbound.cli import register_agent_evaluation_cli_commands
+from fabrica.features.agent_evaluation.adapters.outbound import JsonEvaluationReportWriter
 from fabrica.features.agent_runtime.adapters.inbound.cli.registration import register_agent_runtime_cli_commands
 from fabrica.features.coding_agent_session.adapters.inbound.cli.registration import (
     register_coding_agent_session_cli_commands,
@@ -48,5 +51,9 @@ def create_cli_command_registrars(
         lambda subparsers: register_coding_agent_session_cli_commands(
             subparsers,
             agent_command=run_coding_agent_session_command(dependency_overrides.coding_agent_session_runtime),
+        ),
+        lambda subparsers: register_agent_evaluation_cli_commands(
+            subparsers,
+            evaluate_command=run_agent_evaluation_command(JsonEvaluationReportWriter()),
         ),
     )

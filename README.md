@@ -55,6 +55,16 @@ uv run fabrica agent sessions delete SESSION_ID --workspace /path/to/workspace
 uv run fabrica agent sessions resume SESSION_ID --workspace /path/to/workspace --prompt "Continue safely"
 ```
 
+Run the fixed, offline mature-agent evaluation corpus when you need a deterministic
+report of the six MVP session scenarios. It uses normalized fixture evidence only;
+it neither invokes a model nor reads credentials, and it is reporting-only rather
+than a release gate:
+
+```bash
+uv run fabrica agent-evaluate
+# Writes .reports/mature-agent-evaluation/report.json by default.
+```
+
 Resume creates a fresh turn from completed durable evidence only. A matching
 workspace fingerprint permits normal resume; changed or unavailable fingerprints
 fail closed and require stale-context replanning rather than replaying historical
@@ -65,6 +75,10 @@ acknowledgement is not command or patch approval; each later side effect still
 requires its ordinary approval. Optional `.fabricaignore` exclusions can reduce the
 sensitivity of fingerprint comparison, so exclude only paths you accept as
 irrelevant to safe resume.
+
+See [`docs/mature-agent-safety.md`](docs/mature-agent-safety.md) for the complete
+local-record lifecycle, evaluation fixture/report contract, and policy-only
+execution-isolation threat model.
 
 ## Interactive `ask_question` tool composition
 
