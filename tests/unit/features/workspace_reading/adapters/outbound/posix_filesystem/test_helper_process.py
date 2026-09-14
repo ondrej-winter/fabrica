@@ -1,6 +1,7 @@
 """Tests for one-request POSIX helper-process outcomes."""
 
 import asyncio
+import multiprocessing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -228,6 +229,23 @@ def test_supervisor_maps_malformed_output_and_cancellation_to_stable_failures(mo
     assert cancelled.error.code is ReadFileErrorCode.READ_CANCELLED
 
 
+def test_supervisor_maps_closed_helper_ipc_to_io_failure(monkeypatch, tmp_path: Path) -> None:
+    class EofParentConnection(ParentConnection):
+        def recv(self) -> object:
+            raise EOFError
+
+    parent = EofParentConnection(ready=True)
+    child = ChildConnection()
+    process = RecordingProcess()
+    monkeypatch.setattr(helper_process.multiprocessing, "Pipe", _pipe_factory(parent, child))
+    reader = helper_process.PosixHelperProcessFileReader(tmp_path, process_factory=lambda **_kwargs: process)
+
+    outcome = asyncio.run(reader.read_file(ReadFileRequest("source.py"), _context(NeverCancelled())))
+
+    assert isinstance(outcome, ReadFileFailure)
+    assert outcome.error.code is ReadFileErrorCode.IO_ERROR
+
+
 def test_supervisor_joins_an_exited_helper_without_terminating_it(monkeypatch, tmp_path: Path) -> None:
     parent = ParentConnection(
         ready=True, outcome=ReadFileFailure("source.py", ReadFileError(ReadFileErrorCode.NOT_FOUND))
@@ -311,6 +329,28 @@ def test_helper_translates_reader_exceptions_to_stable_failures(monkeypatch, tmp
         outcome = connection.sent[0]
         assert isinstance(outcome, ReadFileFailure)
         assert outcome.error.code is case.expected
+
+
+def test_helper_sends_failure_metadata_through_a_real_multiprocessing_pipe(tmp_path: Path) -> None:
+    (tmp_path / "source.txt").write_text("content", encoding="utf-8")
+    parent_connection, child_connection = multiprocessing.Pipe(duplex=False)
+    try:
+        helper_process.read_one_file_in_helper(
+            child_connection,
+            str(tmp_path),
+            ReadFileRequest("source.txt"),
+            image_input_supported=False,
+            limits=ReadFilesLimits(max_text_file_bytes=1),
+        )
+
+        outcome = parent_connection.recv()
+    finally:
+        parent_connection.close()
+        child_connection.close()
+
+    assert isinstance(outcome, ReadFileFailure)
+    assert outcome.error.code is ReadFileErrorCode.FILE_TOO_LARGE
+    assert outcome.error.metadata == {"size_bytes": 7, "max_size_bytes": 1}
 
 
 def _context(cancellation: NeverCancelled | Cancelled) -> WorkspaceReadContext:

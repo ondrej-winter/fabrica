@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from types import MappingProxyType
+from typing import Self
 
 DEFAULT_MAX_FILES_PER_CALL = 20
 DEFAULT_MAX_PARALLEL_READS = 8
@@ -154,6 +155,10 @@ class ReadFileError:
                 msg = "read error metadata values must be scalar and safe"
                 raise TypeError(msg)
         object.__setattr__(self, "metadata", MappingProxyType(metadata))
+
+    def __reduce__(self) -> tuple[type[Self], tuple[ReadFileErrorCode, str | None, dict[str, SafeReadMetadataValue]]]:
+        """Serialize immutable metadata as a plain mapping for process transport."""
+        return type(self), (self.code, self.message, dict(self.metadata))
 
 
 @dataclass(frozen=True, slots=True)

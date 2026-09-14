@@ -49,7 +49,7 @@ _CLASSIFICATION_BYTES = 8_192
 class HelperResultSender(Protocol):
     """Minimal serializable-outcome channel owned by one helper process."""
 
-    def send(self, outcome: ReadFileResult) -> None:
+    def send(self, outcome: ReadFileResult, /) -> None:
         """Send the helper's sole read outcome to its supervising parent."""
         ...
 
@@ -96,15 +96,19 @@ class PosixHelperProcessFileReader(WorkspaceFileReader):
         process.start()
         child_connection.close()
         try:
-            while True:
+            while process.is_alive() or parent_connection.poll():
                 if parent_connection.poll():
-                    outcome = parent_connection.recv()
-                    if not isinstance(outcome, (ReadFileFailure,)) and not hasattr(outcome, "path"):
+                    try:
+                        outcome = parent_connection.recv()
+                    except EOFError:
+                        return _failure(request, ReadFileErrorCode.IO_ERROR)
+                    if not isinstance(outcome, ReadFileFailure) and not hasattr(outcome, "path"):
                         return _failure(request, ReadFileErrorCode.IO_ERROR)
                     return outcome
                 if context.cancellation.is_cancelled:
                     return _failure(request, ReadFileErrorCode.READ_CANCELLED)
                 await asyncio.sleep(_POLL_INTERVAL_SECONDS)
+            return _failure(request, ReadFileErrorCode.IO_ERROR)
         finally:
             parent_connection.close()
             if process.is_alive():
