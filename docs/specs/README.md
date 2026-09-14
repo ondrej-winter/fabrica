@@ -56,6 +56,9 @@ replacing those technical details.
   for model-callable coding-agent workflows.
 - `tools-search-codebase-tool-spec.md` defines the read-only textual regex discovery
   primitive for locating relevant workspace file contents before reading files.
+- `tools-list-files-tool-spec.md` defines the draft, unaccepted read-only workspace
+  structure-discovery primitive. It is not implemented or part of the accepted
+  default coding-agent-session tool set.
 - `tools-apply-patch-tool-spec.md` defines the context-based workspace file mutation
   primitive for model-callable coding-agent workflows.
 - `tools-run-commands-tool-spec.md` defines the accepted non-interactive process

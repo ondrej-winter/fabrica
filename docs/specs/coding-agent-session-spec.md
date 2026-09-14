@@ -137,6 +137,10 @@ apply_patch
 
 - `read_files` and `search_codebase` are enabled as bounded, read-only workspace
   inspection primitives.
+- A proposed `list_files` structure-discovery primitive is documented in
+  [`tools-list-files-tool-spec.md`](tools-list-files-tool-spec.md). It is not
+  implemented or exposed by this accepted Version 1 tool set until that draft is
+  accepted and its composition is implemented.
 - `run_commands` is enabled only with the terminal host's explicit static policy,
   filtered environment, per-command approval, sandbox-preflight, timeout, and
   process supervision. Prohibited forms return `DENY`; every eligible command
