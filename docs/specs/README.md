@@ -8,6 +8,11 @@ ownership, validation expectations, and preserved historical decisions.
 
 ## Specification governance
 
+Repository-wide implementation and validation policy lives in `AGENTS.md` at the
+repository root. Older specifications refer to that policy under `.clinerules/`;
+it is now centralized in `AGENTS.md`. `.clinerules/` contains only Cline-specific
+execution mechanics. This relocation does not change specification contracts.
+
 Every `*-spec.md` is a canonical requirements artifact and follows the local
 `spec-driven-development` template. Each specification must record its status,
 acceptance evidence, revision, objective and context, explicit scope, assessable
