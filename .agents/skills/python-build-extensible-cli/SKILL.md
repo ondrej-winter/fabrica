@@ -2,7 +2,7 @@
 name: python-build-extensible-cli
 description: Build or refactor an extensible product CLI for a Python hexagonal vertical-slice project, with a feature-neutral shell, feature-owned command contributions, bootstrap-owned composition, stable exit semantics, and tests. Use when multiple feature slices need to contribute commands without leaking parser or process concerns into application or domain code.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   dependencies:
     tools:
       - name: uv
@@ -27,8 +27,8 @@ metadata:
       - name: write-adr
         purpose: Document intentional adapter-to-adapter extension-surface exceptions or other architecture decisions.
         required: false
-      - name: run-python-quality-gate
-        purpose: Run formatting, linting, type checking, and tests before handoff.
+      - name: run-local-quality-gate
+        purpose: Discover and run the complete repository-defined validation pass before handoff.
         required: false
 ---
 
@@ -261,7 +261,8 @@ Useful checks include:
 - `uv run ty check .`
 - `uv run pytest`
 
-When available, use `run-python-quality-gate` for the full validation pass.
+When available, use `run-local-quality-gate` for the full repository-defined
+validation pass.
 
 ## Review checklist
 

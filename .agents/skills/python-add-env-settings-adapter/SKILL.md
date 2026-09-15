@@ -2,7 +2,7 @@
 name: python-add-env-settings-adapter
 description: Add an environment-backed runtime settings adapter to a Python hexagonal vertical-slice app or library, using a configuration slice, application-owned settings DTOs, pydantic-settings adapter validation, and focused tests.
 metadata:
-  version: "1.0.1"
+  version: "1.1.0"
   dependencies:
     tools:
       - name: python
@@ -20,15 +20,15 @@ metadata:
       - name: ruff
         purpose: Lint the resulting Python implementation when available.
         required: false
-      - name: mypy
-        purpose: Type-check the resulting Python implementation when available.
+      - name: type-checker
+        purpose: Type-check the resulting Python implementation with the project's configured tool when available.
         required: false
     skills:
       - name: python-add-adapter
         purpose: Add an adapter when the configuration boundary already exists.
         required: false
-      - name: run-python-quality-gate
-        purpose: Run the full Python validation pass when available.
+      - name: run-local-quality-gate
+        purpose: Run the repository-defined full validation pass when available.
         required: false
       - name: update-project-docs
         purpose: Update user-facing and operator-facing configuration documentation.
@@ -261,15 +261,17 @@ decision.
 
 Run focused tests first, then the repository quality gate.
 
-Preferred order:
+Discover and follow the repository-defined commands. A common order is:
 
 1. settings DTO and env adapter tests,
 2. `uv run ruff check .`,
-3. `uv run mypy .`,
-4. `uv run pytest`.
+3. the configured type checker, such as `uv run ty check src tests`,
+4. configured import-boundary or architecture checks,
+5. `uv run pytest`.
 
-When available, use `run-python-quality-gate` for the full Python validation
-pass.
+When available, use `run-local-quality-gate` for the complete repository-defined
+validation pass. Do not replace an established project type checker with `mypy`
+or omit architecture checks configured by the project.
 
 ## Design checklist
 

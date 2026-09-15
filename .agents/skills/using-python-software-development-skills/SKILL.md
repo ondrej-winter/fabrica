@@ -2,7 +2,7 @@
 name: using-python-software-development-skills
 description: Discover and invoke Python software development skills. Use when starting Python work or deciding which Python-specific implementation, validation, testing, or documentation skill applies.
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   dependencies:
     tools: []
     skills:
@@ -31,7 +31,10 @@ metadata:
         purpose: Route shared product CLI shell and multi-feature command contribution work.
         required: false
       - name: run-python-quality-gate
-        purpose: Route the complete Python formatting, linting, type-checking, and test quality gate.
+        purpose: Route Python work into the repository-defined complete local quality gate.
+        required: false
+      - name: run-local-quality-gate
+        purpose: Discover and execute all repository-defined validation commands before handoff.
         required: false
       - name: run-python-tests
         purpose: Route Python pytest execution work.
@@ -82,7 +85,7 @@ Python task arrives
 - Running Python tests: run-python-tests
 - Formatting Python code: format-python-code
 - Linting or type checking Python code: lint-python-code
-- Running the complete Python quality gate: run-python-quality-gate
+- Running the complete repository quality gate: run-local-quality-gate
 - Adding Python docstrings or useful comments: write-python-docstrings
 ```
 
@@ -99,5 +102,7 @@ Python task arrives
   environment variables, `.env` files, or runtime settings objects.
 - Use `write-pytest-tests` for test design and structure, then
   `run-python-tests` for execution.
-- Use `run-python-quality-gate` for the complete pre-handoff validation sequence.
+- Use `run-local-quality-gate` for the complete pre-handoff validation sequence.
+  Use `run-python-quality-gate` only as a Python-specific routing alias when the
+  environment requires it.
 - Use `format-python-code` before `lint-python-code` when both are needed.

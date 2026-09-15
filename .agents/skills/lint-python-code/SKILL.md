@@ -1,8 +1,8 @@
 ---
 name: lint-python-code
-description: Run project-configured Python linting and type checking with Ruff and mypy when a project uses uv-managed development tooling.
+description: Run project-configured Python linting, type checking, and architecture checks when a Python project uses uv-managed development tooling.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   dependencies:
     tools:
       - name: uv
@@ -11,32 +11,34 @@ metadata:
       - name: ruff
         purpose: Check Python code for lint violations.
         required: true
-      - name: mypy
-        purpose: Perform static type checking.
+      - name: type-checker
+        purpose: Run the static type checker configured by the target project, such as ty or mypy.
         required: true
     skills: []
 ---
 
 # Lint Python Code
 
-Use this skill when a Python project is configured to run Ruff for linting and
-`mypy` for static type checking through `uv`.
+Use this skill when a Python project needs its configured lint, type-check, and
+optional import-boundary or architecture checks run through `uv`.
 
 ## Prerequisites
 
 - `uv` is installed and configured for the project.
-- Ruff and `mypy` are installed as development dependencies.
-- The project includes configuration for Ruff and `mypy`, such as in
-  `pyproject.toml` or tool-specific configuration files.
+- Ruff and the project's selected type checker are installed as development
+  dependencies.
+- The project includes configuration for its lint, type-check, and any
+  architecture-validation tools.
 
 ## Steps
 
 ### 1. Discover the project commands and targets
 
 Inspect `pyproject.toml`, project documentation, and existing task definitions.
-Use the project's lint and type-check commands when they are defined. Otherwise,
-use the fallback commands below with the narrowest configured source and test
-paths.
+Use the project's documented or task-runner commands when they are defined. Do
+not replace an established type checker or architecture check with a generic
+fallback. If no command is documented, inspect `pyproject.toml` and tool-specific
+configuration to identify the selected tools and targets.
 
 ### 2. Run Ruff linting
 
@@ -46,17 +48,33 @@ uv run ruff check .
 
 This command checks for linting errors without applying auto-fixes.
 
-### 3. Run mypy type checking
+### 3. Run the configured type checker
+
+Use the configured project command. Common examples are:
 
 ```bash
+uv run ty check src tests
 uv run mypy .
 ```
 
-This command performs static type checking on the Python codebase.
+Use only the command for the tool selected by the project. Prefer `ty` when the
+project has not selected a type checker and its supported Python version is
+compatible.
 
-### 4. Verify and report the result
+### 4. Run configured architecture checks
 
-After fixing any failures, re-run both project-configured checks. Report the
+If the project defines import-boundary or architecture validation, run it as part
+of linting. For example:
+
+```bash
+uv run lint-imports
+```
+
+Do not weaken architecture contracts to make the check pass.
+
+### 5. Verify and report the result
+
+After fixing any failures, re-run all project-configured checks. Report the
 commands and targets used, whether each check passed, and any check that could not
 run with the reason.
 
@@ -67,8 +85,11 @@ run with the reason.
   comments unless the suppression is explicitly justified.
 - Do not disable lint rules to silence violations. Prefer refactoring the code to
   satisfy the rule.
-- Read `mypy` errors and fix the type annotations or logic that caused them. Use
-  `# type: ignore[<code>]` only at narrowly scoped boundaries to genuinely untyped
-  third-party code, and document the reason.
-- If a `mypy` error reflects a genuine design issue, such as a wrong return type
-  or missing protocol method, fix the design rather than suppressing the error.
+- Read type-checker errors and fix the annotations or logic that caused them. Use
+  the selected tool's narrowly scoped suppression syntax only at genuine untyped
+  boundaries, and document the reason.
+- If a type error reflects a design issue, such as a wrong return type or missing
+  protocol method, fix the design rather than suppressing the error.
+- Read architecture-check failures as dependency-boundary violations. Fix the
+  import direction or ownership issue rather than deleting or loosening a
+  contract without an explicit architectural decision.

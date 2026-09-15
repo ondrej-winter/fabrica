@@ -2,7 +2,7 @@
 name: python-add-adapter
 description: Add an inbound or outbound adapter to the owning vertical slice in a Python hexagonal project while keeping business logic in the application layer.
 metadata:
-  version: "1.0.1"
+  version: "1.1.0"
   dependencies:
     tools: []
     skills:
@@ -15,8 +15,8 @@ metadata:
       - name: add-hexagonal-feature
         purpose: Implement a complete feature slice when the change extends beyond adapter work.
         required: false
-      - name: run-python-quality-gate
-        purpose: Run the full project-configured Python validation pass before handoff.
+      - name: run-local-quality-gate
+        purpose: Discover and run the full repository-defined validation pass before handoff.
         required: false
 ---
 
@@ -155,11 +155,12 @@ Useful checks often include:
 
 - adapter unit or integration tests for the changed adapter path
 - `uv run ruff check .`
-- `uv run mypy .`
+- the project's configured type-check command, such as `uv run ty check src tests`
+- configured import-boundary or architecture checks
 - `uv run pytest`
 
-When available, use `run-python-quality-gate` for the full Python validation pass
-before handoff.
+When available, use `run-local-quality-gate` for the complete repository-defined
+validation pass before handoff.
 
 ## Related skills
 
