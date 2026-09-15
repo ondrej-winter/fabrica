@@ -1,11 +1,12 @@
 # Cline bootstrap
 
-Read and follow `AGENTS.md` at the repository root before working in this
-repository. Resolve that path from the repository root, not its parent directory.
+`AGENTS.md` at the repository root is the canonical repository policy. Read and
+follow it before working in this repository.
 
-Follow the task-procedure guidance in the repository-root `AGENTS.md`. Repository-specific
-architecture, toolchain, safety, and project-state constraints there take
-precedence over generic defaults in reusable skills.
+Follow its task-procedure guidance. Its repository-specific architecture,
+toolchain, safety, and project-state constraints take precedence over generic
+defaults in reusable skills.
 
-Keep repository policy in the repository-root `AGENTS.md`. This directory contains only
-Cline-specific operating mechanics; do not duplicate repository policy here.
+Keep repository policy in `AGENTS.md` and task procedures in `.agents/skills/`.
+Keep only Cline-specific operating mechanics in this directory; do not duplicate
+those other sources here.

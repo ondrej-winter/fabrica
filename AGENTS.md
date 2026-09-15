@@ -263,10 +263,10 @@ identify and follow the most specific matching `.agents/skills/<skill>/SKILL.md`
 The directory is the authoritative skill catalog; do not maintain an inventory
 here.
 
-- Use `using-agnostic-software-development-skills/SKILL.md` for shared workflow
-  discovery and skill selection.
-- Use `using-python-software-development-skills/SKILL.md` alongside it for
-  Python-specific skill selection and workflow guidance.
+- Use `.agents/skills/using-agnostic-software-development-skills/SKILL.md` for
+  shared workflow discovery and skill selection.
+- Use `.agents/skills/using-python-software-development-skills/SKILL.md` alongside
+  it for Python-specific skill selection and workflow guidance.
 - Before editing skills, check `ritebook.toml` and `ritebook.lock` for synchronized
   ownership and recorded sources. Keep Fabrica-specific overrides here; update
   synchronized skills at their source and resynchronize them, or obtain explicit
