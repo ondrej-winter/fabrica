@@ -10,6 +10,7 @@ at the repository root.
   host interaction mechanism instead.
 - Prefer direct, readable one-line commands. Do not stream multiline scripts into
   a shell or interpreter, including through heredocs or piped standard input.
+  Ordinary non-interactive pipelines between commands remain allowed.
 - In Act mode, when a non-trivial helper script is necessary, create it with a
   file-writing tool under the ignored `.tmp/cline/` directory. Use a descriptive
   filename and execute it with an explicit command containing its absolute path.

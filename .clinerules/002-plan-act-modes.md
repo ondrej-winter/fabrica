@@ -13,7 +13,8 @@ switch overrides the mode used for earlier messages.
 
 ## Act mode
 
+- Act-mode rules also apply when the client reports Yolo mode.
 - Before editing, re-check Git status and re-read the affected files if they may
   have changed since planning.
-- Apply the approved work while continuing to follow `AGENTS.md`, the selected
-  task procedures, and all command-safety constraints.
+- Apply the requested or approved work while continuing to follow `AGENTS.md`,
+  the selected task procedures, and all command-safety constraints.

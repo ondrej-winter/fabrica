@@ -1,12 +1,20 @@
 # Fabrica agent instructions
 
 This file is the canonical repository policy for coding agents working on Fabrica.
-Paths and commands below are relative to the repository root. Keep shared policy
-here, Cline-specific execution mechanics in `.clinerules/`, and task procedures in
-`.agents/skills/`.
+Paths and commands below are relative to the repository root.
 
-For Fabrica-specific architecture, toolchain, safety, and project-state constraints,
-this file takes precedence over generic defaults in reusable skills.
+## Instruction ownership and precedence
+
+- `AGENTS.md` owns durable Fabrica-specific architecture, toolchain, safety,
+  validation, and project-state policy that applies across coding agents.
+- `.clinerules/` owns only Cline-specific host, tool, command-execution, and
+  Plan/Act mode mechanics. It must not duplicate or redefine repository policy.
+- `.agents/skills/` owns on-demand procedures for particular task types. Skills
+  describe how to perform work; they must not become the only source of an
+  always-on repository constraint.
+- For repository-local instructions, this file takes precedence over generic
+  defaults in reusable skills. Cline rules may further constrain how Cline
+  operates, but they do not override repository policy.
 
 ## Repository and project state
 
@@ -260,14 +268,14 @@ pre-existing failure clearly.
 
 Task-specific procedures live under `.agents/skills/`. Before starting a task,
 identify and follow the most specific matching `.agents/skills/<skill>/SKILL.md`.
-The directory is the authoritative skill catalog; do not maintain an inventory
-here.
+The directory is the authoritative skill catalog; do not duplicate its inventory
+or detailed procedures here.
 
 - Use `.agents/skills/using-agnostic-software-development-skills/SKILL.md` for
   shared workflow discovery and skill selection.
 - Use `.agents/skills/using-python-software-development-skills/SKILL.md` alongside
   it for Python-specific skill selection and workflow guidance.
 - Before editing skills, check `ritebook.toml` and `ritebook.lock` for synchronized
-  ownership and recorded sources. Keep Fabrica-specific overrides here; update
-  synchronized skills at their source and resynchronize them, or obtain explicit
-  approval for a documented local exception. Preserve unrelated local skill edits.
+  ownership and recorded sources. Update synchronized skills at their source and
+  resynchronize them, or obtain explicit approval for a documented local
+  exception. Preserve unrelated local skill edits.
